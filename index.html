@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KnowledgeForge - Enterprise Knowledge Graph Platform</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <h2>KnowledgeForge</h2>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="#features">Features</a></li>
+                <li><a href="#how-it-works">How It Works</a></li>
+                <li><a href="#security">Security</a></li>
+                <li><a href="#contact" class="cta-button">Get Started</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <div class="hero-content">
+                <h1>Transform Your Enterprise Data Into Intelligent Knowledge Networks</h1>
+                <p class="hero-subtitle">Securely convert Excel files, PDFs, databases, and enterprise systems into queryable knowledge graphs that unlock hidden business insights - all running on your own infrastructure.</p>
+                <div class="hero-buttons">
+                    <button class="btn-primary">Start Free Trial</button>
+                    <button class="btn-secondary">Watch Demo</button>
+                </div>
+            </div>
+            
+            <!-- Data Flow Visualization -->
+            <div class="hero-visual">
+                <div class="data-sources">
+                    <div class="source-item excel">
+                        <div class="file-icon excel-icon"></div>
+                        <span>Customer.xls</span>
+                    </div>
+                    <div class="source-item excel">
+                        <div class="file-icon excel-icon"></div>
+                        <span>Orders.xls</span>
+                    </div>
+                    <div class="source-item database">
+                        <div class="file-icon db-icon"></div>
+                        <span>Database x</span>
+                    </div>
+                    <div class="source-item sap">
+                        <div class="file-icon sap-icon"></div>
+                        <span>SAP</span>
+                    </div>
+                </div>
+                
+                <div class="flow-arrow">
+                    <div class="processing-step">
+                        <div class="chat-interface">
+                            <div class="chat-header">Manual Curation</div>
+                            <div class="chat-content">
+                                <div class="message">Merge customer data?</div>
+                                <div class="message user">Yes, link to orders</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="knowledge-output">
+                    <div class="knowledge-graph">
+                        <div class="graph-container">
+                            <div class="node person" data-label="John"></div>
+                            <div class="node team" data-label="Team A"></div>
+                            <div class="node client" data-label="Client B"></div>
+                            <div class="node project" data-label="Project Q"></div>
+                            
+                            <div class="edge" data-from="person" data-to="team" data-label="Works_on"></div>
+                            <div class="edge" data-from="client" data-to="team" data-label="client_of"></div>
+                            <div class="edge" data-from="team" data-to="project" data-label="Works_on"></div>
+                        </div>
+                        
+                        <div class="analytics-panel">
+                            <div class="chart">
+                                <div class="bar" style="height: 30%"></div>
+                                <div class="bar" style="height: 60%"></div>
+                                <div class="bar" style="height: 45%"></div>
+                                <div class="bar" style="height: 80%"></div>
+                                <div class="bar" style="height: 55%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features">
+        <div class="container">
+            <h2>Comprehensive Data Integration & Intelligence</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3>Multi-Format Support</h3>
+                    <p>Import from Excel, PDF, CSV, databases, SAP, and other enterprise systems with intelligent parsing and data normalization.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🧠</div>
+                    <h3>Expert-Driven Curation</h3>
+                    <p>Human-in-the-loop approach ensures accuracy through manual review, merging, and validation by subject matter experts.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔍</div>
+                    <h3>Intelligent Querying</h3>
+                    <p>Query specific nodes to discover hidden relationships and extract business knowledge that drives strategic decisions.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔒</div>
+                    <h3>On-Premise Security</h3>
+                    <p>Deploy locally on your infrastructure with complete data sovereignty and compliance with enterprise security requirements.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Cluster Scalability</h3>
+                    <p>Scale across multiple servers while maintaining local control, with built-in redundancy and high availability.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📈</div>
+                    <h3>Business Analytics</h3>
+                    <p>Transform complex graph relationships into actionable insights through interactive dashboards and visualizations.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works Section -->
+    <section id="how-it-works" class="how-it-works">
+        <div class="container">
+            <h2>From Data Silos to Unified Intelligence</h2>
+            <div class="process-steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h3>Data Ingestion</h3>
+                    <p>Connect and import from multiple enterprise data sources including files, databases, and systems.</p>
+                </div>
+                <div class="process-arrow">→</div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h3>Expert Curation</h3>
+                    <p>Subject matter experts review, merge, and validate relationships to ensure accuracy and business relevance.</p>
+                </div>
+                <div class="process-arrow">→</div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h3>Knowledge Creation</h3>
+                    <p>Build sophisticated knowledge graphs that capture complex business relationships and hierarchies.</p>
+                </div>
+                <div class="process-arrow">→</div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <h3>Intelligent Insights</h3>
+                    <p>Query nodes and discover patterns to unlock business knowledge and drive strategic decisions.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Security Section -->
+    <section id="security" class="security">
+        <div class="container">
+            <div class="security-content">
+                <div class="security-text">
+                    <h2>Enterprise-Grade Security & Compliance</h2>
+                    <ul class="security-features">
+                        <li>✅ Complete on-premise deployment</li>
+                        <li>✅ Data sovereignty and local control</li>
+                        <li>✅ GDPR, HIPAA, and industry compliance</li>
+                        <li>✅ Enterprise authentication integration</li>
+                        <li>✅ Audit trails and version control</li>
+                        <li>✅ Cluster redundancy and backup</li>
+                    </ul>
+                </div>
+                <div class="security-visual">
+                    <div class="cluster-diagram">
+                        <div class="server-node">Server 1</div>
+                        <div class="server-node">Server 2</div>
+                        <div class="server-node">Server 3</div>
+                        <div class="security-shield">🛡️</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta">
+        <div class="container">
+            <h2>Ready to Transform Your Enterprise Data?</h2>
+            <p>Join leading organizations who have unlocked hidden business insights through intelligent knowledge graphs.</p>
+            <div class="cta-buttons">
+                <button class="btn-primary large">Schedule Demo</button>
+                <button class="btn-secondary large">Download Whitepaper</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>KnowledgeForge</h4>
+                    <p>Enterprise Knowledge Graph Platform</p>
+                </div>
+                <div class="footer-section">
+                    <h5>Product</h5>
+                    <ul>
+                        <li><a href="#">Features</a></li>
+                        <li><a href="#">Security</a></li>
+                        <li><a href="#">Integration</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h5>Company</h5>
+                    <ul>
+                        <li><a href="#">About</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html> 
