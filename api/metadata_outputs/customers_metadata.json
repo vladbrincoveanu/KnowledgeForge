@@ -1,0 +1,337 @@
+{
+  "file_info": {
+    "file_name": "customers.csv",
+    "file_path": "/Users/iuliarinea/Desktop/Coding/KnowledgeForge/api/sample_data/customers.csv",
+    "file_size_bytes": 1697,
+    "file_size_mb": 0.0016183853149414062,
+    "last_modified": "2025-07-27T16:45:33.216255",
+    "total_rows": 10,
+    "total_columns": 17,
+    "has_duplicates": false,
+    "duplicate_rows_count": 0,
+    "extraction_timestamp": "2025-07-27T17:03:25.798213"
+  },
+  "columns": {
+    "customer_id": {
+      "position": 0,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "integer",
+      "subtype": "int64",
+      "nullable": false,
+      "unique_count": 10,
+      "min_value": 1001,
+      "max_value": 1010,
+      "sample_values": [
+        1001,
+        1002,
+        1003,
+        1004,
+        1005
+      ]
+    },
+    "first_name": {
+      "position": 1,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "string",
+      "subtype": "object",
+      "nullable": false,
+      "unique_count": 10,
+      "max_length": 11,
+      "sample_values": [
+        "John",
+        "Sarah",
+        "Michael",
+        "Emily",
+        "David"
+      ]
+    },
+    "last_name": {
+      "position": 2,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "string",
+      "subtype": "object",
+      "nullable": false,
+      "unique_count": 10,
+      "max_length": 8,
+      "sample_values": [
+        "Smith",
+        "Johnson",
+        "Brown",
+        "Davis",
+        "Wilson"
+      ]
+    },
+    "email": {
+      "position": 3,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "string",
+      "subtype": "object",
+      "nullable": false,
+      "unique_count": 10,
+      "max_length": 30,
+      "sample_values": [
+        "john.smith@email.com",
+        "sarah.johnson@email.com",
+        "michael.brown@email.com",
+        "emily.davis@email.com",
+        "david.wilson@email.com"
+      ]
+    },
+    "phone": {
+      "position": 4,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "string",
+      "subtype": "object",
+      "nullable": false,
+      "unique_count": 10,
+      "max_length": 11,
+      "sample_values": [
+        "+1-555-0001",
+        "+1-555-0002",
+        "+1-555-0003",
+        "+1-555-0004",
+        "+1-555-0005"
+      ]
+    },
+    "date_of_birth": {
+      "position": 5,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "datetime",
+      "subtype": "datetime64[ns]",
+      "nullable": false,
+      "unique_count": 10,
+      "min_value": "1985-03-15",
+      "max_value": "1994-05-07",
+      "sample_values": [
+        "1985-03-15",
+        "1990-07-22",
+        "1988-11-08",
+        "1992-04-12",
+        "1987-09-30"
+      ]
+    },
+    "gender": {
+      "position": 6,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "string",
+      "subtype": "object",
+      "nullable": false,
+      "unique_count": 2,
+      "max_length": 6,
+      "sample_values": [
+        "Male",
+        "Female",
+        "Male",
+        "Female",
+        "Male"
+      ]
+    },
+    "address": {
+      "position": 7,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "string",
+      "subtype": "object",
+      "nullable": false,
+      "unique_count": 10,
+      "max_length": 16,
+      "sample_values": [
+        "123 Main Street",
+        "456 Oak Avenue",
+        "789 Pine Road",
+        "321 Elm Street",
+        "654 Maple Drive"
+      ]
+    },
+    "city": {
+      "position": 8,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "string",
+      "subtype": "object",
+      "nullable": false,
+      "unique_count": 10,
+      "max_length": 12,
+      "sample_values": [
+        "New York",
+        "Los Angeles",
+        "Chicago",
+        "Houston",
+        "Phoenix"
+      ]
+    },
+    "state": {
+      "position": 9,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "string",
+      "subtype": "object",
+      "nullable": false,
+      "unique_count": 6,
+      "max_length": 2,
+      "sample_values": [
+        "NY",
+        "CA",
+        "IL",
+        "TX",
+        "AZ"
+      ]
+    },
+    "zip_code": {
+      "position": 10,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "integer",
+      "subtype": "int64",
+      "nullable": false,
+      "unique_count": 10,
+      "min_value": 10001,
+      "max_value": 95101,
+      "sample_values": [
+        10001,
+        90210,
+        60601,
+        77001,
+        85001
+      ]
+    },
+    "country": {
+      "position": 11,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "string",
+      "subtype": "object",
+      "nullable": false,
+      "unique_count": 1,
+      "max_length": 3,
+      "sample_values": [
+        "USA",
+        "USA",
+        "USA",
+        "USA",
+        "USA"
+      ]
+    },
+    "registration_date": {
+      "position": 12,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "datetime",
+      "subtype": "datetime64[ns]",
+      "nullable": false,
+      "unique_count": 10,
+      "min_value": "2022-01-15",
+      "max_value": "2022-10-03",
+      "sample_values": [
+        "2022-01-15",
+        "2022-02-20",
+        "2022-03-10",
+        "2022-04-05",
+        "2022-05-18"
+      ]
+    },
+    "is_active": {
+      "position": 13,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "boolean",
+      "subtype": "bool",
+      "nullable": false,
+      "unique_count": 2,
+      "sample_values": [
+        true,
+        true,
+        true,
+        false,
+        true
+      ]
+    },
+    "total_orders": {
+      "position": 14,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "integer",
+      "subtype": "int64",
+      "nullable": false,
+      "unique_count": 7,
+      "min_value": 2,
+      "max_value": 8,
+      "sample_values": [
+        5,
+        3,
+        7,
+        2,
+        4
+      ]
+    },
+    "last_order_date": {
+      "position": 15,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "datetime",
+      "subtype": "datetime64[ns]",
+      "nullable": false,
+      "unique_count": 10,
+      "min_value": "2023-10-15",
+      "max_value": "2023-12-05",
+      "sample_values": [
+        "2023-12-01",
+        "2023-11-28",
+        "2023-12-05",
+        "2023-10-15",
+        "2023-11-20"
+      ]
+    },
+    "preferred_payment_method": {
+      "position": 16,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "string",
+      "subtype": "object",
+      "nullable": false,
+      "unique_count": 4,
+      "max_length": 13,
+      "sample_values": [
+        "Credit Card",
+        "PayPal",
+        "Bank Transfer",
+        "Credit Card",
+        "PayPal"
+      ]
+    }
+  },
+  "schema_summary": {
+    "numeric_columns_count": 0,
+    "categorical_columns_count": 0,
+    "datetime_columns_count": 0,
+    "boolean_columns_count": 0,
+    "numeric_columns": [],
+    "categorical_columns": [],
+    "datetime_columns": [],
+    "boolean_columns": []
+  }
+}

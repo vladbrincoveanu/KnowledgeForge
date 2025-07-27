@@ -1,0 +1,268 @@
+{
+  "file_info": {
+    "file_name": "products.csv",
+    "file_path": "/Users/iuliarinea/Desktop/Coding/KnowledgeForge/api/sample_data/products.csv",
+    "file_size_bytes": 1276,
+    "file_size_mb": 0.001216888427734375,
+    "last_modified": "2025-07-27T16:44:58.390388",
+    "total_rows": 10,
+    "total_columns": 13,
+    "has_duplicates": false,
+    "duplicate_rows_count": 0,
+    "extraction_timestamp": "2025-07-27T17:03:17.379249"
+  },
+  "columns": {
+    "product_id": {
+      "position": 0,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "integer",
+      "subtype": "int64",
+      "nullable": false,
+      "unique_count": 10,
+      "min_value": 1,
+      "max_value": 10,
+      "sample_values": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    "name": {
+      "position": 1,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "string",
+      "subtype": "object",
+      "nullable": false,
+      "unique_count": 10,
+      "max_length": 20,
+      "sample_values": [
+        "Laptop Pro",
+        "Wireless Mouse",
+        "Office Chair",
+        "Desk Lamp",
+        "Notebook Set"
+      ]
+    },
+    "price": {
+      "position": 2,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "float",
+      "subtype": "float64",
+      "nullable": false,
+      "unique_count": 10,
+      "min_value": 12.99,
+      "max_value": 1299.99,
+      "sample_values": [
+        1299.99,
+        29.99,
+        299.99,
+        49.99,
+        15.5
+      ]
+    },
+    "category": {
+      "position": 3,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "string",
+      "subtype": "object",
+      "nullable": false,
+      "unique_count": 3,
+      "max_length": 11,
+      "sample_values": [
+        "Electronics",
+        "Electronics",
+        "Furniture",
+        "Furniture",
+        "Office"
+      ]
+    },
+    "stock": {
+      "position": 4,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "integer",
+      "subtype": "int64",
+      "nullable": false,
+      "unique_count": 10,
+      "min_value": 12,
+      "max_value": 200,
+      "sample_values": [
+        45,
+        120,
+        25,
+        80,
+        200
+      ]
+    },
+    "weight": {
+      "position": 5,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "float",
+      "subtype": "float64",
+      "nullable": false,
+      "unique_count": 10,
+      "min_value": 0.1,
+      "max_value": 45.0,
+      "sample_values": [
+        2.5,
+        0.2,
+        15.0,
+        1.8,
+        0.5
+      ]
+    },
+    "is_available": {
+      "position": 6,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "boolean",
+      "subtype": "bool",
+      "nullable": false,
+      "unique_count": 1,
+      "sample_values": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    },
+    "created_date": {
+      "position": 7,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "datetime",
+      "subtype": "datetime64[ns]",
+      "nullable": false,
+      "unique_count": 10,
+      "min_value": "2023-01-15",
+      "max_value": "2023-09-05",
+      "sample_values": [
+        "2023-01-15",
+        "2023-02-10",
+        "2023-03-05",
+        "2023-01-20",
+        "2023-04-12"
+      ]
+    },
+    "last_updated": {
+      "position": 8,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "datetime",
+      "subtype": "datetime64[ns]",
+      "nullable": false,
+      "unique_count": 10,
+      "min_value": "2023-11-15",
+      "max_value": "2023-12-10",
+      "sample_values": [
+        "2023-12-01",
+        "2023-11-15",
+        "2023-12-05",
+        "2023-11-20",
+        "2023-12-10"
+      ]
+    },
+    "description": {
+      "position": 9,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "string",
+      "subtype": "object",
+      "nullable": false,
+      "unique_count": 10,
+      "max_length": 43,
+      "sample_values": [
+        "High-performance laptop with 16GB RAM",
+        "Ergonomic wireless mouse",
+        "Ergonomic office chair with lumbar support",
+        "LED desk lamp with adjustable brightness",
+        "Premium notebook set with 5 notebooks"
+      ]
+    },
+    "supplier_id": {
+      "position": 10,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "integer",
+      "subtype": "int64",
+      "nullable": false,
+      "unique_count": 5,
+      "min_value": 101,
+      "max_value": 105,
+      "sample_values": [
+        101,
+        102,
+        103,
+        104,
+        105
+      ]
+    },
+    "rating": {
+      "position": 11,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "float",
+      "subtype": "float64",
+      "nullable": false,
+      "unique_count": 9,
+      "min_value": 4.0,
+      "max_value": 4.8,
+      "sample_values": [
+        4.5,
+        4.2,
+        4.7,
+        4.3,
+        4.1
+      ]
+    },
+    "reviews_count": {
+      "position": 12,
+      "total_count": 10,
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "type": "integer",
+      "subtype": "int64",
+      "nullable": false,
+      "unique_count": 10,
+      "min_value": 23,
+      "max_value": 156,
+      "sample_values": [
+        127,
+        89,
+        56,
+        34,
+        23
+      ]
+    }
+  },
+  "schema_summary": {
+    "numeric_columns_count": 0,
+    "categorical_columns_count": 0,
+    "datetime_columns_count": 0,
+    "boolean_columns_count": 0,
+    "numeric_columns": [],
+    "categorical_columns": [],
+    "datetime_columns": [],
+    "boolean_columns": []
+  }
+}

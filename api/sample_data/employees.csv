@@ -1,0 +1,11 @@
+id,name,age,salary,department,hire_date,is_active,rating,email,phone,address,city,country,manager_id,skills
+1,John Doe,30,75000.50,Engineering,2023-01-15,true,4.5,john.doe@company.com,+1-555-0101,"123 Main St",New York,USA,5,"Python,Java,SQL"
+2,Jane Smith,28,82000.75,Marketing,2023-02-20,true,4.8,jane.smith@company.com,+1-555-0102,"456 Oak Ave",Los Angeles,USA,3,"Digital Marketing,SEO,Analytics"
+3,Bob Johnson,35,95000.25,Engineering,2022-11-10,false,3.9,bob.johnson@company.com,+1-555-0103,"789 Pine Rd",Chicago,USA,5,"C++,Python,JavaScript"
+4,Alice Brown,32,78000.00,Sales,2023-03-05,true,4.2,alice.brown@company.com,+1-555-0104,"321 Elm St",Houston,USA,2,"Sales,CRM,Negotiation"
+5,Charlie Wilson,29,65000.50,Marketing,2023-04-12,true,4.6,charlie.wilson@company.com,+1-555-0105,"654 Maple Dr",Phoenix,USA,3,"Social Media,Content Creation"
+6,Diana Davis,31,88000.75,Engineering,2022-12-01,true,4.7,diana.davis@company.com,+1-555-0106,"987 Cedar Ln",Philadelphia,USA,5,"React,Node.js,TypeScript"
+7,Edward Miller,27,72000.25,Sales,2023-05-18,false,3.8,edward.miller@company.com,+1-555-0107,"147 Birch Way",San Antonio,USA,2,"Lead Generation,Closing"
+8,Fiona Garcia,33,92000.00,Engineering,2023-01-30,true,4.9,fiona.garcia@company.com,+1-555-0108,"258 Spruce Ct",San Diego,USA,5,"Machine Learning,Python,TensorFlow"
+9,George Lee,26,68000.50,Marketing,2023-06-22,true,4.1,george.lee@company.com,+1-555-0109,"369 Willow Pl",Dallas,USA,3,"PPC,Google Ads,Analytics"
+10,Helen Chen,34,105000.75,Engineering,2022-10-15,true,4.4,helen.chen@company.com,+1-555-0110,"741 Aspen St",San Jose,USA,5,"Data Science,R,Python" 

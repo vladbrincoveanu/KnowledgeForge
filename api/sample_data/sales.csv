@@ -1,0 +1,11 @@
+sale_id,customer_id,product_id,quantity,total_amount,sale_date,payment_method,shipping_address,order_status,delivery_date,returned,refund_amount
+1,1001,1,1,1299.99,2023-01-15,Credit Card,"123 Main St, New York, NY 10001",Delivered,2023-01-18,false,0.00
+2,1002,3,2,599.98,2023-01-16,PayPal,"456 Oak Ave, Los Angeles, CA 90210",Delivered,2023-01-20,false,0.00
+3,1003,5,5,77.50,2023-01-17,Credit Card,"789 Pine Rd, Chicago, IL 60601",Delivered,2023-01-19,false,0.00
+4,1004,2,3,89.97,2023-01-18,Bank Transfer,"321 Elm St, Houston, TX 77001",Delivered,2023-01-22,true,89.97
+5,1005,6,1,89.99,2023-01-19,Credit Card,"654 Maple Dr, Phoenix, AZ 85001",Delivered,2023-01-23,false,0.00
+6,1006,4,1,49.99,2023-01-20,PayPal,"987 Cedar Ln, Philadelphia, PA 19101",Delivered,2023-01-25,false,0.00
+7,1007,7,1,599.99,2023-01-21,Credit Card,"147 Birch Way, San Antonio, TX 78201",Delivered,2023-01-28,false,0.00
+8,1008,8,10,129.90,2023-01-22,Bank Transfer,"258 Spruce Ct, San Diego, CA 92101",Delivered,2023-01-26,false,0.00
+9,1009,9,1,79.99,2023-01-23,Credit Card,"369 Willow Pl, Dallas, TX 75201",Delivered,2023-01-30,false,0.00
+10,1010,10,2,119.98,2023-01-24,PayPal,"741 Aspen St, San Jose, CA 95101",Delivered,2023-01-29,false,0.00 

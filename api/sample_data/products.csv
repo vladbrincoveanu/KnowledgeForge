@@ -1,0 +1,11 @@
+product_id,name,price,category,stock,weight,is_available,created_date,last_updated,description,supplier_id,rating,reviews_count
+1,Laptop Pro,1299.99,Electronics,45,2.5,true,2023-01-15,2023-12-01,"High-performance laptop with 16GB RAM",101,4.5,127
+2,Wireless Mouse,29.99,Electronics,120,0.2,true,2023-02-10,2023-11-15,"Ergonomic wireless mouse",102,4.2,89
+3,Office Chair,299.99,Furniture,25,15.0,true,2023-03-05,2023-12-05,"Ergonomic office chair with lumbar support",103,4.7,56
+4,Desk Lamp,49.99,Furniture,80,1.8,true,2023-01-20,2023-11-20,"LED desk lamp with adjustable brightness",104,4.3,34
+5,Notebook Set,15.50,Office,200,0.5,true,2023-04-12,2023-12-10,"Premium notebook set with 5 notebooks",105,4.1,23
+6,Bluetooth Headphones,89.99,Electronics,60,0.3,true,2023-05-18,2023-11-25,"Noise-cancelling Bluetooth headphones",101,4.6,156
+7,Standing Desk,599.99,Furniture,12,45.0,true,2023-06-22,2023-12-03,"Electric standing desk with memory settings",103,4.8,28
+8,USB-C Cable,12.99,Electronics,150,0.1,true,2023-07-15,2023-11-30,"High-speed USB-C cable",102,4.0,67
+9,Monitor Stand,79.99,Furniture,35,3.2,true,2023-08-10,2023-12-08,"Adjustable monitor stand",104,4.4,42
+10,Wireless Keyboard,59.99,Electronics,75,0.4,true,2023-09-05,2023-11-28,"Slim wireless keyboard",101,4.3,91 
