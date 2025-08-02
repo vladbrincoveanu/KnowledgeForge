@@ -1,17 +1,9 @@
-<<<<<<< HEAD
 # Python cache files
 __pycache__/
 *.py[cod]
 *$py.class
 
 # Distribution / packaging
-=======
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
->>>>>>> 2ab202496f0c532f7b2c33b6e4b1e2cdf6d72427
 .Python
 build/
 develop-eggs/
@@ -30,7 +22,6 @@ wheels/
 *.egg
 MANIFEST
 
-<<<<<<< HEAD
 # PyInstaller
 *.manifest
 *.spec
@@ -72,22 +63,6 @@ docs/_build/
 
 # PyBuilder
 target/
-=======
-# Virtual environments
-venv/
-env/
-ENV/
-env.bak/
-venv.bak/
-.venv/
-
-# Python IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
->>>>>>> 2ab202496f0c532f7b2c33b6e4b1e2cdf6d72427
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -95,7 +70,6 @@ venv.bak/
 # pyenv
 .python-version
 
-<<<<<<< HEAD
 # celery beat schedule file
 celerybeat-schedule
 
@@ -128,109 +102,6 @@ dmypy.json
 
 # macOS
 .DS_Store
-=======
-# pipenv
-Pipfile.lock
-
-# Node.js
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.npm
-.yarn-integrity
-
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
-
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Coverage directory used by tools like istanbul
-coverage/
-*.lcov
-
-# nyc test coverage
-.nyc_output
-
-# Dependency directories
-jspm_packages/
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
-
-# Microbundle cache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# dotenv environment variables file
-.env
-.env.test
-.env.local
-.env.production
-
-# parcel-bundler cache (https://parceljs.org/)
-.cache
-.parcel-cache
-
-# Next.js build output
-.next
-
-# Nuxt.js build / generate output
-.nuxt
-dist
-
-# Gatsby files
-.cache/
-public
-
-# Storybook build outputs
-.out
-.storybook-out
-
-# Temporary folders
-tmp/
-temp/
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Docker
-.dockerignore
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
->>>>>>> 2ab202496f0c532f7b2c33b6e4b1e2cdf6d72427
 
 # IDE
 .vscode/
@@ -239,29 +110,13 @@ Thumbs.db
 *.swo
 *~
 
-<<<<<<< HEAD
 # Logs
-*.log 
-=======
-# Backup files
-*.bak
-*.backup
-*.old
+*.log
 
-# Archives
-*.7z
-*.dmg
-*.gz
-*.iso
-*.jar
-*.rar
-*.tar
-*.zip
-
-# Local configuration
-config.local.*
-settings.local.*
-
-# Configuration files with secrets
-config.json 
->>>>>>> 2ab202496f0c532f7b2c33b6e4b1e2cdf6d72427
+# Configuration files (keep templates, ignore actual configs)
+config.json
+*.env
+.env.local
+.env.development
+.env.test
+.env.production 
