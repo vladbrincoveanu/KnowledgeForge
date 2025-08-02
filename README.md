@@ -47,6 +47,8 @@ KnowledgeForge is an enterprise-grade data processing and knowledge management p
 - **Intelligent Metadata Extraction**: Automatic schema inference
 - **MongoDB Integration**: Scalable document storage
 - **RESTful API**: Easy integration with existing systems
+- **Modern React UI**: Drag-and-drop file upload interface
+- **Real-time Processing**: Live file upload and processing status
 - **Docker Deployment**: Production-ready infrastructure
 - **Clean Architecture**: Maintainable and testable codebase
 - **Enterprise Security**: On-premise deployment options
@@ -141,21 +143,48 @@ sources/
 
 ## 📦 Installation
 
-### Option 1: Docker (Recommended)
+### Option 1: Full Stack with UI (Recommended)
 
 ```bash
 # Clone the repository
 git clone <repository-url>
 cd Knowlly/sources
 
-# Start all services
+# Start all services including UI
 docker-compose up -d
 
 # Check status
 docker-compose ps
+
+# Access the application
+# UI: http://localhost
+# API: http://localhost:8000
+# API Docs: http://localhost/docs
 ```
 
-### Option 2: Local Development
+### Option 2: Development Mode with Hot Reloading
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd Knowlly/sources
+
+# Start infrastructure services
+docker-compose -f docker-compose.dev.yml up -d
+
+# Start the API locally
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+python main.py
+
+# In another terminal, start the UI
+cd UI
+npm install
+npm start
+```
+
+### Option 3: API Only
 
 ```bash
 # Clone the repository
@@ -248,6 +277,8 @@ The Docker Compose setup includes the following services:
 
 | Service | Port | Description |
 |---------|------|-------------|
+| UI | 80 | React application (via Nginx) |
+| UI Dev | 3000 | React development server |
 | API | 8000 | FastAPI application |
 | Nginx | 80 | HTTP reverse proxy |
 | MongoDB | 27017 | Database |
@@ -1191,6 +1222,53 @@ server {
 - Use VPC for network isolation
 - Configure firewall rules
 - Use security groups
+
+---
+
+# User Interface
+
+## 🎨 React Application
+
+The KnowledgeForge platform includes a modern React-based user interface located in `sources/UI/` that provides:
+
+### Features
+- **Drag-and-Drop File Upload**: Support for CSV, XLSX, and XLS files
+- **Real-time Processing**: Live status updates during file processing
+- **File Management**: View uploaded files with metadata and collection information
+- **Connection Discovery**: Automatic detection of relationships between datasets
+- **Interactive Graph Visualization**: Visual representation of data connections
+
+### File Structure
+```
+sources/UI/
+├── src/
+│   ├── components/
+│   │   ├── FileUploader.js      # File upload component
+│   │   ├── Graph.js             # Graph visualization
+│   │   └── ConnectionPrompt.js  # Connection confirmation
+│   ├── App.js                   # Main application
+│   └── App.css                  # Application styles
+├── public/                      # Static assets
+├── package.json                 # Dependencies
+└── Dockerfile                   # Production build
+```
+
+### Development
+```bash
+# Start development server
+cd sources/UI
+npm install
+npm start
+
+# Build for production
+npm run build
+```
+
+### Docker Integration
+The UI is fully integrated into the Docker Compose setup:
+- **Production**: Built and served via Nginx
+- **Development**: Hot-reloading development server
+- **API Integration**: Automatic proxy configuration
 
 ---
 

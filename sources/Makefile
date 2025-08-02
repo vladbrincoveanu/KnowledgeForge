@@ -1,143 +1,95 @@
 # Knowlly Data Processing API - Docker Management
 
-.PHONY: help build up down restart logs clean test dev-up dev-down
+.PHONY: help install dev prod clean logs test
 
 # Default target
 help:
-	@echo "Knowlly Data Processing API - Docker Management"
-	@echo "=============================================="
+	@echo "KnowledgeForge - Available Commands:"
 	@echo ""
-	@echo "Available commands:"
-	@echo "  build     - Build Docker images"
-	@echo "  up        - Start all services (production)"
-	@echo "  down      - Stop all services"
-	@echo "  restart   - Restart all services"
-	@echo "  logs      - View logs for all services"
-	@echo "  clean     - Stop and remove all containers, volumes, and images"
-	@echo "  test      - Test Docker infrastructure"
-	@echo "  dev-up    - Start development infrastructure only"
-	@echo "  dev-down  - Stop development infrastructure"
-	@echo "  status    - Show service status"
-	@echo "  backup    - Backup data volumes"
-	@echo "  restore   - Restore data volumes"
+	@echo "  make install    - Install dependencies for API and UI"
+	@echo "  make dev        - Start development environment"
+	@echo "  make prod       - Start production environment"
+	@echo "  make clean      - Stop and clean all containers"
+	@echo "  make logs       - View logs from all services"
+	@echo "  make test       - Run tests"
+	@echo "  make api        - Start API only (local development)"
+	@echo "  make ui         - Start UI only (local development)"
+	@echo ""
 
-# Build Docker images
-build:
-	@echo "🔨 Building Docker images..."
-	docker-compose build
+# Install dependencies
+install:
+	@echo "Installing API dependencies..."
+	pip install -r requirements.txt
+	@echo "Installing UI dependencies..."
+	cd UI && npm install
+	@echo "Installation complete!"
 
-# Start all services (production)
-up:
-	@echo "🚀 Starting all services..."
+# Development environment
+dev:
+	@echo "Starting development environment..."
+	docker-compose -f docker-compose.dev.yml up -d
+	@echo "Development services started!"
+	@echo "Access points:"
+	@echo "  - UI Dev Server: http://localhost:3000"
+	@echo "  - MongoDB Express: http://localhost:8081"
+	@echo "  - Redis Commander: http://localhost:8082"
+	@echo "  - Portainer: http://localhost:9002"
+
+# Production environment
+prod:
+	@echo "Starting production environment..."
 	docker-compose up -d
-	@echo "✅ Services started. Check status with: make status"
+	@echo "Production services started!"
+	@echo "Access points:"
+	@echo "  - Application: http://localhost"
+	@echo "  - API: http://localhost:8000"
+	@echo "  - API Docs: http://localhost/docs"
+	@echo "  - MongoDB Express: http://localhost:8081"
 
-# Stop all services
-down:
-	@echo "🛑 Stopping all services..."
-	docker-compose down
+# Clean up
+clean:
+	@echo "Stopping and cleaning containers..."
+	docker-compose down -v
+	docker-compose -f docker-compose.dev.yml down -v
+	@echo "Cleanup complete!"
 
-# Restart all services
-restart:
-	@echo "🔄 Restarting all services..."
-	docker-compose restart
-
-# View logs for all services
+# View logs
 logs:
-	@echo "📋 Viewing logs for all services..."
+	@echo "Viewing logs from all services..."
 	docker-compose logs -f
 
-# Clean up everything
-clean:
-	@echo "🧹 Cleaning up Docker resources..."
-	docker-compose down -v --rmi all
-	@echo "✅ Cleanup completed"
-
-# Test Docker infrastructure
+# Run tests
 test:
-	@echo "🧪 Testing Docker infrastructure..."
-	python test_docker_setup.py
+	@echo "Running tests..."
+	pytest Tests/ -v
 
-# Start development infrastructure only
-dev-up:
-	@echo "🚀 Starting development infrastructure..."
-	docker-compose -f docker-compose.dev.yml up -d
-	@echo "✅ Development infrastructure started"
+# Start API only (local development)
+api:
+	@echo "Starting API in development mode..."
+	python main.py
 
-# Stop development infrastructure
-dev-down:
-	@echo "🛑 Stopping development infrastructure..."
-	docker-compose -f docker-compose.dev.yml down
+# Start UI only (local development)
+ui:
+	@echo "Starting UI in development mode..."
+	cd UI && npm start
 
-# Show service status
-status:
-	@echo "📊 Service Status:"
-	docker-compose ps
+# Build UI for production
+build-ui:
+	@echo "Building UI for production..."
+	cd UI && npm run build
 
-# Backup data volumes
-backup:
-	@echo "💾 Creating backup..."
-	@mkdir -p backups/$(shell date +%Y%m%d_%H%M%S)
-	@echo "📦 Backing up MongoDB..."
-	docker exec knowlly-mongodb mongodump --out /backup
-	docker cp knowlly-mongodb:/backup backups/$(shell date +%Y%m%d_%H%M%S)/mongodb
-	@echo "📦 Backing up Redis..."
-	docker exec knowlly-redis redis-cli BGSAVE
-	@echo "✅ Backup completed in backups/$(shell date +%Y%m%d_%H%M%S)/"
+# Quick start (production)
+start:
+	@echo "Quick start - Production mode..."
+	make prod
+	@echo "Waiting for services to be ready..."
+	@sleep 10
+	@echo "Application should be available at http://localhost"
 
-# Restore data volumes (requires backup directory)
-restore:
-	@echo "📥 Restoring from backup..."
-	@if [ -z "$(BACKUP_DIR)" ]; then \
-		echo "❌ Please specify backup directory: make restore BACKUP_DIR=backups/YYYYMMDD_HHMMSS"; \
-		exit 1; \
-	fi
-	@if [ ! -d "$(BACKUP_DIR)" ]; then \
-		echo "❌ Backup directory $(BACKUP_DIR) not found"; \
-		exit 1; \
-	fi
-	@echo "📦 Restoring MongoDB..."
-	docker cp $(BACKUP_DIR)/mongodb knowlly-mongodb:/restore
-	docker exec knowlly-mongodb mongorestore /restore
-	@echo "✅ Restore completed"
-
-# Quick start for development
-dev: dev-up
-	@echo "🎯 Development environment ready!"
-	@echo "📋 Available services:"
-	@echo "  - MongoDB: localhost:27017"
-	@echo "  - MongoDB Express: http://localhost:8081"
-	@echo "  - Redis: localhost:6379"
-	@echo "  - Redis Commander: http://localhost:8082"
-	@echo "  - MinIO: localhost:9000"
-	@echo "  - MinIO Console: http://localhost:9001"
-	@echo "  - Portainer: http://localhost:9002"
-	@echo ""
-	@echo "🚀 Now run: python main.py"
-
-# Production deployment
-prod: build up
-	@echo "🎯 Production environment ready!"
-	@echo "📋 Available services:"
-	@echo "  - API: http://localhost:8000"
-	@echo "  - API Docs: http://localhost:8000/docs"
-	@echo "  - MongoDB Express: http://localhost:8081"
-	@echo "  - MinIO Console: http://localhost:9001"
-
-# Monitor services
-monitor:
-	@echo "📊 Service monitoring..."
-	@echo "Press Ctrl+C to stop monitoring"
-	watch -n 2 'docker-compose ps'
-
-# Show resource usage
-resources:
-	@echo "💻 Resource usage:"
-	docker stats --no-stream
-
-# Update all images
-update:
-	@echo "🔄 Updating Docker images..."
-	docker-compose pull
-	docker-compose up -d --build
-	@echo "✅ Images updated and services restarted" 
+# Quick start (development)
+start-dev:
+	@echo "Quick start - Development mode..."
+	make dev
+	@echo "Waiting for services to be ready..."
+	@sleep 10
+	@echo "UI should be available at http://localhost:3000" 
