@@ -1,0 +1,123 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: knowlly-mongodb-dev
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: knowlly123
+      MONGO_INITDB_DATABASE: knowlly_data
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data_dev:/data/db
+      - ./docker/mongo/init:/docker-entrypoint-initdb.d
+    networks:
+      - knowlly-network-dev
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MongoDB Express (Web-based admin interface)
+  mongo-express:
+    image: mongo-express:1.0.0
+    container_name: knowlly-mongo-express-dev
+    restart: unless-stopped
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: knowlly123
+      ME_CONFIG_MONGODB_URL: mongodb://admin:knowlly123@mongodb:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: knowlly123
+    ports:
+      - "8081:8081"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - knowlly-network-dev
+
+  # Redis (for caching and session management)
+  redis:
+    image: redis:7.2-alpine
+    container_name: knowlly-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_dev:/data
+    networks:
+      - knowlly-network-dev
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MinIO (for file storage)
+  minio:
+    image: minio/minio:latest
+    container_name: knowlly-minio-dev
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: knowlly123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data_dev:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - knowlly-network-dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis Commander (Web-based Redis admin)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: knowlly-redis-commander-dev
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - "8082:8081"
+    depends_on:
+      - redis
+    networks:
+      - knowlly-network-dev
+
+  # Portainer (Docker management UI)
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: knowlly-portainer-dev
+    restart: unless-stopped
+    ports:
+      - "9002:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data_dev:/data
+    networks:
+      - knowlly-network-dev
+
+volumes:
+  mongodb_data_dev:
+    driver: local
+  redis_data_dev:
+    driver: local
+  minio_data_dev:
+    driver: local
+  portainer_data_dev:
+    driver: local
+
+networks:
+  knowlly-network-dev:
+    driver: bridge 
