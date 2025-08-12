@@ -62,18 +62,44 @@ const FileUploader = ({ onFilesUploaded, isProcessing }) => {
       try {
         setUploadProgress(prev => ({ ...prev, [file.name]: 'uploading' }));
         
+        // Parse file locally to get sample data
+        let sampleData = [];
+        if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+          const parsedData = await parseCSVFile(file);
+          sampleData = parsedData.data.slice(0, 5); // Get first 5 rows as sample
+        }
+        
         // Upload file to backend
         const uploadResult = await uploadFileToBackend(file);
         
         if (uploadResult.success) {
-          processedFiles.push({
+          // Transform backend response to match expected format
+          const transformedFile = {
             name: file.name,
-            headers: uploadResult.data.headers || [],
+            label: uploadResult.data.collection_name || file.name.replace(/\.[^/.]+$/, ""), // Use collection name or filename without extension
+            headers: uploadResult.data.file_info?.total_columns ? Array.from({length: uploadResult.data.file_info.total_columns}, (_, i) => `column_${i+1}`) : [],
             data: uploadResult.data.data || [],
+            sampleData: sampleData, // Include sample data for metadata merging
             size: file.size,
             collectionName: uploadResult.data.collection_name,
-            rowCount: uploadResult.data.row_count
-          });
+            rowCount: uploadResult.data.file_info?.total_rows || 0,
+            // Transform metadata to match expected format
+            metadata: {
+              columns: uploadResult.data.file_info?.total_columns ? 
+                Object.keys(uploadResult.data.columns || {}).reduce((acc, colName) => {
+                  acc[colName] = {
+                    name: colName,
+                    data_type: uploadResult.data.columns[colName]?.data_type || 'string',
+                    nullable: uploadResult.data.columns[colName]?.nullable || false,
+                    unique_count: uploadResult.data.columns[colName]?.unique_count || 0,
+                    sample_values: uploadResult.data.columns[colName]?.sample_values || []
+                  };
+                  return acc;
+                }, {}) : {}
+            }
+          };
+          
+          processedFiles.push(transformedFile);
           setUploadProgress(prev => ({ ...prev, [file.name]: 'success' }));
         } else {
           throw new Error(uploadResult.message || 'Upload failed');
@@ -97,7 +123,10 @@ const FileUploader = ({ onFilesUploaded, isProcessing }) => {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch('/api/process/file', {
+    // Use the correct API base URL
+    const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+    
+    const response = await fetch(`${API_BASE_URL}/process/file`, {
       method: 'POST',
       body: formData,
     });
@@ -107,7 +136,9 @@ const FileUploader = ({ onFilesUploaded, isProcessing }) => {
       throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
     }
 
-    return await response.json();
+    const result = await response.json();
+    console.log('Backend response for file upload:', result);
+    return result;
   };
 
   const parseCSVFile = (file) => {

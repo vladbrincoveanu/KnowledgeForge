@@ -8,7 +8,7 @@ import pytest
 from datetime import datetime
 from typing import Dict, List, Any
 
-from sources.Api.Domain.models import (
+from Api.Domain.models import (
     DataType, ColumnMetadata, SchemaSummary, FileInfo, 
     FileMetadata, DataRow, ProcessingResult, CollectionInfo, ProcessingStatus
 )

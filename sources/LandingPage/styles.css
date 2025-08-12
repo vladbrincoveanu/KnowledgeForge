@@ -102,6 +102,34 @@ body {
     margin-right: auto;
 }
 
+.section-subtitle {
+    text-align: center;
+    font-size: 1.1rem;
+    color: #6b7280;
+    margin-bottom: 40px;
+    max-width: 700px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.hero-highlight {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    flex-wrap: wrap;
+    margin-top: 30px;
+}
+
+.highlight-badge {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
 .hero-buttons {
     display: flex;
     gap: 20px;
@@ -218,38 +246,38 @@ body {
     backdrop-filter: blur(10px);
 }
 
-.chat-interface {
+.ai-interface {
     background: white;
-    border-radius: 10px;
-    width: 200px;
-    color: #333;
-}
-
-.chat-header {
-    background: #f1f5f9;
-    padding: 10px 15px;
-    border-radius: 10px 10px 0 0;
-    font-weight: 600;
-    font-size: 12px;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    min-width: 280px;
     text-align: center;
 }
 
-.chat-content {
-    padding: 15px;
-}
-
-.message {
-    background: #e5e7eb;
-    padding: 8px 12px;
-    border-radius: 15px;
-    margin-bottom: 8px;
-    font-size: 12px;
-}
-
-.message.user {
-    background: #3b82f6;
+.ai-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    margin-left: 20px;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    margin-bottom: 15px;
+    font-size: 0.9rem;
+}
+
+.ai-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ai-message {
+    background: #f3f4f6;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    color: #374151;
+    border-left: 3px solid #667eea;
 }
 
 .knowledge-output {
@@ -587,10 +615,101 @@ body {
     
     .features-grid {
         grid-template-columns: 1fr;
+        gap: 30px;
     }
-    
+
+    .comparison-grid {
+        grid-template-columns: 1fr;
+        gap: 30px;
+    }
+
     .footer-content {
         grid-template-columns: 1fr;
         gap: 30px;
     }
-} 
+}
+
+/* Comparison Section */
+.comparison {
+    padding: 80px 0;
+    background: #f8fafc;
+}
+
+.comparison h2 {
+    text-align: center;
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+    color: #1f2937;
+}
+
+.comparison-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    margin: 60px 0;
+}
+
+.comparison-card {
+    background: white;
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    text-align: center;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.comparison-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.comparison-card h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+    color: #1f2937;
+}
+
+.comparison-icon {
+    font-size: 3rem;
+    margin-bottom: 20px;
+}
+
+.comparison-features {
+    list-style: none;
+    text-align: left;
+}
+
+.comparison-features li {
+    padding: 8px 0;
+    font-size: 1rem;
+    color: #4b5563;
+}
+
+.comparison-card.traditional {
+    border: 2px solid #e5e7eb;
+}
+
+.comparison-card.knowledgeforge {
+    border: 2px solid #2563eb;
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+}
+
+.comparison-highlight {
+    text-align: center;
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.comparison-highlight p {
+    font-size: 1.1rem;
+    color: #374151;
+    line-height: 1.6;
+}
+
+/* How It Works Section */ 

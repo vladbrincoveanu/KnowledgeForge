@@ -1,0 +1,14 @@
+{
+  "summary": {
+    "total_tests": 45,
+    "passed_tests": 45,
+    "failed_tests": 0,
+    "errored_tests": 0,
+    "skipped_tests": 0,
+    "success_rate": 100.0,
+    "duration": 0.0,
+    "timestamp": "2025-08-06T08:44:14.530650"
+  },
+  "failures": [],
+  "errors": []
+}

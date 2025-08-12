@@ -53,6 +53,18 @@ class DataProcessingService:
             result = self.file_processor.process_file(file_path, collection_name, request.sheet_name)
             
             if result.success:
+                # Convert metadata to dictionary for JSON serialization
+                metadata_dict = {}
+                if result.metadata and result.metadata.columns:
+                    for col_name, col_metadata in result.metadata.columns.items():
+                        metadata_dict[col_name] = {
+                            "name": col_metadata.name,
+                            "data_type": col_metadata.data_type.value if hasattr(col_metadata.data_type, 'value') else str(col_metadata.data_type),
+                            "nullable": col_metadata.nullable,
+                            "unique_count": col_metadata.unique_count,
+                            "sample_values": col_metadata.sample_values[:5] if col_metadata.sample_values else []
+                        }
+                
                 return ProcessingResponse(
                     success=True,
                     message=f"Successfully processed {file_path}",
@@ -64,7 +76,8 @@ class DataProcessingService:
                             "file_name": result.metadata.file_info.file_name,
                             "total_rows": result.metadata.file_info.total_rows,
                             "total_columns": result.metadata.file_info.total_columns
-                        }
+                        },
+                        "columns": metadata_dict
                     }
                 )
             else:

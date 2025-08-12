@@ -102,27 +102,39 @@ class ConfigManager:
     
     def get_database_config(self) -> Dict[str, Any]:
         """Get database configuration."""
+        # Prioritize environment variables over config file
+        connection_string = os.getenv('MONGODB_URI') or self.get('database.mongodb.connection_string')
+        database_name = os.getenv('MONGODB_DATABASE') or self.get('database.mongodb.database_name')
+        
         return {
-            'connection_string': self.get('database.mongodb.connection_string'),
-            'database_name': self.get('database.mongodb.database_name'),
+            'connection_string': connection_string,
+            'database_name': database_name,
             'max_pool_size': self.get('database.mongodb.max_pool_size', 10),
             'min_pool_size': self.get('database.mongodb.min_pool_size', 1)
         }
     
     def get_cache_config(self) -> Dict[str, Any]:
         """Get cache configuration."""
+        # Prioritize environment variables over config file
+        connection_string = os.getenv('REDIS_URL') or self.get('cache.redis.connection_string')
+        
         return {
-            'connection_string': self.get('cache.redis.connection_string'),
+            'connection_string': connection_string,
             'max_connections': self.get('cache.redis.max_connections', 20),
             'timeout': self.get('cache.redis.timeout', 30)
         }
     
     def get_storage_config(self) -> Dict[str, Any]:
         """Get storage configuration."""
+        # Prioritize environment variables over config file
+        endpoint = os.getenv('MINIO_ENDPOINT') or self.get('storage.minio.endpoint')
+        access_key = os.getenv('MINIO_ACCESS_KEY') or self.get('storage.minio.access_key')
+        secret_key = os.getenv('MINIO_SECRET_KEY') or self.get('storage.minio.secret_key')
+        
         return {
-            'endpoint': self.get('storage.minio.endpoint'),
-            'access_key': self.get('storage.minio.access_key'),
-            'secret_key': self.get('storage.minio.secret_key'),
+            'endpoint': endpoint,
+            'access_key': access_key,
+            'secret_key': secret_key,
             'bucket_name': self.get('storage.minio.bucket_name'),
             'use_ssl': self.get('storage.minio.use_ssl', False)
         }

@@ -1,0 +1,9 @@
+movement_id,product_id,movement_type,quantity,reference_id,reference_type,movement_date,warehouse
+MVT1001,P001,IN,20,PO-5001,Purchase Order,2024-01-10,WH-NY
+MVT1002,P002,IN,50,PO-5002,Purchase Order,2024-01-10,WH-LA
+MVT1003,P003,OUT,1,1003,Order,2024-01-17,WH-CHI
+MVT1004,P001,OUT,1,1001,Order,2024-01-15,WH-NY
+MVT1005,P004,OUT,1,1004,Order,2024-01-18,WH-HOU
+MVT1006,P005,OUT,1,1005,Order,2024-01-19,WH-PHX
+MVT1007,P002,OUT,2,1002,Order,2024-01-16,WH-LA
+
