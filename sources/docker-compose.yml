@@ -116,24 +116,6 @@ services:
       retries: 3
 
   # React UI Application
-  ui:
-    build:
-      context: ./UI
-      dockerfile: Dockerfile
-    container_name: knowlly-ui
-    restart: unless-stopped
-    ports:
-      - "3000:80"
-    depends_on:
-      api:
-        condition: service_healthy
-    networks:
-      - knowlly-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   # Nginx (reverse proxy and load balancer)
   nginx:
