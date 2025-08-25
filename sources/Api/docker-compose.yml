@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  # Neo4j Graph Database
+  neo4j:
+    image: neo4j:5.15-community
+    container_name: knowledgeforge-neo4j
+    environment:
+      - NEO4J_AUTH=neo4j/password
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_dbms_memory_heap_initial__size=512m
+      - NEO4J_dbms_memory_heap_max__size=2G
+      - NEO4J_dbms_memory_pagecache_size=1G
+    ports:
+      - "7474:7474"  # HTTP
+      - "7687:7687"  # Bolt
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - neo4j_import:/var/lib/neo4j/import
+      - neo4j_plugins:/plugins
+    networks:
+      - knowledgeforge-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:7474/browser/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # LM Studio LLM Service (Note: LM Studio runs locally, not in Docker)
+  # You need to run LM Studio locally and start the local server
+  # The API will connect to http://localhost:1234
+
+  # KnowledgeForge API Service
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: knowledgeforge-api
+    ports:
+      - "8000:8000"
+    environment:
+      - ONTOLOGY_CONFIG_FILE=/app/config.yaml
+      - ONTOLOGY_ENVIRONMENT=production
+      - ONTOLOGY_NEO4J__URI=bolt://neo4j:7687
+      - ONTOLOGY_NEO4J__USERNAME=neo4j
+      - ONTOLOGY_NEO4J__PASSWORD=password
+      - ONTOLOGY_LMSTUDIO__BASE_URL=http://host.docker.internal:1234
+      - ONTOLOGY_LMSTUDIO__MODEL_NAME=llama2
+      - ONTOLOGY_METADATA_STORAGE__DUCKDB_PATH=/app/data/metadata.db
+      - ONTOLOGY_LOGGING__FILE_PATH=/app/logs/api.log
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./uploads:/app/uploads
+    networks:
+      - knowledgeforge-network
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy (Optional)
+  nginx:
+    image: nginx:alpine
+    container_name: knowledgeforge-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    networks:
+      - knowledgeforge-network
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  neo4j_data:
+    driver: local
+  neo4j_logs:
+    driver: local
+  neo4j_import:
+    driver: local
+  neo4j_plugins:
+    driver: local
+
+
+networks:
+  knowledgeforge-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
