@@ -16,7 +16,7 @@ import threading
 from collections import defaultdict, deque
 import re
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +61,12 @@ class OntologyMappingSchema(BaseModel):
     confidence: float
     ontology_type: str
     processing_time: float
+    
+    @field_validator('mappings', mode='before')
+    @classmethod
+    def convert_numpy_types(cls, v):
+        from .models import convert_numpy_types
+        return convert_numpy_types(v)
 
 
 class LLMManager:
