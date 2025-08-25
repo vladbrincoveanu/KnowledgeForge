@@ -1,0 +1,6 @@
+order_id,customer_id,order_date,product_name,quantity,price,total_amount
+1001,1,2024-01-15,Laptop,1,1200.00,1200.00
+1002,2,2024-01-16,Phone,2,800.00,1600.00
+1003,3,2024-01-17,Tablet,1,500.00,500.00
+1004,1,2024-01-18,Headphones,1,150.00,150.00
+1005,4,2024-01-19,Monitor,1,300.00,300.00 
