@@ -35,6 +35,18 @@ class RelationshipDiscoverer:
         self.use_sbert = use_sbert
         self.cache_dir = cache_dir
         
+        # Configure DuckDB to handle CSV reading more robustly
+        # Only set these if the database is not already running
+        try:
+            self.con.execute("SET enable_progress_bar=true")
+        except:
+            pass  # Ignore if already set
+        
+        try:
+            self.con.execute("SET enable_external_access=true")
+        except:
+            pass  # Ignore if already set
+        
         # Initialize SBERT model if requested
         self.sbert_model = None
         if self.use_sbert:
@@ -47,6 +59,25 @@ class RelationshipDiscoverer:
         
         # Relationship type patterns
         self.relationship_patterns = self._initialize_relationship_patterns()
+        
+    def _safe_read_csv(self, file_path: str, columns: List[str] = None) -> str:
+        """Safely read CSV with explicit type casting to avoid type conversion errors."""
+        try:
+            if columns:
+                # Use explicit type casting to avoid type inference issues
+                # Also ensure we're reading with proper headers
+                column_list = ', '.join([f'CAST("{col}" AS VARCHAR) as "{col}"' for col in columns])
+                return f"SELECT {column_list} FROM read_csv_auto('{file_path}', header=true, auto_detect=true, sample_size=1000)"
+            else:
+                return f"SELECT * FROM read_csv_auto('{file_path}', header=true, auto_detect=true, sample_size=1000)"
+        except Exception as e:
+            logger.warning(f"Error in safe CSV reading: {e}")
+            # Fallback to basic reading if the advanced method fails
+            if columns:
+                column_list = ', '.join([f'"{col}"' for col in columns])
+                return f"SELECT {column_list} FROM read_csv_auto('{file_path}', header=true)"
+            else:
+                return f"SELECT * FROM read_csv_auto('{file_path}', header=true)"
         
     def __del__(self):
         """Clean up database connection."""
@@ -78,6 +109,10 @@ class RelationshipDiscoverer:
             List of discovered relationships
         """
         logger.info(f"Discovering relationships in {file_path}")
+        
+        # Log column information for debugging
+        logger.debug(f"Analyzing {len(columns)} columns: {[col.name for col in columns]}")
+        logger.debug(f"Found {len(entities)} entities")
         
         relationships = []
         
@@ -170,13 +205,24 @@ class RelationshipDiscoverer:
             return []
         
         try:
-            # Get unique values from both columns
+            # Validate column names to prevent SQL injection and errors
+            if not col1.name or not col2.name:
+                logger.warning(f"Invalid column names for FK analysis: '{col1.name}', '{col2.name}'")
+                return []
+            
+            # Check if column names contain invalid characters
+            if any(char in col1.name + col2.name for char in ['+', '-', '*', '/', '(', ')', '"', "'"]):
+                logger.warning(f"Column names contain invalid characters: '{col1.name}', '{col2.name}' - skipping")
+                return []
+            
+            # Get unique values from both columns with proper type handling
+            # Use explicit type casting to VARCHAR to avoid type conversion issues
             query = f"""
             SELECT 
-                COUNT(DISTINCT "{col1.name}") as unique_col1,
-                COUNT(DISTINCT "{col2.name}") as unique_col2,
+                COUNT(DISTINCT CAST("{col1.name}" AS VARCHAR)) as unique_col1,
+                COUNT(DISTINCT CAST("{col2.name}" AS VARCHAR)) as unique_col2,
                 COUNT(*) as total_rows
-            FROM read_csv_auto('{file_path}')
+            FROM ({self._safe_read_csv(file_path, [col1.name, col2.name])})
             WHERE "{col1.name}" IS NOT NULL AND "{col2.name}" IS NOT NULL
             """
             
@@ -188,71 +234,79 @@ class RelationshipDiscoverer:
             
             # Check for foreign key patterns
             if unique_col1 > 0 and unique_col2 > 0:
-                # Calculate overlap percentage
+                # Calculate overlap percentage with proper type handling
+                # Use explicit type casting to avoid conversion errors
                 overlap_query = f"""
                 SELECT COUNT(*) as overlap_count
                 FROM (
-                    SELECT DISTINCT "{col1.name}" as val1
-                    FROM read_csv_auto('{file_path}')
+                    SELECT DISTINCT CAST("{col1.name}" AS VARCHAR) as val1
+                    FROM ({self._safe_read_csv(file_path, [col1.name])})
                     WHERE "{col1.name}" IS NOT NULL
                 ) t1
                 JOIN (
-                    SELECT DISTINCT "{col2.name}" as val2
-                    FROM read_csv_auto('{file_path}')
+                    SELECT DISTINCT CAST("{col2.name}" AS VARCHAR) as val2
+                    FROM ({self._safe_read_csv(file_path, [col2.name])})
                     WHERE "{col2.name}" IS NOT NULL
                 ) t2 ON t1.val1 = t2.val2
                 """
                 
-                overlap_result = self.con.execute(overlap_query).fetchone()
-                if overlap_result:
-                    overlap_count = overlap_result[0]
-                    overlap_percentage = overlap_count / min(unique_col1, unique_col2)
-                    
-                    # Determine relationship direction and type
-                    if overlap_percentage >= config.get('fk_overlap_threshold', 0.8):
-                        if unique_col1 <= unique_col2:
-                            source_col, target_col = col1, col2
-                            relationship_type = "references"
-                        else:
-                            source_col, target_col = col2, col1
-                            relationship_type = "is_referenced_by"
+                try:
+                    overlap_result = self.con.execute(overlap_query).fetchone()
+                    if overlap_result:
+                        overlap_count = overlap_result[0]
+                        overlap_percentage = overlap_count / min(unique_col1, unique_col2)
                         
-                        # Calculate confidence based on overlap and data characteristics
-                        confidence = self._calculate_fk_confidence(
-                            overlap_percentage, unique_col1, unique_col2, total_rows
-                        )
-                        
-                        if confidence >= config.get('relationship_threshold', 0.6):
-                            # Find representative entities
-                            source_entity = self._find_representative_entity(source_col, entity_columns)
-                            target_entity = self._find_representative_entity(target_col, entity_columns)
+                        # Determine relationship direction and type
+                        if overlap_percentage >= config.get('fk_overlap_threshold', 0.8):
+                            if unique_col1 <= unique_col2:
+                                source_col, target_col = col1, col2
+                                relationship_type = "references"
+                            else:
+                                source_col, target_col = col2, col1
+                                relationship_type = "is_referenced_by"
                             
-                            if source_entity and target_entity:
-                                # Get sample evidence
-                                evidence = self._get_fk_evidence(file_path, source_col, target_col)
+                            # Calculate confidence based on overlap and data characteristics
+                            confidence = self._calculate_fk_confidence(
+                                overlap_percentage, unique_col1, unique_col2, total_rows
+                            )
+                            
+                            if confidence >= config.get('relationship_threshold', 0.6):
+                                # Find representative entities
+                                source_entity = self._find_representative_entity(source_col, entity_columns)
+                                target_entity = self._find_representative_entity(target_col, entity_columns)
                                 
-                                relationship = Relationship(
-                                    id=f"fk_{source_entity.id}_{target_entity.id}_{hash(relationship_type)}",
-                                    source_entity_id=source_entity.id,
-                                    target_entity_id=target_entity.id,
-                                    relationship_type=relationship_type,
-                                    attributes={
-                                        "overlap_percentage": overlap_percentage,
-                                        "overlap_count": overlap_count,
-                                        "source_column": source_col.name,
-                                        "target_column": target_col.name,
-                                        "unique_source_values": unique_col1,
-                                        "unique_target_values": unique_col2,
-                                        "evidence": evidence,
-                                        "extraction_method": "foreign_key_analysis"
-                                    },
-                                    confidence=confidence,
-                                    source_columns=[source_col.name, target_col.name]
-                                )
-                                relationships.append(relationship)
+                                if source_entity and target_entity:
+                                    # Get sample evidence
+                                    evidence = self._get_fk_evidence(file_path, source_col, target_col)
+                                    
+                                    relationship = Relationship(
+                                        id=f"fk_{source_entity.id}_{target_entity.id}_{hash(relationship_type)}",
+                                        source_entity_id=source_entity.id,
+                                        target_entity_id=target_entity.id,
+                                        relationship_type=relationship_type,
+                                        attributes={
+                                            "overlap_percentage": overlap_percentage,
+                                            "overlap_count": overlap_count,
+                                            "source_column": source_col.name,
+                                            "target_column": target_col.name,
+                                            "unique_source_values": unique_col1,
+                                            "unique_target_values": unique_col2,
+                                            "evidence": evidence,
+                                            "extraction_method": "foreign_key_analysis"
+                                        },
+                                        confidence=confidence,
+                                        source_columns=[source_col.name, target_col.name]
+                                    )
+                                    relationships.append(relationship)
+                except Exception as overlap_error:
+                    logger.warning(f"Error calculating overlap for columns '{col1.name}' and '{col2.name}': {overlap_error}")
+                    # Continue without this relationship
         
         except Exception as e:
             logger.warning(f"Error analyzing foreign key candidate: {e}")
+            # Log additional context for debugging
+            logger.debug(f"Failed columns: '{col1.name}' ({getattr(col1, 'data_type', 'unknown')}) and '{col2.name}' ({getattr(col2, 'data_type', 'unknown')})")
+            logger.debug(f"File path: {file_path}")
         
         return relationships
     
@@ -315,8 +369,8 @@ class RelationshipDiscoverer:
                 return []
             
             query = f"""
-            SELECT DISTINCT "{source_col.name}", "{target_col.name}"
-            FROM read_csv_auto('{file_path}')
+            SELECT DISTINCT "{source_col.name}" as source_val, "{target_col.name}" as target_val
+            FROM ({self._safe_read_csv(file_path, [source_col.name, target_col.name])})
             WHERE "{source_col.name}" IS NOT NULL AND "{target_col.name}" IS NOT NULL
             LIMIT 5
             """
@@ -328,8 +382,8 @@ class RelationshipDiscoverer:
             
             for _, row in df.iterrows():
                 evidence.append({
-                    "source_value": str(row[source_col.name]),
-                    "target_value": str(row[target_col.name])
+                    "source_value": str(row['source_val']),
+                    "target_value": str(row['target_val'])
                 })
             
             logger.debug(f"Found {len(evidence)} FK evidence samples")

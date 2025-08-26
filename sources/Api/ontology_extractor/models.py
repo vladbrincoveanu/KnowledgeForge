@@ -1,8 +1,38 @@
 """Data models for ontology extraction."""
 
 from typing import Any, Dict, List, Optional, Union
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from enum import Enum
+import numpy as np
+
+
+def convert_numpy_types(value: Any) -> Any:
+    """Convert numpy types to Python native types for JSON serialization."""
+    if isinstance(value, np.integer):
+        return int(value)
+    elif isinstance(value, np.floating):
+        return float(value)
+    elif isinstance(value, np.bool_):
+        return bool(value)
+    elif isinstance(value, np.ndarray):
+        return value.tolist()
+    elif isinstance(value, np.dtype):
+        return str(value)
+    elif isinstance(value, dict):
+        return {k: convert_numpy_types(v) for k, v in value.items()}
+    elif isinstance(value, list):
+        return [convert_numpy_types(item) for item in value]
+    elif hasattr(value, 'dtype'):  # Handle pandas Series, DataFrames, etc.
+        try:
+            return convert_numpy_types(value.tolist())
+        except:
+            return str(value)
+    elif hasattr(value, 'item'):  # Handle scalar numpy types
+        try:
+            return value.item()
+        except:
+            return str(value)
+    return value
 
 
 class DataType(str, Enum):
@@ -24,6 +54,11 @@ class ColumnProfile(BaseModel):
     unique_count: int
     sample_values: List[Any] = Field(default_factory=list)
     statistics: Dict[str, Any] = Field(default_factory=dict)
+    
+    @field_validator('sample_values', 'statistics', mode='before')
+    @classmethod
+    def convert_numpy_types(cls, v):
+        return convert_numpy_types(v)
 
 
 class DatasetProfile(BaseModel):
@@ -34,6 +69,11 @@ class DatasetProfile(BaseModel):
     columns: List[ColumnProfile]
     created_at: str
     metadata: Dict[str, Any] = Field(default_factory=dict)
+    
+    @field_validator('metadata', mode='before')
+    @classmethod
+    def convert_numpy_types(cls, v):
+        return convert_numpy_types(v)
 
 
 class Entity(BaseModel):
@@ -45,6 +85,11 @@ class Entity(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     source_column: Optional[str] = None
     source_value: Optional[str] = None
+    
+    @field_validator('attributes', mode='before')
+    @classmethod
+    def convert_numpy_types(cls, v):
+        return convert_numpy_types(v)
 
 
 class Relationship(BaseModel):
@@ -56,6 +101,11 @@ class Relationship(BaseModel):
     attributes: Dict[str, Any] = Field(default_factory=dict)
     confidence: float = Field(ge=0.0, le=1.0)
     source_columns: List[str] = Field(default_factory=list)
+    
+    @field_validator('attributes', mode='before')
+    @classmethod
+    def convert_numpy_types(cls, v):
+        return convert_numpy_types(v)
 
 
 class Ontology(BaseModel):
@@ -65,6 +115,11 @@ class Ontology(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
     created_at: str
     version: str = "1.0"
+    
+    @field_validator('metadata', mode='before')
+    @classmethod
+    def convert_numpy_types(cls, v):
+        return convert_numpy_types(v)
 
 
 class ExtractionConfig(BaseModel):

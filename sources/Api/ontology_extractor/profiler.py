@@ -176,37 +176,46 @@ class DataProfiler:
             Pandas DataFrame with the data
         """
         try:
-            # Use DuckDB to read CSV efficiently
-            if sample_size > 0:
-                # Sample rows for profiling
-                query = f"""
-                SELECT * FROM read_csv_auto('{file_path}')
-                LIMIT {sample_size}
-                """
-            else:
-                # Read all rows
-                query = f"SELECT * FROM read_csv_auto('{file_path}')"
-            
-            # Execute query and convert to pandas DataFrame
-            result = self.con.execute(query)
-            df = result.df()
-            
-            logger.info(f"Successfully read CSV file with {len(df)} rows and {len(df.columns)} columns")
-            return df
-            
-        except Exception as e:
-            logger.error(f"Error reading CSV file {file_path} with DuckDB: {str(e)}")
-            # Fallback to pandas if DuckDB fails
+            # First, try to read with explicit header handling
             try:
-                logger.info("Falling back to pandas CSV reader")
+                # Use DuckDB with explicit header handling to prevent auto-generated column names
+                if sample_size > 0:
+                    query = f"""
+                    SELECT * FROM read_csv_auto('{file_path}', header=true, auto_detect=true, sample_size=1000)
+                    LIMIT {sample_size}
+                    """
+                else:
+                    query = f"SELECT * FROM read_csv_auto('{file_path}', header=true, auto_detect=true)"
+                
+                # Execute query and convert to pandas DataFrame
+                result = self.con.execute(query)
+                df = result.df()
+                
+                # Validate that we have proper column names (not auto-generated)
+                if any(col.startswith('column') for col in df.columns):
+                    logger.warning(f"Detected auto-generated column names: {df.columns.tolist()}")
+                    # Fall back to pandas for better column name handling
+                    raise Exception("Auto-generated column names detected")
+                
+                logger.info(f"Successfully read CSV file with DuckDB: {len(df)} rows and {len(df.columns)} columns")
+                logger.debug(f"Column names: {df.columns.tolist()}")
+                return df
+                
+            except Exception as duckdb_error:
+                logger.warning(f"DuckDB reading failed, falling back to pandas: {duckdb_error}")
+                # Fallback to pandas if DuckDB fails or generates invalid column names
                 if sample_size > 0:
                     df = pd.read_csv(file_path, nrows=sample_size)
                 else:
                     df = pd.read_csv(file_path)
+                
+                logger.info(f"Successfully read CSV file with pandas: {len(df)} rows and {len(df.columns)} columns")
+                logger.debug(f"Column names: {df.columns.tolist()}")
                 return df
-            except Exception as pandas_error:
-                logger.error(f"Pandas fallback also failed: {str(pandas_error)}")
-                raise Exception(f"Failed to read CSV file: {str(e)}")
+                
+        except Exception as e:
+            logger.error(f"Error reading CSV file {file_path}: {str(e)}")
+            raise Exception(f"Failed to read CSV file: {str(e)}")
     
     def _profile_column_comprehensive(self, df: pd.DataFrame, column_name: str, 
                                     file_path: str) -> ColumnProfile:

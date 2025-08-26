@@ -297,11 +297,11 @@ def test_with_llm():
     
     try:
         # Try to initialize LLM manager (will fail if LLM Server is not running)
-llm_manager = LLMManager(lmstudio_url="http://localhost:1234")
+        llm_manager = LLMManager(lmstudio_url="http://localhost:1234")
 
-# Test if LLM Server is available
-if llm_manager._test_connection():
-    print("✅ LLM Server connection successful")
+        # Test if LLM Server is available
+        if llm_manager._test_connection():
+            print("✅ LLM Server connection successful")
             
             # Create sample data
             csv_file = create_sample_csv()
