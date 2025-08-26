@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 from datetime import datetime
 import pickle
+import os
 
 from .models import Entity, DataType, ColumnProfile
 from .llm_manager import LLMManager
@@ -56,9 +57,11 @@ class EntityExtractor:
                 (r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', 0.90)
             ],
             'phone': [
+                # More specific phone patterns that won't catch percentages
                 (r'^\+?1?[-.\s]?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})$', 0.95),
                 (r'^\+?[0-9]{1,4}[-.\s]?[0-9]{1,4}[-.\s]?[0-9]{1,4}$', 0.90),
-                (r'[0-9]{3}[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}', 0.85)
+                # Exclude patterns that look like percentages (e.g., 63.4, 8.04)
+                (r'^(?!\d+\.\d+$)[0-9]{3}[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}$', 0.85)
             ],
             'url': [
                 (r'^https?://[^\s/$.?#].[^\s]*$', 0.95),
@@ -171,99 +174,14 @@ class EntityExtractor:
         except Exception as e:
             logger.warning(f"Failed to cache entities: {e}")
     
-    def extract_business_entities(self, file_path: str, columns: List[ColumnProfile], 
-                                 config: Dict[str, Any]) -> List[Entity]:
-        """Extract meaningful business entities based on domain knowledge."""
-        entities = []
-        
-        # Extract Country entity
-        country_entity = Entity(
-            id="country_entity",
-            name="Country",
-            entity_type="geographic_entity",
-            attributes={
-                "description": "Represents a specific nation or country",
-                "source_column": "country",
-                "extraction_method": "business_logic",
-                "sample_values": ["Afghanistan", "Angola", "Albania", "UAE", "Argentina"],
-                "business_meaning": "Core entity representing nations in the dataset"
-            },
-            confidence=0.95,
-            source_column="country"
-        )
-        entities.append(country_entity)
-        
-        # Extract Agricultural Employment entity
-        ag_employment_entity = Entity(
-            id="agricultural_employment_entity",
-            name="Agricultural Employment",
-            entity_type="measurement_entity",
-            attributes={
-                "description": "Percentage of a country's workforce employed in agriculture sector",
-                "source_columns": ["1991", "1992", "1993", "1994", "1995", "1996", "1997", "1998", "1999", 
-                                 "2000", "2001", "2002", "2003", "2004", "2005", "2006", "2007", "2008", "2009",
-                                 "2010", "2011", "2012", "2013", "2014", "2015", "2016", "2017", "2018", "2019"],
-                "extraction_method": "business_logic",
-                "business_meaning": "Measurement entity representing agricultural employment percentages over time",
-                "data_type": "percentage",
-                "time_series": True,
-                "year_range": [1991, 2019]
-            },
-            confidence=0.95,
-            source_column="agricultural_employment"
-        )
-        entities.append(ag_employment_entity)
-        
-        # Extract Year entity for time dimension
-        year_entity = Entity(
-            id="year_entity",
-            name="Year",
-            entity_type="temporal_entity",
-            attributes={
-                "description": "Time dimension for agricultural employment data",
-                "source_columns": ["1991", "1992", "1993", "1994", "1995", "1996", "1997", "1998", "1999", 
-                                 "2000", "2001", "2002", "2003", "2004", "2005", "2006", "2007", "2008", "2009",
-                                 "2010", "2011", "2012", "2013", "2014", "2015", "2016", "2017", "2018", "2019"],
-                "extraction_method": "business_logic",
-                "business_meaning": "Temporal dimension for tracking employment trends",
-                "data_type": "year",
-                "range": [1991, 2019]
-            },
-            confidence=0.95,
-            source_column="year"
-        )
-        entities.append(year_entity)
-        
-        logger.info(f"Extracted {len(entities)} business entities: {[e.name for e in entities]}")
-        return entities
-
     def extract_entities(self, file_path: str, columns: List[ColumnProfile], 
                         config: Dict[str, Any]) -> List[Entity]:
         """Extract entities from CSV data using various techniques."""
         logger.info(f"Extracting entities from {file_path}")
         
-        # Use business logic extraction for this agriculture dataset
-        if self._is_agriculture_dataset(columns):
-            logger.info("Detected agriculture dataset, using business logic extraction")
-            return self.extract_business_entities(file_path, columns, config)
-        
-        # Fall back to traditional extraction methods for other datasets
+        # Use traditional extraction methods for all datasets
         logger.info("Using traditional entity extraction methods")
         return self._extract_entities_traditional(file_path, columns, config)
-    
-    def _is_agriculture_dataset(self, columns: List[ColumnProfile]) -> bool:
-        """Check if this is an agriculture-related dataset."""
-        column_names = [col.name.lower() for col in columns]
-        
-        # Check for agriculture-related indicators
-        agriculture_indicators = ['agriculture', 'employment', 'worker', 'farming', 'rural']
-        year_indicators = [str(year) for year in range(1990, 2030)]
-        
-        has_agriculture = any(indicator in ' '.join(column_names) for indicator in agriculture_indicators)
-        has_years = any(year in column_names for year in year_indicators)
-        has_country = 'country' in column_names
-        
-        return has_agriculture or (has_years and has_country)
     
     def _extract_entities_traditional(self, file_path: str, columns: List[ColumnProfile], 
                                      config: Dict[str, Any]) -> List[Entity]:
@@ -289,6 +207,25 @@ class EntityExtractor:
             composite_entities = self._detect_composite_keys(file_path, columns, config)
             entities.extend(composite_entities)
         
+        # Detect hierarchical entities
+        if config.get('use_hierarchical_detection', True):
+            hierarchical_entities = self._detect_hierarchical_entities(file_path, columns, config)
+            entities.extend(hierarchical_entities)
+        
+        # Use LLM to identify core business entities if available
+        if config.get('use_llm_business_entities', True) and self.llm_manager:
+            business_entities = self._extract_business_entities_llm(file_path, columns, config)
+            entities.extend(business_entities)
+        
+        # Detect time series patterns
+        if config.get('use_time_series_detection', True):
+            time_series_entities = self._detect_time_series_patterns(file_path, columns, config)
+            entities.extend(time_series_entities)
+        
+        # Intelligent entity consolidation - NEW GENERIC APPROACH
+        if config.get('use_intelligent_consolidation', True):
+            entities = self._consolidate_entities_intelligently(file_path, columns, entities, config)
+        
         # Deduplicate entities
         entities = self._deduplicate_entities(entities)
         
@@ -305,6 +242,619 @@ class EntityExtractor:
         
         logger.info(f"Entity extraction completed. Total entities: {len(entities)}")
         return entities
+    
+    def _consolidate_entities_intelligently(self, file_path: str, columns: List[ColumnProfile], 
+                                           entities: List[Entity], config: Dict[str, Any]) -> List[Entity]:
+        """Intelligently consolidate entities based on data patterns and relationships."""
+        logger.info("Starting intelligent entity consolidation...")
+        
+        try:
+            # Step 1: Analyze dataset structure to identify patterns
+            dataset_patterns = self._analyze_dataset_structure(columns)
+            
+            # Step 2: Group related columns based on patterns
+            column_groups = self._group_related_columns(columns, dataset_patterns)
+            
+            # Step 3: Create consolidated entities from groups
+            consolidated_entities = self._create_consolidated_entities(column_groups, dataset_patterns)
+            
+            # Step 4: Merge with existing entities, replacing redundant ones
+            final_entities = self._merge_with_existing_entities(entities, consolidated_entities)
+            
+            logger.info(f"Intelligent consolidation: {len(entities)} -> {len(final_entities)} entities")
+            return final_entities
+            
+        except Exception as e:
+            logger.error(f"Intelligent entity consolidation failed: {e}")
+            return entities
+    
+    def _analyze_dataset_structure(self, columns: List[ColumnProfile]) -> Dict[str, Any]:
+        """Analyze dataset structure to identify patterns for entity consolidation."""
+        patterns = {
+            'time_series': [],
+            'geographic': [],
+            'categorical': [],
+            'measurement': [],
+            'identifier': [],
+            'metadata': []
+        }
+        
+        for col in columns:
+            col_name = col.name.lower()
+            col_type = col.data_type
+            
+            # Time series detection
+            if self._is_time_dimension(col):
+                patterns['time_series'].append(col)
+            
+            # Geographic detection
+            elif self._is_geographic_dimension(col):
+                patterns['geographic'].append(col)
+            
+            # Categorical detection
+            elif self._is_categorical_dimension(col):
+                patterns['categorical'].append(col)
+            
+            # Measurement detection
+            elif self._is_measurement_dimension(col):
+                patterns['measurement'].append(col)
+            
+            # Identifier detection
+            elif self._is_identifier_dimension(col):
+                patterns['identifier'].append(col)
+            
+            # Metadata detection
+            else:
+                patterns['metadata'].append(col)
+        
+        # Add pattern metadata
+        patterns['has_time_series'] = len(patterns['time_series']) > 0
+        patterns['has_geographic'] = len(patterns['geographic']) > 0
+        patterns['has_measurements'] = len(patterns['measurement']) > 0
+        patterns['time_series_length'] = len(patterns['time_series'])
+        patterns['measurement_columns'] = len(patterns['measurement'])
+        
+        return patterns
+    
+    def _is_time_dimension(self, column: ColumnProfile) -> bool:
+        """Check if a column represents a time dimension."""
+        col_name = column.name
+        
+        # Check for year columns (e.g., 1991, 1992, 2020)
+        if re.match(r'^\d{4}$', col_name) and 1900 <= int(col_name) <= 2100:
+            return True
+        
+        # Check for time-related terms
+        time_terms = ['year', 'yr', 'month', 'mon', 'quarter', 'qtr', 'week', 'day', 'date', 'time', 'period']
+        if any(term in col_name.lower() for term in time_terms):
+            return True
+        
+        # Check for date-like patterns
+        if re.match(r'\d{1,2}[/-]\d{1,2}[/-]\d{2,4}', col_name):
+            return True
+        
+        return False
+    
+    def _is_geographic_dimension(self, column: ColumnProfile) -> bool:
+        """Check if a column represents a geographic dimension."""
+        col_name = column.name.lower()
+        
+        geographic_terms = [
+            'country', 'nation', 'state', 'province', 'region', 'city', 'town', 'village',
+            'county', 'district', 'area', 'zone', 'location', 'place', 'address',
+            'latitude', 'longitude', 'coord', 'geo', 'spatial', 'continent'
+        ]
+        
+        return any(term in col_name for term in geographic_terms)
+    
+    def _is_categorical_dimension(self, column: ColumnProfile) -> bool:
+        """Check if a column represents a categorical dimension."""
+        col_name = column.name.lower()
+        
+        categorical_terms = [
+            'category', 'type', 'class', 'group', 'level', 'status', 'code', 'id',
+            'name', 'description', 'label', 'tag', 'brand', 'model', 'version'
+        ]
+        
+        return any(term in col_name for term in categorical_terms)
+    
+    def _is_measurement_dimension(self, column: ColumnProfile) -> bool:
+        """Check if a column represents a measurement dimension."""
+        # Numeric columns that aren't time dimensions are likely measurements
+        if column.data_type in [DataType.FLOAT, DataType.INTEGER]:
+            if not self._is_time_dimension(column):
+                return True
+        
+        # Check for measurement-related terms
+        col_name = column.name.lower()
+        measurement_terms = [
+            'value', 'amount', 'quantity', 'count', 'number', 'rate', 'ratio', 'percentage',
+            'score', 'index', 'metric', 'measure', 'total', 'sum', 'average', 'mean'
+        ]
+        
+        return any(term in col_name for term in measurement_terms)
+    
+    def _is_identifier_dimension(self, column: ColumnProfile) -> bool:
+        """Check if a column represents an identifier dimension."""
+        col_name = column.name.lower()
+        
+        # Check for ID-like patterns
+        if re.match(r'.*id$', col_name) or re.match(r'.*_id$', col_name):
+            return True
+        
+        # Check for identifier terms
+        identifier_terms = ['id', 'identifier', 'key', 'code', 'reference', 'serial']
+        if any(term in col_name for term in identifier_terms):
+            return True
+        
+        # Check if it's a primary key candidate (high uniqueness)
+        if column.unique_count > 0 and column.unique_count / (column.unique_count + column.null_count) > 0.9:
+            return True
+        
+        return False
+    
+    def _group_related_columns(self, columns: List[ColumnProfile], 
+                              patterns: Dict[str, Any]) -> Dict[str, List[ColumnProfile]]:
+        """Group related columns based on detected patterns."""
+        groups = {
+            'core_entities': [],
+            'time_dimensions': [],
+            'measurement_entities': [],
+            'geographic_entities': [],
+            'categorical_entities': []
+        }
+        
+        # Group time series columns
+        if patterns['time_series']:
+            # Sort by year if they're year columns
+            year_cols = [col for col in patterns['time_series'] if re.match(r'^\d{4}$', col.name)]
+            if year_cols:
+                year_cols.sort(key=lambda x: int(x.name))
+                groups['time_dimensions'] = year_cols
+            else:
+                groups['time_dimensions'] = patterns['time_series']
+        
+        # Group geographic columns
+        if patterns['geographic']:
+            groups['geographic_entities'] = patterns['geographic']
+        
+        # Group categorical columns (potential core entities)
+        if patterns['categorical']:
+            groups['core_entities'] = patterns['categorical']
+        
+        # Group measurement columns
+        if patterns['measurement']:
+            groups['measurement_entities'] = patterns['measurement']
+        
+        # If no categorical columns, use the first non-time, non-measurement column as core entity
+        if not groups['core_entities'] and patterns['metadata']:
+            groups['core_entities'] = [patterns['metadata'][0]]
+        
+        return groups
+    
+    def _create_consolidated_entities(self, column_groups: Dict[str, List[ColumnProfile]], 
+                                     patterns: Dict[str, Any]) -> List[Entity]:
+        """Create consolidated entities from column groups."""
+        entities = []
+        
+        try:
+            # Create core entity
+            if column_groups['core_entities']:
+                core_entity = self._create_core_entity(column_groups['core_entities'], patterns)
+                if core_entity:
+                    entities.append(core_entity)
+            
+            # Create time dimension entity
+            if column_groups['time_dimensions']:
+                time_entity = self._create_time_entity(column_groups['time_dimensions'], patterns)
+                if time_entity:
+                    entities.append(time_entity)
+            
+            # Create measurement entity
+            if column_groups['measurement_entities']:
+                measurement_entity = self._create_measurement_entity(
+                    column_groups['measurement_entities'], 
+                    column_groups['time_dimensions'], 
+                    patterns
+                )
+                if measurement_entity:
+                    entities.append(measurement_entity)
+            
+            # Create geographic entity
+            if column_groups['geographic_entities']:
+                geo_entity = self._create_geographic_entity(column_groups['geographic_entities'], patterns)
+                if geo_entity:
+                    entities.append(geo_entity)
+            
+            # Create categorical entity
+            if column_groups['categorical_entities']:
+                cat_entity = self._create_categorical_entity(column_groups['categorical_entities'], patterns)
+                if cat_entity:
+                    entities.append(cat_entity)
+                    
+        except Exception as e:
+            logger.error(f"Failed to create consolidated entities: {e}")
+        
+        return entities
+    
+    def _create_core_entity(self, columns: List[ColumnProfile], patterns: Dict[str, Any]) -> Entity:
+        """Create a core entity representing the main object in the dataset."""
+        if not columns:
+            return None
+        
+        # Determine entity type based on column characteristics
+        entity_type = "core_entity"
+        if patterns['has_geographic']:
+            entity_type = "geographic_entity"
+        elif any('category' in col.name.lower() for col in columns):
+            entity_type = "categorical_entity"
+        
+        # Determine business meaning based on context
+        business_meaning = self._infer_business_meaning(columns, patterns)
+        
+        entity = Entity(
+            id=f"core_entity_{hash('core')}",
+            name=self._infer_entity_name(columns, patterns),
+            entity_type=entity_type,
+            attributes={
+                "business_meaning": business_meaning,
+                "source_columns": [col.name for col in columns],
+                "extraction_method": "intelligent_consolidation",
+                "entity_category": "core_entity",
+                "column_count": len(columns)
+            },
+            confidence=0.95,
+            source_column=columns[0].name
+        )
+        
+        return entity
+    
+    def _create_time_entity(self, columns: List[ColumnProfile], patterns: Dict[str, Any]) -> Entity:
+        """Create a time dimension entity."""
+        if not columns:
+            return None
+        
+        # Determine if this is a year-based time series
+        is_year_series = all(re.match(r'^\d{4}$', col.name) for col in columns)
+        
+        if is_year_series:
+            # Sort chronologically
+            columns.sort(key=lambda x: int(x.name))
+            year_range = [int(columns[0].name), int(columns[-1].name)]
+            
+            entity = Entity(
+                id=f"time_series_{hash('time')}",
+                name="Year",
+                entity_type="temporal_entity",
+                attributes={
+                    "business_meaning": "Represents the calendar year for which measurements are recorded",
+                    "source_columns": [col.name for col in columns],
+                    "extraction_method": "intelligent_consolidation",
+                    "time_series_type": "yearly",
+                    "year_range": year_range,
+                    "column_count": len(columns)
+                },
+                confidence=0.98,
+                source_column="time_series"
+            )
+        else:
+            entity = Entity(
+                id=f"time_dimension_{hash('time')}",
+                name="Time Dimension",
+                entity_type="temporal_entity",
+                attributes={
+                    "business_meaning": "Represents time periods in the dataset",
+                    "source_columns": [col.name for col in columns],
+                    "extraction_method": "intelligent_consolidation",
+                    "time_series_type": "mixed",
+                    "column_count": len(columns)
+                },
+                confidence=0.9,
+                source_column="time_dimension"
+            )
+        
+        return entity
+    
+    def _create_measurement_entity(self, measurement_columns: List[ColumnProfile], 
+                                  time_columns: List[ColumnProfile], 
+                                  patterns: Dict[str, Any]) -> Entity:
+        """Create a measurement entity that consolidates all measurement columns."""
+        if not measurement_columns:
+            return None
+        
+        # Infer measurement type and business meaning
+        measurement_type = self._infer_measurement_type(measurement_columns, patterns)
+        business_meaning = self._infer_measurement_meaning(measurement_columns, time_columns, patterns)
+        
+        # Determine if this is a time series measurement
+        is_time_series = len(time_columns) > 0
+        
+        entity = Entity(
+            id=f"measurement_entity_{hash('measurement')}",
+            name=measurement_type,
+            entity_type="measurement_entity",
+            attributes={
+                "business_meaning": business_meaning,
+                "source_columns": [col.name for col in measurement_columns],
+                "extraction_method": "intelligent_consolidation",
+                "entity_category": "measurement_entity",
+                "measurement_type": measurement_type,
+                "is_time_series": is_time_series,
+                "time_columns": [col.name for col in time_columns] if time_columns else [],
+                "column_count": len(measurement_columns)
+            },
+            confidence=0.92,
+            source_column="measurement_values"
+        )
+        
+        return entity
+    
+    def _create_geographic_entity(self, columns: List[ColumnProfile], patterns: Dict[str, Any]) -> Entity:
+        """Create a geographic entity."""
+        if not columns:
+            return None
+        
+        entity = Entity(
+            id=f"geographic_entity_{hash('geo')}",
+            name="Geographic Location",
+            entity_type="geographic_entity",
+            attributes={
+                "business_meaning": "Represents geographic locations or regions in the dataset",
+                "source_columns": [col.name for col in columns],
+                "extraction_method": "intelligent_consolidation",
+                "entity_category": "geographic_entity",
+                "geographic_types": [self._get_geographic_type(col) for col in columns],
+                "column_count": len(columns)
+            },
+            confidence=0.9,
+            source_column=columns[0].name
+        )
+        
+        return entity
+    
+    def _create_categorical_entity(self, columns: List[ColumnProfile], patterns: Dict[str, Any]) -> Entity:
+        """Create a categorical entity."""
+        if not columns:
+            return None
+        
+        entity = Entity(
+            id=f"categorical_entity_{hash('category')}",
+            name="Category",
+            entity_type="categorical_entity",
+            attributes={
+                "business_meaning": "Represents classification or categorization dimensions in the dataset",
+                "source_columns": [col.name for col in columns],
+                "extraction_method": "intelligent_consolidation",
+                "entity_category": "categorical_entity",
+                "column_count": len(columns)
+            },
+            confidence=0.85,
+            source_column=columns[0].name
+        )
+        
+        return entity
+    
+    def _infer_business_meaning(self, columns: List[ColumnProfile], patterns: Dict[str, Any]) -> str:
+        """Infer the business meaning of a core entity based on context."""
+        if not columns:
+            return "Core entity in the dataset"
+        
+        col_name = columns[0].name.lower()
+        
+        # Geographic context
+        if patterns['has_geographic']:
+            if 'country' in col_name or 'nation' in col_name:
+                return "Represents a specific nation or country"
+            elif 'state' in col_name or 'province' in col_name:
+                return "Represents a state or province"
+            elif 'city' in col_name or 'town' in col_name:
+                return "Represents a city or town"
+            else:
+                return "Represents a geographic location or region"
+        
+        # Business context
+        elif 'customer' in col_name or 'client' in col_name:
+            return "Represents a customer or client"
+        elif 'product' in col_name or 'item' in col_name:
+            return "Represents a product or item"
+        elif 'order' in col_name or 'transaction' in col_name:
+            return "Represents an order or transaction"
+        
+        # Generic context
+        else:
+            return f"Represents the main {col_name} entity in the dataset"
+    
+    def _infer_entity_name(self, columns: List[ColumnProfile], patterns: Dict[str, Any]) -> str:
+        """Infer a meaningful name for the core entity."""
+        if not columns:
+            return "Core Entity"
+        
+        col_name = columns[0].name
+        
+        # Geographic naming
+        if patterns['has_geographic']:
+            if 'country' in col_name.lower() or 'nation' in col_name.lower():
+                return "Country"
+            elif 'state' in col_name.lower() or 'province' in col_name.lower():
+                return "State/Province"
+            elif 'city' in col_name.lower() or 'town' in col_name.lower():
+                return "City"
+            else:
+                return "Geographic Location"
+        
+        # Business naming
+        elif 'customer' in col_name.lower() or 'client' in col_name.lower():
+            return "Customer"
+        elif 'product' in col_name.lower() or 'item' in col_name.lower():
+            return "Product"
+        elif 'order' in col_name.lower() or 'transaction' in col_name.lower():
+            return "Order"
+        
+        # Generic naming - capitalize and clean the column name
+        else:
+            # Convert snake_case or kebab-case to Title Case
+            clean_name = col_name.replace('_', ' ').replace('-', ' ').title()
+            return clean_name
+    
+    def _infer_measurement_type(self, columns: List[ColumnProfile], patterns: Dict[str, Any]) -> str:
+        """Infer the type of measurement being made."""
+        if not columns:
+            return "Measurement"
+        
+        # Check column names for hints
+        col_names = [col.name.lower() for col in columns]
+        
+        # Employment/Workforce
+        if any(term in ' '.join(col_names) for term in ['employment', 'worker', 'workforce', 'labor']):
+            return "Employment"
+        
+        # Sales/Revenue
+        elif any(term in ' '.join(col_names) for term in ['sales', 'revenue', 'income', 'profit']):
+            return "Sales"
+        
+        # Population/Demographics
+        elif any(term in ' '.join(col_names) for term in ['population', 'demographic', 'people', 'resident']):
+            return "Population"
+        
+        # Economic indicators
+        elif any(term in ' '.join(col_names) for term in ['gdp', 'economic', 'index', 'ratio']):
+            return "Economic Indicator"
+        
+        # Generic measurement
+        else:
+            return "Measurement Value"
+    
+    def _infer_measurement_meaning(self, measurement_columns: List[ColumnProfile], 
+                                  time_columns: List[ColumnProfile], 
+                                  patterns: Dict[str, Any]) -> str:
+        """Infer the business meaning of measurements."""
+        measurement_type = self._infer_measurement_type(measurement_columns, patterns)
+        
+        if time_columns:
+            return f"Represents {measurement_type.lower()} values recorded over time for each core entity"
+        else:
+            return f"Represents {measurement_type.lower()} values for each core entity"
+    
+    def _merge_with_existing_entities(self, existing_entities: List[Entity], 
+                                     consolidated_entities: List[Entity]) -> List[Entity]:
+        """Merge consolidated entities with existing ones, replacing redundant ones."""
+        if not consolidated_entities:
+            return existing_entities
+        
+        # Create a map of existing entities by type
+        existing_by_type = {}
+        for entity in existing_entities:
+            entity_type = entity.entity_type
+            if entity_type not in existing_by_type:
+                existing_by_type[entity_type] = []
+            existing_by_type[entity_type].append(entity)
+        
+        # Replace existing entities with consolidated ones
+        final_entities = []
+        
+        for consolidated_entity in consolidated_entities:
+            entity_type = consolidated_entity.entity_type
+            
+            # If we have a consolidated entity of this type, use it instead of existing ones
+            if entity_type in existing_by_type:
+                # Keep the consolidated entity, skip the existing ones
+                final_entities.append(consolidated_entity)
+                logger.info(f"Replaced {len(existing_by_type[entity_type])} {entity_type} entities with consolidated entity")
+            else:
+                # No existing entities of this type, add the consolidated one
+                final_entities.append(consolidated_entity)
+        
+        # Add any existing entities that weren't replaced
+        for entity_type, entities in existing_by_type.items():
+            if not any(e.entity_type == entity_type for e in consolidated_entities):
+                final_entities.extend(entities)
+        
+        return final_entities
+    
+    def _extract_regex_entities(self, file_path: str, column: ColumnProfile, 
+                               config: Dict[str, Any]) -> List[Entity]:
+        """Extract entities using regex patterns for known types."""
+        entities = []
+        
+        # Get sample values from the column using safe CSV reading
+        query = f"""
+        SELECT DISTINCT CAST("{column.name}" AS VARCHAR) as value
+        FROM ({self._safe_read_csv(file_path, [column.name])})
+        WHERE "{column.name}" IS NOT NULL
+        LIMIT {config.get('max_entities_per_column', 100)}
+        """
+        
+        df = self.con.execute(query).df()
+        
+        for _, row in df.iterrows():
+            value = str(row['value']).strip()
+            if not value or len(value) < 2:
+                continue
+            
+            # Check if this looks like a percentage value first
+            if self._is_percentage_value(value, column):
+                percentage_entity = Entity(
+                    id=f"{column.name}_percentage_{hash(value)}",
+                    name=f"{column.name}_percentage",
+                    entity_type="measurement_entity",
+                    attributes={
+                        "source_column": column.name,
+                        "data_type": column.data_type.value,
+                        "extraction_method": "percentage_detection",
+                        "measurement_unit": "percentage",
+                        "sample_values": [value],
+                        "statistical_profile": self._get_statistical_profile(value, column)
+                    },
+                    confidence=0.85,
+                    source_column=column.name,
+                    source_value=value
+                )
+                entities.append(percentage_entity)
+                continue
+            
+            # Test against all regex patterns
+            for entity_type, patterns in self.regex_patterns.items():
+                for pattern, confidence in patterns:
+                    if re.match(pattern, value, re.IGNORECASE):
+                        entity = Entity(
+                            id=f"{column.name}_{entity_type}_{hash(value)}",
+                            name=value,
+                            entity_type=entity_type,
+                            attributes={
+                                "source_column": column.name,
+                                "data_type": column.data_type.value,
+                                "extraction_method": "regex_pattern",
+                                "pattern": pattern,
+                                "sample_values": [value],
+                                "statistical_profile": self._get_statistical_profile(value, column)
+                            },
+                            confidence=confidence,
+                            source_column=column.name,
+                            source_value=value
+                        )
+                        entities.append(entity)
+                        break  # Use first matching pattern
+        
+        return entities
+    
+    def _safe_read_csv(self, file_path: str, columns: List[str] = None) -> str:
+        """Safely read CSV with explicit type casting to avoid type conversion errors."""
+        try:
+            if columns:
+                # Use explicit type casting to avoid type inference issues
+                # Also ensure we're reading with proper headers
+                column_list = ', '.join([f'CAST("{col}" AS VARCHAR) as "{col}"' for col in columns])
+                return f"SELECT {column_list} FROM read_csv_auto('{file_path}', header=true, auto_detect=true, sample_size=1000)"
+            else:
+                return f"SELECT * FROM read_csv_auto('{file_path}', header=true, auto_detect=true, sample_size=1000)"
+        except Exception as e:
+            logger.warning(f"Error in safe CSV reading: {e}")
+            # Fallback to basic reading if the advanced method fails
+            if columns:
+                column_list = ', '.join([f'"{col}"' for col in columns])
+                return f"SELECT {column_list} FROM read_csv_auto('{file_path}', header=true)"
+            else:
+                return f"SELECT * FROM read_csv_auto('{file_path}', header=true)"
     
     def _extract_column_entities(self, file_path: str, column: ColumnProfile, 
                                 config: Dict[str, Any]) -> List[Entity]:
@@ -337,69 +887,26 @@ class EntityExtractor:
         
         return entities
     
-    def _safe_read_csv(self, file_path: str, columns: List[str] = None) -> str:
-        """Safely read CSV with explicit type casting to avoid type conversion errors."""
+    def _is_percentage_value(self, value: str, column: ColumnProfile) -> bool:
+        """Check if a value looks like a percentage."""
         try:
-            if columns:
-                # Use explicit type casting to avoid type inference issues
-                # Also ensure we're reading with proper headers
-                column_list = ', '.join([f'CAST("{col}" AS VARCHAR) as "{col}"' for col in columns])
-                return f"SELECT {column_list} FROM read_csv_auto('{file_path}', header=true, auto_detect=true, sample_size=1000)"
-            else:
-                return f"SELECT * FROM read_csv_auto('{file_path}', header=true, auto_detect=true, sample_size=1000)"
-        except Exception as e:
-            logger.warning(f"Error in safe CSV reading: {e}")
-            # Fallback to basic reading if the advanced method fails
-            if columns:
-                column_list = ', '.join([f'"{col}"' for col in columns])
-                return f"SELECT {column_list} FROM read_csv_auto('{file_path}', header=true)"
-            else:
-                return f"SELECT * FROM read_csv_auto('{file_path}', header=true)"
-
-    def _extract_regex_entities(self, file_path: str, column: ColumnProfile, 
-                               config: Dict[str, Any]) -> List[Entity]:
-        """Extract entities using regex patterns for known types."""
-        entities = []
-        
-        # Get sample values from the column using safe CSV reading
-        query = f"""
-        SELECT DISTINCT CAST("{column.name}" AS VARCHAR) as value
-        FROM ({self._safe_read_csv(file_path, [column.name])})
-        WHERE "{column.name}" IS NOT NULL
-        LIMIT {config.get('max_entities_per_column', 100)}
-        """
-        
-        df = self.con.execute(query).df()
-        
-        for _, row in df.iterrows():
-            value = str(row['value']).strip()
-            if not value or len(value) < 2:
-                continue
+            # Check if it's a numeric value that could be a percentage
+            float_val = float(value)
             
-            # Test against all regex patterns
-            for entity_type, patterns in self.regex_patterns.items():
-                for pattern, confidence in patterns:
-                    if re.match(pattern, value, re.IGNORECASE):
-                        entity = Entity(
-                            id=f"{column.name}_{entity_type}_{hash(value)}",
-                            name=value,
-                            entity_type=entity_type,
-                            attributes={
-                                "source_column": column.name,
-                                "data_type": column.data_type.value,
-                                "extraction_method": "regex_pattern",
-                                "pattern": pattern,
-                                "sample_values": [value],
-                                "statistical_profile": self._get_statistical_profile(value, column)
-                            },
-                            confidence=confidence,
-                            source_column=column.name,
-                            source_value=value
-                        )
-                        entities.append(entity)
-                        break  # Use first matching pattern
-        
-        return entities
+            # If it's a float between 0 and 100, likely a percentage
+            if 0 <= float_val <= 100:
+                # Additional checks to avoid false positives
+                if column.data_type in [DataType.FLOAT, DataType.INTEGER]:
+                    # If column name is a year, this is likely a measurement value, not a phone number
+                    if re.match(r'^\d{4}$', column.name):
+                        return True
+                    # If the value has decimal places and is reasonable for percentages
+                    if '.' in value and len(value.split('.')[1]) <= 2:
+                        return True
+            
+            return False
+        except (ValueError, TypeError):
+            return False
     
     def _extract_id_entities(self, file_path: str, column: ColumnProfile, 
                             config: Dict[str, Any]) -> List[Entity]:
@@ -1129,3 +1636,390 @@ class EntityExtractor:
         except Exception as e:
             logger.error(f"Failed to get cache stats: {e}")
             return {"cache_enabled": True, "error": str(e)}
+
+    def _extract_business_entities_llm(self, file_path: str, columns: List[ColumnProfile], 
+                                      config: Dict[str, Any]) -> List[Entity]:
+        """Extract business entities using LLM semantic analysis."""
+        if not self.llm_manager:
+            return []
+        
+        entities = []
+        
+        try:
+            # Get sample data for LLM analysis
+            sample_data = self._get_sample_data_for_llm(file_path, columns)
+            
+            # Analyze dataset context for better guidance
+            dataset_context = self._analyze_dataset_context(file_path, columns)
+            
+            # Create prompt for business entity identification
+            prompt = self._create_business_entity_prompt(columns, sample_data, dataset_context)
+            
+            # Use LLM to identify business entities
+            business_entities = self.llm_manager.identify_business_entities(prompt, columns)
+            
+            if business_entities:
+                for entity_info in business_entities:
+                    entity = self._create_entity_from_llm_analysis(entity_info, columns)
+                    if entity:
+                        entities.append(entity)
+                        logger.info(f"LLM identified business entity: {entity.name} ({entity.entity_type})")
+            
+        except Exception as e:
+            logger.warning(f"LLM business entity extraction failed: {e}")
+        
+        return entities
+    
+    def _get_sample_data_for_llm(self, file_path: str, columns: List[ColumnProfile]) -> Dict[str, List[str]]:
+        """Get sample data from each column for LLM analysis."""
+        sample_data = {}
+        
+        for column in columns:
+            try:
+                query = f"""
+                SELECT DISTINCT CAST("{column.name}" AS VARCHAR) as value
+                FROM ({self._safe_read_csv(file_path, [column.name])})
+                WHERE "{column.name}" IS NOT NULL
+                LIMIT 10
+                """
+                
+                df = self.con.execute(query).df()
+                if not df.empty:
+                    sample_data[column.name] = df['value'].astype(str).tolist()
+                else:
+                    sample_data[column.name] = []
+                    
+            except Exception as e:
+                logger.warning(f"Failed to get sample data for column {column.name}: {e}")
+                sample_data[column.name] = []
+        
+        return sample_data
+    
+    def _analyze_dataset_context(self, file_path: str, columns: List[ColumnProfile]) -> Dict[str, Any]:
+        """Analyze dataset context to provide better guidance to LLM."""
+        context = {
+            'file_name': os.path.basename(file_path),
+            'column_count': len(columns),
+            'data_patterns': {},
+            'domain_hints': []
+        }
+        
+        try:
+            # Analyze file name for domain hints
+            file_name_lower = context['file_name'].lower()
+            if 'agriculture' in file_name_lower or 'worker' in file_name_lower or 'employment' in file_name_lower:
+                context['domain_hints'].append('agriculture')
+                context['domain_hints'].append('employment')
+                context['domain_hints'].append('labor')
+            
+            if 'sales' in file_name_lower or 'revenue' in file_name_lower:
+                context['domain_hints'].append('business')
+                context['domain_hints'].append('sales')
+            
+            if 'population' in file_name_lower or 'demographics' in file_name_lower:
+                context['domain_hints'].append('demographics')
+                context['domain_hints'].append('population')
+            
+            # Analyze column patterns
+            year_columns = []
+            geographic_columns = []
+            measurement_columns = []
+            
+            for col in columns:
+                col_name = col.name.lower()
+                
+                # Check for year columns
+                if col_name.isdigit() and 1900 <= int(col_name) <= 2100:
+                    year_columns.append(col.name)
+                
+                # Check for geographic columns
+                if any(term in col_name for term in ['country', 'nation', 'state', 'city', 'region']):
+                    geographic_columns.append(col.name)
+                
+                # Check for measurement columns (numeric columns that aren't years)
+                if col.data_type in [DataType.FLOAT, DataType.INTEGER] and not col_name.isdigit():
+                    measurement_columns.append(col.name)
+            
+            context['data_patterns'] = {
+                'year_columns': year_columns,
+                'geographic_columns': geographic_columns,
+                'measurement_columns': measurement_columns,
+                'has_time_series': len(year_columns) > 0,
+                'has_geographic': len(geographic_columns) > 0
+            }
+            
+            # Add specific domain context
+            if context['domain_hints'] and 'agriculture' in context['domain_hints']:
+                context['domain_context'] = "This appears to be an agriculture-related dataset, likely containing employment or workforce data over time."
+            elif context['domain_hints'] and 'business' in context['domain_hints']:
+                context['domain_context'] = "This appears to be a business dataset, likely containing sales, revenue, or financial data."
+            elif context['domain_hints'] and 'demographics' in context['domain_hints']:
+                context['domain_context'] = "This appears to be a demographics dataset, likely containing population or social statistics."
+            
+        except Exception as e:
+            logger.warning(f"Failed to analyze dataset context: {e}")
+        
+        return context
+    
+    def _create_business_entity_prompt(self, columns: List[ColumnProfile], 
+                                     sample_data: Dict[str, List[str]],
+                                     dataset_context: Dict[str, Any]) -> str:
+        """Create a prompt for LLM to identify business entities."""
+        column_info = []
+        for col in columns:
+            sample_values = sample_data.get(col.name, [])[:5]  # Limit to 5 samples
+            column_info.append(f"- {col.name} ({col.data_type.value}): {sample_values}")
+        
+        prompt = f"""
+        Analyze this CSV dataset and identify the core business entities. Return your response in valid JSON format.
+
+        Columns:
+        {chr(10).join(column_info)}
+
+        Dataset Context:
+        {dataset_context.get('domain_context', 'General dataset analysis')}
+        
+        Data Patterns Detected:
+        - Time Series: {dataset_context['data_patterns'].get('has_time_series', False)}
+        - Geographic Data: {dataset_context['data_patterns'].get('has_geographic', False)}
+        - Year Columns: {dataset_context['data_patterns'].get('year_columns', [])}
+        - Geographic Columns: {dataset_context['data_patterns'].get('geographic_columns', [])}
+
+        Please identify and return a JSON object with this structure:
+        {{
+            "entities": [
+                {{
+                    "name": "Entity Name",
+                    "entity_type": "core_entity|measurement_entity|temporal_entity|geographic_entity|categorical_entity",
+                    "source_columns": ["column1", "column2"],
+                    "business_meaning": "Description of what this entity represents",
+                    "confidence": 0.95
+                }}
+            ]
+        }}
+
+        IMPORTANT GUIDELINES:
+        1. **Core Entity**: Identify the main object/concept that the data is about (e.g., Country, Customer, Product)
+        2. **Measurement Entity**: Be specific about WHAT is being measured, not just "Measurement Value". 
+           - If it's employment data, name it "Employment" or "Agricultural Employment"
+           - If it's sales data, name it "Sales" or "Revenue"
+           - If it's population data, name it "Population"
+        3. **Temporal Entity**: Identify time dimensions (Year, Month, Date, Quarter)
+        4. **Geographic Entity**: Identify location dimensions (Country, City, State, Region)
+        5. **Categorical Entity**: Identify classification dimensions (Category, Type, Status)
+
+        For the measurement entity, analyze the data values and column context to determine:
+        - What specific metric is being measured
+        - What units or context the values represent
+        - The business domain this data belongs to
+
+        Example: If you see percentage values (like 63.4, 39.8) in year columns, and the context suggests employment data, 
+        name the measurement entity "Agricultural Employment" or "Employment Percentage", not just "Measurement Value".
+
+        Return only valid JSON, no additional text.
+        """
+        
+        return prompt
+    
+    def _create_entity_from_llm_analysis(self, entity_info: Dict[str, Any], 
+                                       columns: List[ColumnProfile]) -> Optional[Entity]:
+        """Create an Entity object from LLM analysis results."""
+        try:
+            # Extract entity information from LLM response
+            entity_name = entity_info.get('name', 'Unknown')
+            entity_type = entity_info.get('entity_type', 'unknown')
+            source_columns = entity_info.get('source_columns', [])
+            business_meaning = entity_info.get('business_meaning', '')
+            confidence = entity_info.get('confidence', 0.7)
+            
+            # Find actual column names that match the source columns
+            actual_source_columns = []
+            for col_name in source_columns:
+                for col in columns:
+                    if col_name.lower() in col.name.lower() or col.name.lower() in col_name.lower():
+                        actual_source_columns.append(col.name)
+                        break
+            
+            if not actual_source_columns:
+                # If no exact match, use the first column as fallback
+                actual_source_columns = [columns[0].name] if columns else []
+            
+            # Create entity
+            entity = Entity(
+                id=f"llm_{entity_type}_{hash(entity_name)}",
+                name=entity_name,
+                entity_type=entity_type,
+                attributes={
+                    "description": business_meaning,
+                    "source_columns": actual_source_columns,
+                    "extraction_method": "llm_business_analysis",
+                    "business_meaning": business_meaning,
+                    "llm_confidence": confidence
+                },
+                confidence=confidence,
+                source_column=actual_source_columns[0] if actual_source_columns else None
+            )
+            
+            return entity
+            
+        except Exception as e:
+            logger.warning(f"Failed to create entity from LLM analysis: {e}")
+            return None
+    
+    def _detect_time_series_patterns(self, file_path: str, columns: List[ColumnProfile], 
+                                   config: Dict[str, Any]) -> List[Entity]:
+        """Detect time series patterns in the data."""
+        entities = []
+        
+        try:
+            # Look for year columns (common time series pattern)
+            year_columns = []
+            for col in columns:
+                if self._is_year_column(col):
+                    year_columns.append(col)
+            
+            if year_columns:
+                # Create time series entity
+                entity = Entity(
+                    id=f"time_series_{hash('year')}",
+                    name="Time Series",
+                    entity_type="temporal_entity",
+                    attributes={
+                        "source_columns": [col.name for col in year_columns],
+                        "extraction_method": "time_series_detection",
+                        "time_columns": [col.name for col in year_columns],
+                        "year_range": self._extract_year_range(year_columns),
+                        "business_meaning": "Temporal dimension representing time periods in the dataset"
+                    },
+                    confidence=0.9,
+                    source_column="time_series"
+                )
+                entities.append(entity)
+                logger.info(f"Detected time series pattern with {len(year_columns)} year columns")
+            
+            # Look for other time patterns (months, quarters, etc.)
+            time_pattern_columns = []
+            for col in columns:
+                if self._is_time_pattern_column(col):
+                    time_pattern_columns.append(col)
+            
+            if time_pattern_columns:
+                entity = Entity(
+                    id=f"time_pattern_{hash('time')}",
+                    name="Time Pattern",
+                    entity_type="temporal_entity",
+                    attributes={
+                        "source_columns": [col.name for col in time_pattern_columns],
+                        "extraction_method": "time_pattern_detection",
+                        "time_patterns": [col.name for col in time_pattern_columns],
+                        "business_meaning": "Time-based patterns or periods in the dataset"
+                    },
+                    confidence=0.8,
+                    source_column="time_patterns"
+                )
+                entities.append(entity)
+                
+        except Exception as e:
+            logger.warning(f"Time series pattern detection failed: {e}")
+        
+        return entities
+    
+    def _is_year_column(self, column: ColumnProfile) -> bool:
+        """Check if a column represents years."""
+        # Check if column name looks like a year
+        if re.match(r'^\d{4}$', column.name):
+            return True
+        
+        # Check if column name contains year-related terms
+        year_terms = ['year', 'yr', 'annual', 'fiscal']
+        if any(term in column.name.lower() for term in year_terms):
+            return True
+        
+        # Check if data type is numeric and values are in reasonable year range
+        if column.data_type in [DataType.INTEGER, DataType.FLOAT]:
+            # This would require sampling the data, but for now we'll rely on naming
+            return False
+        
+        return False
+    
+    def _is_time_pattern_column(self, column: ColumnProfile) -> bool:
+        """Check if a column represents time patterns."""
+        time_terms = ['month', 'quarter', 'week', 'day', 'date', 'period', 'season']
+        return any(term in column.name.lower() for term in time_terms)
+    
+    def _extract_year_range(self, year_columns: List[ColumnProfile]) -> List[int]:
+        """Extract the range of years from year columns."""
+        years = []
+        for col in year_columns:
+            try:
+                year = int(col.name)
+                if 1900 <= year <= 2100:  # Reasonable year range
+                    years.append(year)
+            except ValueError:
+                continue
+        
+        if years:
+            return [min(years), max(years)]
+        return []
+
+    def _detect_geographic_entities(self, file_path: str, columns: List[ColumnProfile], 
+                                   config: Dict[str, Any]) -> List[Entity]:
+        """Detect geographic entities in the data."""
+        entities = []
+        
+        try:
+            # Look for geographic columns
+            geographic_columns = []
+            for col in columns:
+                if self._is_geographic_column(col):
+                    geographic_columns.append(col)
+            
+            if geographic_columns:
+                # Create geographic entity
+                entity = Entity(
+                    id=f"geographic_{hash('location')}",
+                    name="Geographic Entity",
+                    entity_type="geographic_entity",
+                    attributes={
+                        "source_columns": [col.name for col in geographic_columns],
+                        "extraction_method": "geographic_detection",
+                        "geographic_types": [self._get_geographic_type(col) for col in geographic_columns],
+                        "business_meaning": "Geographic locations or regions in the dataset"
+                    },
+                    confidence=0.85,
+                    source_column="geographic"
+                )
+                entities.append(entity)
+                logger.info(f"Detected geographic entities in {len(geographic_columns)} columns")
+                
+        except Exception as e:
+            logger.warning(f"Geographic entity detection failed: {e}")
+        
+        return entities
+    
+    def _is_geographic_column(self, column: ColumnProfile) -> bool:
+        """Check if a column represents geographic data."""
+        geographic_terms = [
+            'country', 'nation', 'state', 'province', 'region', 'city', 'town', 'village',
+            'county', 'district', 'area', 'zone', 'location', 'place', 'address',
+            'latitude', 'longitude', 'coord', 'geo', 'spatial'
+        ]
+        
+        return any(term in column.name.lower() for term in geographic_terms)
+    
+    def _get_geographic_type(self, column: ColumnProfile) -> str:
+        """Get the type of geographic data in a column."""
+        col_name = column.name.lower()
+        
+        if any(term in col_name for term in ['country', 'nation']):
+            return 'country'
+        elif any(term in col_name for term in ['state', 'province']):
+            return 'state/province'
+        elif any(term in col_name for term in ['city', 'town', 'village']):
+            return 'city'
+        elif any(term in col_name for term in ['county', 'district']):
+            return 'county/district'
+        elif any(term in col_name for term in ['latitude', 'longitude', 'coord']):
+            return 'coordinates'
+        else:
+            return 'geographic_location'

@@ -73,7 +73,7 @@ class LLMManager:
     """Manages interactions with LM Studio LLM for semantic analysis."""
     
     def __init__(self, lmstudio_url: str = "http://localhost:1234", 
-                 default_model: str = "llama2", 
+                 default_model: str = "deepseek/deepseek-r1-0528-qwen3-8b",
                  use_embeddings: bool = True,
                  cache_dir: Optional[str] = None,
                  max_retries: int = 3,
@@ -132,6 +132,7 @@ class LLMManager:
         
         # Model fallback chain - updated to include available models
         self.model_fallback_chain = [
+            "openai/gpt-oss-20b",
             "meta-llama-3-8b-instruct",  # Primary model from config
             "llama-3.2-1b-instruct",     # Alternative instruction model
             "qwen/qwen3-8b",             # Qwen model
@@ -857,6 +858,104 @@ Common relationship types:
         except Exception as e:
             logger.error(f"Ontology mapping generation failed: {e}")
             return None
+    
+    def identify_business_entities(self, prompt: str, columns: List[Any]) -> List[Dict[str, Any]]:
+        """Identify business entities from CSV data using LLM analysis.
+        
+        Args:
+            prompt: Prompt describing the business entity identification task
+            columns: List of column profiles
+            
+        Returns:
+            List of identified business entities with their attributes
+        """
+        try:
+            # Generate response using LLM
+            response = self.generate_text(prompt, max_tokens=800, temperature=0.3)
+            if not response:
+                logger.warning("No response from LLM for business entity identification")
+                return []
+            
+            # Extract JSON from response
+            json_data = self._extract_json_from_response(response)
+            if not json_data or not isinstance(json_data, dict):
+                logger.warning("Invalid JSON response from LLM for business entity identification")
+                return []
+            
+            # Extract entities from response
+            entities = json_data.get('entities', [])
+            if not entities:
+                logger.info("No business entities identified by LLM")
+                return []
+            
+            # Validate and clean entity data
+            validated_entities = []
+            for entity in entities:
+                if isinstance(entity, dict) and 'name' in entity:
+                    # Enhance measurement entity names if they're too generic
+                    entity_name = entity.get('name', 'Unknown')
+                    entity_type = entity.get('entity_type', 'unknown')
+                    
+                    # Improve measurement entity naming
+                    if entity_type == 'measurement_entity' and entity_name.lower() in ['measurement value', 'value', 'data', 'metric']:
+                        entity_name = self._improve_measurement_entity_name(columns, entity)
+                    
+                    validated_entity = {
+                        'name': entity_name,
+                        'entity_type': entity_type,
+                        'source_columns': entity.get('source_columns', []),
+                        'business_meaning': entity.get('business_meaning', ''),
+                        'confidence': min(max(entity.get('confidence', 0.7), 0.0), 1.0)
+                    }
+                    validated_entities.append(validated_entity)
+            
+            logger.info(f"LLM identified {len(validated_entities)} business entities")
+            return validated_entities
+            
+        except Exception as e:
+            logger.error(f"Business entity identification failed: {e}")
+            return []
+    
+    def _improve_measurement_entity_name(self, columns: List[Any], entity: Dict[str, Any]) -> str:
+        """Improve generic measurement entity names based on column context."""
+        try:
+            # Look for context clues in column names and data
+            source_columns = entity.get('source_columns', [])
+            
+            # Check if this looks like employment data
+            if any('employment' in col.lower() for col in source_columns):
+                return "Employment"
+            
+            # Check if this looks like percentage data
+            if any(col.isdigit() and 1900 <= int(col) <= 2100 for col in source_columns):
+                # This is likely time series data, look for other context
+                for col in columns:
+                    if hasattr(col, 'name') and 'employment' in col.name.lower():
+                        return "Agricultural Employment"
+                    elif hasattr(col, 'name') and 'worker' in col.name.lower():
+                        return "Worker Employment"
+                    elif hasattr(col, 'name') and 'agriculture' in col.name.lower():
+                        return "Agricultural Employment"
+            
+            # Check for other common patterns
+            for col in columns:
+                if hasattr(col, 'name'):
+                    col_name = col.name.lower()
+                    if 'sales' in col_name or 'revenue' in col_name:
+                        return "Sales"
+                    elif 'population' in col_name:
+                        return "Population"
+                    elif 'price' in col_name or 'cost' in col_name:
+                        return "Price"
+                    elif 'count' in col_name or 'number' in col_name:
+                        return "Count"
+            
+            # Default improvement
+            return "Measured Value"
+            
+        except Exception as e:
+            logger.warning(f"Failed to improve measurement entity name: {e}")
+            return "Measured Value"
     
     def clear_cache(self) -> bool:
         """Clear all cached responses."""
