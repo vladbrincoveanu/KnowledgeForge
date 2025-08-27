@@ -917,7 +917,7 @@ class EmbeddingManager:
     
     def close(self):
         """Clean up resources."""
-        try:    
+        try:
             # Save FAISS index
             if self.faiss_indexes.get("main") is not None:
                 index_path = os.path.join(self.config.cache_dir, "faiss_index.bin")

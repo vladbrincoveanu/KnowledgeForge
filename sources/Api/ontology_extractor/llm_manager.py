@@ -16,7 +16,7 @@ import threading
 from collections import defaultdict, deque
 import re
 
-from pydantic import BaseModel, ValidationError, field_validator
+from pydantic import BaseModel, ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -61,19 +61,13 @@ class OntologyMappingSchema(BaseModel):
     confidence: float
     ontology_type: str
     processing_time: float
-    
-    @field_validator('mappings', mode='before')
-    @classmethod
-    def convert_numpy_types(cls, v):
-        from .models import convert_numpy_types
-        return convert_numpy_types(v)
 
 
 class LLMManager:
     """Manages interactions with LM Studio LLM for semantic analysis."""
     
     def __init__(self, lmstudio_url: str = "http://localhost:1234", 
-                 default_model: str = "deepseek/deepseek-r1-0528-qwen3-8b",
+                 default_model: str = "llama2", 
                  use_embeddings: bool = True,
                  cache_dir: Optional[str] = None,
                  max_retries: int = 3,
@@ -94,8 +88,6 @@ class LLMManager:
         self.default_model = default_model
         self.use_embeddings = use_embeddings
         self.max_retries = max_retries
-        
-        logger.info(f"Initializing LLM Manager with URL: {self.lmstudio_url}, Model: {self.default_model}")
         
         # Rate limiting
         self.rate_limit_requests = rate_limit_requests
@@ -130,17 +122,9 @@ class LLMManager:
                 logger.warning(f"Failed to load sentence transformer: {e}")
                 self.use_embeddings = False
         
-        # Model fallback chain - updated to include available models
+        # Model fallback chain
         self.model_fallback_chain = [
-            "openai/gpt-oss-20b",
-            "meta-llama-3-8b-instruct",  # Primary model from config
-            "llama-3.2-1b-instruct",     # Alternative instruction model
-            "qwen/qwen3-8b",             # Qwen model
-            "llama2",                    # Legacy fallback
-            "mistral",                   # Additional fallbacks
-            "phi3", 
-            "codellama", 
-            "llama2-7b"
+            "llama2", "mistral", "phi3", "codellama", "llama2-7b"
         ]
         
         # Prompt templates
@@ -228,25 +212,7 @@ Create ontology mappings in JSON format:
         try:
             response = self.session.get(f"{self.lmstudio_url}/v1/models", timeout=5)
             if response.status_code == 200:
-                models_data = response.json()
-                available_models = [model['id'] for model in models_data.get('data', [])]
                 logger.info(f"Successfully connected to LM Studio at {self.lmstudio_url}")
-                logger.info(f"Available models: {', '.join(available_models)}")
-                
-                # Check if our default model is available
-                if self.default_model in available_models:
-                    logger.info(f"Default model '{self.default_model}' is available")
-                else:
-                    logger.warning(f"Default model '{self.default_model}' not found. Available models: {', '.join(available_models)}")
-                    # Try to find a suitable alternative
-                    for model in self.model_fallback_chain:
-                        if model in available_models:
-                            logger.info(f"Using fallback model: {model}")
-                            self.default_model = model
-                            break
-                    else:
-                        logger.warning("No suitable fallback model found")
-                
                 return True
             else:
                 logger.warning(f"LM Studio service responded with status {response.status_code}")
@@ -541,7 +507,7 @@ Create ontology mappings in JSON format:
             if response:
                 # Extract JSON from response
                 json_data = self._extract_json_from_response(response)
-                if json_data and isinstance(json_data, dict):
+                if json_data:
                     processing_time = time.time() - start_time
                     
                     return EntityExtractionSchema(
@@ -580,7 +546,7 @@ Create ontology mappings in JSON format:
                 response = self.generate_text(prompt, max_tokens=200, temperature=0.3)
                 if response:
                     json_data = self._extract_json_from_response(response)
-                    if json_data and isinstance(json_data, dict):
+                    if json_data:
                         all_relationships.append(json_data)
                 
             except Exception as e:
@@ -622,7 +588,7 @@ Create ontology mappings in JSON format:
             response = self.generate_text(prompt, max_tokens=300, temperature=0.3)
             if response:
                 json_data = self._extract_json_from_response(response)
-                if json_data and isinstance(json_data, dict):
+                if json_data:
                     return SemanticTypeClassification(
                         semantic_type=json_data.get('semantic_type', 'unknown'),
                         confidence=json_data.get('confidence', 0.7),
@@ -802,7 +768,7 @@ Common relationship types:
             if response:
                 # Extract JSON from response
                 json_data = self._extract_json_from_response(response)
-                if json_data and isinstance(json_data, dict):
+                if json_data:
                     return {
                         'relationship_type': json_data.get('relationship_type', 'unrelated'),
                         'confidence': json_data.get('confidence', 0.5),
@@ -842,7 +808,7 @@ Common relationship types:
             response = self.generate_text(prompt, max_tokens=500, temperature=0.3)
             if response:
                 json_data = self._extract_json_from_response(response)
-                if json_data and isinstance(json_data, dict):
+                if json_data:
                     processing_time = time.time() - start_time
                     
                     return OntologyMappingSchema(
@@ -858,104 +824,6 @@ Common relationship types:
         except Exception as e:
             logger.error(f"Ontology mapping generation failed: {e}")
             return None
-    
-    def identify_business_entities(self, prompt: str, columns: List[Any]) -> List[Dict[str, Any]]:
-        """Identify business entities from CSV data using LLM analysis.
-        
-        Args:
-            prompt: Prompt describing the business entity identification task
-            columns: List of column profiles
-            
-        Returns:
-            List of identified business entities with their attributes
-        """
-        try:
-            # Generate response using LLM
-            response = self.generate_text(prompt, max_tokens=800, temperature=0.3)
-            if not response:
-                logger.warning("No response from LLM for business entity identification")
-                return []
-            
-            # Extract JSON from response
-            json_data = self._extract_json_from_response(response)
-            if not json_data or not isinstance(json_data, dict):
-                logger.warning("Invalid JSON response from LLM for business entity identification")
-                return []
-            
-            # Extract entities from response
-            entities = json_data.get('entities', [])
-            if not entities:
-                logger.info("No business entities identified by LLM")
-                return []
-            
-            # Validate and clean entity data
-            validated_entities = []
-            for entity in entities:
-                if isinstance(entity, dict) and 'name' in entity:
-                    # Enhance measurement entity names if they're too generic
-                    entity_name = entity.get('name', 'Unknown')
-                    entity_type = entity.get('entity_type', 'unknown')
-                    
-                    # Improve measurement entity naming
-                    if entity_type == 'measurement_entity' and entity_name.lower() in ['measurement value', 'value', 'data', 'metric']:
-                        entity_name = self._improve_measurement_entity_name(columns, entity)
-                    
-                    validated_entity = {
-                        'name': entity_name,
-                        'entity_type': entity_type,
-                        'source_columns': entity.get('source_columns', []),
-                        'business_meaning': entity.get('business_meaning', ''),
-                        'confidence': min(max(entity.get('confidence', 0.7), 0.0), 1.0)
-                    }
-                    validated_entities.append(validated_entity)
-            
-            logger.info(f"LLM identified {len(validated_entities)} business entities")
-            return validated_entities
-            
-        except Exception as e:
-            logger.error(f"Business entity identification failed: {e}")
-            return []
-    
-    def _improve_measurement_entity_name(self, columns: List[Any], entity: Dict[str, Any]) -> str:
-        """Improve generic measurement entity names based on column context."""
-        try:
-            # Look for context clues in column names and data
-            source_columns = entity.get('source_columns', [])
-            
-            # Check if this looks like employment data
-            if any('employment' in col.lower() for col in source_columns):
-                return "Employment"
-            
-            # Check if this looks like percentage data
-            if any(col.isdigit() and 1900 <= int(col) <= 2100 for col in source_columns):
-                # This is likely time series data, look for other context
-                for col in columns:
-                    if hasattr(col, 'name') and 'employment' in col.name.lower():
-                        return "Agricultural Employment"
-                    elif hasattr(col, 'name') and 'worker' in col.name.lower():
-                        return "Worker Employment"
-                    elif hasattr(col, 'name') and 'agriculture' in col.name.lower():
-                        return "Agricultural Employment"
-            
-            # Check for other common patterns
-            for col in columns:
-                if hasattr(col, 'name'):
-                    col_name = col.name.lower()
-                    if 'sales' in col_name or 'revenue' in col_name:
-                        return "Sales"
-                    elif 'population' in col_name:
-                        return "Population"
-                    elif 'price' in col_name or 'cost' in col_name:
-                        return "Price"
-                    elif 'count' in col_name or 'number' in col_name:
-                        return "Count"
-            
-            # Default improvement
-            return "Measured Value"
-            
-        except Exception as e:
-            logger.warning(f"Failed to improve measurement entity name: {e}")
-            return "Measured Value"
     
     def clear_cache(self) -> bool:
         """Clear all cached responses."""

@@ -188,6 +188,12 @@ class EntityExtractor:
         """Traditional entity extraction using pattern analysis and regex."""
         entities = []
         
+        # Performance optimization: limit processing for large datasets
+        max_columns_to_process = config.get('max_columns_to_process', 50)
+        if len(columns) > max_columns_to_process:
+            logger.info(f"Large dataset detected ({len(columns)} columns). Limiting processing to first {max_columns_to_process} columns for performance.")
+            columns = columns[:max_columns_to_process]
+        
         # Extract entities for each column
         for column in columns:
             if config.get('use_regex', True):
@@ -202,7 +208,7 @@ class EntityExtractor:
                 llm_entities = self._extract_llm_entities(file_path, column, config)
                 entities.extend(llm_entities)
         
-        # Detect composite keys
+        # Detect composite keys (with performance limits)
         if config.get('use_composite_key_detection', True):
             composite_entities = self._detect_composite_keys(file_path, columns, config)
             entities.extend(composite_entities)
@@ -272,7 +278,7 @@ class EntityExtractor:
         """Analyze dataset structure to identify patterns for entity consolidation."""
         patterns = {
             'time_series': [],
-            'geographic': [],
+            'location': [],
             'categorical': [],
             'measurement': [],
             'identifier': [],
@@ -287,9 +293,9 @@ class EntityExtractor:
             if self._is_time_dimension(col):
                 patterns['time_series'].append(col)
             
-            # Geographic detection
-            elif self._is_geographic_dimension(col):
-                patterns['geographic'].append(col)
+            # Location detection
+            elif self._is_location_dimension(col):
+                patterns['location'].append(col)
             
             # Categorical detection
             elif self._is_categorical_dimension(col):
@@ -309,7 +315,7 @@ class EntityExtractor:
         
         # Add pattern metadata
         patterns['has_time_series'] = len(patterns['time_series']) > 0
-        patterns['has_geographic'] = len(patterns['geographic']) > 0
+        patterns['has_location'] = len(patterns['location']) > 0
         patterns['has_measurements'] = len(patterns['measurement']) > 0
         patterns['time_series_length'] = len(patterns['time_series'])
         patterns['measurement_columns'] = len(patterns['measurement'])
@@ -335,17 +341,16 @@ class EntityExtractor:
         
         return False
     
-    def _is_geographic_dimension(self, column: ColumnProfile) -> bool:
-        """Check if a column represents a geographic dimension."""
+    def _is_location_dimension(self, column: ColumnProfile) -> bool:
+        """Check if a column represents a location dimension."""
         col_name = column.name.lower()
         
-        geographic_terms = [
-            'country', 'nation', 'state', 'province', 'region', 'city', 'town', 'village',
-            'county', 'district', 'area', 'zone', 'location', 'place', 'address',
-            'latitude', 'longitude', 'coord', 'geo', 'spatial', 'continent'
+        # Generic location terms that could apply to any domain
+        location_terms = [
+            'location', 'place', 'area', 'zone', 'region'
         ]
         
-        return any(term in col_name for term in geographic_terms)
+        return any(term in col_name for term in location_terms)
     
     def _is_categorical_dimension(self, column: ColumnProfile) -> bool:
         """Check if a column represents a categorical dimension."""
@@ -400,7 +405,7 @@ class EntityExtractor:
             'core_entities': [],
             'time_dimensions': [],
             'measurement_entities': [],
-            'geographic_entities': [],
+            'location_entities': [],
             'categorical_entities': []
         }
         
@@ -414,9 +419,9 @@ class EntityExtractor:
             else:
                 groups['time_dimensions'] = patterns['time_series']
         
-        # Group geographic columns
-        if patterns['geographic']:
-            groups['geographic_entities'] = patterns['geographic']
+        # Group location columns
+        if patterns['location']:
+            groups['location_entities'] = patterns['location']
         
         # Group categorical columns (potential core entities)
         if patterns['categorical']:
@@ -460,11 +465,11 @@ class EntityExtractor:
                 if measurement_entity:
                     entities.append(measurement_entity)
             
-            # Create geographic entity
-            if column_groups['geographic_entities']:
-                geo_entity = self._create_geographic_entity(column_groups['geographic_entities'], patterns)
-                if geo_entity:
-                    entities.append(geo_entity)
+            # Create location entity
+            if column_groups['location_entities']:
+                location_entity = self._create_location_entity(column_groups['location_entities'], patterns)
+                if location_entity:
+                    entities.append(location_entity)
             
             # Create categorical entity
             if column_groups['categorical_entities']:
@@ -484,9 +489,7 @@ class EntityExtractor:
         
         # Determine entity type based on column characteristics
         entity_type = "core_entity"
-        if patterns['has_geographic']:
-            entity_type = "geographic_entity"
-        elif any('category' in col.name.lower() for col in columns):
+        if any('category' in col.name.lower() for col in columns):
             entity_type = "categorical_entity"
         
         # Determine business meaning based on context
@@ -612,6 +615,28 @@ class EntityExtractor:
         
         return entity
     
+    def _create_location_entity(self, columns: List[ColumnProfile], patterns: Dict[str, Any]) -> Entity:
+        """Create a location entity."""
+        if not columns:
+            return None
+        
+        entity = Entity(
+            id=f"location_entity_{hash('location')}",
+            name="Location",
+            entity_type="location_entity",
+            attributes={
+                "business_meaning": "Represents locations or regions in the dataset",
+                "source_columns": [col.name for col in columns],
+                "extraction_method": "intelligent_consolidation",
+                "entity_category": "location_entity",
+                "column_count": len(columns)
+            },
+            confidence=0.8,
+            source_column=columns[0].name
+        )
+        
+        return entity
+    
     def _create_categorical_entity(self, columns: List[ColumnProfile], patterns: Dict[str, Any]) -> Entity:
         """Create a categorical entity."""
         if not columns:
@@ -624,7 +649,6 @@ class EntityExtractor:
             attributes={
                 "business_meaning": "Represents classification or categorization dimensions in the dataset",
                 "source_columns": [col.name for col in columns],
-                "extraction_method": "intelligent_consolidation",
                 "entity_category": "categorical_entity",
                 "column_count": len(columns)
             },
@@ -641,19 +665,8 @@ class EntityExtractor:
         
         col_name = columns[0].name.lower()
         
-        # Geographic context
-        if patterns['has_geographic']:
-            if 'country' in col_name or 'nation' in col_name:
-                return "Represents a specific nation or country"
-            elif 'state' in col_name or 'province' in col_name:
-                return "Represents a state or province"
-            elif 'city' in col_name or 'town' in col_name:
-                return "Represents a city or town"
-            else:
-                return "Represents a geographic location or region"
-        
-        # Business context
-        elif 'customer' in col_name or 'client' in col_name:
+        # Generic business context
+        if 'customer' in col_name or 'client' in col_name:
             return "Represents a customer or client"
         elif 'product' in col_name or 'item' in col_name:
             return "Represents a product or item"
@@ -671,19 +684,8 @@ class EntityExtractor:
         
         col_name = columns[0].name
         
-        # Geographic naming
-        if patterns['has_geographic']:
-            if 'country' in col_name.lower() or 'nation' in col_name.lower():
-                return "Country"
-            elif 'state' in col_name.lower() or 'province' in col_name.lower():
-                return "State/Province"
-            elif 'city' in col_name.lower() or 'town' in col_name.lower():
-                return "City"
-            else:
-                return "Geographic Location"
-        
-        # Business naming
-        elif 'customer' in col_name.lower() or 'client' in col_name.lower():
+        # Generic business naming
+        if 'customer' in col_name.lower() or 'client' in col_name.lower():
             return "Customer"
         elif 'product' in col_name.lower() or 'item' in col_name.lower():
             return "Product"
@@ -704,21 +706,13 @@ class EntityExtractor:
         # Check column names for hints
         col_names = [col.name.lower() for col in columns]
         
-        # Employment/Workforce
-        if any(term in ' '.join(col_names) for term in ['employment', 'worker', 'workforce', 'labor']):
-            return "Employment"
-        
-        # Sales/Revenue
-        elif any(term in ' '.join(col_names) for term in ['sales', 'revenue', 'income', 'profit']):
+        # Generic business measurements
+        if any(term in ' '.join(col_names) for term in ['sales', 'revenue', 'income', 'profit']):
             return "Sales"
-        
-        # Population/Demographics
-        elif any(term in ' '.join(col_names) for term in ['population', 'demographic', 'people', 'resident']):
-            return "Population"
-        
-        # Economic indicators
-        elif any(term in ' '.join(col_names) for term in ['gdp', 'economic', 'index', 'ratio']):
-            return "Economic Indicator"
+        elif any(term in ' '.join(col_names) for term in ['count', 'number', 'quantity', 'amount']):
+            return "Count"
+        elif any(term in ' '.join(col_names) for term in ['rate', 'ratio', 'percentage']):
+            return "Rate"
         
         # Generic measurement
         else:
@@ -1429,25 +1423,52 @@ class EntityExtractor:
             entity_names = [entity.name for entity in entities]
             embeddings = self.llm_manager.embedding_model.encode(entity_names)
             
-            # Use DBSCAN clustering to find similar entities
-            clustering = DBSCAN(eps=0.3, min_samples=1, metric='cosine')
-            clusters = clustering.fit_predict(embeddings)
+            # Use simple threshold-based deduplication instead of DBSCAN to avoid sklearn warnings
+            similarity_threshold = 0.85
+            processed_indices = set()
+            clusters = {}
+            cluster_id = 0
+            
+            for i, entity in enumerate(entities):
+                if i in processed_indices:
+                    continue
+                
+                # Start a new cluster
+                clusters[cluster_id] = [i]
+                processed_indices.add(i)
+                
+                for j in range(i + 1, len(entities)):
+                    if j in processed_indices:
+                        continue
+                    
+                    try:
+                        # Calculate simple cosine similarity manually
+                        if not np.allclose(embeddings[i], 0) and not np.allclose(embeddings[j], 0):
+                            # Manual cosine similarity calculation
+                            dot_product = np.dot(embeddings[i], embeddings[j])
+                            norm_i = np.linalg.norm(embeddings[i])
+                            norm_j = np.linalg.norm(embeddings[j])
+                            
+                            if norm_i > 0 and norm_j > 0:
+                                similarity = dot_product / (norm_i * norm_j)
+                                if similarity >= similarity_threshold:
+                                    clusters[cluster_id].append(j)
+                                    processed_indices.add(j)
+                    except Exception:
+                        # Skip this comparison if it fails
+                        continue
+                
+                cluster_id += 1
             
             # Group entities by cluster
-            cluster_groups: Dict[int, List[Entity]] = {}
-            for i, cluster_id in enumerate(clusters):
-                if cluster_id not in cluster_groups:
-                    cluster_groups[cluster_id] = []
-                cluster_groups[cluster_id].append(entities[i])
-            
-            # Merge entities in each cluster
             deduplicated_entities = []
-            for cluster in cluster_groups.values():
-                if len(cluster) == 1:
-                    deduplicated_entities.append(cluster[0])
+            for cluster_indices in clusters.values():
+                if len(cluster_indices) == 1:
+                    deduplicated_entities.append(entities[cluster_indices[0]])
                 else:
                     # Merge cluster entities
-                    merged_entity = self._merge_entity_group(cluster)
+                    cluster_entities = [entities[i] for i in cluster_indices]
+                    merged_entity = self._merge_entity_group(cluster_entities)
                     deduplicated_entities.append(merged_entity)
             
             logger.info(f"Embedding-based deduplication: {len(entities)} -> {len(deduplicated_entities)} entities")
@@ -1705,24 +1726,9 @@ class EntityExtractor:
         }
         
         try:
-            # Analyze file name for domain hints
-            file_name_lower = context['file_name'].lower()
-            if 'agriculture' in file_name_lower or 'worker' in file_name_lower or 'employment' in file_name_lower:
-                context['domain_hints'].append('agriculture')
-                context['domain_hints'].append('employment')
-                context['domain_hints'].append('labor')
-            
-            if 'sales' in file_name_lower or 'revenue' in file_name_lower:
-                context['domain_hints'].append('business')
-                context['domain_hints'].append('sales')
-            
-            if 'population' in file_name_lower or 'demographics' in file_name_lower:
-                context['domain_hints'].append('demographics')
-                context['domain_hints'].append('population')
-            
-            # Analyze column patterns
+            # Analyze column patterns generically
             year_columns = []
-            geographic_columns = []
+            location_columns = []
             measurement_columns = []
             
             for col in columns:
@@ -1732,9 +1738,9 @@ class EntityExtractor:
                 if col_name.isdigit() and 1900 <= int(col_name) <= 2100:
                     year_columns.append(col.name)
                 
-                # Check for geographic columns
-                if any(term in col_name for term in ['country', 'nation', 'state', 'city', 'region']):
-                    geographic_columns.append(col.name)
+                # Check for location columns (generic, not domain-specific)
+                if any(term in col_name for term in ['location', 'place', 'area', 'region']):
+                    location_columns.append(col.name)
                 
                 # Check for measurement columns (numeric columns that aren't years)
                 if col.data_type in [DataType.FLOAT, DataType.INTEGER] and not col_name.isdigit():
@@ -1742,19 +1748,14 @@ class EntityExtractor:
             
             context['data_patterns'] = {
                 'year_columns': year_columns,
-                'geographic_columns': geographic_columns,
+                'location_columns': location_columns,
                 'measurement_columns': measurement_columns,
                 'has_time_series': len(year_columns) > 0,
-                'has_geographic': len(geographic_columns) > 0
+                'has_location': len(location_columns) > 0
             }
             
-            # Add specific domain context
-            if context['domain_hints'] and 'agriculture' in context['domain_hints']:
-                context['domain_context'] = "This appears to be an agriculture-related dataset, likely containing employment or workforce data over time."
-            elif context['domain_hints'] and 'business' in context['domain_hints']:
-                context['domain_context'] = "This appears to be a business dataset, likely containing sales, revenue, or financial data."
-            elif context['domain_hints'] and 'demographics' in context['domain_hints']:
-                context['domain_context'] = "This appears to be a demographics dataset, likely containing population or social statistics."
+            # Generic domain context
+            context['domain_context'] = "General dataset analysis for entity identification."
             
         except Exception as e:
             logger.warning(f"Failed to analyze dataset context: {e}")
@@ -1781,9 +1782,9 @@ class EntityExtractor:
         
         Data Patterns Detected:
         - Time Series: {dataset_context['data_patterns'].get('has_time_series', False)}
-        - Geographic Data: {dataset_context['data_patterns'].get('has_geographic', False)}
+        - Location Data: {dataset_context['data_patterns'].get('has_location', False)}
         - Year Columns: {dataset_context['data_patterns'].get('year_columns', [])}
-        - Geographic Columns: {dataset_context['data_patterns'].get('geographic_columns', [])}
+        - Location Columns: {dataset_context['data_patterns'].get('location_columns', [])}
 
         Please identify and return a JSON object with this structure:
         {{
@@ -1962,64 +1963,44 @@ class EntityExtractor:
             return [min(years), max(years)]
         return []
 
-    def _detect_geographic_entities(self, file_path: str, columns: List[ColumnProfile], 
+    def _detect_location_entities(self, file_path: str, columns: List[ColumnProfile], 
                                    config: Dict[str, Any]) -> List[Entity]:
-        """Detect geographic entities in the data."""
+        """Detect location entities in the data (generic, not domain-specific)."""
         entities = []
         
         try:
-            # Look for geographic columns
-            geographic_columns = []
+            # Look for location columns (generic terms only)
+            location_columns = []
             for col in columns:
-                if self._is_geographic_column(col):
-                    geographic_columns.append(col)
+                if self._is_location_column(col):
+                    location_columns.append(col)
             
-            if geographic_columns:
-                # Create geographic entity
+            if location_columns:
+                # Create generic location entity
                 entity = Entity(
-                    id=f"geographic_{hash('location')}",
-                    name="Geographic Entity",
-                    entity_type="geographic_entity",
+                    id=f"location_{hash('location')}",
+                    name="Location",
+                    entity_type="location_entity",
                     attributes={
-                        "source_columns": [col.name for col in geographic_columns],
-                        "extraction_method": "geographic_detection",
-                        "geographic_types": [self._get_geographic_type(col) for col in geographic_columns],
-                        "business_meaning": "Geographic locations or regions in the dataset"
+                        "source_columns": [col.name for col in location_columns],
+                        "extraction_method": "location_detection",
+                        "business_meaning": "Represents locations or regions in the dataset"
                     },
-                    confidence=0.85,
-                    source_column="geographic"
+                    confidence=0.8,
+                    source_column="location"
                 )
                 entities.append(entity)
-                logger.info(f"Detected geographic entities in {len(geographic_columns)} columns")
+                logger.info(f"Detected location entities in {len(location_columns)} columns")
                 
         except Exception as e:
-            logger.warning(f"Geographic entity detection failed: {e}")
+            logger.warning(f"Location entity detection failed: {e}")
         
         return entities
     
-    def _is_geographic_column(self, column: ColumnProfile) -> bool:
-        """Check if a column represents geographic data."""
-        geographic_terms = [
-            'country', 'nation', 'state', 'province', 'region', 'city', 'town', 'village',
-            'county', 'district', 'area', 'zone', 'location', 'place', 'address',
-            'latitude', 'longitude', 'coord', 'geo', 'spatial'
+    def _is_location_column(self, column: ColumnProfile) -> bool:
+        """Check if a column represents location data (generic terms only)."""
+        location_terms = [
+            'location', 'place', 'area', 'zone', 'region'
         ]
         
-        return any(term in column.name.lower() for term in geographic_terms)
-    
-    def _get_geographic_type(self, column: ColumnProfile) -> str:
-        """Get the type of geographic data in a column."""
-        col_name = column.name.lower()
-        
-        if any(term in col_name for term in ['country', 'nation']):
-            return 'country'
-        elif any(term in col_name for term in ['state', 'province']):
-            return 'state/province'
-        elif any(term in col_name for term in ['city', 'town', 'village']):
-            return 'city'
-        elif any(term in col_name for term in ['county', 'district']):
-            return 'county/district'
-        elif any(term in col_name for term in ['latitude', 'longitude', 'coord']):
-            return 'coordinates'
-        else:
-            return 'geographic_location'
+        return any(term in column.name.lower() for term in location_terms)

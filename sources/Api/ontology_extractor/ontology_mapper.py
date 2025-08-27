@@ -335,8 +335,18 @@ class OntologyMapper:
             try:
                 class_text = f"{class_name} {class_info.get('description', '')}"
                 class_vector = self.vectorizer.transform([class_text])
-                similarity = cosine_similarity(entity_vector, class_vector)[0][0]
-                confidence += similarity * 0.1
+                
+                # Safety check: ensure vectors are valid
+                if entity_vector is not None and class_vector is not None:
+                    # Check for zero vectors
+                    if not np.allclose(entity_vector, 0) and not np.allclose(class_vector, 0):
+                        similarity = cosine_similarity(entity_vector, class_vector)[0][0]
+                        confidence += similarity * 0.1
+                    else:
+                        logger.debug("Skipping cosine similarity due to zero vectors")
+                else:
+                    logger.debug("Skipping cosine similarity due to invalid vectors")
+                    
             except Exception as e:
                 logger.debug(f"Failed to calculate embedding similarity: {e}")
         

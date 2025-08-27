@@ -3,7 +3,7 @@
 
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), 'sources', 'Api'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'Api'))
 
 from ontology_extractor.profiler import DataProfiler
 from ontology_extractor.entity_extractor import EntityExtractor
@@ -51,10 +51,23 @@ def test_full_pipeline():
         entities = entity_extractor.extract_entities(csv_file, profile.columns, entity_config)
         
         print(f"   ✅ Extracted {len(entities)} entities")
-        for entity in entities:
-            print(f"   🏷️  - {entity.name} ({entity.entity_type}, confidence: {entity.confidence:.2f})")
-            if hasattr(entity, 'attributes') and 'business_meaning' in entity.attributes:
-                print(f"      💡 {entity.attributes['business_meaning']}")
+        print("\n   📋 ENTITY DETAILS:")
+        for i, entity in enumerate(entities, 1):
+            print(f"   {i}. {entity.name} ({entity.entity_type})")
+            print(f"      📊 Confidence: {entity.confidence:.2f}")
+            print(f"      🏷️  Source Column: {entity.source_column}")
+            
+            if hasattr(entity, 'attributes') and entity.attributes:
+                if 'business_meaning' in entity.attributes:
+                    print(f"      💡 Business Meaning: {entity.attributes['business_meaning']}")
+                if 'source_columns' in entity.attributes:
+                    print(f"      📍 Source Columns: {entity.attributes['source_columns']}")
+                if 'extraction_method' in entity.attributes:
+                    print(f"      🔍 Extraction Method: {entity.attributes['extraction_method']}")
+                if 'entity_category' in entity.attributes:
+                    print(f"      🏗️  Category: {entity.attributes['entity_category']}")
+            
+            print()
         
         # Step 3: Relationship Discovery
         print("\n3️⃣ Relationship Discovery...")
@@ -105,6 +118,22 @@ def test_full_pipeline():
         print(f"   - Total entities: {len(entities)}")
         print(f"   - Entity types: {list(set([e.entity_type for e in entities]))}")
         print(f"   - Average confidence: {sum(e.confidence for e in entities) / len(entities):.2f}")
+        
+        # Show entity breakdown by type
+        entity_types = {}
+        for entity in entities:
+            entity_type = entity.entity_type
+            if entity_type not in entity_types:
+                entity_types[entity_type] = []
+            entity_types[entity_type].append(entity.name)
+        
+        print(f"\n   📊 ENTITY BREAKDOWN BY TYPE:")
+        for entity_type, names in entity_types.items():
+            print(f"      {entity_type}: {len(names)} entities")
+            for name in names[:3]:  # Show first 3 names
+                print(f"        - {name}")
+            if len(names) > 3:
+                print(f"        ... and {len(names) - 3} more")
         
         print(f"\n✅ Relationship Discovery: SUCCESS")
         print(f"   - Total relationships: {len(relationships)}")

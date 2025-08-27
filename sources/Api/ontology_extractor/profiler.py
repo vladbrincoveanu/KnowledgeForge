@@ -176,16 +176,27 @@ class DataProfiler:
             Pandas DataFrame with the data
         """
         try:
-            # First, try to read with explicit header handling
+            # First, try to read with explicit header handling and better column name preservation
             try:
-                # Use DuckDB with explicit header handling to prevent auto-generated column names
+                # Use DuckDB with explicit header handling and column name preservation
                 if sample_size > 0:
                     query = f"""
-                    SELECT * FROM read_csv_auto('{file_path}', header=true, auto_detect=true, sample_size=1000)
+                    SELECT * FROM read_csv_auto('{file_path}', 
+                        header=true, 
+                        auto_detect=true, 
+                        sample_size=1000,
+                        names=[],
+                        all_varchar=true)
                     LIMIT {sample_size}
                     """
                 else:
-                    query = f"SELECT * FROM read_csv_auto('{file_path}', header=true, auto_detect=true)"
+                    query = f"""
+                    SELECT * FROM read_csv_auto('{file_path}', 
+                        header=true, 
+                        auto_detect=true,
+                        names=[],
+                        all_varchar=true)
+                    """
                 
                 # Execute query and convert to pandas DataFrame
                 result = self.con.execute(query)
@@ -194,8 +205,50 @@ class DataProfiler:
                 # Validate that we have proper column names (not auto-generated)
                 if any(col.startswith('column') for col in df.columns):
                     logger.warning(f"Detected auto-generated column names: {df.columns.tolist()}")
-                    # Fall back to pandas for better column name handling
-                    raise Exception("Auto-generated column names detected")
+                    # Try alternative DuckDB approach with explicit column name handling
+                    logger.info("Attempting alternative DuckDB reading method...")
+                    
+                    # Read the first few lines to get actual headers
+                    with open(file_path, 'r') as f:
+                        first_line = f.readline().strip()
+                        if first_line:
+                            # Parse headers manually
+                            headers = [col.strip().strip('"').strip("'") for col in first_line.split(',')]
+                            logger.info(f"Manual header detection: {headers}")
+                            
+                            # Use explicit column names
+                            if sample_size > 0:
+                                query = f"""
+                                SELECT * FROM read_csv_auto('{file_path}', 
+                                    header=false, 
+                                    names={headers},
+                                    all_varchar=true)
+                                LIMIT {sample_size + 1}
+                                """
+                            else:
+                                query = f"""
+                                SELECT * FROM read_csv_auto('{file_path}', 
+                                    header=false, 
+                                    names={headers},
+                                    all_varchar=true)
+                                """
+                            
+                            # Skip the first row since we're not using header=true
+                            result = self.con.execute(query)
+                            df = result.df()
+                            
+                            # Remove the first row (which was the header)
+                            if len(df) > 0:
+                                df = df.iloc[1:].reset_index(drop=True)
+                            
+                            # Check if this worked
+                            if not any(col.startswith('column') for col in df.columns):
+                                logger.info("Successfully read CSV with manual header handling")
+                                return df
+                            else:
+                                raise Exception("Manual header handling also failed")
+                        else:
+                            raise Exception("Could not read CSV headers")
                 
                 logger.info(f"Successfully read CSV file with DuckDB: {len(df)} rows and {len(df.columns)} columns")
                 logger.debug(f"Column names: {df.columns.tolist()}")
