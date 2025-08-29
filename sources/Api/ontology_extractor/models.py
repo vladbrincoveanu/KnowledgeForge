@@ -78,12 +78,12 @@ class DatasetProfile(BaseModel):
 
 class Entity(BaseModel):
     """Represents an entity in the ontology."""
-    id: str
+    id: Optional[str] = None
     name: str
     entity_type: str
     attributes: Dict[str, Any] = Field(default_factory=dict)
     confidence: float = Field(ge=0.0, le=1.0)
-    source_column: Optional[str] = None
+    source_columns: List[str] = Field(default_factory=list)
     source_value: Optional[str] = None
     
     @field_validator('attributes', mode='before')
@@ -94,9 +94,9 @@ class Entity(BaseModel):
 
 class Relationship(BaseModel):
     """Represents a relationship between entities."""
-    id: str
-    source_entity_id: str
-    target_entity_id: str
+    id: Optional[str] = None
+    source_entity_id: Optional[str] = None
+    target_entity_id: Optional[str] = None
     relationship_type: str
     attributes: Dict[str, Any] = Field(default_factory=dict)
     confidence: float = Field(ge=0.0, le=1.0)
@@ -128,6 +128,6 @@ class ExtractionConfig(BaseModel):
     max_entities_per_column: int = Field(default=100, ge=1)
     relationship_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
     use_llm: bool = True
-    llm_model: str = "llama2"
+    llm_model: str = ""
     batch_size: int = Field(default=1000, ge=1)
     enable_semantic_similarity: bool = True

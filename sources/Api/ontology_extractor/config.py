@@ -39,7 +39,7 @@ class LMStudioConfig(BaseModel):
     """LM Studio LLM service configuration."""
     
     base_url: str = Field(default="http://localhost:1234", description="LM Studio service base URL")
-    model_name: str = Field(default="llama2", description="Default model to use")
+    model_name: str = Field(default="deepseek/deepseek-r1-0528-qwen3-8b", description="Default model to use")
     temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="Sampling temperature")
     max_tokens: int = Field(default=100, ge=1, le=4096, description="Maximum tokens to generate")
     timeout: int = Field(default=30, description="Request timeout in seconds")

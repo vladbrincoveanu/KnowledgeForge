@@ -41,8 +41,8 @@ from ontology_extractor import (
     MetadataStore,
     EmbeddingManager
 )
-from ontology_extractor.models import Entity, Relationship, Ontology, ExtractionConfig
-from ontology_extractor.config import load_config, OntologyExtractionConfig
+from ontology_extractor import Entity, Relationship, Ontology, ExtractionConfig
+from ontology_extractor import load_config, OntologyExtractionConfig
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

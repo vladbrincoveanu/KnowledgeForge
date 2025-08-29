@@ -236,7 +236,7 @@ class Neo4jGraphManager:
         """Store entity with comprehensive metadata using MERGE operations."""
         if not self.is_connected():
             logger.error("Cannot store entity: not connected to database")
-            return False
+            return False 
         
         extraction_timestamp = extraction_timestamp or datetime.now()
         
@@ -245,7 +245,7 @@ class Neo4jGraphManager:
         SET e.name = $name,
             e.entity_type = $entity_type,
             e.confidence = $confidence,
-            e.source_column = $source_column,
+            e.source_columns = $source_columns,
             e.source_value = $source_value,
             e.attributes = $attributes,
             e.source_file = $source_file,
@@ -261,7 +261,7 @@ class Neo4jGraphManager:
             'name': entity.name,
             'entity_type': entity.entity_type,
             'confidence': entity.confidence,
-            'source_column': entity.source_column,
+            'source_columns': json.dumps(entity.source_columns),
             'source_value': entity.source_value,
             'attributes': json.dumps(entity.attributes),
             'source_file': source_file,
@@ -284,7 +284,7 @@ class Neo4jGraphManager:
             
         except Exception as e:
             logger.error(f"Failed to store entity {entity.id}: {e}")
-            return False
+            return False11
     
     def store_relationship_with_metadata(self, relationship: Relationship, 
                                        discovered_at: Optional[datetime] = None,

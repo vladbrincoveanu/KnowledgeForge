@@ -67,7 +67,7 @@ class LLMManager:
     """Manages interactions with LM Studio LLM for semantic analysis."""
     
     def __init__(self, lmstudio_url: str = "http://localhost:1234", 
-                 default_model: str = "llama2", 
+                 default_model: str = "deepseek/deepseek-r1-0528-qwen3-8b", 
                  use_embeddings: bool = True,
                  cache_dir: Optional[str] = None,
                  max_retries: int = 3,

@@ -231,6 +231,12 @@ class OntologyMapper:
         else:
             entity_vectors = None
         
+        # Ensure all entities have valid IDs
+        for i, entity in enumerate(entities):
+            if entity.id is None or entity.id == "":
+                # Create a stable ID based on entity name and index
+                entity.id = f"entity_{i}_{abs(hash(str(entity.name))) % 1000000}"
+        
         # Map each entity
         for i, entity in enumerate(entities):
             best_mapping = None
@@ -288,17 +294,20 @@ class OntologyMapper:
         
         processing_time = time.time() - start_time
         
+        # Ensure confidence_scores only contains valid keys
+        valid_confidence_scores = {k: v for k, v in confidence_scores.items() if k is not None}
+        
         return OntologyMappingResult(
             mapped_entities=mapped_entities,
             unmapped_entities=unmapped_entities,
             ontology_classes=ontology_classes,
-            confidence_scores=confidence_scores,
+            confidence_scores=valid_confidence_scores,
             mapping_metadata={
                 "target_ontologies": target_ontologies,
                 "total_entities": len(entities),
                 "mapped_count": len(mapped_entities),
                 "unmapped_count": len(unmapped_entities),
-                "average_confidence": np.mean(list(confidence_scores.values())) if confidence_scores else 0.0
+                "average_confidence": np.mean(list(valid_confidence_scores.values())) if valid_confidence_scores else 0.0
             },
             processing_time=processing_time
         )

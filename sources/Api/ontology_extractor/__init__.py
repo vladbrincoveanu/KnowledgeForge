@@ -15,6 +15,8 @@ from .ontology_mapper import OntologyMapper, StandardOntology, OntologyMappingRe
 from .quality_assurance import QualityAssurance
 from .active_learning import ActiveLearningModule
 from .embedding_manager import EmbeddingManager
+from .models import Entity, Relationship, DataType, ColumnProfile, DatasetProfile, Ontology, ExtractionConfig
+from .config import OntologyExtractionConfig, load_config
 
 __all__ = [
     "DataProfiler",
@@ -30,4 +32,13 @@ __all__ = [
     "QualityAssurance",
     "ActiveLearningModule",
     "EmbeddingManager",
+    "Entity",
+    "Relationship", 
+    "DataType",
+    "ColumnProfile",
+    "DatasetProfile",
+    "Ontology",
+    "ExtractionConfig",
+    "OntologyExtractionConfig",
+    "load_config",
 ]
