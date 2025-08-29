@@ -482,27 +482,38 @@ class RelationshipDiscoverer:
                 logger.warning(f"LLM inference failed: {llm_error}")
                 return relationships
             
-            if relationship_info and isinstance(relationship_info, dict) and relationship_info.get('confidence', 0) >= config.get('relationship_threshold', 0.6):
-                # Create relationships for entity pairs
-                for entity1 in col1_entities[:5]:  # Limit to avoid too many relationships
-                    for entity2 in col2_entities[:5]:
-                        relationship = Relationship(
-                            id=f"llm_{entity1.id}_{entity2.id}_{hash(relationship_info.get('relationship_type', 'unknown'))}",
-                            source_entity_id=entity1.id,
-                            target_entity_id=entity2.id,
-                            relationship_type=relationship_info.get('relationship_type', 'unknown'),
-                            attributes={
-                                "llm_confidence": relationship_info.get('confidence', 0.5),
-                                "llm_reasoning": relationship_info.get('reasoning', 'No reasoning provided'),
-                                "source_column": col1_name,
-                                "target_column": col2_name,
-                                "evidence": sample_data,
-                                "extraction_method": "llm_inference"
-                            },
-                            confidence=relationship_info.get('confidence', 0.5),
-                            source_columns=[col1_name, col2_name]
-                        )
-                        relationships.append(relationship)
+            if relationship_info and isinstance(relationship_info, dict):
+                confidence = relationship_info.get('confidence', 0)
+                relationship_type = relationship_info.get('relationship_type', 'unknown')
+                reasoning = relationship_info.get('reasoning', 'No reasoning provided')
+                
+                logger.debug(f"Processing LLM result: confidence={confidence}, type={relationship_type}")
+                
+                if confidence >= config.get('relationship_threshold', 0.6):
+                    # Create relationships for entity pairs
+                    for entity1 in col1_entities[:5]:  # Limit to avoid too many relationships
+                        for entity2 in col2_entities[:5]:
+                            try:
+                                relationship = Relationship(
+                                    id=f"llm_{entity1.id}_{entity2.id}_{hash(relationship_type)}",
+                                    source_entity_id=entity1.id,
+                                    target_entity_id=entity2.id,
+                                    relationship_type=relationship_type,
+                                    attributes={
+                                        "llm_confidence": confidence,
+                                        "llm_reasoning": reasoning,
+                                        "source_column": col1_name,
+                                        "target_column": col2_name,
+                                        "evidence": sample_data,
+                                        "extraction_method": "llm_inference"
+                                    },
+                                    confidence=confidence,
+                                    source_columns=[col1_name, col2_name]
+                                )
+                                relationships.append(relationship)
+                            except Exception as rel_error:
+                                logger.warning(f"Failed to create relationship: {rel_error}")
+                                continue
         
         except Exception as e:
             logger.warning(f"LLM column analysis failed: {e}")
