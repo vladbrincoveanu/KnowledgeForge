@@ -27,7 +27,7 @@ install:
 # Development environment
 dev:
 	@echo "Starting development environment..."
-	docker-compose -f docker-compose.dev.yml up -d
+	docker-compose -f docker-compose.yml up -d
 	@echo "Development services started!"
 	@echo "Access points:"
 	@echo "  - UI Dev Server: http://localhost:3000"
@@ -50,7 +50,7 @@ prod:
 clean:
 	@echo "Stopping and cleaning containers..."
 	docker-compose down -v
-	docker-compose -f docker-compose.dev.yml down -v
+	docker-compose -f docker-compose.yml down -v
 	@echo "Cleanup complete!"
 
 # View logs
