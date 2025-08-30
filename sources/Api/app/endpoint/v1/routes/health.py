@@ -6,10 +6,10 @@ from datetime import datetime
 from typing import Dict, Any
 import logging
 
-from ....utils.config import get_config
-from ....infrastructure.graph.neo4j_manager import Neo4jGraphManager
-from ....infrastructure.llm.llm_manager import LLMManager
-from ....infrastructure.storage.metadata_store import MetadataStore
+from utils.config import get_config
+from app.infrastructure.graph.neo4j_manager import Neo4jGraphManager
+from app.infrastructure.llm.llm_manager import LLMManager
+from app.infrastructure.storage.metadata_store import MetadataStore
 
 logger = logging.getLogger(__name__)
 

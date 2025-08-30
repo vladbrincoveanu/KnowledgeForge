@@ -12,8 +12,8 @@ import networkx as nx
 from sentence_transformers import SentenceTransformer
 import re
 
-from domain.models.entities import Entity, Relationship, ColumnProfile, DataType
-from infrastructure.llm.llm_manager import LLMManager
+from app.domain.models.entities import Entity, Relationship, ColumnProfile, DataType
+from app.infrastructure.llm.llm_manager import LLMManager
 
 logger = logging.getLogger(__name__)
 

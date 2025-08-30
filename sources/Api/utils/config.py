@@ -119,6 +119,9 @@ class SecurityConfig(BaseModel):
 class Config(BaseSettings):
     """Main configuration class for KnowledgeForge API."""
     
+    # Configuration file path
+    config_file: Optional[str] = Field(default=None, description="Path to configuration file")
+    
     # Environment settings
     environment: str = Field(default="development", description="Environment name")
     debug: bool = Field(default=True, description="Enable debug mode")

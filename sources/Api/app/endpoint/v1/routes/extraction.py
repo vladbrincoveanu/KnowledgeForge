@@ -12,13 +12,13 @@ import asyncio
 from pydantic import BaseModel, Field
 
 # Import actual backend services
-from ....services.entity_extraction.entity_extractor import EntityExtractor
-from ....services.ontology_mapping.ontology_mapper import OntologyMapper
-from ....services.relationship_discovery.relationship_discoverer import RelationshipDiscoverer
-from ....infrastructure.graph.neo4j_manager import Neo4jGraphManager
-from ....infrastructure.storage.metadata_store import MetadataStore
-from ....domain.models.entities import DatasetProfile, Entity, Relationship
-from ....utils.config import get_config
+from app.services.entity_extraction.entity_extractor import EntityExtractor
+from app.services.ontology_mapping.ontology_mapper import OntologyMapper
+from app.services.relationship_discovery.relationship_discoverer import RelationshipDiscoverer
+from app.infrastructure.graph.neo4j_manager import Neo4jGraphManager
+from app.infrastructure.storage.metadata_store import MetadataStore
+from app.domain.models.entities import DatasetProfile, Entity, Relationship
+from utils.config import get_config
 
 logger = logging.getLogger(__name__)
 
