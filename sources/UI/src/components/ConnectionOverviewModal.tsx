@@ -2,13 +2,14 @@ import React from 'react';
 
 import { useState, useEffect } from 'react';
 import './ConnectionOverviewModal.css';
+import { Connection } from '../types';
 
 interface ConnectionOverviewModalProps {
-  connections: any[];
+  connections: Connection[];
   onClose: () => void;
   onConfirmAll: () => void;
   onRejectAll: () => void;
-  onConnectionAction: (action: string, connection: any) => void;
+  onConnectionAction: (action: string, connection: Connection) => void;
 }
 
 const ConnectionOverviewModal: React.FC<ConnectionOverviewModalProps> = ({

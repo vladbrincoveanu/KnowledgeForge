@@ -194,26 +194,29 @@ const MainContent: React.FC = () => {
     links: [],
   });
 
-  const handleWebSocketMessage = useCallback((data: WebSocketMessage) => {
-    if (data.task_id && extractionTasks[data.task_id]) {
-      setExtractionTasks(prev => ({
-        ...prev,
-        [data.task_id!]: {
-          ...prev[data.task_id!],
-          status:
-            (data.status as ExtractionTask['status']) ||
-            prev[data.task_id!].status,
-          message: data.message || prev[data.task_id!].message,
-          timestamp: data.timestamp,
-        },
-      }));
+  const handleWebSocketMessage = useCallback(
+    (data: WebSocketMessage) => {
+      if (data.task_id && extractionTasks[data.task_id]) {
+        setExtractionTasks(prev => ({
+          ...prev,
+          [data.task_id!]: {
+            ...prev[data.task_id!],
+            status:
+              (data.status as ExtractionTask['status']) ||
+              prev[data.task_id!].status,
+            message: data.message || prev[data.task_id!].message,
+            timestamp: data.timestamp,
+          },
+        }));
 
-      // Update graph data when extraction completes
-      if (data.status === 'completed') {
-        loadGraphData(data.task_id);
+        // Update graph data when extraction completes
+        if (data.status === 'completed') {
+          loadGraphData(data.task_id);
+        }
       }
-    }
-  }, [extractionTasks, loadGraphData]);
+    },
+    [extractionTasks, loadGraphData]
+  );
 
   useEffect(() => {
     wsService.connect();
@@ -227,21 +230,24 @@ const MainContent: React.FC = () => {
     };
   }, [handleWebSocketMessage]);
 
-  const calculateSimilarity = useCallback((str1: string, str2: string): number => {
-    const normalize = (str: string) =>
-      str.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const norm1 = normalize(str1);
-    const norm2 = normalize(str2);
+  const calculateSimilarity = useCallback(
+    (str1: string, str2: string): number => {
+      const normalize = (str: string) =>
+        str.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const norm1 = normalize(str1);
+      const norm2 = normalize(str2);
 
-    if (norm1 === norm2) return 1.0;
-    if (norm1.includes(norm2) || norm2.includes(norm1)) return 0.8;
-    if (norm1.includes('id') && norm2.includes('id')) return 0.7;
-    if (norm1.includes('name') && norm2.includes('name')) return 0.7;
-    if (norm1.includes('customer') && norm2.includes('customer')) return 0.9;
-    if (norm1.includes('order') && norm2.includes('order')) return 0.9;
+      if (norm1 === norm2) return 1.0;
+      if (norm1.includes(norm2) || norm2.includes(norm1)) return 0.8;
+      if (norm1.includes('id') && norm2.includes('id')) return 0.7;
+      if (norm1.includes('name') && norm2.includes('name')) return 0.7;
+      if (norm1.includes('customer') && norm2.includes('customer')) return 0.9;
+      if (norm1.includes('order') && norm2.includes('order')) return 0.9;
 
-    return 0.0;
-  }, []);
+      return 0.0;
+    },
+    []
+  );
 
   const findPotentialConnections = useCallback(
     (headersA: string[], headersB: string[]): Connection[] => {
@@ -366,47 +372,50 @@ const MainContent: React.FC = () => {
     []
   );
 
-  const loadGraphData = useCallback(async (taskId: string) => {
-    try {
-      // const graphDataResponse = await ontologyAPI.getGraphVisualization(taskId);
+  const loadGraphData = useCallback(
+    async (taskId: string) => {
+      try {
+        // const graphDataResponse = await ontologyAPI.getGraphVisualization(taskId);
 
-      // Convert Cypher queries to graph data
-      const nodes: GraphNode[] = [];
-      const links: GraphLink[] = [];
+        // Convert Cypher queries to graph data
+        const nodes: GraphNode[] = [];
+        const links: GraphLink[] = [];
 
-      // This is a simplified conversion - in production you'd parse the Cypher queries
-      // For now, we'll create basic graph data from entities and relationships
-      if (extractionTasks[taskId]?.results) {
-        const { entities, relationships } = extractionTasks[taskId].results!;
+        // This is a simplified conversion - in production you'd parse the Cypher queries
+        // For now, we'll create basic graph data from entities and relationships
+        if (extractionTasks[taskId]?.results) {
+          const { entities, relationships } = extractionTasks[taskId].results!;
 
-        entities.forEach(entity => {
-          nodes.push({
-            id: entity.id,
-            label: entity.name,
-            type: 'entity',
-            entityType: entity.entity_type,
-            confidence: entity.confidence,
+          entities.forEach(entity => {
+            nodes.push({
+              id: entity.id,
+              label: entity.name,
+              type: 'entity',
+              entityType: entity.entity_type,
+              confidence: entity.confidence,
+            });
           });
-        });
 
-        relationships.forEach(rel => {
-          links.push({
-            id: rel.id,
-            source: rel.source_entity_id,
-            target: rel.target_entity_id,
-            label: rel.relationship_type,
-            confidence: rel.confidence,
+          relationships.forEach(rel => {
+            links.push({
+              id: rel.id,
+              source: rel.source_entity_id,
+              target: rel.target_entity_id,
+              label: rel.relationship_type,
+              confidence: rel.confidence,
+            });
           });
-        });
+        }
+
+        setGraphData({ nodes, links });
+      } catch (error) {
+        console.error('Failed to load graph data:', error);
       }
+    },
+    [extractionTasks]
+  );
 
-      setGraphData({ nodes, links });
-    } catch (error) {
-      console.error('Failed to load graph data:', error);
-    }
-  }, [extractionTasks]);
-
-  const handleFeedbackSubmitted = useCallback((feedback: any) => {
+  const handleFeedbackSubmitted = useCallback((feedback: unknown) => {
     console.log('Feedback submitted:', feedback);
     // You can add additional logic here, such as updating the UI
   }, []);

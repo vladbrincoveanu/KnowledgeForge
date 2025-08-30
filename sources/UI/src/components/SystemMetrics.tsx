@@ -47,8 +47,8 @@ const SystemMetrics: React.FC = () => {
 
       setMetrics(metricsData);
       setHealth(healthData);
-    } catch (error: any) {
-      setError(error.message);
+    } catch (error: unknown) {
+      setError((error as Error).message);
     } finally {
       setLoading(false);
     }
@@ -335,7 +335,7 @@ const SystemMetrics: React.FC = () => {
               <XAxis dataKey="name" />
               <YAxis domain={[0, 1]} />
               <Tooltip
-                formatter={(value: any) => [
+                formatter={(value: unknown) => [
                   Math.round(Number(value) * 100) + '%',
                   'Confidence',
                 ]}

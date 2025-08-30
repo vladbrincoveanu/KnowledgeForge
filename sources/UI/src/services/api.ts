@@ -2,7 +2,7 @@ import axios, { AxiosInstance, AxiosResponse } from 'axios';
 
 // TypeScript interfaces
 interface ExtractConfig {
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface ExtractResponse {
@@ -16,7 +16,7 @@ interface ExtractionStatus {
   status: 'pending' | 'running' | 'completed' | 'failed';
   progress?: number;
   message?: string;
-  result?: any;
+  result?: unknown;
 }
 
 interface Entity {
@@ -24,7 +24,7 @@ interface Entity {
   name: string;
   type: string;
   confidence: number;
-  attributes?: Record<string, any>;
+  attributes?: Record<string, unknown>;
 }
 
 interface Relationship {
@@ -33,7 +33,7 @@ interface Relationship {
   target_entity: string;
   type: string;
   confidence: number;
-  attributes?: Record<string, any>;
+  attributes?: Record<string, unknown>;
 }
 
 interface PaginatedResponse<T> {
@@ -41,6 +41,16 @@ interface PaginatedResponse<T> {
   total: number;
   limit: number;
   offset: number;
+}
+
+interface AxiosErrorResponse {
+  response?: {
+    status: number;
+    statusText: string;
+    data: unknown;
+    headers: Record<string, string>;
+  };
+  message: string;
 }
 
 interface GraphVisualization {
@@ -52,7 +62,7 @@ interface GraphNode {
   id: string;
   label: string;
   type: string;
-  properties?: Record<string, any>;
+  properties?: Record<string, unknown>;
 }
 
 interface GraphEdge {
@@ -60,7 +70,7 @@ interface GraphEdge {
   source: string;
   target: string;
   type: string;
-  properties?: Record<string, any>;
+  properties?: Record<string, unknown>;
 }
 
 interface SystemMetrics {
@@ -169,7 +179,7 @@ fileUploadApi.interceptors.response.use(
 );
 
 // Ontology Extraction API
-export const _ontologyAPI = {
+export const ontologyAPI = {
   // Extract ontology from CSV file
   extractOntology: async (
     filePath: string,
@@ -199,7 +209,7 @@ export const _ontologyAPI = {
     limit = 100,
     offset = 0
   ): Promise<PaginatedResponse<Entity>> => {
-    const params: Record<string, any> = { limit, offset };
+    const params: Record<string, string | number> = { limit, offset };
     if (taskId) params.task_id = taskId;
 
     const response: AxiosResponse<PaginatedResponse<Entity>> = await api.get(
@@ -215,7 +225,7 @@ export const _ontologyAPI = {
     limit = 100,
     offset = 0
   ): Promise<PaginatedResponse<Relationship>> => {
-    const params: Record<string, any> = { limit, offset };
+    const params: Record<string, string | number> = { limit, offset };
     if (taskId) params.task_id = taskId;
 
     const response: AxiosResponse<PaginatedResponse<Relationship>> =
@@ -224,8 +234,8 @@ export const _ontologyAPI = {
   },
 
   // Submit feedback
-  submitFeedback: async (feedbackData: FeedbackData): Promise<any> => {
-    const response: AxiosResponse<any> = await api.post(
+  submitFeedback: async (feedbackData: FeedbackData): Promise<unknown> => {
+    const response: AxiosResponse<unknown> = await api.post(
       '/feedback',
       feedbackData
     );
@@ -330,13 +340,14 @@ export const fileAPI = {
 
       console.log('Upload response:', response.data);
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const axiosError = error as AxiosErrorResponse;
       console.error('Upload error details:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        headers: error.response?.headers,
-        message: error.message,
+        status: axiosError.response?.status,
+        statusText: axiosError.response?.statusText,
+        data: axiosError.response?.data,
+        headers: axiosError.response?.headers,
+        message: axiosError.message,
       });
       throw error;
     }
@@ -346,7 +357,7 @@ export const fileAPI = {
 // WebSocket message types
 interface WebSocketMessage {
   type: string;
-  data?: any;
+  data?: unknown;
   timestamp?: string;
 }
 
@@ -356,7 +367,7 @@ export class WebSocketService {
   private reconnectAttempts = 0;
   private readonly maxReconnectAttempts = 5;
   private readonly reconnectDelay = 1000;
-  private readonly listeners = new Map<string, ((data?: any) => void)[]>();
+  private readonly listeners = new Map<string, ((data?: unknown) => void)[]>();
 
   connect(): void {
     try {
@@ -416,14 +427,14 @@ export class WebSocketService {
     }
   }
 
-  on(event: string, callback: (data?: any) => void): void {
+  on(event: string, callback: (data?: unknown) => void): void {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
     }
     this.listeners.get(event)?.push(callback);
   }
 
-  off(event: string, callback: (data?: any) => void): void {
+  off(event: string, callback: (data?: unknown) => void): void {
     if (this.listeners.has(event)) {
       const callbacks = this.listeners.get(event)!;
       const index = callbacks.indexOf(callback);
@@ -433,7 +444,7 @@ export class WebSocketService {
     }
   }
 
-  private emit(event: string, data?: any): void {
+  private emit(event: string, data?: unknown): void {
     if (this.listeners.has(event)) {
       this.listeners.get(event)?.forEach(callback => {
         try {
@@ -445,7 +456,7 @@ export class WebSocketService {
     }
   }
 
-  send(data: any): void {
+  send(data: unknown): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(data));
     }
@@ -484,7 +495,7 @@ export const apiUtils = {
   },
 
   // Validate API response
-  validateResponse: (response: any): any => {
+  validateResponse: (response: unknown): unknown => {
     if (!response || typeof response !== 'object') {
       throw new Error('Invalid response format');
     }

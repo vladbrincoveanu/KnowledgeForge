@@ -2,14 +2,19 @@ import React from 'react';
 
 import { useEffect } from 'react';
 import './EdgeDetailsModal.css';
+import { GraphLink } from '../types';
 
 interface EdgeDetailsModalProps {
-  edge: any;
+  edge: GraphLink;
   isOpen: boolean;
   onClose: () => void;
 }
 
-const EdgeDetailsModal: React.FC<EdgeDetailsModalProps> = ({ edge, isOpen, onClose }) => {
+const EdgeDetailsModal: React.FC<EdgeDetailsModalProps> = ({
+  edge,
+  isOpen,
+  onClose,
+}) => {
   // Handle escape key to close modal
   useEffect(() => {
     const handleEscape = event => {

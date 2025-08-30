@@ -9,7 +9,7 @@ interface QueryNode {
   name: string;
   node_type: 'table' | 'field' | 'join' | 'filter' | 'aggregate';
   position: Position;
-  properties: Record<string, any>;
+  properties: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
@@ -19,7 +19,7 @@ interface QueryEdge {
   source_node_id: string;
   target_node_id: string;
   edge_type: 'select' | 'join' | 'filter' | 'group' | 'order';
-  properties: Record<string, any>;
+  properties: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
@@ -28,7 +28,7 @@ interface SemanticQuery {
   id: string;
   name: string;
   description: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   nodes?: QueryNode[];
   edges?: QueryEdge[];
   created_at: string;
@@ -142,7 +142,7 @@ class SemanticQueryService {
   async createQuery(
     name: string,
     description: string,
-    metadata: Record<string, any> = {}
+    metadata: Record<string, unknown> = {}
   ): Promise<SemanticQuery> {
     const params = new URLSearchParams({
       name,
@@ -299,16 +299,16 @@ class SemanticQueryService {
         connected: true,
         message: 'Successfully connected to semantic query API',
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         connected: false,
-        message: `Connection failed: ${error.message}`,
+        message: `Connection failed: ${(error as Error).message}`,
       };
     }
   }
 
   // Local storage fallback for offline functionality
-  saveToLocalStorage(key: string, data: any): boolean {
+  saveToLocalStorage(key: string, data: unknown): boolean {
     try {
       localStorage.setItem(key, JSON.stringify(data));
       return true;

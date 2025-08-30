@@ -112,7 +112,7 @@ export interface SemanticQuery {
   description: string;
   nodes: QueryNode[];
   edges: QueryEdge[];
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
@@ -198,6 +198,31 @@ export interface ChartData {
   value: number;
   color?: string;
   unit?: string;
+}
+
+// API response types
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+// Feedback response type
+export interface FeedbackResponse {
+  success: boolean;
+  message?: string;
+}
+
+// Axios error response type
+export interface AxiosErrorResponse {
+  response?: {
+    status: number;
+    statusText: string;
+    data: unknown;
+    headers: Record<string, string>;
+  };
+  message: string;
 }
 
 // Event handler types

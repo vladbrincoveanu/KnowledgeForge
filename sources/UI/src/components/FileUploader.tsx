@@ -2,6 +2,7 @@ import React from 'react';
 
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { ontologyAPI, fileAPI, wsService, apiUtils } from '../services/api';
+import { UploadedFile } from '../types';
 import {
   Upload,
   FileText,
@@ -14,9 +15,9 @@ import {
 import './FileUploader.css';
 
 interface FileUploaderProps {
-  onFilesUploaded: (files: any[]) => void;
+  onFilesUploaded: (files: UploadedFile[]) => void;
   isProcessing: boolean;
-  onExtractionStarted: (taskId: string, file: any) => void;
+  onExtractionStarted: (taskId: string, file: UploadedFile) => void;
 }
 
 const FileUploader: React.FC<FileUploaderProps> = ({
@@ -36,19 +37,22 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     enable_hierarchical_discovery: true,
   });
 
-  const handleWebSocketMessage = useCallback(data => {
-    if (data.task_id && extractionTasks[data.task_id]) {
-      setExtractionTasks(prev => ({
-        ...prev,
-        [data.task_id]: {
-          ...prev[data.task_id],
-          status: data.status,
-          message: data.message,
-          timestamp: data.timestamp,
-        },
-      }));
-    }
-  }, [extractionTasks]);
+  const handleWebSocketMessage = useCallback(
+    data => {
+      if (data.task_id && extractionTasks[data.task_id]) {
+        setExtractionTasks(prev => ({
+          ...prev,
+          [data.task_id]: {
+            ...prev[data.task_id],
+            status: data.status,
+            message: data.message,
+            timestamp: data.timestamp,
+          },
+        }));
+      }
+    },
+    [extractionTasks]
+  );
 
   // WebSocket connection for real-time updates
   useEffect(() => {

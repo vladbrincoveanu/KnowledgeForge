@@ -1,14 +1,19 @@
 import React from 'react';
 
 import './NodeDetailsModal.css';
+import { GraphNode } from '../types';
 
 interface NodeDetailsModalProps {
-  node: any;
+  node: GraphNode;
   isOpen: boolean;
   onClose: () => void;
 }
 
-const NodeDetailsModal: React.FC<NodeDetailsModalProps> = ({ node, isOpen, onClose }) => {
+const NodeDetailsModal: React.FC<NodeDetailsModalProps> = ({
+  node,
+  isOpen,
+  onClose,
+}) => {
   if (!isOpen || !node) return null;
 
   const formatDataType = dataType => {

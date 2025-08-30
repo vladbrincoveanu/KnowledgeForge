@@ -5,16 +5,14 @@ import ForceGraph2D from 'react-force-graph-2d';
 import EdgeDetailsModal from './EdgeDetailsModal';
 import NodeDetailsModal from './NodeDetailsModal';
 import './Graph.css';
+import { GraphData, GraphLink } from '../types';
 
 interface GraphProps {
-  data: any;
-  onEdgeClick: (edge: any) => void;
+  data: GraphData;
+  onEdgeClick: (edge: GraphLink) => void;
 }
 
-const Graph: React.FC<GraphProps> = ({
-  data,
-  onEdgeClick,
-}) => {
+const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
   const graphRef = useRef();
   const [selectedEdge, setSelectedEdge] = useState(null);
   const [showEdgeModal, setShowEdgeModal] = useState(false);

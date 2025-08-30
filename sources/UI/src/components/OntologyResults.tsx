@@ -15,12 +15,14 @@ import {
   Relationship,
   PaginationState,
   FeedbackForm,
+  PaginatedResponse,
+  FeedbackResponse,
 } from '../types';
 import './OntologyResults.css';
 
 interface OntologyResultsProps {
   taskId: string;
-  onFeedbackSubmitted: (feedback: any) => void;
+  onFeedbackSubmitted: (feedback: FeedbackResponse) => void;
 }
 
 const OntologyResults: React.FC<OntologyResultsProps> = ({
@@ -48,53 +50,55 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
     user_id: 'current_user',
   });
 
-  const loadData = useCallback(async (
-    type: 'entities' | 'relationships',
-    reset = false
-  ) => {
-    try {
-      setLoading(true);
-      setError(null);
+  const loadData = useCallback(
+    async (type: 'entities' | 'relationships', reset = false) => {
+      try {
+        setLoading(true);
+        setError(null);
 
-      const currentPagination = pagination[type];
-      const page = reset ? 1 : currentPagination.page;
+        const currentPagination = pagination[type];
+        const page = reset ? 1 : currentPagination.page;
 
-      let data: any;
-      if (type === 'entities') {
-        data = await ontologyAPI.getEntities(
-          taskId,
-          currentPagination.limit,
-          (page - 1) * currentPagination.limit
-        );
-        if (reset) {
-          setEntities(data.items || []);
+        let data: PaginatedResponse<Entity> | PaginatedResponse<Relationship>;
+        if (type === 'entities') {
+          data = await ontologyAPI.getEntities(
+            taskId,
+            currentPagination.limit,
+            (page - 1) * currentPagination.limit
+          );
+          if (reset) {
+            setEntities(data.items || []);
+          } else {
+            setEntities(prev => [...prev, ...(data.items || [])]);
+          }
         } else {
-          setEntities(prev => [...prev, ...(data.items || [])]);
+          data = await ontologyAPI.getRelationships(
+            taskId,
+            currentPagination.limit,
+            (page - 1) * currentPagination.limit
+          );
+          if (reset) {
+            setRelationships(data.items || []);
+          } else {
+            setRelationships(prev => [...prev, ...(data.items || [])]);
+          }
         }
-      } else {
-        data = await ontologyAPI.getRelationships(
-          taskId,
-          currentPagination.limit,
-          (page - 1) * currentPagination.limit
-        );
-        if (reset) {
-          setRelationships(data.items || []);
-        } else {
-          setRelationships(prev => [...prev, ...(data.items || [])]);
-        }
+
+        const newPage = reset ? 2 : page + 1;
+        setPagination(prev => ({
+          ...prev,
+          [type]: { ...prev[type], page: newPage, total: data.total || 0 },
+        }));
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : 'An unknown error occurred';
+        setError(errorMessage);
+      } finally {
+        setLoading(false);
       }
-
-      const newPage = reset ? 2 : page + 1;
-      setPagination(prev => ({
-        ...prev,
-        [type]: { ...prev[type], page: newPage, total: data.total || 0 },
-      }));
-    } catch (error: any) {
-      setError(error.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [taskId, pagination]);
+    },
+    [taskId, pagination]
+  );
 
   const handleFeedbackSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,10 +129,10 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
       loadData(activeTab, true);
 
       alert('Feedback submitted successfully!');
-    } catch (error: any) {
-      alert(
-        'Failed to submit feedback: ' + (error?.message || 'Unknown error')
-      );
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      alert('Failed to submit feedback: ' + errorMessage);
     }
   };
 
@@ -152,8 +156,10 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch (error: any) {
-      alert('Failed to export results: ' + (error?.message || 'Unknown error'));
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      alert('Failed to export results: ' + errorMessage);
     }
   };
 
