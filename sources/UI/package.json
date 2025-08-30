@@ -28,13 +28,17 @@
     "@typescript-eslint/eslint-plugin": "^8.41.0",
     "@typescript-eslint/parser": "^8.41.0",
     "@vitejs/plugin-react": "^4.1.1",
+    "@vitest/ui": "^3.2.4",
     "eslint": "^9.34.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
     "prettier": "^3.6.2",
+    "sass": "^1.91.0",
     "typescript": "^5.9.2",
     "vite": "^4.5.0",
-    "vite-plugin-node-polyfills": "^0.24.0"
+    "vite-plugin-node-polyfills": "^0.24.0",
+    "vitest": "^3.2.4"
   },
   "scripts": {
     "dev": "vite",
@@ -44,9 +48,20 @@
     "test": "vitest",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "lint:fix": "eslint . --ext ts,tsx --fix",
-    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
-    "type-check": "tsc --noEmit"
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,scss,md}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,scss,md}\"",
+    "type-check": "tsc --noEmit",
+    "start:prod": "npm run build && npm run preview",
+    "clean": "rm -rf dist node_modules/.vite",
+    "reinstall": "npm run clean && npm install",
+    "ci": "npm run type-check && npm run lint && npm run format:check && npm run build",
+    "check-all": "npm run type-check && npm run lint && npm run format:check",
+    "fix-all": "npm run format && npm run lint:fix",
+    "test:watch": "vitest --watch",
+    "test:ui": "vitest --ui",
+    "serve": "vite preview --host 0.0.0.0 --port 3000",
+    "dev:check": "npm run type-check && npm run lint && npm run format:check",
+    "dev:fix": "npm run format && npm run lint:fix"
   },
   "eslintConfig": {
     "extends": [

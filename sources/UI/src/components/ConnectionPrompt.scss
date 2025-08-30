@@ -210,7 +210,8 @@
   font-size: 0.875rem;
 }
 
-.type-badge, .strategy-badge {
+.type-badge,
+.strategy-badge {
   display: inline-block;
   padding: 6px 12px;
   background: #10b981;
@@ -226,7 +227,8 @@
 }
 
 /* Issues and Recommendations */
-.issues-section, .recommendations-section {
+.issues-section,
+.recommendations-section {
   margin-bottom: 20px;
   padding: 20px;
   border-radius: 8px;
@@ -242,7 +244,8 @@
   border: 1px solid #bbf7d0;
 }
 
-.issues-section h4, .recommendations-section h4 {
+.issues-section h4,
+.recommendations-section h4 {
   margin: 0 0 12px 0;
   font-size: 1rem;
   font-weight: 600;
@@ -256,13 +259,15 @@
   color: #059669;
 }
 
-.issues-section ul, .recommendations-section ul {
+.issues-section ul,
+.recommendations-section ul {
   margin: 0;
   padding-left: 20px;
   color: #374151;
 }
 
-.issues-section li, .recommendations-section li {
+.issues-section li,
+.recommendations-section li {
   margin-bottom: 6px;
   line-height: 1.5;
   font-size: 0.875rem;
@@ -302,7 +307,8 @@
   flex-shrink: 0;
 }
 
-.cancel-button, .confirm-button {
+.cancel-button,
+.confirm-button {
   padding: 12px 24px;
   border: none;
   border-radius: 8px;
@@ -390,40 +396,41 @@
     display: flex;
     flex-direction: column;
   }
-  
+
   .prompt-header {
     padding: 20px 24px 16px;
     flex-shrink: 0;
   }
-  
+
   .prompt-content {
     padding: 24px;
     flex: 1;
     overflow-y: auto;
     min-height: 0;
   }
-  
+
   .dataset-overview {
     flex-direction: column;
     gap: 16px;
   }
-  
+
   .analysis-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .prompt-actions {
     flex-direction: column;
     padding: 20px 24px;
     flex-shrink: 0;
   }
-  
-  .cancel-button, .confirm-button {
+
+  .cancel-button,
+  .confirm-button {
     width: 100%;
   }
-  
+
   .prompt-help {
     padding: 16px 24px 20px;
     flex-shrink: 0;
   }
-} 
+}

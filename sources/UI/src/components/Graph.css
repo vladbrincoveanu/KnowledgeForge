@@ -277,7 +277,8 @@
   border-radius: 4px;
 }
 
-.column-a, .column-b {
+.column-a,
+.column-b {
   font-size: 13px;
   font-weight: 500;
   color: #495057;
@@ -608,16 +609,16 @@
     gap: 12px;
     align-items: flex-start;
   }
-  
+
   .graph-stats {
     width: 100%;
     justify-content: space-between;
   }
-  
+
   .graph-controls {
     flex-wrap: wrap;
   }
-  
+
   .edge-panel {
     position: fixed;
     top: 50%;
@@ -627,52 +628,52 @@
     max-width: 400px;
     max-height: 80vh;
   }
-  
+
   .connection-nodes {
     flex-direction: column;
     gap: 12px;
   }
-  
+
   .connection-arrow {
     transform: rotate(90deg);
     margin: 8px 0;
   }
-  
+
   .metadata-summary {
     grid-template-columns: 1fr;
   }
-  
+
   .metrics-grid {
     gap: 6px;
   }
-  
+
   .metric-item {
     flex-direction: column;
     align-items: flex-start;
     gap: 4px;
   }
-  
+
   .metric-label {
     min-width: auto;
   }
-  
+
   .metric-bar {
     width: 100%;
   }
-  
+
   .metric-value {
     align-self: flex-end;
   }
-  
+
   .types-grid {
     max-height: 100px;
   }
-  
+
   .edge-actions {
     flex-direction: column;
   }
-  
+
   .btn-action {
     min-width: auto;
   }
-} 
+}

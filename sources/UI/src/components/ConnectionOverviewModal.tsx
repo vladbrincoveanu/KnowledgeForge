@@ -1,7 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+
+import { useState, useEffect } from 'react';
 import './ConnectionOverviewModal.css';
 
-const ConnectionOverviewModal = ({ connections, onClose, onConfirmAll, onRejectAll, onConnectionAction }) => {
+interface ConnectionOverviewModalProps {
+  connections: any[];
+  onClose: () => void;
+  onConfirmAll: () => void;
+  onRejectAll: () => void;
+  onConnectionAction: (action: string, connection: any) => void;
+}
+
+const ConnectionOverviewModal: React.FC<ConnectionOverviewModalProps> = ({
+  connections,
+  onClose,
+  onConfirmAll,
+  onRejectAll,
+  onConnectionAction,
+}) => {
   const [selectedConnections, setSelectedConnections] = useState(new Set());
   const [expandedConnection, setExpandedConnection] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -14,7 +30,7 @@ const ConnectionOverviewModal = ({ connections, onClose, onConfirmAll, onRejectA
     setSelectedConnections(new Set(highConfidenceIds));
   }, [connections]);
 
-  const handleConnectionToggle = (connectionId) => {
+  const handleConnectionToggle = connectionId => {
     const newSelected = new Set(selectedConnections);
     if (newSelected.has(connectionId)) {
       newSelected.delete(connectionId);
@@ -63,13 +79,13 @@ const ConnectionOverviewModal = ({ connections, onClose, onConfirmAll, onRejectA
     }
   };
 
-  const getConfidenceColor = (confidence) => {
+  const getConfidenceColor = confidence => {
     if (confidence >= 0.9) return '#10b981';
     if (confidence >= 0.7) return '#f59e0b';
     return '#ef4444';
   };
 
-  const getConfidenceLabel = (confidence) => {
+  const _getConfidenceLabel = confidence => {
     if (confidence >= 0.9) return 'High';
     if (confidence >= 0.7) return 'Medium';
     return 'Low';
@@ -80,7 +96,10 @@ const ConnectionOverviewModal = ({ connections, onClose, onConfirmAll, onRejectA
 
   return (
     <div className="connection-overview-overlay" onClick={onClose}>
-      <div className="connection-overview-modal" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="connection-overview-modal"
+        onClick={e => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="overview-header">
           <div className="header-content">
@@ -95,8 +114,20 @@ const ConnectionOverviewModal = ({ connections, onClose, onConfirmAll, onRejectA
             </div>
           </div>
           <button className="close-button" onClick={onClose}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M18 6L6 18M6 6L18 18"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           </button>
         </div>
@@ -104,26 +135,50 @@ const ConnectionOverviewModal = ({ connections, onClose, onConfirmAll, onRejectA
         {/* Content */}
         <div className="overview-content">
           <div className="connections-list">
-            {connections.map((connection, index) => (
+            {connections.map((connection, _index) => (
               <div key={connection.id} className="connection-item">
                 <div className="connection-header">
                   <div className="connection-info">
                     <div className="connection-pair">
-                      <span className="dataset-name">{connection.source_collection}</span>
-                      <span className="column-pill">{connection.source_column}</span>
+                      <span className="dataset-name">
+                        {connection.source_collection}
+                      </span>
+                      <span className="column-pill">
+                        {connection.source_column}
+                      </span>
                       <span className="arrow">→</span>
-                      <span className="dataset-name">{connection.target_collection}</span>
-                      <span className="column-pill">{connection.target_column}</span>
+                      <span className="dataset-name">
+                        {connection.target_collection}
+                      </span>
+                      <span className="column-pill">
+                        {connection.target_column}
+                      </span>
                     </div>
                     <div className="connection-meta">
-                      <span className="confidence-badge" style={{ backgroundColor: getConfidenceColor(connection.confidence_score || connection.ai_score) }}>
-                        {Math.round((connection.confidence_score || connection.ai_score) * 100)}% CONFIDENCE
+                      <span
+                        className="confidence-badge"
+                        style={{
+                          backgroundColor: getConfidenceColor(
+                            connection.confidence_score || connection.ai_score
+                          ),
+                        }}
+                      >
+                        {Math.round(
+                          (connection.confidence_score || connection.ai_score) *
+                            100
+                        )}
+                        % CONFIDENCE
                       </span>
-                      <span className="connection-type-badge">{connection.connection_type || 'FOREIGN_KEY'}</span>
-                      <span className="join-strategy-badge">{connection.llm_analysis?.suggested_join_strategy || 'inner_join'}</span>
+                      <span className="connection-type-badge">
+                        {connection.connection_type || 'FOREIGN_KEY'}
+                      </span>
+                      <span className="join-strategy-badge">
+                        {connection.llm_analysis?.suggested_join_strategy ||
+                          'inner_join'}
+                      </span>
                     </div>
                   </div>
-                  
+
                   <div className="connection-actions">
                     <label className="checkbox-container">
                       <input
@@ -134,28 +189,38 @@ const ConnectionOverviewModal = ({ connections, onClose, onConfirmAll, onRejectA
                       />
                       <span className="checkmark"></span>
                     </label>
-                    
+
                     <button
                       className="action-button approve"
-                      onClick={() => handleConnectionAction(connection.id, 'approve')}
+                      onClick={() =>
+                        handleConnectionAction(connection.id, 'approve')
+                      }
                       disabled={isProcessing}
                       title="Approve this connection"
                     >
                       ✓
                     </button>
-                    
+
                     <button
                       className="action-button reject"
-                      onClick={() => handleConnectionAction(connection.id, 'reject')}
+                      onClick={() =>
+                        handleConnectionAction(connection.id, 'reject')
+                      }
                       disabled={isProcessing}
                       title="Reject this connection"
                     >
                       ✕
                     </button>
-                    
+
                     <button
                       className="action-button expand"
-                      onClick={() => setExpandedConnection(expandedConnection === connection.id ? null : connection.id)}
+                      onClick={() =>
+                        setExpandedConnection(
+                          expandedConnection === connection.id
+                            ? null
+                            : connection.id
+                        )
+                      }
                       title="View details"
                     >
                       {expandedConnection === connection.id ? '−' : '+'}
@@ -168,46 +233,65 @@ const ConnectionOverviewModal = ({ connections, onClose, onConfirmAll, onRejectA
                   <div className="connection-details">
                     <div className="ai-analysis">
                       <h4>AI Analysis</h4>
-                      
+
                       {connection.llm_analysis ? (
                         <>
                           <div className="analysis-grid">
                             <div className="analysis-item">
                               <strong>Reasoning:</strong>
-                              <p>{connection.llm_analysis.reasoning || 'AI analysis not available'}</p>
+                              <p>
+                                {connection.llm_analysis.reasoning ||
+                                  'AI analysis not available'}
+                              </p>
                             </div>
                             <div className="analysis-item">
                               <strong>Business Context:</strong>
-                              <p>{connection.llm_analysis.business_context || 'Context not available'}</p>
+                              <p>
+                                {connection.llm_analysis.business_context ||
+                                  'Context not available'}
+                              </p>
                             </div>
                             <div className="analysis-item">
                               <strong>Connection Type:</strong>
-                              <div className="type-badge">{connection.llm_analysis.connection_type || connection.connection_type || 'FOREIGN_KEY'}</div>
+                              <div className="type-badge">
+                                {connection.llm_analysis.connection_type ||
+                                  connection.connection_type ||
+                                  'FOREIGN_KEY'}
+                              </div>
                             </div>
                             <div className="analysis-item">
                               <strong>Join Strategy:</strong>
-                              <div className="strategy-badge">{connection.llm_analysis.suggested_join_strategy || 'inner_join'}</div>
+                              <div className="strategy-badge">
+                                {connection.llm_analysis
+                                  .suggested_join_strategy || 'inner_join'}
+                              </div>
                             </div>
                           </div>
-                          
-                          {connection.llm_analysis.potential_issues?.length > 0 && (
+
+                          {connection.llm_analysis.potential_issues?.length >
+                            0 && (
                             <div className="issues-section">
                               <h5>⚠️ Potential Issues</h5>
                               <ul>
-                                {connection.llm_analysis.potential_issues.map((issue, idx) => (
-                                  <li key={idx}>{issue}</li>
-                                ))}
+                                {connection.llm_analysis.potential_issues.map(
+                                  (issue, idx) => (
+                                    <li key={idx}>{issue}</li>
+                                  )
+                                )}
                               </ul>
                             </div>
                           )}
-                          
-                          {connection.llm_analysis.recommendations?.length > 0 && (
+
+                          {connection.llm_analysis.recommendations?.length >
+                            0 && (
                             <div className="recommendations-section">
                               <h5>💡 Recommendations</h5>
                               <ul>
-                                {connection.llm_analysis.recommendations.map((rec, idx) => (
-                                  <li key={idx}>{rec}</li>
-                                ))}
+                                {connection.llm_analysis.recommendations.map(
+                                  (rec, idx) => (
+                                    <li key={idx}>{rec}</li>
+                                  )
+                                )}
                               </ul>
                             </div>
                           )}
@@ -217,9 +301,24 @@ const ConnectionOverviewModal = ({ connections, onClose, onConfirmAll, onRejectA
                           <p>AI analysis not available for this connection.</p>
                           <div className="connection-summary">
                             <strong>Connection Summary:</strong>
-                            <p>This connection links {connection.source_column} from {connection.source_collection} to {connection.target_column} from {connection.target_collection}.</p>
-                            <p>Confidence: {Math.round((connection.confidence_score || connection.ai_score) * 100)}%</p>
-                            <p>Type: {connection.connection_type || 'FOREIGN_KEY'}</p>
+                            <p>
+                              This connection links {connection.source_column}{' '}
+                              from {connection.source_collection} to{' '}
+                              {connection.target_column} from{' '}
+                              {connection.target_collection}.
+                            </p>
+                            <p>
+                              Confidence:{' '}
+                              {Math.round(
+                                (connection.confidence_score ||
+                                  connection.ai_score) * 100
+                              )}
+                              %
+                            </p>
+                            <p>
+                              Type:{' '}
+                              {connection.connection_type || 'FOREIGN_KEY'}
+                            </p>
                           </div>
                         </div>
                       )}
@@ -241,7 +340,7 @@ const ConnectionOverviewModal = ({ connections, onClose, onConfirmAll, onRejectA
             >
               Cancel
             </button>
-            
+
             <div className="bulk-actions">
               <button
                 className="reject-all-button"
@@ -250,7 +349,7 @@ const ConnectionOverviewModal = ({ connections, onClose, onConfirmAll, onRejectA
               >
                 Reject Selected ({selectedCount})
               </button>
-              
+
               <button
                 className="confirm-all-button"
                 onClick={handleConfirmAll}
@@ -260,10 +359,11 @@ const ConnectionOverviewModal = ({ connections, onClose, onConfirmAll, onRejectA
               </button>
             </div>
           </div>
-          
+
           <div className="footer-help">
             <small>
-              💡 <strong>Tip:</strong> Select connections using checkboxes for bulk actions, or use individual approve/reject buttons. 
+              💡 <strong>Tip:</strong> Select connections using checkboxes for
+              bulk actions, or use individual approve/reject buttons.
               High-confidence connections are auto-selected.
             </small>
           </div>
@@ -273,4 +373,4 @@ const ConnectionOverviewModal = ({ connections, onClose, onConfirmAll, onRejectA
   );
 };
 
-export default ConnectionOverviewModal; 
+export default ConnectionOverviewModal;

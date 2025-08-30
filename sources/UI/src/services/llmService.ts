@@ -3,72 +3,141 @@
  * Provides AI analysis for data connections using local Ollama models
  */
 
+// TypeScript interfaces
+interface Connection {
+  source_collection?: string;
+  source_column?: string;
+  target_collection?: string;
+  target_column?: string;
+  connection_type?: string;
+  confidence_score?: number;
+  llm_analysis?: LLMAnalysis;
+  ai_score?: number;
+}
+
+interface LLMAnalysis {
+  reasoning: string;
+  business_context: string;
+  connection_type: string;
+  suggested_join_strategy: string;
+  potential_issues: string[];
+  recommendations: string[];
+  confidence_level: 'High' | 'Medium' | 'Low';
+}
+
+interface OllamaRequest {
+  model: string;
+  prompt: string;
+  stream: boolean;
+  options: {
+    temperature: number;
+    top_p: number;
+    max_tokens: number;
+  };
+}
+
+interface OllamaResponse {
+  response: string;
+  done: boolean;
+  context?: number[];
+}
+
+interface OllamaModel {
+  name: string;
+  size: number;
+  digest: string;
+  modified_at: string;
+}
+
+interface OllamaModelsResponse {
+  models: OllamaModel[];
+}
+
 class LLMService {
+  private ollamaUrl: string;
+  private model: string;
+  private disableOllama: boolean;
+  private ollamaAvailable: boolean | null = null; // tri-state: null = unknown, true/false = known
+  private warnedUnavailable = false;
+
   constructor() {
-    this.ollamaUrl = process.env.REACT_APP_OLLAMA_URL || 'http://localhost:11434';
-    this.model = process.env.REACT_APP_OLLAMA_MODEL || 'llama2';
-    this.disableOllama = String(process.env.REACT_APP_OLLAMA_DISABLED || '').toLowerCase() === 'true';
-    this.ollamaAvailable = null; // tri-state: null = unknown, true/false = known
-    this.warnedUnavailable = false;
+    this.ollamaUrl =
+      import.meta.env.VITE_OLLAMA_URL || 'http://localhost:11434';
+    this.model = import.meta.env.VITE_OLLAMA_MODEL || 'llama2';
+    this.disableOllama =
+      String(import.meta.env.VITE_OLLAMA_DISABLED || '').toLowerCase() ===
+      'true';
   }
 
   /**
    * Analyze potential connections between datasets - COMPLETELY REWRITTEN
    */
-  async analyzeConnections(connections, maxConnections = 5) {
+  async analyzeConnections(
+    connections: Connection[],
+    maxConnections = 5
+  ): Promise<Connection[]> {
     try {
-      console.log(`Smart analyzing ${connections.length} connections with Ollama...`);
-      
+      console.log(
+        `Smart analyzing ${connections.length} connections with Ollama...`
+      );
+
       // First, pre-filter connections using smart rules
       const preFiltered = this.preFilterConnections(connections);
       console.log(`Pre-filtered to ${preFiltered.length} connections`);
-      
+
       // Take only the top connections for LLM analysis
       const topConnections = preFiltered.slice(0, maxConnections);
-      
+
       // If Ollama is disabled or unavailable, use fallback analyses without attempting fetches
       const canUseOllama = await this.ensureOllamaAvailable();
       if (!canUseOllama) {
         if (!this.warnedUnavailable) {
-          console.warn('Ollama is disabled or not reachable. Using fallback analysis.');
+          console.warn(
+            'Ollama is disabled or not reachable. Using fallback analysis.'
+          );
           this.warnedUnavailable = true;
         }
-        const analyses = topConnections.map((connection) => this.getFallbackAnalysis(connection));
+        const analyses = topConnections.map(connection =>
+          this.getFallbackAnalysis(connection)
+        );
         const scoredConnections = topConnections.map((connection, index) => ({
           ...connection,
           llm_analysis: analyses[index],
-          ai_score: this.calculateAIScore(analyses[index])
+          ai_score: this.calculateAIScore(analyses[index]),
         }));
         const rankedConnections = scoredConnections
-          .sort((a, b) => b.ai_score - a.ai_score)
+          .sort((a, b) => (b.ai_score || 0) - (a.ai_score || 0))
           .slice(0, maxConnections);
-        console.log(`Returning top ${rankedConnections.length} smart connections (fallback)`);
+        console.log(
+          `Returning top ${rankedConnections.length} smart connections (fallback)`
+        );
         return rankedConnections;
       }
 
       // Create analysis prompts for each connection
-      const analysisPromises = topConnections.map(connection => 
+      const analysisPromises = topConnections.map(connection =>
         this.analyzeSingleConnection(connection)
       );
-      
+
       // Run all analyses in parallel
       const analyses = await Promise.all(analysisPromises);
-      
+
       // Score and rank connections
       const scoredConnections = topConnections.map((connection, index) => ({
         ...connection,
         llm_analysis: analyses[index],
-        ai_score: this.calculateAIScore(analyses[index])
+        ai_score: this.calculateAIScore(analyses[index]),
       }));
-      
+
       // Sort by AI score and return top connections
       const rankedConnections = scoredConnections
-        .sort((a, b) => b.ai_score - a.ai_score)
+        .sort((a, b) => (b.ai_score || 0) - (a.ai_score || 0))
         .slice(0, maxConnections);
-      
-      console.log(`Returning top ${rankedConnections.length} smart connections`);
+
+      console.log(
+        `Returning top ${rankedConnections.length} smart connections`
+      );
       return rankedConnections;
-      
     } catch (error) {
       console.error('Error analyzing connections with Ollama:', error);
       // Fallback to smart pre-filtered connections without AI analysis
@@ -79,9 +148,11 @@ class LLMService {
   /**
    * Analyze a single connection using Ollama
    */
-  async analyzeSingleConnection(connection) {
+  private async analyzeSingleConnection(
+    connection: Connection
+  ): Promise<LLMAnalysis> {
     const prompt = this.buildAnalysisPrompt(connection);
-    
+
     try {
       // If Ollama unavailable, short-circuit to fallback without attempting fetch
       const canUseOllama = await this.ensureOllamaAvailable();
@@ -101,20 +172,19 @@ class LLMService {
           options: {
             temperature: 0.3,
             top_p: 0.9,
-            max_tokens: 500
-          }
-        })
+            max_tokens: 500,
+          },
+        } as OllamaRequest),
       });
 
       if (!response.ok) {
         throw new Error(`Ollama API error: ${response.status}`);
       }
 
-      const data = await response.json();
+      const data: OllamaResponse = await response.json();
       const analysis = this.parseLLMResponse(data.response);
-      
+
       return analysis;
-      
     } catch (error) {
       console.error('Error calling Ollama:', error);
       return this.getFallbackAnalysis(connection);
@@ -124,7 +194,7 @@ class LLMService {
   /**
    * Build analysis prompt for Ollama
    */
-  buildAnalysisPrompt(connection) {
+  private buildAnalysisPrompt(connection: Connection): string {
     return `Analyze this potential data connection and provide insights:
 
 DATASET A: ${connection.source_collection}
@@ -161,7 +231,7 @@ Format your response as JSON:
   /**
    * Parse LLM response into structured format
    */
-  parseLLMResponse(response) {
+  private parseLLMResponse(response: string): LLMAnalysis {
     try {
       // Try to extract JSON from response
       const jsonMatch = response.match(/\{[\s\S]*\}/);
@@ -171,16 +241,17 @@ Format your response as JSON:
           reasoning: parsed.reasoning || 'AI analysis not available',
           business_context: parsed.business_context || 'Context not available',
           connection_type: parsed.connection_type || 'unknown',
-          suggested_join_strategy: parsed.suggested_join_strategy || 'inner_join',
+          suggested_join_strategy:
+            parsed.suggested_join_strategy || 'inner_join',
           potential_issues: parsed.potential_issues || [],
           recommendations: parsed.recommendations || [],
-          confidence_level: parsed.confidence_level || 'Medium'
+          confidence_level: parsed.confidence_level || 'Medium',
         };
       }
     } catch (error) {
       console.error('Error parsing LLM response:', error);
     }
-    
+
     // Fallback parsing for non-JSON responses
     return this.parseTextResponse(response);
   }
@@ -188,15 +259,15 @@ Format your response as JSON:
   /**
    * Parse text response when JSON parsing fails
    */
-  parseTextResponse(response) {
-    const analysis = {
+  private parseTextResponse(response: string): LLMAnalysis {
+    const analysis: LLMAnalysis = {
       reasoning: 'AI analysis completed',
       business_context: 'Connection analysis provided',
       connection_type: 'foreign_key',
       suggested_join_strategy: 'inner_join',
       potential_issues: ['Data validation recommended'],
       recommendations: ['Verify data types before joining'],
-      confidence_level: 'Medium'
+      confidence_level: 'Medium',
     };
 
     // Extract insights from text response
@@ -219,9 +290,9 @@ Format your response as JSON:
   /**
    * Calculate AI score based on analysis
    */
-  calculateAIScore(analysis) {
+  private calculateAIScore(analysis: LLMAnalysis): number {
     let score = 0.5; // Base score
-    
+
     // Adjust based on confidence level
     switch (analysis.confidence_level?.toLowerCase()) {
       case 'high':
@@ -234,18 +305,18 @@ Format your response as JSON:
         score -= 0.2;
         break;
     }
-    
+
     // Adjust based on connection type
     if (analysis.connection_type === 'foreign_key') {
       score += 0.2;
     } else if (analysis.connection_type === 'lookup') {
       score += 0.1;
     }
-    
+
     // Adjust based on issues (fewer issues = higher score)
-    const issuePenalty = analysis.potential_issues?.length * 0.05 || 0;
+    const issuePenalty = (analysis.potential_issues?.length || 0) * 0.05;
     score -= issuePenalty;
-    
+
     // Ensure score is between 0 and 1
     return Math.max(0, Math.min(1, score));
   }
@@ -253,7 +324,7 @@ Format your response as JSON:
   /**
    * Fallback analysis when Ollama is not available
    */
-  getFallbackAnalysis(connection) {
+  private getFallbackAnalysis(connection: Connection): LLMAnalysis {
     return {
       reasoning: 'Connection analysis using fallback logic',
       business_context: 'Standard data relationship analysis',
@@ -261,85 +332,119 @@ Format your response as JSON:
       suggested_join_strategy: 'inner_join',
       potential_issues: ['Data validation recommended'],
       recommendations: ['Verify data types and referential integrity'],
-      confidence_level: 'Medium'
+      confidence_level: 'Medium',
     };
   }
 
   /**
    * Pre-filter connections using smart rules - NO MORE RANDOM CONNECTIONS!
    */
-  preFilterConnections(connections) {
+  private preFilterConnections(connections: Connection[]): Connection[] {
     console.log('Pre-filtering connections with smart rules...');
-    
+
     const filtered = connections.filter(connection => {
       const sourceCol = connection.source_column?.toLowerCase() || '';
       const targetCol = connection.target_column?.toLowerCase() || '';
-      const sourceCollection = connection.source_collection?.toLowerCase() || '';
-      const targetCollection = connection.target_collection?.toLowerCase() || '';
-      
+      const sourceCollection =
+        connection.source_collection?.toLowerCase() || '';
+      const targetCollection =
+        connection.target_collection?.toLowerCase() || '';
+
       // Rule 1: Exact name matches (highest priority)
       if (sourceCol === targetCol) {
         return true;
       }
-      
+
       // Rule 2: Common identifier patterns
       const idPatterns = ['id', 'key', 'code', 'ref', 'num', 'no'];
       for (const pattern of idPatterns) {
         if (sourceCol.includes(pattern) && targetCol.includes(pattern)) {
           // Check if they're related (e.g., customer_id and customer_id)
-          const sourceBase = sourceCol.replace(pattern, '').replace(/[_-]/g, '');
-          const targetBase = targetCol.replace(pattern, '').replace(/[_-]/g, '');
-          if (sourceBase && targetBase && (sourceBase.includes(targetBase) || targetBase.includes(sourceBase))) {
+          const sourceBase = sourceCol
+            .replace(pattern, '')
+            .replace(/[_-]/g, '');
+          const targetBase = targetCol
+            .replace(pattern, '')
+            .replace(/[_-]/g, '');
+          if (
+            sourceBase &&
+            targetBase &&
+            (sourceBase.includes(targetBase) || targetBase.includes(sourceBase))
+          ) {
             return true;
           }
         }
       }
-      
+
       // Rule 3: Semantic matches (e.g., customer_name vs client_name)
-      const semanticPairs = [
-        ['customer', 'client'], ['user', 'customer'], ['user', 'client'],
-        ['order', 'purchase'], ['sale', 'order'], ['transaction', 'order'],
-        ['product', 'item'], ['goods', 'product'], ['service', 'product'],
-        ['date', 'created'], ['date', 'timestamp'], ['time', 'date'],
-        ['email', 'mail'], ['phone', 'telephone'], ['mobile', 'phone'],
-        ['name', 'title'], ['description', 'details'], ['price', 'cost'],
-        ['quantity', 'amount'], ['total', 'sum'], ['address', 'location']
+      const semanticPairs: [string, string][] = [
+        ['customer', 'client'],
+        ['user', 'customer'],
+        ['user', 'client'],
+        ['order', 'purchase'],
+        ['sale', 'order'],
+        ['transaction', 'order'],
+        ['product', 'item'],
+        ['goods', 'product'],
+        ['service', 'product'],
+        ['date', 'created'],
+        ['date', 'timestamp'],
+        ['time', 'date'],
+        ['email', 'mail'],
+        ['phone', 'telephone'],
+        ['mobile', 'phone'],
+        ['name', 'title'],
+        ['description', 'details'],
+        ['price', 'cost'],
+        ['quantity', 'amount'],
+        ['total', 'sum'],
+        ['address', 'location'],
       ];
-      
+
       for (const [word1, word2] of semanticPairs) {
-        if ((sourceCol.includes(word1) && targetCol.includes(word2)) ||
-            (sourceCol.includes(word2) && targetCol.includes(word1))) {
+        if (
+          (sourceCol.includes(word1) && targetCol.includes(word2)) ||
+          (sourceCol.includes(word2) && targetCol.includes(word1))
+        ) {
           return true;
         }
       }
-      
+
       // Rule 4: Collection name similarity (e.g., customers.csv and customer_orders.csv)
       if (sourceCollection && targetCollection) {
         const sourceWords = sourceCollection.split(/[_\s-]/);
         const targetWords = targetCollection.split(/[_\s-]/);
-        const commonWords = sourceWords.filter(word => targetWords.includes(word));
-        if (commonWords.length > 0 && (sourceCol.includes(commonWords[0]) || targetCol.includes(commonWords[0]))) {
+        const commonWords = sourceWords.filter(word =>
+          targetWords.includes(word)
+        );
+        if (
+          commonWords.length > 0 &&
+          (sourceCol.includes(commonWords[0]) ||
+            targetCol.includes(commonWords[0]))
+        ) {
           return true;
         }
       }
-      
+
       // Rule 5: High confidence connections (above 0.8)
-      if (connection.confidence_score >= 0.8) {
+      if ((connection.confidence_score || 0) >= 0.8) {
         return true;
       }
-      
+
       // Reject everything else - NO MORE RANDOM CONNECTIONS!
       return false;
     });
-    
-    console.log(`Filtered from ${connections.length} to ${filtered.length} logical connections`);
+
+    console.log(
+      `Filtered from ${connections.length} to ${filtered.length} logical connections`
+    );
     return filtered;
   }
 
   /**
    * Check if Ollama is available
    */
-  async checkOllamaStatus() {
+  private async checkOllamaStatus(): Promise<boolean> {
     try {
       const response = await fetch(`${this.ollamaUrl}/api/tags`);
       return response.ok;
@@ -352,7 +457,7 @@ Format your response as JSON:
   /**
    * Determine whether Ollama can be used (cached per session)
    */
-  async ensureOllamaAvailable() {
+  private async ensureOllamaAvailable(): Promise<boolean> {
     if (this.disableOllama) {
       this.ollamaAvailable = false;
       return false;
@@ -366,11 +471,11 @@ Format your response as JSON:
   /**
    * Get available models
    */
-  async getAvailableModels() {
+  async getAvailableModels(): Promise<OllamaModel[]> {
     try {
       const response = await fetch(`${this.ollamaUrl}/api/tags`);
       if (response.ok) {
-        const data = await response.json();
+        const data: OllamaModelsResponse = await response.json();
         return data.models || [];
       }
     } catch (error) {
@@ -380,4 +485,4 @@ Format your response as JSON:
   }
 }
 
-export default new LLMService(); 
+export default new LLMService();

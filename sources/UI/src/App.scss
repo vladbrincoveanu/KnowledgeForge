@@ -250,8 +250,8 @@
   font-weight: 500;
 }
 
-.setting-item input[type="text"],
-.setting-item input[type="password"] {
+.setting-item input[type='text'],
+.setting-item input[type='password'] {
   flex: 1;
   padding: 0.75rem;
   border: 1px solid #ced4da;
@@ -259,12 +259,12 @@
   font-size: 1rem;
 }
 
-.setting-item input[type="range"] {
+.setting-item input[type='range'] {
   flex: 1;
   margin: 0 1rem;
 }
 
-.setting-item input[type="checkbox"] {
+.setting-item input[type='checkbox'] {
   width: 18px;
   height: 18px;
 }
@@ -300,45 +300,45 @@
   .app-container {
     flex-direction: column;
   }
-  
+
   .main-navigation {
     width: 100%;
     min-width: auto;
     padding: 1rem;
   }
-  
+
   .nav-header {
     padding: 0 0 1rem;
     margin-bottom: 1rem;
   }
-  
+
   .nav-list {
     display: flex;
     overflow-x: auto;
     gap: 1rem;
   }
-  
+
   .nav-link {
     padding: 0.75rem 1rem;
     white-space: nowrap;
     border-left: none;
     border-bottom: 3px solid transparent;
   }
-  
+
   .nav-link.active {
     border-left: none;
     border-bottom-color: #667eea;
   }
-  
+
   .main-content {
     padding: 1rem;
     overflow-x: hidden;
   }
-  
+
   .section-header h1 {
     font-size: 2rem;
   }
-  
+
   .section-header p {
     font-size: 1rem;
   }
@@ -349,32 +349,32 @@
     flex-wrap: wrap;
     justify-content: center;
   }
-  
+
   .section-header h1 {
     font-size: 1.8rem;
     flex-direction: column;
     gap: 0.5rem;
   }
-  
+
   .settings-content {
     padding: 1.5rem;
   }
-  
+
   .setting-item {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
   }
-  
+
   .setting-item label {
     min-width: auto;
   }
-  
-  .setting-item input[type="range"] {
+
+  .setting-item input[type='range'] {
     margin: 0;
     width: 100%;
   }
-  
+
   .main-content {
     padding: 1rem;
     overflow-x: hidden;
@@ -394,8 +394,12 @@
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .error {
@@ -438,4 +442,4 @@
 
 .empty p {
   font-size: 1.1rem;
-} 
+}

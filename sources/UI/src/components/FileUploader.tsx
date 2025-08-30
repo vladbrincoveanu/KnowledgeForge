@@ -1,10 +1,29 @@
-import React, { useRef, useState, useEffect } from 'react';
-import Papa from 'papaparse';
+import React from 'react';
+
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { ontologyAPI, fileAPI, wsService, apiUtils } from '../services/api';
-import { Upload, FileText, Database, Brain, Link, CheckCircle, AlertCircle, Clock } from 'lucide-react';
+import {
+  Upload,
+  FileText,
+  Database,
+  Brain,
+  CheckCircle,
+  AlertCircle,
+  Clock,
+} from 'lucide-react';
 import './FileUploader.css';
 
-const FileUploader = ({ onFilesUploaded, isProcessing, onExtractionStarted }) => {
+interface FileUploaderProps {
+  onFilesUploaded: (files: any[]) => void;
+  isProcessing: boolean;
+  onExtractionStarted: (taskId: string, file: any) => void;
+}
+
+const FileUploader: React.FC<FileUploaderProps> = ({
+  onFilesUploaded,
+  isProcessing,
+  onExtractionStarted,
+}) => {
   const fileInputRef = useRef(null);
   const [dragActive, setDragActive] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
@@ -14,23 +33,10 @@ const FileUploader = ({ onFilesUploaded, isProcessing, onExtractionStarted }) =>
     confidence_threshold: 0.7,
     max_entities_per_column: 100,
     enable_semantic_similarity: true,
-    enable_hierarchical_discovery: true
+    enable_hierarchical_discovery: true,
   });
 
-  // WebSocket connection for real-time updates
-  useEffect(() => {
-    wsService.connect();
-    
-    wsService.on('message', handleWebSocketMessage);
-    wsService.on('connected', () => console.log('WebSocket connected'));
-    wsService.on('disconnected', () => console.log('WebSocket disconnected'));
-    
-    return () => {
-      wsService.disconnect();
-    };
-  }, []);
-
-  const handleWebSocketMessage = (data) => {
+  const handleWebSocketMessage = useCallback(data => {
     if (data.task_id && extractionTasks[data.task_id]) {
       setExtractionTasks(prev => ({
         ...prev,
@@ -38,46 +44,61 @@ const FileUploader = ({ onFilesUploaded, isProcessing, onExtractionStarted }) =>
           ...prev[data.task_id],
           status: data.status,
           message: data.message,
-          timestamp: data.timestamp
-        }
+          timestamp: data.timestamp,
+        },
       }));
     }
-  };
+  }, [extractionTasks]);
 
-  const handleDrag = (e) => {
+  // WebSocket connection for real-time updates
+  useEffect(() => {
+    wsService.connect();
+
+    wsService.on('message', handleWebSocketMessage);
+    wsService.on('connected', () => console.log('WebSocket connected'));
+    wsService.on('disconnected', () => console.log('WebSocket disconnected'));
+
+    return () => {
+      wsService.disconnect();
+    };
+  }, [handleWebSocketMessage]);
+
+  const handleDrag = e => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
+    if (e.type === 'dragenter' || e.type === 'dragover') {
       setDragActive(true);
-    } else if (e.type === "dragleave") {
+    } else if (e.type === 'dragleave') {
       setDragActive(false);
     }
   };
 
-  const handleDrop = (e) => {
+  const handleDrop = e => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFiles(e.dataTransfer.files);
     }
   };
 
-  const handleFileInput = (e) => {
+  const handleFileInput = e => {
     if (e.target.files && e.target.files.length > 0) {
       handleFiles(e.target.files);
     }
   };
 
-  const handleFiles = async (fileList) => {
-    const supportedFiles = Array.from(fileList).filter(file => 
-      file.type === 'text/csv' || 
-      file.name.endsWith('.csv') ||
-      file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-      file.name.endsWith('.xlsx') ||
-      file.type === 'application/vnd.ms-excel' ||
-      file.name.endsWith('.xls')
+  const handleFiles = async fileList => {
+    const supportedFiles = Array.from(fileList).filter(
+      file =>
+        file.type === 'text/csv' ||
+        file.name.endsWith('.csv') ||
+        file.type ===
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+        file.name.endsWith('.xlsx') ||
+        file.type === 'application/vnd.ms-excel' ||
+        file.name.endsWith('.xls')
     );
 
     if (supportedFiles.length === 0) {
@@ -97,24 +118,23 @@ const FileUploader = ({ onFilesUploaded, isProcessing, onExtractionStarted }) =>
 
       try {
         setUploadProgress(prev => ({ ...prev, [file.name]: 'uploading' }));
-        
+
         // First upload the file to the server
         const uploadResult = await fileAPI.uploadFile(file);
-        
+
         if (!uploadResult.file_path) {
           throw new Error('File upload failed: no file path returned');
         }
-        
+
         // Process file locally for display purposes
         const processedFile = await fileAPI.processLocalFile(file);
         processedFile.serverPath = uploadResult.file_path; // Store server path
         processedFiles.push(processedFile);
-        
+
         setUploadProgress(prev => ({ ...prev, [file.name]: 'success' }));
-        
+
         // Start ontology extraction with the server file path
         await startOntologyExtraction(processedFile);
-        
       } catch (error) {
         console.error(`Error processing ${file.name}:`, error);
         alert(`Error processing ${file.name}: ${error.message}`);
@@ -129,11 +149,14 @@ const FileUploader = ({ onFilesUploaded, isProcessing, onExtractionStarted }) =>
     }
   };
 
-  const startOntologyExtraction = async (file) => {
+  const startOntologyExtraction = async file => {
     try {
       // Start extraction task with the uploaded file path
-      const extractionResult = await ontologyAPI.extractOntology(file.serverPath, extractionConfig);
-      
+      const extractionResult = await ontologyAPI.extractOntology(
+        file.serverPath,
+        extractionConfig
+      );
+
       if (extractionResult.task_id) {
         // Track the extraction task
         setExtractionTasks(prev => ({
@@ -144,8 +167,8 @@ const FileUploader = ({ onFilesUploaded, isProcessing, onExtractionStarted }) =>
             status: 'pending',
             message: 'Task created and queued',
             createdAt: extractionResult.created_at,
-            estimatedCompletion: extractionResult.estimated_completion
-          }
+            estimatedCompletion: extractionResult.estimated_completion,
+          },
         }));
 
         // Notify parent component
@@ -162,11 +185,11 @@ const FileUploader = ({ onFilesUploaded, isProcessing, onExtractionStarted }) =>
     }
   };
 
-  const pollExtractionStatus = async (taskId) => {
+  const pollExtractionStatus = async taskId => {
     const pollInterval = setInterval(async () => {
       try {
         const status = await ontologyAPI.getExtractionStatus(taskId);
-        
+
         setExtractionTasks(prev => ({
           ...prev,
           [taskId]: {
@@ -177,8 +200,8 @@ const FileUploader = ({ onFilesUploaded, isProcessing, onExtractionStarted }) =>
             completedAt: status.completed_at,
             processingTime: status.processing_time,
             results: status.results,
-            error: status.error
-          }
+            error: status.error,
+          },
         }));
 
         // Stop polling if task is completed or failed
@@ -205,51 +228,66 @@ const FileUploader = ({ onFilesUploaded, isProcessing, onExtractionStarted }) =>
     }
   };
 
-  const getFileIcon = (fileName) => {
+  const getFileIcon = fileName => {
     if (fileName.endsWith('.csv')) return '📊';
     if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) return '📈';
     return '📁';
   };
 
-  const getProgressStatus = (fileName) => {
+  const getProgressStatus = fileName => {
     const status = uploadProgress[fileName];
     switch (status) {
       case 'uploading':
-        return <span className="status uploading"><Clock size={16} /> Uploading...</span>;
+        return (
+          <span className="status uploading">
+            <Clock size={16} /> Uploading...
+          </span>
+        );
       case 'success':
-        return <span className="status success"><CheckCircle size={16} /> Success</span>;
+        return (
+          <span className="status success">
+            <CheckCircle size={16} /> Success
+          </span>
+        );
       case 'error':
-        return <span className="status error"><AlertCircle size={16} /> Error</span>;
+        return (
+          <span className="status error">
+            <AlertCircle size={16} /> Error
+          </span>
+        );
       default:
         return null;
     }
   };
 
-  const getExtractionStatus = (fileName) => {
-    const task = Object.values(extractionTasks).find(t => t.fileName === fileName);
+  const getExtractionStatus = fileName => {
+    const task = Object.values(extractionTasks).find(
+      t => t.fileName === fileName
+    );
     if (!task) return null;
 
     const statusColors = {
-      'pending': '#ffc107',
-      'processing': '#007bff',
-      'completed': '#28a745',
-      'failed': '#dc3545'
+      pending: '#ffc107',
+      processing: '#007bff',
+      completed: '#28a745',
+      failed: '#dc3545',
     };
 
     const statusIcons = {
-      'pending': <Clock size={16} />,
-      'processing': <Database size={16} />,
-      'completed': <CheckCircle size={16} />,
-      'failed': <AlertCircle size={16} />
+      pending: <Clock size={16} />,
+      processing: <Database size={16} />,
+      completed: <CheckCircle size={16} />,
+      failed: <AlertCircle size={16} />,
     };
 
     return (
-      <div className="extraction-status" style={{ color: statusColors[task.status] }}>
+      <div
+        className="extraction-status"
+        style={{ color: statusColors[task.status] }}
+      >
         {statusIcons[task.status]}
         <span>{task.message}</span>
-        {task.processingTime && (
-          <small>({task.processingTime}s)</small>
-        )}
+        {task.processingTime && <small>({task.processingTime}s)</small>}
       </div>
     );
   };
@@ -257,17 +295,21 @@ const FileUploader = ({ onFilesUploaded, isProcessing, onExtractionStarted }) =>
   const updateExtractionConfig = (key, value) => {
     setExtractionConfig(prev => ({
       ...prev,
-      [key]: value
+      [key]: value,
     }));
   };
 
   return (
     <div className="file-uploader">
-      <h3><Upload size={20} /> Upload Data Files</h3>
-      
+      <h3>
+        <Upload size={20} /> Upload Data Files
+      </h3>
+
       {/* Extraction Configuration */}
       <div className="extraction-config">
-        <h4><Brain size={16} /> Extraction Configuration</h4>
+        <h4>
+          <Brain size={16} /> Extraction Configuration
+        </h4>
         <div className="config-grid">
           <div className="config-item">
             <label>Confidence Threshold:</label>
@@ -277,11 +319,16 @@ const FileUploader = ({ onFilesUploaded, isProcessing, onExtractionStarted }) =>
               max="1.0"
               step="0.1"
               value={extractionConfig.confidence_threshold}
-              onChange={(e) => updateExtractionConfig('confidence_threshold', parseFloat(e.target.value))}
+              onChange={e =>
+                updateExtractionConfig(
+                  'confidence_threshold',
+                  parseFloat(e.target.value)
+                )
+              }
             />
             <span>{extractionConfig.confidence_threshold}</span>
           </div>
-          
+
           <div className="config-item">
             <label>Max Entities per Column:</label>
             <input
@@ -289,35 +336,50 @@ const FileUploader = ({ onFilesUploaded, isProcessing, onExtractionStarted }) =>
               min="10"
               max="1000"
               value={extractionConfig.max_entities_per_column}
-              onChange={(e) => updateExtractionConfig('max_entities_per_column', parseInt(e.target.value))}
+              onChange={e =>
+                updateExtractionConfig(
+                  'max_entities_per_column',
+                  parseInt(e.target.value)
+                )
+              }
             />
           </div>
-          
+
           <div className="config-item">
             <label>
               <input
                 type="checkbox"
                 checked={extractionConfig.enable_semantic_similarity}
-                onChange={(e) => updateExtractionConfig('enable_semantic_similarity', e.target.checked)}
+                onChange={e =>
+                  updateExtractionConfig(
+                    'enable_semantic_similarity',
+                    e.target.checked
+                  )
+                }
               />
               Enable Semantic Similarity
             </label>
           </div>
-          
+
           <div className="config-item">
             <label>
               <input
                 type="checkbox"
                 checked={extractionConfig.enable_hierarchical_discovery}
-                onChange={(e) => updateExtractionConfig('enable_hierarchical_discovery', e.target.checked)}
+                onChange={e =>
+                  updateExtractionConfig(
+                    'enable_hierarchical_discovery',
+                    e.target.checked
+                  )
+                }
               />
               Enable Hierarchical Discovery
             </label>
           </div>
         </div>
       </div>
-      
-      <div 
+
+      <div
         className={`upload-area ${dragActive ? 'drag-active' : ''}`}
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
@@ -326,13 +388,17 @@ const FileUploader = ({ onFilesUploaded, isProcessing, onExtractionStarted }) =>
         onClick={handleUploadClick}
       >
         <div className="upload-content">
-          <div className="upload-icon"><Upload size={48} /></div>
+          <div className="upload-icon">
+            <Upload size={48} />
+          </div>
           <p>Drag and drop CSV or Excel files here or click to browse</p>
           <p className="upload-hint">Supports CSV, XLSX, and XLS files</p>
-          <p className="upload-hint">Files will be processed for ontology extraction</p>
+          <p className="upload-hint">
+            Files will be processed for ontology extraction
+          </p>
         </div>
       </div>
-      
+
       <input
         ref={fileInputRef}
         type="file"
@@ -341,21 +407,23 @@ const FileUploader = ({ onFilesUploaded, isProcessing, onExtractionStarted }) =>
         onChange={handleFileInput}
         style={{ display: 'none' }}
       />
-      
+
       {isProcessing && (
         <div className="processing-indicator">
           <div className="spinner"></div>
           <p>Analyzing file connections and extracting ontology...</p>
         </div>
       )}
-      
+
       {uploadedFiles.length > 0 && (
         <div className="upload-status">
-          <p><FileText size={16} /> {uploadedFiles.length} file(s) uploaded</p>
+          <p>
+            <FileText size={16} /> {uploadedFiles.length} file(s) uploaded
+          </p>
           <p className="upload-hint">Drag and drop more files to add them</p>
         </div>
       )}
-      
+
       {uploadedFiles.length > 0 && (
         <div className="uploaded-files-list">
           {uploadedFiles.map((file, index) => (
@@ -364,8 +432,12 @@ const FileUploader = ({ onFilesUploaded, isProcessing, onExtractionStarted }) =>
                 <span className="file-icon">{getFileIcon(file.name)}</span>
                 <div className="file-details">
                   <strong>{file.name}</strong>
-                  <small>{file.headers.length} columns, {file.rowCount} rows</small>
-                  <small className="file-size">{apiUtils.formatFileSize(file.size)}</small>
+                  <small>
+                    {file.headers.length} columns, {file.rowCount} rows
+                  </small>
+                  <small className="file-size">
+                    {apiUtils.formatFileSize(file.size)}
+                  </small>
                 </div>
               </div>
               <div className="file-status">
@@ -376,11 +448,11 @@ const FileUploader = ({ onFilesUploaded, isProcessing, onExtractionStarted }) =>
           ))}
         </div>
       )}
-      
+
       {uploadedFiles.length > 0 && (
         <div className="upload-actions">
-          <button 
-            className="btn-clear" 
+          <button
+            className="btn-clear"
             onClick={clearFiles}
             disabled={isProcessing}
           >
@@ -392,4 +464,4 @@ const FileUploader = ({ onFilesUploaded, isProcessing, onExtractionStarted }) =>
   );
 };
 
-export default FileUploader; 
+export default FileUploader;

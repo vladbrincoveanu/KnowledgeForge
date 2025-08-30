@@ -41,7 +41,7 @@
   cursor: pointer;
 }
 
-.metrics-controls input[type="checkbox"] {
+.metrics-controls input[type='checkbox'] {
   width: 18px;
   height: 18px;
   cursor: pointer;
@@ -316,8 +316,12 @@
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Error State */
@@ -379,16 +383,16 @@
     gap: 1rem;
     align-items: flex-start;
   }
-  
+
   .metrics-controls {
     width: 100%;
     justify-content: space-between;
   }
-  
+
   .health-grid {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
-  
+
   .metrics-grid {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
@@ -398,31 +402,31 @@
   .system-metrics {
     padding: 1.5rem;
   }
-  
+
   .metrics-controls {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.75rem;
   }
-  
+
   .health-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .metrics-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .dependencies-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .detail-row {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
   }
-  
+
   .recharts-responsive-container {
     min-height: 250px;
   }
@@ -432,28 +436,27 @@
   .system-metrics {
     padding: 1rem;
   }
-  
+
   .metrics-header h3 {
     font-size: 1.3rem;
   }
-  
+
   .health-section,
   .metrics-section,
   .chart-section {
     padding: 1rem;
   }
-  
+
   .metric-card {
     padding: 1rem;
   }
-  
+
   .metric-value {
     font-size: 1.5rem;
   }
-  
+
   .btn-refresh {
     width: 100%;
     justify-content: center;
   }
 }
-

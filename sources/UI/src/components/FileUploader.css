@@ -61,13 +61,13 @@
   font-size: 0.9rem;
 }
 
-.config-item input[type="range"] {
+.config-item input[type='range'] {
   width: 100%;
   margin: 0.5rem 0;
   min-width: 0;
 }
 
-.config-item input[type="number"] {
+.config-item input[type='number'] {
   padding: 0.75rem;
   border: 1px solid #ced4da;
   border-radius: 6px;
@@ -77,13 +77,13 @@
   min-width: 0;
 }
 
-.config-item input[type="number"]:focus {
+.config-item input[type='number']:focus {
   outline: none;
   border-color: #007bff;
   box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
 }
 
-.config-item input[type="checkbox"] {
+.config-item input[type='checkbox'] {
   width: 18px;
   height: 18px;
   margin-right: 0.5rem;
@@ -163,8 +163,12 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .processing-indicator p {
@@ -355,41 +359,41 @@
     padding: 1.5rem;
     overflow-x: hidden;
   }
-  
+
   .config-grid {
     grid-template-columns: 1fr;
     gap: 1rem;
     overflow-x: hidden;
   }
-  
+
   .upload-area {
     padding: 2rem 1rem;
     overflow-x: hidden;
   }
-  
+
   .upload-icon {
     font-size: 2.5rem;
   }
-  
+
   .file-item {
     flex-direction: column;
     gap: 1rem;
     align-items: flex-start;
     overflow-x: hidden;
   }
-  
+
   .file-status {
     align-items: flex-start;
     width: 100%;
     overflow-x: hidden;
   }
-  
+
   .status {
     width: 100%;
     justify-content: center;
     overflow-x: hidden;
   }
-  
+
   .extraction-status {
     width: 100%;
     justify-content: center;
@@ -402,34 +406,34 @@
     padding: 1rem;
     overflow-x: hidden;
   }
-  
+
   .extraction-config {
     padding: 1rem;
     overflow-x: hidden;
   }
-  
+
   .upload-area {
     padding: 1.5rem 1rem;
     overflow-x: hidden;
   }
-  
+
   .upload-icon {
     font-size: 2rem;
   }
-  
+
   .file-uploader h3 {
     font-size: 1.3rem;
   }
-  
+
   .extraction-config h4 {
     font-size: 1.1rem;
   }
-  
+
   .btn-clear {
     width: 100%;
   }
-  
+
   .config-grid {
     overflow-x: hidden;
   }
-} 
+}

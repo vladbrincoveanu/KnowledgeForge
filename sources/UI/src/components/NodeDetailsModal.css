@@ -123,7 +123,9 @@
   border-radius: 12px;
   padding: 20px;
   border: 1px solid #e9ecef;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
 }
 
 .column-card:hover {
@@ -245,15 +247,15 @@
     width: 95vw;
     max-height: 95vh;
   }
-  
+
   .info-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .columns-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .column-stats {
     grid-template-columns: 1fr;
   }
