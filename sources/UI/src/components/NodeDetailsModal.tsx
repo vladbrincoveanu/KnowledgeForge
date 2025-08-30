@@ -1,6 +1,6 @@
 import React from 'react';
 
-import './NodeDetailsModal.css';
+import './NodeDetailsModal.scss';
 import { GraphNode } from '../types';
 
 interface NodeDetailsModalProps {

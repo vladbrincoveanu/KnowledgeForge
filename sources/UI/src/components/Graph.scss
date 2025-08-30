@@ -16,13 +16,13 @@
   padding: 16px 20px;
   background: #f8f9fa;
   border-bottom: 1px solid #e9ecef;
-}
 
-.graph-header h3 {
-  margin: 0;
-  color: #333;
-  font-size: 18px;
-  font-weight: 600;
+  h3 {
+    margin: 0;
+    color: #333;
+    font-size: 18px;
+    font-weight: 600;
+  }
 }
 
 .graph-stats {
@@ -30,6 +30,21 @@
   gap: 16px;
   align-items: center;
   flex-wrap: wrap;
+
+  span {
+    background: #e9ecef;
+    padding: 4px 12px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #495057;
+
+    &.selected-edge {
+      background: #007bff !important;
+      color: white !important;
+      font-weight: 600;
+    }
+  }
 }
 
 .discovery-insights {
@@ -55,26 +70,15 @@
   font-size: 14px;
 }
 
-.graph-stats span {
-  background: #e9ecef;
-  padding: 4px 12px;
-  border-radius: 16px;
-  font-size: 12px;
-  font-weight: 500;
-  color: #495057;
-}
-
-.selected-edge {
-  background: #007bff !important;
-  color: white !important;
-  font-weight: 600;
-}
-
 .graph-visualization {
   flex: 1;
   position: relative;
   background: #ffffff;
   min-height: 400px;
+
+  canvas {
+    border-radius: 0;
+  }
 }
 
 .empty-graph {
@@ -86,24 +90,24 @@
   color: #6c757d;
   text-align: center;
   padding: 40px;
+
+  h4 {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  p {
+    margin: 0;
+    font-size: 14px;
+    opacity: 0.8;
+  }
 }
 
 .empty-icon {
   font-size: 48px;
   margin-bottom: 16px;
   opacity: 0.5;
-}
-
-.empty-graph h4 {
-  margin: 0 0 8px 0;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.empty-graph p {
-  margin: 0;
-  font-size: 14px;
-  opacity: 0.8;
 }
 
 .graph-controls {
@@ -122,15 +126,11 @@
   font-size: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
-}
 
-.btn-control:hover {
-  background: #e9ecef;
-  border-color: #adb5bd;
-}
-
-.graph-visualization canvas {
-  border-radius: 0;
+  &:hover {
+    background: #e9ecef;
+    border-color: #adb5bd;
+  }
 }
 
 .edge-panel {
@@ -166,13 +166,13 @@
   padding: 16px 20px;
   background: #f8f9fa;
   border-bottom: 1px solid #e9ecef;
-}
 
-.edge-panel-header h4 {
-  margin: 0;
-  color: #333;
-  font-size: 16px;
-  font-weight: 600;
+  h4 {
+    margin: 0;
+    color: #333;
+    font-size: 16px;
+    font-weight: 600;
+  }
 }
 
 .close-btn {
@@ -189,11 +189,11 @@
   justify-content: center;
   border-radius: 4px;
   transition: all 0.2s ease;
-}
 
-.close-btn:hover {
-  background: #e9ecef;
-  color: #495057;
+  &:hover {
+    background: #e9ecef;
+    color: #495057;
+  }
 }
 
 .edge-panel-content {
@@ -222,13 +222,13 @@
   align-items: center;
   text-align: center;
   flex: 1;
-}
 
-.node-info strong {
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 4px;
+  strong {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 4px;
+  }
 }
 
 .node-type {
@@ -258,13 +258,13 @@
   border: 1px solid #e9ecef;
   border-radius: 6px;
   padding: 16px;
-}
 
-.connection-mapping h5 {
-  margin: 0 0 12px 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
+  h5 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+  }
 }
 
 .mapping-item {
@@ -301,21 +301,21 @@
   color: #6c757d;
   text-align: center;
   margin-top: 8px;
-}
 
-.confidence-high {
-  color: #28a745;
-  font-weight: 600;
-}
+  &.confidence-high {
+    color: #28a745;
+    font-weight: 600;
+  }
 
-.confidence-medium {
-  color: #ffc107;
-  font-weight: 600;
-}
+  &.confidence-medium {
+    color: #ffc107;
+    font-weight: 600;
+  }
 
-.confidence-low {
-  color: #dc3545;
-  font-weight: 600;
+  &.confidence-low {
+    color: #dc3545;
+    font-weight: 600;
+  }
 }
 
 .merged-metadata {
@@ -324,15 +324,15 @@
   border: 1px solid #e9ecef;
   border-radius: 6px;
   padding: 16px;
-}
 
-.merged-metadata h5 {
-  margin: 0 0 16px 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
-  border-bottom: 1px solid #e9ecef;
-  padding-bottom: 8px;
+  h5 {
+    margin: 0 0 16px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    border-bottom: 1px solid #e9ecef;
+    padding-bottom: 8px;
+  }
 }
 
 .metadata-summary {
@@ -346,31 +346,31 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-}
 
-.metadata-item .label {
-  font-size: 11px;
-  color: #6c757d;
-  font-weight: 500;
-}
+  .label {
+    font-size: 11px;
+    color: #6c757d;
+    font-weight: 500;
+  }
 
-.metadata-item .value {
-  font-size: 13px;
-  color: #333;
-  font-weight: 600;
+  .value {
+    font-size: 13px;
+    color: #333;
+    font-weight: 600;
+  }
 }
 
 .sample-data {
   margin-top: 16px;
   border-top: 1px solid #e9ecef;
   padding-top: 16px;
-}
 
-.sample-data h6 {
-  margin: 0 0 12px 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: #333;
+  h6 {
+    margin: 0 0 12px 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+  }
 }
 
 .sample-table {
@@ -378,31 +378,31 @@
   border-radius: 4px;
   overflow: hidden;
   border: 1px solid #e9ecef;
-}
 
-.sample-table table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 11px;
-}
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
 
-.sample-table th {
-  background: #e9ecef;
-  padding: 6px 8px;
-  text-align: left;
-  font-weight: 600;
-  color: #495057;
-  border-bottom: 1px solid #dee2e6;
-}
+  th {
+    background: #e9ecef;
+    padding: 6px 8px;
+    text-align: left;
+    font-weight: 600;
+    color: #495057;
+    border-bottom: 1px solid #dee2e6;
+  }
 
-.sample-table td {
-  padding: 4px 8px;
-  border-bottom: 1px solid #e9ecef;
-  color: #333;
-}
+  td {
+    padding: 4px 8px;
+    border-bottom: 1px solid #e9ecef;
+    color: #333;
+  }
 
-.sample-table tr:last-child td {
-  border-bottom: none;
+  tr:last-child td {
+    border-bottom: none;
+  }
 }
 
 /* Data Quality Metrics */
@@ -410,13 +410,13 @@
   margin-top: 16px;
   border-top: 1px solid #e9ecef;
   padding-top: 16px;
-}
 
-.data-quality-metrics h6 {
-  margin: 0 0 12px 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: #333;
+  h6 {
+    margin: 0 0 12px 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+  }
 }
 
 .metrics-grid {
@@ -467,13 +467,13 @@
   margin-top: 16px;
   border-top: 1px solid #e9ecef;
   padding-top: 16px;
-}
 
-.column-types h6 {
-  margin: 0 0 12px 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: #333;
+  h6 {
+    margin: 0 0 12px 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+  }
 }
 
 .types-grid {
@@ -507,36 +507,36 @@
   border-radius: 10px;
   font-weight: 600;
   text-transform: uppercase;
-}
 
-.type-numeric {
-  background: #e3f2fd;
-  color: #1976d2;
-}
+  &.type-numeric {
+    background: #e3f2fd;
+    color: #1976d2;
+  }
 
-.type-text {
-  background: #f3e5f5;
-  color: #7b1fa2;
-}
+  &.type-text {
+    background: #f3e5f5;
+    color: #7b1fa2;
+  }
 
-.type-date {
-  background: #e8f5e8;
-  color: #388e3c;
-}
+  &.type-date {
+    background: #e8f5e8;
+    color: #388e3c;
+  }
 
-.type-integer {
-  background: #fff3e0;
-  color: #f57c00;
-}
+  &.type-integer {
+    background: #fff3e0;
+    color: #f57c00;
+  }
 
-.type-boolean {
-  background: #fce4ec;
-  color: #c2185b;
-}
+  &.type-boolean {
+    background: #fce4ec;
+    color: #c2185b;
+  }
 
-.type-unknown {
-  background: #f5f5f5;
-  color: #757575;
+  &.type-unknown {
+    background: #f5f5f5;
+    color: #757575;
+  }
 }
 
 /* Complexity Indicators */
@@ -574,33 +574,33 @@
   cursor: pointer;
   transition: all 0.2s ease;
   text-align: center;
-}
 
-.btn-action.primary {
-  background: #007bff;
-  color: white;
-}
+  &.primary {
+    background: #007bff;
+    color: white;
 
-.btn-action.primary:hover {
-  background: #0056b3;
-}
+    &:hover {
+      background: #0056b3;
+    }
+  }
 
-.btn-action.secondary {
-  background: #6c757d;
-  color: white;
-}
+  &.secondary {
+    background: #6c757d;
+    color: white;
 
-.btn-action.secondary:hover {
-  background: #545b62;
-}
+    &:hover {
+      background: #545b62;
+    }
+  }
 
-.btn-action.danger {
-  background: #dc3545;
-  color: white;
-}
+  &.danger {
+    background: #dc3545;
+    color: white;
 
-.btn-action.danger:hover {
-  background: #c82333;
+    &:hover {
+      background: #c82333;
+    }
+  }
 }
 
 @media (max-width: 768px) {

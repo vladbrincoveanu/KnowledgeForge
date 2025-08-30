@@ -26,7 +26,7 @@ import {
   HealthStatus,
   ChartData,
 } from '../types';
-import './SystemMetrics.css';
+import './SystemMetrics.scss';
 
 const SystemMetrics: React.FC = () => {
   const [metrics, setMetrics] = useState<SystemMetricsType | null>(null);

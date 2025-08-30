@@ -30,12 +30,12 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
 
-.node-details-header h2 {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 600;
+  h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+  }
 }
 
 .close-button {
@@ -52,10 +52,10 @@
   justify-content: center;
   border-radius: 50%;
   transition: background-color 0.2s;
-}
 
-.close-button:hover {
-  background-color: rgba(255, 255, 255, 0.2);
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+  }
 }
 
 .node-details-content {
@@ -66,15 +66,15 @@
 
 .node-info-section {
   margin-bottom: 32px;
-}
 
-.node-info-section h3 {
-  color: #333;
-  margin-bottom: 16px;
-  font-size: 1.2rem;
-  font-weight: 600;
-  border-bottom: 2px solid #e9ecef;
-  padding-bottom: 8px;
+  h3 {
+    color: #333;
+    margin-bottom: 16px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 8px;
+  }
 }
 
 .info-grid {
@@ -91,25 +91,27 @@
   background: #f8f9fa;
   border-radius: 8px;
   border-left: 4px solid #007bff;
+
+  .label {
+    font-weight: 600;
+    color: #495057;
+  }
+
+  .value {
+    color: #212529;
+    font-weight: 500;
+  }
 }
 
-.info-item .label {
-  font-weight: 600;
-  color: #495057;
-}
-
-.info-item .value {
-  color: #212529;
-  font-weight: 500;
-}
-
-.columns-section h3 {
-  color: #333;
-  margin-bottom: 20px;
-  font-size: 1.2rem;
-  font-weight: 600;
-  border-bottom: 2px solid #e9ecef;
-  padding-bottom: 8px;
+.columns-section {
+  h3 {
+    color: #333;
+    margin-bottom: 20px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 8px;
+  }
 }
 
 .columns-grid {
@@ -126,11 +128,11 @@
   transition:
     transform 0.2s,
     box-shadow 0.2s;
-}
 
-.column-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  }
 }
 
 .column-header {
@@ -140,13 +142,13 @@
   margin-bottom: 16px;
   padding-bottom: 12px;
   border-bottom: 1px solid #dee2e6;
-}
 
-.column-header h4 {
-  margin: 0;
-  color: #212529;
-  font-size: 1.1rem;
-  font-weight: 600;
+  h4 {
+    margin: 0;
+    color: #212529;
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
 }
 
 .data-type-badge {
@@ -234,11 +236,11 @@
   text-align: center;
   padding: 40px 20px;
   color: #6c757d;
-}
 
-.no-columns p {
-  margin: 0;
-  font-size: 1rem;
+  p {
+    margin: 0;
+    font-size: 1rem;
+  }
 }
 
 /* Responsive design */

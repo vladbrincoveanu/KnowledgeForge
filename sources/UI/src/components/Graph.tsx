@@ -4,7 +4,7 @@ import { useRef, useCallback, useState } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import EdgeDetailsModal from './EdgeDetailsModal';
 import NodeDetailsModal from './NodeDetailsModal';
-import './Graph.css';
+import './Graph.scss';
 import { GraphData, GraphLink } from '../types';
 
 interface GraphProps {

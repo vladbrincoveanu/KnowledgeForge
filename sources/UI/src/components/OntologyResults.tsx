@@ -18,7 +18,7 @@ import {
   PaginatedResponse,
   FeedbackResponse,
 } from '../types';
-import './OntologyResults.css';
+import './OntologyResults.scss';
 
 interface OntologyResultsProps {
   taskId: string;

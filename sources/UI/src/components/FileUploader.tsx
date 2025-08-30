@@ -12,7 +12,7 @@ import {
   AlertCircle,
   Clock,
 } from 'lucide-react';
-import './FileUploader.css';
+import './FileUploader.scss';
 
 interface FileUploaderProps {
   onFilesUploaded: (files: UploadedFile[]) => void;

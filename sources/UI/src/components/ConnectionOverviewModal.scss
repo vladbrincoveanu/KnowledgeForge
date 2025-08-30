@@ -38,18 +38,18 @@
   background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
   border-radius: 16px 16px 0 0;
   flex-shrink: 0;
+
+  h2 {
+    margin: 0 0 8px 0;
+    color: #1e293b;
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
 }
 
 .header-content {
   flex: 1;
-}
-
-.overview-header h2 {
-  margin: 0 0 8px 0;
-  color: #1e293b;
-  font-size: 1.75rem;
-  font-weight: 700;
-  line-height: 1.2;
 }
 
 .connection-stats {
@@ -60,11 +60,11 @@
 .stat-item {
   font-size: 0.875rem;
   color: #64748b;
-}
 
-.stat-item strong {
-  color: #1e293b;
-  font-weight: 600;
+  strong {
+    color: #1e293b;
+    font-weight: 600;
+  }
 }
 
 .close-button {
@@ -81,12 +81,12 @@
   border-radius: 50%;
   transition: all 0.2s ease;
   margin-left: 16px;
-}
 
-.close-button:hover {
-  background-color: #f1f5f9;
-  color: #1e293b;
-  transform: scale(1.1);
+  &:hover {
+    background-color: #f1f5f9;
+    color: #1e293b;
+    transform: scale(1.1);
+  }
 }
 
 /* Content */
@@ -104,14 +104,14 @@
 .connection-item {
   border-bottom: 1px solid #e5e7eb;
   transition: background-color 0.2s ease;
-}
 
-.connection-item:hover {
-  background-color: #f8fafc;
-}
+  &:hover {
+    background-color: #f8fafc;
+  }
 
-.connection-item:last-child {
-  border-bottom: none;
+  &:last-child {
+    border-bottom: none;
+  }
 }
 
 .connection-header {
@@ -209,12 +209,25 @@
   width: 20px;
   height: 20px;
   cursor: pointer;
-}
 
-.checkbox-container input {
-  opacity: 0;
-  width: 0;
-  height: 0;
+  input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+
+    &:checked ~ .checkmark {
+      background-color: #3b82f6;
+      border-color: #3b82f6;
+
+      &:after {
+        display: block;
+      }
+    }
+  }
+
+  &:hover input ~ .checkmark {
+    border-color: #3b82f6;
+  }
 }
 
 .checkmark {
@@ -227,35 +240,19 @@
   border: 2px solid #d1d5db;
   border-radius: 4px;
   transition: all 0.2s ease;
-}
 
-.checkbox-container:hover input ~ .checkmark {
-  border-color: #3b82f6;
-}
-
-.checkbox-container input:checked ~ .checkmark {
-  background-color: #3b82f6;
-  border-color: #3b82f6;
-}
-
-.checkmark:after {
-  content: '';
-  position: absolute;
-  display: none;
-}
-
-.checkbox-container input:checked ~ .checkmark:after {
-  display: block;
-}
-
-.checkbox-container .checkmark:after {
-  left: 6px;
-  top: 2px;
-  width: 4px;
-  height: 8px;
-  border: solid white;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
+  &:after {
+    content: '';
+    position: absolute;
+    display: none;
+    left: 6px;
+    top: 2px;
+    width: 4px;
+    height: 8px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
 }
 
 /* Action Buttons */
@@ -271,41 +268,41 @@
   font-size: 14px;
   font-weight: 600;
   transition: all 0.2s ease;
-}
 
-.action-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 
-.action-button.approve {
-  background-color: #10b981;
-  color: white;
-}
+  &.approve {
+    background-color: #10b981;
+    color: white;
 
-.action-button.approve:hover:not(:disabled) {
-  background-color: #059669;
-  transform: scale(1.05);
-}
+    &:hover:not(:disabled) {
+      background-color: #059669;
+      transform: scale(1.05);
+    }
+  }
 
-.action-button.reject {
-  background-color: #ef4444;
-  color: white;
-}
+  &.reject {
+    background-color: #ef4444;
+    color: white;
 
-.action-button.reject:hover:not(:disabled) {
-  background-color: #dc2626;
-  transform: scale(1.05);
-}
+    &:hover:not(:disabled) {
+      background-color: #dc2626;
+      transform: scale(1.05);
+    }
+  }
 
-.action-button.expand {
-  background-color: #f3f4f6;
-  color: #374151;
-}
+  &.expand {
+    background-color: #f3f4f6;
+    color: #374151;
 
-.action-button.expand:hover:not(:disabled) {
-  background-color: #e5e7eb;
-  transform: scale(1.05);
+    &:hover:not(:disabled) {
+      background-color: #e5e7eb;
+      transform: scale(1.05);
+    }
+  }
 }
 
 /* Connection Details */
@@ -315,11 +312,13 @@
   border-top: 1px solid #e5e7eb;
 }
 
-.ai-analysis h4 {
-  margin: 0 0 16px 0;
-  color: #1e293b;
-  font-size: 1.1rem;
-  font-weight: 600;
+.ai-analysis {
+  h4 {
+    margin: 0 0 16px 0;
+    color: #1e293b;
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
 }
 
 .analysis-grid {
@@ -334,21 +333,21 @@
   padding: 16px;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
-}
 
-.analysis-item strong {
-  display: block;
-  margin-bottom: 8px;
-  color: #374151;
-  font-size: 0.875rem;
-  font-weight: 600;
-}
+  strong {
+    display: block;
+    margin-bottom: 8px;
+    color: #374151;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
 
-.analysis-item p {
-  margin: 0;
-  color: #6b7280;
-  font-size: 0.875rem;
-  line-height: 1.5;
+  p {
+    margin: 0;
+    color: #6b7280;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
 }
 
 .strategy-badge,
@@ -368,12 +367,12 @@
   padding: 16px;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
-}
 
-.fallback-analysis p {
-  margin: 0 0 12px 0;
-  color: #6b7280;
-  font-size: 0.875rem;
+  p {
+    margin: 0 0 12px 0;
+    color: #6b7280;
+    font-size: 0.875rem;
+  }
 }
 
 .connection-summary {
@@ -382,21 +381,21 @@
   border-radius: 8px;
   border: 1px solid #e2e8f0;
   margin-top: 12px;
-}
 
-.connection-summary strong {
-  display: block;
-  margin-bottom: 8px;
-  color: #374151;
-  font-size: 0.875rem;
-  font-weight: 600;
-}
+  strong {
+    display: block;
+    margin-bottom: 8px;
+    color: #374151;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
 
-.connection-summary p {
-  margin: 0 0 8px 0;
-  color: #6b7280;
-  font-size: 0.875rem;
-  line-height: 1.5;
+  p {
+    margin: 0 0 8px 0;
+    color: #6b7280;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
 }
 
 .issues-section,
@@ -404,45 +403,42 @@
   margin-bottom: 16px;
   padding: 16px;
   border-radius: 8px;
+
+  h5 {
+    margin: 0 0 12px 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  ul {
+    margin: 0;
+    padding-left: 20px;
+    color: #374151;
+  }
+
+  li {
+    margin-bottom: 4px;
+    line-height: 1.4;
+    font-size: 0.875rem;
+  }
 }
 
 .issues-section {
   background: #fef2f2;
   border: 1px solid #fecaca;
+
+  h5 {
+    color: #dc2626;
+  }
 }
 
 .recommendations-section {
   background: #f0fdf4;
   border: 1px solid #bbf7d0;
-}
 
-.issues-section h5,
-.recommendations-section h5 {
-  margin: 0 0 12px 0;
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-.issues-section h5 {
-  color: #dc2626;
-}
-
-.recommendations-section h5 {
-  color: #059669;
-}
-
-.issues-section ul,
-.recommendations-section ul {
-  margin: 0;
-  padding-left: 20px;
-  color: #374151;
-}
-
-.issues-section li,
-.recommendations-section li {
-  margin-bottom: 4px;
-  line-height: 1.4;
-  font-size: 0.875rem;
+  h5 {
+    color: #059669;
+  }
 }
 
 /* Footer */
@@ -471,16 +467,16 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-}
 
-.secondary-button:hover:not(:disabled) {
-  background-color: #e2e8f0;
-  color: #374151;
-}
+  &:hover:not(:disabled) {
+    background-color: #e2e8f0;
+    color: #374151;
+  }
 
-.secondary-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 }
 
 .bulk-actions {
@@ -497,45 +493,44 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
 }
 
 .reject-all-button {
   background-color: #ef4444;
   color: white;
-}
 
-.reject-all-button:hover:not(:disabled) {
-  background-color: #dc2626;
-  transform: translateY(-1px);
+  &:hover:not(:disabled) {
+    background-color: #dc2626;
+    transform: translateY(-1px);
+  }
 }
 
 .confirm-all-button {
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   color: white;
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-}
 
-.confirm-all-button:hover:not(:disabled) {
-  background: linear-gradient(135deg, #059669 0%, #047857 100%);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
-}
-
-.reject-all-button:disabled,
-.confirm-all-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
+  &:hover:not(:disabled) {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+  }
 }
 
 .footer-help {
   text-align: center;
-}
 
-.footer-help small {
-  color: #6b7280;
-  font-size: 0.875rem;
-  line-height: 1.5;
+  small {
+    color: #6b7280;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
 }
 
 /* Animations */

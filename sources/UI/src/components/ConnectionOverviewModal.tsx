@@ -1,7 +1,7 @@
 import React from 'react';
 
 import { useState, useEffect } from 'react';
-import './ConnectionOverviewModal.css';
+import './ConnectionOverviewModal.scss';
 import { Connection } from '../types';
 
 interface ConnectionOverviewModalProps {
