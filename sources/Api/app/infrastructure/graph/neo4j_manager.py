@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 import uuid
 
-from .models import Entity, Relationship, Ontology
+from app.domain.models.entities import Entity, Relationship, Ontology
 
 logger = logging.getLogger(__name__)
 

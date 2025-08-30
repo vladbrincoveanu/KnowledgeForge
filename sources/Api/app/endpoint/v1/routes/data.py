@@ -7,10 +7,10 @@ import logging
 from datetime import datetime
 
 # Import actual backend services
-from ....infrastructure.graph.neo4j_manager import Neo4jGraphManager
-from ....infrastructure.storage.metadata_store import MetadataStore
-from ....domain.models.entities import Entity, Relationship
-from ....utils.config import get_config
+from app.infrastructure.graph.neo4j_manager import Neo4jGraphManager
+from app.infrastructure.storage.metadata_store import MetadataStore
+from app.domain.models.entities import Entity, Relationship
+from utils.config import get_config
 
 logger = logging.getLogger(__name__)
 

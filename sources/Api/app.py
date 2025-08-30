@@ -9,11 +9,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from datetime import datetime
 
-# Add the app directory to the Python path
-app_dir = Path(__file__).parent / "app"
-sys.path.insert(0, str(app_dir))
+# Add the current directory (sources/api) to the Python path so routes can access utils
+current_dir = Path(__file__).parent
+sys.path.insert(0, str(current_dir))
 
-from app.utils.config import get_config
+from utils.config import get_config
 
 # Create FastAPI app instance
 app = FastAPI(
@@ -29,7 +29,7 @@ app = FastAPI(
 async def startup_event():
     """Log startup information."""
     logging.info("KnowledgeForge API starting up...")
-    logging.info(f"App directory: {app_dir}")
+    logging.info(f"Current directory: {current_dir}")
     logging.info("FastAPI app created successfully")
 
 # Add CORS middleware
@@ -101,14 +101,26 @@ if __name__ == "__main__":
         config = get_config()
         
         # Run the application
-        uvicorn.run(
-            app,
-            host="0.0.0.0",
-            port=8000,
-            reload=config.debug,
-            log_level=config.logging.level.lower(),
-            access_log=True
-        )
+        if config.debug:
+            # Use import string for reload mode
+            uvicorn.run(
+                "app:app",
+                host="0.0.0.0",
+                port=8000,
+                reload=True,
+                log_level=config.logging.level.lower(),
+                access_log=True
+            )
+        else:
+            # Use app instance directly for production
+            uvicorn.run(
+                app,
+                host="0.0.0.0",
+                port=8000,
+                reload=False,
+                log_level=config.logging.level.lower(),
+                access_log=True
+            )
         
     except Exception as e:
         logging.error(f"Failed to start application: {e}")
