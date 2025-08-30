@@ -15,7 +15,7 @@ from .ontology_mapper import OntologyMapper, StandardOntology, OntologyMappingRe
 from .quality_assurance import QualityAssurance
 from .active_learning import ActiveLearningModule
 from .embedding_manager import EmbeddingManager
-from ..domain.ontology_models import Entity, Relationship, DataType, ColumnProfile, DatasetProfile, Ontology, ExtractionConfig
+from .models import Entity, Relationship, DataType, ColumnProfile, DatasetProfile, Ontology, ExtractionConfig
 from .config import OntologyExtractionConfig, load_config
 
 __all__ = [

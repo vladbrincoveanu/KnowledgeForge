@@ -11,7 +11,7 @@ import tempfile
 from typing import Dict, Any, Optional
 from pathlib import Path
 
-from ..Domain.models import LLMAnalysisResult, ConnectionType
+from ..domain.models import LLMAnalysisResult, ConnectionType
 
 logger = logging.getLogger(__name__)
 

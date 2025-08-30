@@ -157,7 +157,7 @@ def run_ontology_extraction_pipeline(csv_file_path: str, output_dir: str = "./ou
             graph_manager = GraphManager()
             if graph_manager.is_connected():
                 # Create ontology object for storage
-                from domain.ontology_models import Ontology
+                from ontology_extractor.models import Ontology
                 ontology = Ontology(
                     entities=entities,
                     relationships=relationships,

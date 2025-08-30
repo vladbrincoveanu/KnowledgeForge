@@ -3,12 +3,12 @@ from typing import List, Dict, Any
 import uuid
 from datetime import datetime
 
-from ..Application.services.semantic_query_service import SemanticQueryService
-from ..Domain.semantic_query_models import (
+from ..application.services.semantic_query_service import SemanticQueryService
+from ..domain.semantic_query_models import (
     SemanticQuery, QueryNode, QueryEdge, QueryNodeType, QueryEdgeType,
     ExportFormat, QueryTranslation, QueryExport, QueryInsight
 )
-from ..Infrastructure.llm_analyzer import LLMAnalyzer
+from ..infrastructure.llm_analyzer import LLMAnalyzer
 
 router = APIRouter(prefix="/api/semantic-queries", tags=["semantic-queries"])
 

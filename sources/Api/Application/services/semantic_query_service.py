@@ -3,11 +3,11 @@ from datetime import datetime
 import uuid
 import json
 
-from ..Domain.semantic_query_models import (
+from ..domain.semantic_query_models import (
     SemanticQuery, QueryNode, QueryEdge, QueryNodeType, QueryEdgeType,
     ExportFormat, QueryTranslation, QueryExport, QueryInsight
 )
-from ..Infrastructure.llm_analyzer import LLMAnalyzer
+from ..infrastructure.llm_analyzer import LLMAnalyzer
 
 
 class SemanticQueryService:

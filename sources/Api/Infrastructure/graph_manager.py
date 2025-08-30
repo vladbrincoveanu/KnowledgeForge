@@ -7,7 +7,7 @@ from neo4j.exceptions import ServiceUnavailable, AuthError
 import json
 from datetime import datetime
 
-from ..domain.ontology_models import Entity, Relationship, Ontology
+from .models import Entity, Relationship, Ontology
 
 logger = logging.getLogger(__name__)
 

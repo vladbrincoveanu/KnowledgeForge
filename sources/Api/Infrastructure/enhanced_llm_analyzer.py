@@ -15,7 +15,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 
-from ..Domain.models import (
+from ..domain.models import (
     EnhancedLLMAnalysisResult, BusinessOntology, DataSourceSuggestion,
     BusinessActionRecommendation, ComplexRelationshipExplanation,
     BusinessIntelligenceRequest, BusinessIntelligenceResponse,

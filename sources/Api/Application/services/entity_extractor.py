@@ -14,7 +14,7 @@ import numpy as np
 import re
 
 # Import your local models
-from ..domain.ontology_models import ColumnProfile, Entity, DataType
+from .models import ColumnProfile, Entity, DataType
 
 logger = logging.getLogger(__name__)
 if not logger.handlers:

@@ -12,7 +12,7 @@ import networkx as nx
 from sentence_transformers import SentenceTransformer
 import re
 
-from ..domain.ontology_models import Entity, Relationship, ColumnProfile, DataType
+from .models import Entity, Relationship, ColumnProfile, DataType
 from .llm_manager import LLMManager
 
 logger = logging.getLogger(__name__)
