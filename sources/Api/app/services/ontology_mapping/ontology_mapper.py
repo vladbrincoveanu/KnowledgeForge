@@ -19,8 +19,8 @@ import owlready2
 from owlready2 import *
 from pydantic import BaseModel
 
-from .models import Entity, Relationship, Ontology
-from .llm_manager import LLMManager
+from domain.models.entities import Entity, Relationship, Ontology
+from infrastructure.llm.llm_manager import LLMManager
 
 logger = logging.getLogger(__name__)
 

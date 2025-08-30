@@ -16,7 +16,8 @@ from .quality_assurance import QualityAssurance
 from .active_learning import ActiveLearningModule
 from .embedding_manager import EmbeddingManager
 from .models import Entity, Relationship, DataType, ColumnProfile, DatasetProfile, Ontology, ExtractionConfig
-from .config import OntologyExtractionConfig, load_config
+from .config import Config, get_config, config
+from .settings import neo4j_config, llm_config, extraction_config, storage_config, logging_config, security_config
 
 __all__ = [
     "DataProfiler",
@@ -39,6 +40,14 @@ __all__ = [
     "DatasetProfile",
     "Ontology",
     "ExtractionConfig",
-    "OntologyExtractionConfig",
-    "load_config",
+    # New configuration system
+    "Config",
+    "get_config",
+    "config",
+    "neo4j_config",
+    "llm_config",
+    "extraction_config",
+    "storage_config",
+    "logging_config",
+    "security_config",
 ]
