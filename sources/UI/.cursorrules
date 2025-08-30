@@ -1,0 +1,147 @@
+# KnowledgeForge UI - React/Vite Project Rules
+
+## Core Principles
+- Write modern, performant React code using functional components and hooks
+- Prioritize accessibility (a11y) in all UI components
+- Implement responsive design for all screen sizes
+- Focus on user experience and intuitive interfaces
+- Optimize for performance and minimize unnecessary re-renders
+
+## React Best Practices
+- Use functional components with React Hooks exclusively
+- Prefer const declarations for component definitions
+- Use React.memo() for expensive components to prevent unnecessary re-renders
+- Implement proper error boundaries for graceful error handling
+- Use React.Suspense for code splitting and lazy loading
+- Keep component logic focused and break down complex components
+- Use custom hooks for reusable stateful logic
+
+## State Management
+- Use useState and useReducer for local component state
+- Implement useContext for shared state across component trees
+- Use useCallback and useMemo to optimize performance-critical functions
+- Avoid prop drilling by using context or state management libraries
+- Keep state as close to where it's used as possible
+- Use useEffect for side effects with proper dependency arrays
+
+## Component Design
+- Create reusable, composable components
+- Use meaningful prop names with proper TypeScript interfaces
+- Implement proper default props and prop validation
+- Keep components pure when possible (same input = same output)
+- Use compound components pattern for complex UI elements
+- Separate presentation components from container components
+
+## Performance Optimization
+- Use React.memo() for components that receive stable props
+- Implement useCallback for event handlers passed to child components
+- Use useMemo for expensive calculations
+- Implement proper keys for list items
+- Lazy load components and images when appropriate
+- Optimize bundle size with code splitting
+- Monitor and minimize DOM manipulations
+
+## Accessibility (a11y)
+- Use semantic HTML elements (button, nav, main, aside, etc.)
+- Implement proper ARIA labels and roles
+- Ensure keyboard navigation works for all interactive elements
+- Maintain proper color contrast ratios (WCAG AA compliance)
+- Add alt text for all images and icons
+- Use proper heading hierarchy (h1, h2, h3...)
+- Test with screen readers and keyboard-only navigation
+
+## Styling & CSS
+- Use CSS modules or styled-components for component-scoped styles
+- Follow BEM methodology or similar naming conventions
+- Implement responsive design with mobile-first approach
+- Use CSS custom properties (variables) for consistent theming
+- Prefer flexbox and CSS Grid for layouts
+- Keep CSS specificity low and avoid !important
+- Use semantic class names that describe purpose, not appearance
+
+## Error Handling
+- Implement error boundaries to catch and handle React errors gracefully
+- Use try-catch blocks for async operations
+- Provide meaningful error messages to users
+- Log errors to monitoring services for debugging
+- Implement fallback UI states for error conditions
+- Handle network errors and API failures gracefully
+
+## API Integration
+- Use async/await for API calls with proper error handling
+- Implement loading states for all async operations
+- Cache API responses when appropriate
+- Use abort controllers to cancel ongoing requests
+- Implement proper retry logic for failed requests
+- Handle different HTTP status codes appropriately
+
+## Code Organization
+- Group related components in feature-based folders
+- Use index.js files for clean imports
+- Separate business logic from UI components
+- Create custom hooks for reusable logic
+- Use TypeScript interfaces for prop and state typing
+- Keep utility functions in dedicated modules
+
+## TypeScript (if using)
+- Define interfaces for all props and state objects
+- Use union types for component variants
+- Implement proper generic types for reusable components
+- Use type guards for runtime type checking
+- Prefer interfaces over types for object shapes
+- Use strict TypeScript configuration
+
+## Testing
+- Write unit tests for all components using React Testing Library
+- Test user interactions and behavior, not implementation details
+- Use descriptive test names that explain the expected behavior
+- Mock external dependencies and API calls
+- Test accessibility with screen reader simulation
+- Implement integration tests for critical user flows
+- Maintain high test coverage for business logic
+
+## Build & Development
+- Use Vite for fast development and optimized builds
+- Configure proper environment variables for different stages
+- Implement proper code splitting for optimal bundle sizes
+- Use source maps for debugging in development
+- Configure proper proxy settings for API development
+- Use ESLint and Prettier for consistent code formatting
+
+## Security
+- Sanitize user input to prevent XSS attacks
+- Use environment variables for sensitive configuration
+- Implement proper CORS configuration
+- Validate API responses before using in UI
+- Use HTTPS in production
+- Implement proper authentication flows
+
+## User Experience
+- Implement proper loading states and skeleton screens
+- Provide immediate feedback for user actions
+- Use progressive enhancement for better perceived performance
+- Implement proper form validation with clear error messages
+- Use animations and transitions to guide user attention
+- Design for mobile-first and touch interactions
+
+## Browser Compatibility
+- Test on major browsers (Chrome, Firefox, Safari, Edge)
+- Use proper polyfills for newer JavaScript features
+- Implement graceful degradation for older browsers
+- Test on different screen sizes and orientations
+- Use autoprefixer for CSS vendor prefixes
+
+## Comments & Documentation
+- Use JSDoc comments for complex components and functions
+- Document props interfaces with clear descriptions
+- Keep inline comments for complex business logic
+- Maintain README with setup and development instructions
+- Document component usage with examples
+- Use Storybook for component documentation (if applicable)
+
+## File Naming & Structure
+- Use PascalCase for component files (e.g., UserProfile.jsx)
+- Use camelCase for utility functions and hooks
+- Use kebab-case for CSS files and assets
+- Keep component and test files co-located
+- Use descriptive file names that reflect functionality

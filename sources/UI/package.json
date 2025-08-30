@@ -22,18 +22,31 @@
     "web-vitals": "^3.5.0"
   },
   "devDependencies": {
+    "@types/papaparse": "^5.3.16",
     "@types/react": "^18.2.37",
     "@types/react-dom": "^18.2.15",
+    "@typescript-eslint/eslint-plugin": "^8.41.0",
+    "@typescript-eslint/parser": "^8.41.0",
     "@vitejs/plugin-react": "^4.1.1",
+    "eslint": "^9.34.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2",
     "vite": "^4.5.0",
     "vite-plugin-node-polyfills": "^0.24.0"
   },
   "scripts": {
     "dev": "vite",
     "start": "vite",
-    "build": "vite build",
+    "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest"
+    "test": "vitest",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint . --ext ts,tsx --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "type-check": "tsc --noEmit"
   },
   "eslintConfig": {
     "extends": [
