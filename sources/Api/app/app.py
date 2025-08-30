@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 # Import the new API router
-from app.api.v1 import api_router
+from app.endpoint.v1 import api_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

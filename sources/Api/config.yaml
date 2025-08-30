@@ -17,9 +17,7 @@ neo4j:
 # LM Studio LLM service configuration
 lmstudio:
   base_url: "http://localhost:1234"
-  model_name: "deepseek/deepseek-r1-0528-qwen3-8b
-
-"  # Changed from llama2 to available model
+  model_name: "deepseek/deepseek-r1-0528-qwen3-8b"  # Changed from llama2 to available model
   temperature: 0.7
   max_tokens: 100
   timeout: 30
