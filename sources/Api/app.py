@@ -9,23 +9,16 @@ import sys
 app_dir = Path(__file__).parent / "app"
 sys.path.insert(0, str(app_dir))
 
-from app.app import app
-from app.core.config import get_settings
+from utils.config import get_config
 
 if __name__ == "__main__":
     try:
         # Load configuration
-        config = get_settings()
-        
-        # Configure logging
-        logging.basicConfig(
-            level=getattr(logging, config.logging.level),
-            format=config.logging.format
-        )
+        config = get_config()
         
         # Run the application
         uvicorn.run(
-            "app.app:app",
+            "app.main:app",
             host="0.0.0.0",
             port=8000,
             reload=config.debug,

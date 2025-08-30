@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from datetime import datetime
 from typing import Dict, Any
 
-from ....core.config import get_settings
+from utils.config import config
 
 router = APIRouter(prefix="/health", tags=["health"])
 
@@ -42,9 +42,6 @@ async def readiness_check():
     """Readiness check endpoint for Kubernetes deployment."""
     try:
         # Check if the service is ready to handle requests
-        config = get_settings()
-        
-        # Basic readiness checks
         if not config:
             return JSONResponse(
                 status_code=503,
@@ -89,8 +86,8 @@ async def get_system_metrics():
                 "total_relationships_discovered": 0
             },
             "quality_metrics": {
-                "average_entity_confidence": 0.85,
-                "average_relationship_confidence": 0.78,
+                "average_entity_confidence": config.extraction.confidence_threshold,
+                "average_relationship_confidence": config.extraction.relationship_threshold,
                 "data_coverage": 0.92
             },
             "timestamp": datetime.now()
