@@ -183,7 +183,7 @@ class TestAgricultureWorkersExtraction:
                 return False
                 
         except Exception as e:
-            print(f"❌ Extraction pipeline test failed: {e}")
+            print(f"n❌ Extraction pipeline test failed: {e}")
             return False
     
     def test_data_profiling(self):
