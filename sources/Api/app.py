@@ -15,22 +15,31 @@ sys.path.insert(0, str(current_dir))
 
 from utils.config import get_config
 
+# Lifespan context manager
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown events."""
+    # Startup
+    logging.info("KnowledgeForge API starting up...")
+    logging.info(f"Current directory: {current_dir}")
+    logging.info("FastAPI app created successfully")
+    
+    yield
+    
+    # Shutdown
+    logging.info("KnowledgeForge API shutting down...")
+
 # Create FastAPI app instance
 app = FastAPI(
     title="KnowledgeForge API",
     description="A semantic ontology extraction API for CSV files",
     version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
-
-# Startup event
-@app.on_event("startup")
-async def startup_event():
-    """Log startup information."""
-    logging.info("KnowledgeForge API starting up...")
-    logging.info(f"Current directory: {current_dir}")
-    logging.info("FastAPI app created successfully")
 
 # Add CORS middleware
 app.add_middleware(
@@ -101,26 +110,14 @@ if __name__ == "__main__":
         config = get_config()
         
         # Run the application
-        if config.debug:
-            # Use import string for reload mode
-            uvicorn.run(
-                "app:app",
-                host="0.0.0.0",
-                port=8000,
-                reload=True,
-                log_level=config.logging.level.lower(),
-                access_log=True
-            )
-        else:
-            # Use app instance directly for production
-            uvicorn.run(
-                app,
-                host="0.0.0.0",
-                port=8000,
-                reload=False,
-                log_level=config.logging.level.lower(),
-                access_log=True
-            )
+        uvicorn.run(
+            app,
+            host="0.0.0.0",
+            port=8000,
+            reload=False,  # Disable reload for now to avoid import issues
+            log_level=config.logging.level.lower(),
+            access_log=True
+        )
         
     except Exception as e:
         logging.error(f"Failed to start application: {e}")

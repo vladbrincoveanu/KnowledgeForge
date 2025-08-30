@@ -124,7 +124,16 @@ async def submit_feedback(
             "submitted_at": datetime.now().isoformat()
         }
         
-        await metadata_store.store_feedback(feedback_data)
+        # Extract individual fields for the add_user_feedback method
+        feedback_id = metadata_store.add_user_feedback(
+            entity_id=feedback_data.get("entity_id"),
+            relationship_id=feedback_data.get("relationship_id"),
+            feedback_type=feedback_data.get("feedback_type"),
+            feedback_value=feedback_data.get("feedback_value"),
+            confidence_adjustment=feedback_data.get("confidence_delta"),
+            user_id=feedback_data.get("user_id"),
+            feedback_source="api"
+        )
         
         return {
             "feedback_id": feedback_id,

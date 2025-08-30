@@ -14,7 +14,7 @@ from collections import defaultdict, Counter
 import numpy as np
 from dataclasses import dataclass
 
-from .models import ColumnProfile, DatasetProfile, DataType
+from app.domain.models.entities import ColumnProfile, DatasetProfile, DataType
 
 logger = logging.getLogger(__name__)
 

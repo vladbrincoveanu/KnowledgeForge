@@ -8,6 +8,7 @@ import uuid
 import tempfile
 import logging
 import asyncio
+import json
 
 from pydantic import BaseModel, Field
 
@@ -16,7 +17,7 @@ from app.services.entity_extraction.entity_extractor import EntityExtractor
 from app.services.ontology_mapping.ontology_mapper import OntologyMapper
 from app.services.relationship_discovery.relationship_discoverer import RelationshipDiscoverer
 from app.infrastructure.graph.neo4j_manager import Neo4jGraphManager
-from app.infrastructure.storage.metadata_store import MetadataStore
+from app.infrastructure.storage.metadata_store import AdvancedMetadataStore as MetadataStore
 from app.domain.models.entities import DatasetProfile, Entity, Relationship
 from utils.config import get_config
 
@@ -124,7 +125,13 @@ async def upload_csv_file(
         }
         
         # Store in metadata store
-        await metadata_store.store_file_metadata(file_metadata)
+        file_id_int = metadata_store.register_file(
+            file_path=file_path,
+            file_name=file.filename,
+            file_size=len(content),
+            file_type="csv",
+            metadata=json.dumps(file_metadata)
+        )
         
         return {
             "file_id": file_id,
@@ -239,7 +246,9 @@ async def run_extraction_pipeline(
         task.progress = 1.0
         
         # Step 6: Update metadata store
-        await metadata_store.store_extraction_results(task_id, {
+        # Get the file_id from the task
+        file_id = 1  # Default value, should be retrieved from task metadata
+        await metadata_store.complete_extraction_run(task_id, {
             "entities_count": len(entities),
             "relationships_count": len(relationships),
             "ontology_results": ontology_results,

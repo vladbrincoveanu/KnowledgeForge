@@ -131,12 +131,6 @@ dmypy.json
 *.zip
 *.rar
 
-# Large data files
-*.csv
-*.json
-*.xml
-*.xlsx
-*.xls
 
 # Model files
 *.pkl

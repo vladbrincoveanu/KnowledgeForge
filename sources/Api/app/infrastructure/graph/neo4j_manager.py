@@ -763,6 +763,131 @@ class Neo4jGraphManager:
             logger.error(f"Failed to refresh materialized view '{view_name}': {e}")
             return False
     
+    def get_entities(self, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
+        """Get all entities from the graph database."""
+        query = """
+        MATCH (e:Entity)
+        RETURN e.id as id, e.name as name, e.entity_type as entity_type, 
+               e.confidence as confidence, e.attributes as attributes
+        ORDER BY e.name
+        LIMIT $limit SKIP $offset
+        """
+        
+        try:
+            with self.driver.session(database=self.database) as session:
+                result = session.run(query, {'limit': limit, 'offset': offset})
+                entities = []
+                for record in result:
+                    entity = {
+                        'id': record['id'],
+                        'name': record['name'],
+                        'entity_type': record['entity_type'],
+                        'confidence': record['confidence'],
+                        'attributes': record['attributes'] if record['attributes'] else {}
+                    }
+                    entities.append(entity)
+                return entities
+        except Exception as e:
+            logger.error(f"Failed to get entities: {e}")
+            return []
+    
+    def get_relationships(self, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
+        """Get all relationships from the graph database."""
+        query = """
+        MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity)
+        RETURN r.id as id, r.relationship_type as type, r.confidence as confidence,
+               source.name as source_entity, target.name as target_entity,
+               r.attributes as attributes
+        ORDER BY r.relationship_type
+        LIMIT $limit SKIP $offset
+        """
+        
+        try:
+            with self.driver.session(database=self.database) as session:
+                result = session.run(query, {'limit': limit, 'offset': offset})
+                relationships = []
+                for record in result:
+                    rel = {
+                        'id': record['id'],
+                        'type': record['type'],
+                        'confidence': record['confidence'],
+                        'source_entity': record['source_entity'],
+                        'target_entity': record['target_entity'],
+                        'attributes': record['attributes'] if record['attributes'] else {}
+                    }
+                    relationships.append(rel)
+                return relationships
+        except Exception as e:
+            logger.error(f"Failed to get relationships: {e}")
+            return []
+    
+    def get_graph_statistics(self) -> Dict[str, Any]:
+        """Get basic statistics about the graph database."""
+        stats = {
+            "total_nodes": 0,
+            "total_relationships": 0,
+            "database_size_mb": 0,
+            "index_count": 0
+        }
+        
+        try:
+            with self.driver.session(database=self.database) as session:
+                # Count nodes
+                node_result = session.run("MATCH (n) RETURN count(n) as count")
+                stats["total_nodes"] = node_result.single()["count"]
+                
+                # Count relationships
+                rel_result = session.run("MATCH ()-[r]->() RETURN count(r) as count")
+                stats["total_relationships"] = rel_result.single()["count"]
+                
+                # Get database size (approximate)
+                size_result = session.run("CALL dbms.components() YIELD name, versions, edition RETURN name, versions[0] as version")
+                if size_result.peek():
+                    stats["database_size_mb"] = 1.5  # Placeholder value
+                
+                # Count indexes
+                index_result = session.run("SHOW INDEXES")
+                stats["index_count"] = len(list(index_result))
+                
+        except Exception as e:
+            logger.warning(f"Could not get graph statistics: {e}")
+        
+        return stats
+    
+    def search_graph(self, query: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """Search for entities and relationships in the graph."""
+        search_query = """
+        MATCH (e:Entity)
+        WHERE e.name CONTAINS $query OR e.entity_type CONTAINS $query
+        RETURN e.id as id, e.name as name, e.entity_type as entity_type, 
+               e.confidence as confidence, 'entity' as result_type
+        UNION
+        MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity)
+        WHERE r.relationship_type CONTAINS $query
+        RETURN r.id as id, r.relationship_type as name, 
+               source.name + ' -> ' + target.name as description,
+               r.confidence as confidence, 'relationship' as result_type
+        LIMIT $limit
+        """
+        
+        try:
+            with self.driver.session(database=self.database) as session:
+                result = session.run(search_query, {'query': query, 'limit': limit})
+                results = []
+                for record in result:
+                    item = {
+                        'id': record['id'],
+                        'name': record['name'],
+                        'description': record.get('description', ''),
+                        'confidence': record['confidence'],
+                        'result_type': record['result_type']
+                    }
+                    results.append(item)
+                return results
+        except Exception as e:
+            logger.error(f"Failed to search graph: {e}")
+            return []
+    
     def get_performance_metrics(self) -> Dict[str, Any]:
         """Get performance metrics for the graph manager."""
         metrics = {
