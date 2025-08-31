@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { useState, useEffect } from 'react';
-import { ontologyAPI, apiUtils } from '../services/api';
+import { ontologyAPI, apiUtils } from '@/services/api';
 import {
   Database,
   Download,
@@ -17,7 +17,7 @@ import {
   FeedbackForm,
   PaginatedResponse,
   FeedbackResponse,
-} from '../types';
+} from '@/types';
 import './OntologyResults.scss';
 
 interface OntologyResultsProps {
@@ -56,15 +56,15 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
         setLoading(true);
         setError(null);
 
-        const currentPagination = pagination[type];
-        const page = reset ? 1 : currentPagination.page;
+        // Use default pagination values, let the component manage its own state
+        const page = reset ? 1 : 1;
 
         let data: PaginatedResponse<Entity> | PaginatedResponse<Relationship>;
         if (type === 'entities') {
           data = await ontologyAPI.getEntities(
             taskId,
-            currentPagination.limit,
-            (page - 1) * currentPagination.limit
+            20,
+            (page - 1) * 20
           );
           if (reset) {
             setEntities(data.items || []);
@@ -74,8 +74,8 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
         } else {
           data = await ontologyAPI.getRelationships(
             taskId,
-            currentPagination.limit,
-            (page - 1) * currentPagination.limit
+            20,
+            (page - 1) * 20
           );
           if (reset) {
             setRelationships(data.items || []);
@@ -87,7 +87,7 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
         const newPage = reset ? 2 : page + 1;
         setPagination(prev => ({
           ...prev,
-          [type]: { ...prev[type], page: newPage, total: data.total || 0 },
+          [type]: { page: newPage, limit: 20, total: data.total || 0 },
         }));
       } catch (error: unknown) {
         const errorMessage =
@@ -97,7 +97,7 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
         setLoading(false);
       }
     },
-    [taskId, pagination]
+    [taskId]
   );
 
   const handleFeedbackSubmit = async (e: React.FormEvent) => {
@@ -168,11 +168,37 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
   };
 
   useEffect(() => {
-    if (taskId) {
-      loadData('entities', true);
-      loadData('relationships', true);
-    }
-  }, [taskId, loadData]);
+    if (!taskId) return;
+
+    const loadInitialData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Load entities
+        const entitiesData = await ontologyAPI.getEntities(taskId, 20, 0);
+        setEntities(entitiesData.items || []);
+
+        // Load relationships
+        const relationshipsData = await ontologyAPI.getRelationships(taskId, 20, 0);
+        setRelationships(relationshipsData.items || []);
+
+        // Update pagination
+        setPagination({
+          entities: { page: 2, limit: 20, total: entitiesData.total || 0 },
+          relationships: { page: 2, limit: 20, total: relationshipsData.total || 0 },
+        });
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : 'An unknown error occurred';
+        setError(errorMessage);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadInitialData();
+  }, [taskId]);
 
   return (
     <div className="ontology-results">

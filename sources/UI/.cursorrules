@@ -53,6 +53,7 @@
 ## Styling & CSS
 - Use CSS modules or styled-components for component-scoped styles
 - Follow BEM methodology or similar naming conventions
+- Use lowercase for all CSS class names (e.g., .user-profile, .nav-item)
 - Implement responsive design with mobile-first approach
 - Use CSS custom properties (variables) for consistent theming
 - Prefer flexbox and CSS Grid for layouts
@@ -76,12 +77,20 @@
 - Handle different HTTP status codes appropriately
 
 ## Code Organization
-- Group related components in feature-based folders
+- All components must be placed inside the @components/ folder structure
+- Group related components in feature-based folders within @components/
 - Use index.js files for clean imports
 - Separate business logic from UI components
 - Create custom hooks for reusable logic
 - Use TypeScript interfaces for prop and state typing
 - Keep utility functions in dedicated modules
+
+## File and Directory Management
+- **NEVER create empty folders or placeholder files without explicit permission**
+- Ask user before creating new directories or major structural changes
+- Only create files that contain meaningful implementation
+- Avoid creating stub components with TODO comments unless specifically requested
+- When creating new components, include proper implementation with tests
 
 ## TypeScript (if using)
 - Define interfaces for all props and state objects
@@ -107,6 +116,26 @@
 - Use source maps for debugging in development
 - Configure proper proxy settings for API development
 - Use ESLint and Prettier for consistent code formatting
+
+## Code Quality & Formatting Automation
+- **CRITICAL**: After any changes to files in the @components/ directory or any other UI files, ALWAYS run the following commands in sequence:
+  1. `npm run fix-all` - This runs both prettier formatting and eslint fixes automatically
+  2. If there are still linting issues, run `npm run lint:fix` for additional fixes
+  3. For manual lint checking, use `npm run lint` to verify all issues are resolved
+  4. `npm run test` - Run all tests to ensure changes don't break functionality
+- **MANDATORY**: Before completing any task that involves UI changes, run the complete verification process:
+  1. `npm run check-all` - Run type-check + lint + format check
+  2. `npm run test` - Run all tests to verify functionality
+- Available quality scripts:
+  - `npm run fix-all`: Runs prettier format + eslint fix (USE THIS FIRST)
+  - `npm run format`: Run prettier formatting only
+  - `npm run lint:fix`: Run eslint fixes only
+  - `npm run check-all`: Run type-check + lint + format check (for code quality verification)
+  - `npm run test`: Run all tests (for functionality verification)
+  - `npm run dev:fix`: Same as fix-all (alternative command)
+- **NEVER** leave code with linting errors, formatting issues, or failing tests
+- **ALWAYS** verify both code quality AND test functionality before declaring a task complete
+- **TEST REQUIREMENT**: All changes must pass existing tests and new functionality must include appropriate tests
 
 ## Security
 - Sanitize user input to prevent XSS attacks
@@ -140,7 +169,9 @@
 - Use Storybook for component documentation (if applicable)
 
 ## File Naming & Structure
-- Use PascalCase for component files (e.g., UserProfile.jsx)
+- Use lowercase for all folder names (e.g., user-profile/, components/)
+- Use lowercase for all file names (e.g., user-profile.tsx, api-service.ts)
+- Use PascalCase for component files (e.g., UserProfile.tsx)
 - Use camelCase for utility functions and hooks
 - Use kebab-case for CSS files and assets
 - Keep component and test files co-located

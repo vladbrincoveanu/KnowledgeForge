@@ -257,19 +257,24 @@ export const ontologyAPI = {
 
   // Get system metrics
   getMetrics: async (): Promise<SystemMetrics> => {
-    const response: AxiosResponse<SystemMetrics> = await api.get('/api/v1/health/metrics');
+    const response: AxiosResponse<SystemMetrics> = await api.get(
+      '/api/v1/health/metrics'
+    );
     return response.data;
   },
 
   // Health check
   healthCheck: async (): Promise<HealthStatus> => {
-    const response: AxiosResponse<HealthStatus> = await api.get('/api/v1/health/');
+    const response: AxiosResponse<HealthStatus> =
+      await api.get('/api/v1/health/');
     return response.data;
   },
 
   // Readiness check
   readinessCheck: async (): Promise<HealthStatus> => {
-    const response: AxiosResponse<HealthStatus> = await api.get('/api/v1/health/ready');
+    const response: AxiosResponse<HealthStatus> = await api.get(
+      '/api/v1/health/ready'
+    );
     return response.data;
   },
 };

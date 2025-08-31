@@ -23,6 +23,13 @@
 - Include type hints for all function parameters and return values
 - Use meaningful variable names, avoid single letters except for common loop variables
 
+## File and Directory Management
+- **NEVER create empty folders or placeholder files without explicit permission**
+- Ask user before creating new directories or major structural changes
+- Only create files that contain meaningful implementation
+- Avoid creating stub files with TODO comments unless specifically requested
+- When creating new modules, include proper implementation, not just imports
+
 ## Pydantic & Data Modeling
 - Always use Pydantic BaseModel for domain models, DTOs, and API schemas
 - Use Pydantic Field() for validation constraints and documentation
@@ -89,6 +96,8 @@
 
 ## File Organization
 - Follow the established domain-driven design structure
+- Use lowercase for all folder names (e.g., domain/, services/, infrastructure/)
+- Use lowercase for all file names (e.g., entities.py, graph_manager.py)
 - Keep related functionality in the same module
 - Use clear, descriptive module and function names
 - Separate domain models, services, and infrastructure concerns

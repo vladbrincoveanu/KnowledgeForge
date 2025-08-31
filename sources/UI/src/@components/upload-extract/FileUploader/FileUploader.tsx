@@ -1,8 +1,8 @@
 import React from 'react';
 
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { ontologyAPI, fileAPI, wsService, apiUtils } from '../services/api';
-import { UploadedFile } from '../types';
+import { ontologyAPI, fileAPI, wsService, apiUtils } from '@/services/api';
+import { UploadedFile } from '@/types';
 import {
   Upload,
   FileText,
@@ -110,16 +110,26 @@ const FileUploader: React.FC<FileUploaderProps> = ({
       return;
     }
 
-    const processedFiles = [];
-    const existingFileNames = uploadedFiles.map(file => file.name);
+    const newFiles = supportedFiles.filter(
+      file => !uploadedFiles.some(uploaded => uploaded.name === file.name)
+    );
 
-    for (const file of supportedFiles) {
-      // Check if file already exists
-      if (existingFileNames.includes(file.name)) {
-        alert(`File "${file.name}" is already uploaded.`);
-        continue;
-      }
+    if (newFiles.length !== supportedFiles.length) {
+      alert('Some files were duplicates and have been ignored.');
+    }
 
+    // Add new files to the list immediately to show them in the UI
+    const newFilePlaceholders = newFiles.map(file => ({
+      name: file.name,
+      size: file.size,
+      headers: [],
+      rowCount: 0,
+      serverPath: null,
+    }));
+    setUploadedFiles(prev => [...prev, ...newFilePlaceholders]);
+
+    const successfullyProcessed = [];
+    for (const file of newFiles) {
       try {
         setUploadProgress(prev => ({ ...prev, [file.name]: 'uploading' }));
 
@@ -133,7 +143,11 @@ const FileUploader: React.FC<FileUploaderProps> = ({
         // Process file locally for display purposes
         const processedFile = await fileAPI.processLocalFile(file);
         processedFile.serverPath = uploadResult.file_path; // Store server path
-        processedFiles.push(processedFile);
+
+        setUploadedFiles(prev =>
+          prev.map(f => (f.name === file.name ? processedFile : f))
+        );
+        successfullyProcessed.push(processedFile);
 
         setUploadProgress(prev => ({ ...prev, [file.name]: 'success' }));
 
@@ -146,10 +160,8 @@ const FileUploader: React.FC<FileUploaderProps> = ({
       }
     }
 
-    if (processedFiles.length > 0) {
-      const updatedFiles = [...uploadedFiles, ...processedFiles];
-      setUploadedFiles(updatedFiles);
-      onFilesUploaded(updatedFiles);
+    if (successfullyProcessed.length > 0) {
+      onFilesUploaded(successfullyProcessed);
     }
   };
 

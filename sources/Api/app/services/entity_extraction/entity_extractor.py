@@ -3,18 +3,15 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import math
-import os
-from dataclasses import replace
-from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
-
-import pandas as pd
-import numpy as np
 import re
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import pandas as pd
 
 # Import your local models
-from app.domain.models.entities import ColumnProfile, Entity, DataType
+from app.domain.models.entities import ColumnProfile, DataType, Entity
 
 logger = logging.getLogger(__name__)
 if not logger.handlers:
@@ -27,8 +24,12 @@ if not logger.handlers:
 _REG_EMAIL = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
 _REG_URL = re.compile(r"^(https?://)?([\w-]+\.)+[\w-]+(/\S*)?$")
 _REG_IP = re.compile(r"^(?:\d{1,3}\.){3}\d{1,3}$")
-_REG_UUID = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
-_REG_HEXISH_UUID = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+_REG_UUID = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+)
+_REG_HEXISH_UUID = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
 _REG_CREDIT_CARD = re.compile(r"^(?:\d[ -]*?){13,19}$")
 _REG_PHONE = re.compile(r"^\+?[0-9 .()\-]{7,}$")
 _REG_POSTAL_5 = re.compile(r"^\d{5}$")  # US-like; adjust by region if needed
@@ -41,6 +42,7 @@ _REG_YEAR = re.compile(r"^(19\d{2}|20\d{2}|2100)$")
 # -----------------------------------------------------
 # Helpers: deterministic hashing & JSON-safe operations
 # -----------------------------------------------------
+
 
 def _stable_hash_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
@@ -74,9 +76,9 @@ class EntityExtractor:
     def extract_entities(
         self,
         file_path: str,
-        columns: List[ColumnProfile],
-        config: Dict[str, Any],
-    ) -> List[Entity]:
+        columns: list[ColumnProfile],
+        config: dict[str, Any],
+    ) -> list[Entity]:
         """Top-level entry: deterministic run with caching."""
         logger.info(f"Extracting entities from {file_path}")
 
@@ -95,14 +97,14 @@ class EntityExtractor:
         return entities
 
     # ---------- caching ----------
-    def _cache_path(self, key: str, suffix: str = ".json") -> Optional[Path]:
+    def _cache_path(self, key: str, suffix: str = ".json") -> Path | None:
         if not self.cache_dir:
             return None
         p = self.cache_dir / f"{key}{suffix}"
         p.parent.mkdir(parents=True, exist_ok=True)
         return p
 
-    def _load_cached_entities(self, file_hash: str) -> Optional[List[Entity]]:
+    def _load_cached_entities(self, file_hash: str) -> list[Entity] | None:
         path = self._cache_path(file_hash)
         if path and path.exists():
             try:
@@ -112,7 +114,7 @@ class EntityExtractor:
                 logger.warning(f"Cache read failed: {e}")
         return None
 
-    def _save_cached_entities(self, file_hash: str, entities: List[Entity]) -> None:
+    def _save_cached_entities(self, file_hash: str, entities: list[Entity]) -> None:
         path = self._cache_path(file_hash)
         if not path:
             return
@@ -123,12 +125,12 @@ class EntityExtractor:
     def _extract_entities_traditional(
         self,
         file_path: str,
-        columns: List[ColumnProfile],
-        config: Dict[str, Any],
-    ) -> List[Entity]:
+        columns: list[ColumnProfile],
+        config: dict[str, Any],
+    ) -> list[Entity]:
         df = self._safe_read_csv(file_path, usecols=[c.name for c in columns])
 
-        per_column: List[Entity] = []
+        per_column: list[Entity] = []
         for col in columns[: int(config.get("max_columns_to_process", 10_000))]:
             try:
                 per_column.extend(self._extract_column_entities(df, col, config))
@@ -136,8 +138,10 @@ class EntityExtractor:
                 logger.exception(f"Column {col.name} extraction failed: {e}")
 
         # Optional business-level entities; gated & cached inside
-        per_dataset: List[Entity] = []
-        if config.get("use_llm", True) and config.get("extract_business_entities", False):
+        per_dataset: list[Entity] = []
+        if config.get("use_llm", True) and config.get(
+            "extract_business_entities", False
+        ):
             try:
                 per_dataset = self._extract_business_entities_llm(df, columns, config)
             except Exception as e:
@@ -164,10 +168,10 @@ class EntityExtractor:
         self,
         df: pd.DataFrame,
         column: ColumnProfile,
-        config: Dict[str, Any],
-    ) -> List[Entity]:
+        config: dict[str, Any],
+    ) -> list[Entity]:
         """Collect candidates per column, then pick one best entity unless disabled."""
-        entities: List[Entity] = []
+        entities: list[Entity] = []
         name = column.name
         s = df[name]
 
@@ -190,7 +194,11 @@ class EntityExtractor:
             "phone",
         }
         top_regex = max(regex_entities, key=lambda e: e.confidence, default=None)
-        if top_regex and top_regex.entity_type in hard_exit_types and top_regex.confidence >= 0.90:
+        if (
+            top_regex
+            and top_regex.entity_type in hard_exit_types
+            and top_regex.confidence >= 0.90
+        ):
             return [top_regex]
 
         # Strategy 2: ID/sequential/uniqueness analysis
@@ -214,8 +222,8 @@ class EntityExtractor:
 
     # ---------- Gate A: validators & regex ----------
     def _extract_regex_entities(
-        self, s: pd.Series, column: ColumnProfile, config: Dict[str, Any]
-    ) -> List[Entity]:
+        self, s: pd.Series, column: ColumnProfile, config: dict[str, Any]
+    ) -> list[Entity]:
         values = self._det_sample_unique_sorted(s, config)
         n = max(len(values), 1)
 
@@ -229,8 +237,8 @@ class EntityExtractor:
                     cnt += 1
             return cnt / n
 
-        out: List[Entity] = []
-        checks: List[Tuple[str, re.Pattern]] = [
+        out: list[Entity] = []
+        checks: list[tuple[str, re.Pattern]] = [
             ("email", _REG_EMAIL),
             ("url", _REG_URL),
             ("ip_address", _REG_IP),
@@ -255,9 +263,9 @@ class EntityExtractor:
 
     # ---------- Gate A: ID/sequential/uniqueness ----------
     def _extract_id_entities(
-        self, s: pd.Series, column: ColumnProfile, config: Dict[str, Any]
-    ) -> List[Entity]:
-        out: List[Entity] = []
+        self, s: pd.Series, column: ColumnProfile, config: dict[str, Any]
+    ) -> list[Entity]:
+        out: list[Entity] = []
         non_null = s.dropna()
         if non_null.empty:
             return out
@@ -275,7 +283,9 @@ class EntityExtractor:
 
         # uuid-like detection (looser than strict UUID)
         sample = self._det_sample_unique_sorted(non_null, config)
-        loose_uuid_hits = sum(1 for v in sample if _REG_HEXISH_UUID.match(str(v).strip()))
+        loose_uuid_hits = sum(
+            1 for v in sample if _REG_HEXISH_UUID.match(str(v).strip())
+        )
         loose_ratio = loose_uuid_hits / max(len(sample), 1)
 
         # Decision rules
@@ -306,9 +316,9 @@ class EntityExtractor:
 
     # ---------- Gate A: other patterns (percent/latlon/year) ----------
     def _extract_pattern_entities(
-        self, s: pd.Series, column: ColumnProfile, config: Dict[str, Any]
-    ) -> List[Entity]:
-        out: List[Entity] = []
+        self, s: pd.Series, column: ColumnProfile, config: dict[str, Any]
+    ) -> list[Entity]:
+        out: list[Entity] = []
         values = self._det_sample_unique_sorted(s, config)
         n = max(len(values), 1)
 
@@ -394,8 +404,8 @@ class EntityExtractor:
 
     # ---------- Gate C: LLM (last resort, deterministic & cached) ----------
     def _extract_llm_entities(
-        self, s: pd.Series, column: ColumnProfile, config: Dict[str, Any]
-    ) -> List[Entity]:
+        self, s: pd.Series, column: ColumnProfile, config: dict[str, Any]
+    ) -> list[Entity]:
         if not self.llm_manager:
             return []
         sample = self._det_sample_unique_sorted(s, config)
@@ -438,8 +448,8 @@ class EntityExtractor:
             **kwargs,
         )
 
-        entities: List[Entity] = []
-        for r in (results or []):
+        entities: list[Entity] = []
+        for r in results or []:
             try:
                 entities.append(
                     Entity(
@@ -455,7 +465,9 @@ class EntityExtractor:
 
         if cache:
             try:
-                cache.write_text(json.dumps([e.__dict__ for e in entities], ensure_ascii=False))
+                cache.write_text(
+                    json.dumps([e.__dict__ for e in entities], ensure_ascii=False)
+                )
             except Exception:
                 pass
         return entities
@@ -463,13 +475,15 @@ class EntityExtractor:
     def _extract_business_entities_llm(
         self,
         df: pd.DataFrame,
-        columns: List[ColumnProfile],
-        config: Dict[str, Any],
-    ) -> List[Entity]:
+        columns: list[ColumnProfile],
+        config: dict[str, Any],
+    ) -> list[Entity]:
         if not self.llm_manager:
             return []
         # Small, deterministic context: schema + few representative rows
-        sample_rows = df.head(int(config.get("llm_context_rows", 20))).to_dict(orient="records")
+        sample_rows = df.head(int(config.get("llm_context_rows", 20))).to_dict(
+            orient="records"
+        )
         context = {
             "columns": [c.name for c in columns],
             "dtypes": {c.name: str(c.data_type) for c in columns},
@@ -495,8 +509,8 @@ class EntityExtractor:
             prompt=prompt,
             **kwargs,
         )
-        entities: List[Entity] = []
-        for r in (results or []):
+        entities: list[Entity] = []
+        for r in results or []:
             try:
                 name = r.get("name") or r.get("column") or "business_entity"
                 entities.append(
@@ -512,16 +526,18 @@ class EntityExtractor:
                 pass
         if cache:
             try:
-                cache.write_text(json.dumps([e.__dict__ for e in entities], ensure_ascii=False))
+                cache.write_text(
+                    json.dumps([e.__dict__ for e in entities], ensure_ascii=False)
+                )
             except Exception:
                 pass
         return entities
 
     # ---------- selection: pick best entity per column ----------
     def _choose_best_entity(
-        self, entities: List[Entity], column: ColumnProfile, config: Dict[str, Any]
+        self, entities: list[Entity], column: ColumnProfile, config: dict[str, Any]
     ) -> Entity:
-        PRIORITY: List[str] = [
+        PRIORITY: list[str] = [
             "email",
             "url",
             "ip_address",
@@ -560,13 +576,23 @@ class EntityExtractor:
                 "time_dimension",
             ):
                 score += 0.1
-            if any(k in name for k in ("pct", "percent", "rate", "%")) and t == "measurement":
+            if (
+                any(k in name for k in ("pct", "percent", "rate", "%"))
+                and t == "measurement"
+            ):
                 score += 0.1
-            if any(k in name for k in ("lat", "latitude")) and t.startswith("location_lat"):
+            if any(k in name for k in ("lat", "latitude")) and t.startswith(
+                "location_lat"
+            ):
                 score += 0.1
-            if any(k in name for k in ("lon", "lng", "longitude")) and t.startswith("location_lon"):
+            if any(k in name for k in ("lon", "lng", "longitude")) and t.startswith(
+                "location_lon"
+            ):
                 score += 0.1
-            if any(k in name for k in ("zip", "postal")) and t in ("postal_code", "address"):
+            if any(k in name for k in ("zip", "postal")) and t in (
+                "postal_code",
+                "address",
+            ):
                 score += 0.1
             return score
 
@@ -578,19 +604,24 @@ class EntityExtractor:
 
         ranked = sorted(
             entities,
-            key=lambda e: (-(float(getattr(e, "confidence", 0.0)) + name_prior(e)), pri_idx(e)),
+            key=lambda e: (
+                -(float(getattr(e, "confidence", 0.0)) + name_prior(e)),
+                pri_idx(e),
+            ),
         )
         return ranked[0]
 
     # ---------- consolidation: dedup by meaning ----------
-    def _deduplicate_by_embeddings(self, entities: List[Entity], config: Dict[str, Any]) -> List[Entity]:
+    def _deduplicate_by_embeddings(
+        self, entities: list[Entity], config: dict[str, Any]
+    ) -> list[Entity]:
         if not entities:
             return entities
         thr = float(config.get("dedup_similarity_threshold", 0.90))
         if not self.embeddings:
             # basic textual dedup (exact same signature)
             seen = set()
-            out: List[Entity] = []
+            out: list[Entity] = []
             for e in entities:
                 sig = (e.name, e.entity_type, tuple(sorted(e.source_columns)))
                 if sig in seen:
@@ -600,9 +631,11 @@ class EntityExtractor:
             return out
 
         # With embeddings: cluster by cosine sim >= thr
-        vecs = self.embeddings.encode([self._entity_signature_text(e) for e in entities])
+        vecs = self.embeddings.encode(
+            [self._entity_signature_text(e) for e in entities]
+        )
         used = [False] * len(entities)
-        clusters: List[List[int]] = []
+        clusters: list[list[int]] = []
         for i in range(len(entities)):
             if used[i]:
                 continue
@@ -618,9 +651,12 @@ class EntityExtractor:
             clusters.append(cluster)
 
         # Merge per cluster by picking highest confidence
-        merged: List[Entity] = []
+        merged: list[Entity] = []
         for idxs in clusters:
-            cand = max((entities[k] for k in idxs), key=lambda e: float(getattr(e, "confidence", 0.0)))
+            cand = max(
+                (entities[k] for k in idxs),
+                key=lambda e: float(getattr(e, "confidence", 0.0)),
+            )
             merged.append(cand)
         return merged
 
@@ -630,7 +666,7 @@ class EntityExtractor:
 
     # ---------- prompts ----------
     @staticmethod
-    def _prompt_for_column(column: ColumnProfile, sample_values: List[str]) -> str:
+    def _prompt_for_column(column: ColumnProfile, sample_values: list[str]) -> str:
         allowed = [
             "identifier",
             "measurement",
@@ -656,7 +692,7 @@ class EntityExtractor:
         )
 
     @staticmethod
-    def _prompt_for_business_entities(context: Dict[str, Any]) -> str:
+    def _prompt_for_business_entities(context: dict[str, Any]) -> str:
         return (
             "Identify any high-level business entities implied by the dataset schema.\n"
             "Return JSON list of objects: {name, entity_type, source_columns, confidence, reason}.\n"
@@ -665,13 +701,15 @@ class EntityExtractor:
 
     # ---------- IO & sampling ----------
     @staticmethod
-    def _safe_read_csv(path: str | Path, usecols: Optional[List[str]] = None) -> pd.DataFrame:
+    def _safe_read_csv(
+        path: str | Path, usecols: list[str] | None = None
+    ) -> pd.DataFrame:
         # You can swap this for DuckDB/Polars if desired. Keep deterministic.
         df = pd.read_csv(path, usecols=usecols, low_memory=False)
         return df
 
     @staticmethod
-    def _det_sample_unique_sorted(s: pd.Series, config: Dict[str, Any]) -> List[str]:
+    def _det_sample_unique_sorted(s: pd.Series, config: dict[str, Any]) -> list[str]:
         maxn = int(config.get("max_entities_per_column", 200))
         vals = (
             s.dropna()

@@ -2,10 +2,10 @@ import React from 'react';
 
 import { useRef, useCallback, useState } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
-import EdgeDetailsModal from './EdgeDetailsModal';
-import NodeDetailsModal from './NodeDetailsModal';
+import EdgeDetailsModal from '../EdgeDetailsModal/EdgeDetailsModal';
+import NodeDetailsModal from '../NodeDetailsModal/NodeDetailsModal';
 import './Graph.scss';
-import { GraphData, GraphLink } from '../types';
+import { GraphData, GraphLink } from '../../../types';
 
 interface GraphProps {
   data: GraphData;
@@ -166,24 +166,20 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
       )}
 
       {/* Edge Details Modal */}
-      {showEdgeModal && selectedEdge && (
-        <EdgeDetailsModal
-          key={`edge-modal-${selectedEdge.id}`}
-          edge={selectedEdge}
-          isOpen={showEdgeModal}
-          onClose={closeEdgeModal}
-        />
-      )}
+      <EdgeDetailsModal
+        key={`edge-modal-${selectedEdge?.id || 'default'}`}
+        edge={selectedEdge}
+        isOpen={showEdgeModal}
+        onClose={closeEdgeModal}
+      />
 
       {/* Node Details Modal */}
-      {showNodeModal && selectedNode && (
-        <NodeDetailsModal
-          key={`node-modal-${selectedNode.id}`}
-          node={selectedNode}
-          isOpen={showNodeModal}
-          onClose={closeNodeModal}
-        />
-      )}
+      <NodeDetailsModal
+        key={`node-modal-${selectedNode?.id || 'default'}`}
+        node={selectedNode}
+        isOpen={showNodeModal}
+        onClose={closeNodeModal}
+      />
     </div>
   );
 };

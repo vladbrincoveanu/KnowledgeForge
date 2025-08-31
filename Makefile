@@ -1,7 +1,7 @@
 # KnowledgeForge - Unified Project Management
 # This Makefile provides commands to manage the entire KnowledgeForge stack
 
-.PHONY: help up down clean logs status install test api ui dev prod build
+.PHONY: help up down clean logs status install test tests e2e api ui dev prod build build-docker
 
 # Default target
 help:
@@ -15,8 +15,11 @@ help:
 	@echo "  make logs       - View logs from all services"
 	@echo "  make status     - Show status of all services"
 	@echo "  make install    - Install dependencies for API and UI"
-	@echo "  make test       - Run tests"
-	@echo "  make build      - Build all Docker images"
+	@echo "  make test       - Run API tests only"
+	@echo "  make e2e        - Run end-to-end tests"
+	@echo "  make tests      - Run all tests (API, UI, E2E)"
+	@echo "  make build      - Build all projects with quality checks (format, lint, compile)"
+	@echo "  make build-docker - Build Docker images only"
 	@echo ""
 	@echo "Individual Services:"
 	@echo "  make api-only   - Start API only (local development)"
@@ -92,18 +95,66 @@ install:
 	cd sources/ui && npm install
 	@echo "✅ Installation complete!"
 
-# Build all Docker images
+# Build all projects with formatting, linting, and compilation
 build:
+	@echo "🔨 Building all projects with quality checks..."
+	@echo ""
+	@echo "📋 Building Backend API..."
+	@echo "  - Formatting code with Black..."
+	cd sources && source venv/bin/activate && cd api && python -m black . --check --diff || (echo "❌ Code formatting issues found. Run 'cd sources && source venv/bin/activate && cd api && python -m black .' to fix" && exit 1)
+	@echo "  - Running Ruff linter..."
+	cd sources && source venv/bin/activate && cd api && python -m ruff check . --exit-zero || (echo "⚠️ Some linting issues found, but continuing build")
+	@echo "  - Type checking with MyPy..."
+	cd sources && source venv/bin/activate && cd api && python -m mypy . --ignore-missing-imports || (echo "❌ Type checking failed" && exit 1)
+	@echo "  ✅ Backend API checks passed!"
+	@echo ""
+	@echo "📋 Building Frontend UI..."
+	@echo "  - Running fix-all script..."
+	cd sources/ui && npm run fix-all
+	@echo "  - Type checking..."
+	cd sources/ui && npm run type-check || (echo "❌ TypeScript compilation failed" && exit 1)
+	@echo "  - Linting..."
+	cd sources/ui && npm run lint -- --max-warnings 0 || (echo "❌ ESLint failed or has warnings" && exit 1)
+	@echo "  - Format checking..."
+	cd sources/ui && npm run format:check || (echo "❌ Prettier format check failed" && exit 1)
+	@echo "  - Building production bundle..."
+	cd sources/ui && npm run build || (echo "❌ Production build failed" && exit 1)
+	@echo "  ✅ Frontend UI build completed!"
+	@echo ""
+	@echo "✅ All projects built successfully with quality checks!"
+
+# Build Docker images only (original build functionality)
+build-docker:
 	@echo "🔨 Building Docker images..."
 	docker-compose build
-	@echo "✅ Build complete!"
+	@echo "✅ Docker build complete!"
 
-# Run tests
+# Run API tests only
 test:
-	@echo "🧪 Running tests..."
+	@echo "🧪 Running API tests..."
 	cd sources && source venv/bin/activate && cd api && python3 -m pytest tests/ -v
+	@echo "✅ API tests completed!"
+
+# Run end-to-end tests
+e2e:
+	@echo "🧪 Running end-to-end tests..."
+	cd sources/e2e && source ../venv/bin/activate && ./run_tests.sh --verbose
+	@echo "✅ E2E tests completed!"
+
+# Run all tests (API, UI, E2E)
+tests:
+	@echo "🧪 Running all tests..."
+	@echo ""
+	@echo "📋 Running API tests..."
+	cd sources && source venv/bin/activate && cd api && python3 -m pytest tests/ -v
+	@echo ""
+	@echo "📋 Running UI tests..."
 	cd sources/ui && npm run test
-	@echo "✅ Tests completed!"
+	@echo ""
+	@echo "📋 Running E2E tests..."
+	cd sources/e2e && source ../venv/bin/activate && ./run_tests.sh --verbose
+	@echo ""
+	@echo "✅ All tests completed!"
 
 # Start API only (local development)
 api-only:

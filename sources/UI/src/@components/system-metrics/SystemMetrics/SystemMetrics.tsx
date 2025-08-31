@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ontologyAPI, apiUtils } from '../services/api';
+import { ontologyAPI, apiUtils } from '@/services/api';
 import {
   Activity,
   Database,
@@ -25,7 +25,7 @@ import {
   SystemMetrics as SystemMetricsType,
   HealthStatus,
   ChartData,
-} from '../types';
+} from '@/types';
 import './SystemMetrics.scss';
 
 const SystemMetrics: React.FC = () => {

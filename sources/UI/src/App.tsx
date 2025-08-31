@@ -8,17 +8,18 @@ import {
   useLocation,
 } from 'react-router-dom';
 import { wsService } from './services/api';
-import FileUploader from './components/FileUploader';
-import Graph from './components/Graph';
-import ConnectionPrompt from './components/ConnectionPrompt';
-import OntologyResults from './components/OntologyResults';
-import SystemMetrics from './components/SystemMetrics';
+import FileUploader from './@components/upload-extract/FileUploader/FileUploader';
+import Graph from './@components/graph-view/Graph/Graph';
+import ConnectionPrompt from './@components/upload-extract/ConnectionPrompt/ConnectionPrompt';
+import OntologyResults from './@components/ontology-results/OntologyResults/OntologyResults';
+import SystemMetrics from './@components/system-metrics/SystemMetrics/SystemMetrics';
+import Settings from './@components/settings/Settings/Settings';
 import {
   Database,
   Activity,
   Upload,
   BarChart3,
-  Settings,
+  Settings as SettingsIcon,
   Brain,
 } from 'lucide-react';
 import './App.scss';
@@ -149,7 +150,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab }) => {
     {
       id: 'settings',
       label: 'Settings',
-      icon: <Settings size={20} />,
+      icon: <SettingsIcon size={20} />,
       path: '/settings',
     },
   ];
@@ -569,9 +570,9 @@ const MainContent: React.FC = () => {
                     </p>
                   </div>
 
-                  <Graph 
-                    data={graphData} 
-                    onEdgeClick={(edge) => console.log('Edge clicked:', edge)}
+                  <Graph
+                    data={graphData}
+                    onEdgeClick={edge => console.log('Edge clicked:', edge)}
                   />
                 </div>
               }
@@ -601,58 +602,12 @@ const MainContent: React.FC = () => {
                 <div className="settings-section">
                   <div className="section-header">
                     <h1>
-                      <Settings size={32} /> Settings
+                      <SettingsIcon size={32} /> Settings
                     </h1>
                     <p>Configure API settings and application preferences</p>
                   </div>
 
-                  <div className="settings-content">
-                    <div className="setting-group">
-                      <h3>API Configuration</h3>
-                      <div className="setting-item">
-                        <label>API Base URL:</label>
-                        <input
-                          type="text"
-                          defaultValue={
-                            import.meta.env.VITE_API_URL ||
-                            'http://localhost:8000'
-                          }
-                          placeholder="API base URL"
-                        />
-                      </div>
-                      <div className="setting-item">
-                        <label>API Key:</label>
-                        <input
-                          type="password"
-                          defaultValue={
-                            import.meta.env.VITE_API_KEY || 'test-api-key-12345'
-                          }
-                          placeholder="API key"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="setting-group">
-                      <h3>Extraction Settings</h3>
-                      <div className="setting-item">
-                        <label>Default Confidence Threshold:</label>
-                        <input
-                          type="range"
-                          min="0.1"
-                          max="1.0"
-                          step="0.1"
-                          defaultValue="0.7"
-                        />
-                        <span>0.7</span>
-                      </div>
-                      <div className="setting-item">
-                        <label>Auto-refresh Metrics:</label>
-                        <input type="checkbox" defaultChecked />
-                      </div>
-                    </div>
-
-                    <button className="btn-save-settings">Save Settings</button>
-                  </div>
+                  <Settings />
                 </div>
               }
             />
