@@ -104,7 +104,7 @@ def get_neo4j_manager():
 def get_metadata_store():
     """Get metadata store instance."""
     config = get_config()
-    return MetadataStore(config.metadata_storage.duckdb_path)
+    return MetadataStore(config=config)
 
 
 @router.post("/upload", response_model=dict[str, Any])

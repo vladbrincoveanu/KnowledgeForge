@@ -1,7 +1,6 @@
 """Data access endpoints for entities, relationships, and graph visualization."""
 
 import logging
-import uuid
 from datetime import datetime
 from typing import Optional
 
@@ -9,7 +8,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 # Import actual backend services
 from app.infrastructure.graph.neo4j_manager import Neo4jGraphManager
-from app.infrastructure.storage.metadata_store import MetadataStore
 from utils.config import get_config
 
 logger = logging.getLogger(__name__)

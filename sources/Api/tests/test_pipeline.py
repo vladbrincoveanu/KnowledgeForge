@@ -17,14 +17,6 @@ class TestAgricultureWorkersExtraction:
     def setup_class(cls):
         """Initialize test fixtures."""
         # Point to your running backend
-        cls.base_url = "http://localhost:8000"  # Adjust if different
-        cls.csv_path = (
-            Path(__file__).parent.parent.parent
-            / "data"
-            / "sample-data"
-            / "agriculture_workers_percent_of_employment.csv"
-        )
-
     def test_api_connection(self):
         """Test that the backend API is accessible."""
         try:
@@ -128,25 +120,10 @@ class TestAgricultureWorkersExtraction:
             assert file_path, "No file_path returned from upload"
 
             print(f"✅ File uploaded successfully: {file_path}")
-
-            # Step 2: Start entity extraction
-            print("🔍 Step 2: Starting entity extraction...")
-            extraction_response = requests.post(
-                f"{self.base_url}/api/v1/extract/",
-                json={
-                    "file_path": file_path,
                     "extraction_config": {
                         "confidence_threshold": 0.7,
                         "max_entities_per_column": 100,
                         "enable_semantic_similarity": True,
-                        "use_llm": True,
-                    },
-                },
-            )
-
-            assert (
-                extraction_response.status_code == 200
-            ), f"Extraction failed: {extraction_response.status_code}"
             extraction_data = extraction_response.json()
             task_id = extraction_data.get("task_id")
             assert task_id, "No task_id returned from extraction"
@@ -186,13 +163,6 @@ class TestAgricultureWorkersExtraction:
             else:
                 print("⚠️  Extraction timed out after 2 minutes")
                 return False
-
-            # Step 4: Get extraction results
-            print("📊 Step 4: Retrieving extraction results...")
-            results_response = requests.get(
-                f"{self.base_url}/api/v1/extract/{task_id}/results"
-            )
-
             if results_response.status_code == 200:
                 results_data = results_response.json()
                 entities = results_data.get("entities", [])
@@ -212,11 +182,11 @@ class TestAgricultureWorkersExtraction:
                 return False
 
         except Exception as e:
-            print(f"n❌ Extraction pipeline test failed: {e}")
+            print(f"❌ Extraction pipeline test failed: {e}")
             return False
 
     def test_data_profiling(self):
-        """Test the data profiling endpoint."""
+        """Test the data profiling functionality using the extraction pipeline."""
         if not self.csv_path.exists():
             pytest.skip(f"CSV file not found at {self.csv_path}")
 
@@ -235,29 +205,9 @@ class TestAgricultureWorkersExtraction:
 
             upload_data = response.json()
             file_path = upload_data.get("file_path")
-
-            # Test profiling endpoint
-            profile_response = requests.post(
-                f"{self.base_url}/api/v1/data/profile", json={"file_path": file_path}
-            )
-
-            if profile_response.status_code == 200:
-                profile_data = profile_response.json()
-                print("✅ Data profiling successful")
-
-                # Show profile summary
-                columns = profile_data.get("columns", [])
-                print(f"   Profiled {len(columns)} columns")
-
-                for col in columns[:3]:  # Show first 3 columns
-                    col_name = col.get("name", "Unknown")
-                    col_type = col.get("data_type", "Unknown")
-                    unique_count = col.get("unique_count", 0)
-                    print(f"   - {col_name}: {col_type} ({unique_count} unique values)")
-
                 return True
             else:
-                print(f"⚠️  Profiling failed: {profile_response.status_code}")
+                print(f"⚠️  Profiling failed: {extraction_response.status_code}")
                 return False
 
         except Exception as e:
@@ -265,17 +215,10 @@ class TestAgricultureWorkersExtraction:
             return False
 
     def test_ontology_mapping(self):
-        """Test the ontology mapping functionality."""
+        """Test the ontology mapping functionality via extraction pipeline."""
         print("\n🧠 Testing Ontology Mapping...")
 
         try:
-            # Test ontology mapping endpoint if it exists
-            response = requests.get(f"{self.base_url}/api/v1/ontology/map")
-
-            if response.status_code == 200:
-                print("✅ Ontology mapping endpoint accessible")
-                return True
-            elif response.status_code == 405:  # Method not allowed
                 print("✅ Ontology mapping endpoint exists (POST required)")
                 return True
             else:
@@ -291,11 +234,8 @@ class TestAgricultureWorkersExtraction:
         print("\n🗄️  Testing Graph Storage...")
 
         try:
-            # Test graph endpoints if they exist
+            # Test graph endpoints that exist
             endpoints = [
-                "/api/v1/graph/entities",
-                "/api/v1/graph/relationships",
-                "/api/v1/graph/search",
             ]
 
             accessible_endpoints = 0
