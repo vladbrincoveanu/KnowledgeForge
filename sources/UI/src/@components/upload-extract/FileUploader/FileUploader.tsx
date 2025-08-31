@@ -1,6 +1,4 @@
-import React from 'react';
-
-import { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { ontologyAPI, fileAPI, wsService, apiUtils } from '@/services/api';
 import { UploadedFile } from '@/types';
 import {
@@ -20,16 +18,42 @@ interface FileUploaderProps {
   onExtractionStarted: (taskId: string, file: UploadedFile) => void;
 }
 
+interface ExtractionTask {
+  taskId: string;
+  fileName: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  message: string;
+  progress: number;
+  createdAt: string;
+  estimatedCompletion?: string;
+  startedAt?: string;
+  completedAt?: string;
+  processingTime?: number;
+  results?: unknown;
+  error?: string;
+}
+
+interface ExtendedUploadedFile extends UploadedFile {
+  serverPath: string | null;
+}
+
+type UploadProgressStatus = 'uploading' | 'success' | 'error';
+type UploadProgress = Record<string, UploadProgressStatus>;
+
 const FileUploader: React.FC<FileUploaderProps> = ({
   onFilesUploaded,
   isProcessing,
   onExtractionStarted,
 }) => {
-  const fileInputRef = useRef(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState([]);
-  const [uploadProgress, setUploadProgress] = useState({});
-  const [extractionTasks, setExtractionTasks] = useState({});
+  const [uploadedFiles, setUploadedFiles] = useState<ExtendedUploadedFile[]>(
+    []
+  );
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress>({});
+  const [extractionTasks, setExtractionTasks] = useState<
+    Record<string, ExtractionTask>
+  >({});
   const [extractionConfig, setExtractionConfig] = useState({
     confidence_threshold: 0.7,
     max_entities_per_column: 100,
@@ -38,15 +62,21 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   });
 
   const handleWebSocketMessage = useCallback(
-    data => {
+    (data: {
+      task_id?: string;
+      status?: string;
+      message?: string;
+      timestamp?: string;
+    }) => {
       if (data.task_id && extractionTasks[data.task_id]) {
         setExtractionTasks(prev => ({
           ...prev,
-          [data.task_id]: {
-            ...prev[data.task_id],
-            status: data.status,
-            message: data.message,
-            timestamp: data.timestamp,
+          [data.task_id!]: {
+            ...prev[data.task_id!],
+            status:
+              (data.status as ExtractionTask['status']) ||
+              prev[data.task_id!].status,
+            message: data.message || prev[data.task_id!].message,
           },
         }));
       }
@@ -67,7 +97,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     };
   }, [handleWebSocketMessage]);
 
-  const handleDrag = e => {
+  const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     if (e.type === 'dragenter' || e.type === 'dragover') {
@@ -77,7 +107,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     }
   };
 
-  const handleDrop = e => {
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
@@ -87,15 +117,15 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     }
   };
 
-  const handleFileInput = e => {
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       handleFiles(e.target.files);
     }
   };
 
-  const handleFiles = async fileList => {
+  const handleFiles = async (fileList: FileList) => {
     const supportedFiles = Array.from(fileList).filter(
-      file =>
+      (file: File) =>
         file.type === 'text/csv' ||
         file.name.endsWith('.csv') ||
         file.type ===
@@ -111,7 +141,8 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     }
 
     const newFiles = supportedFiles.filter(
-      file => !uploadedFiles.some(uploaded => uploaded.name === file.name)
+      (file: File) =>
+        !uploadedFiles.some(uploaded => uploaded.name === file.name)
     );
 
     if (newFiles.length !== supportedFiles.length) {
@@ -119,16 +150,20 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     }
 
     // Add new files to the list immediately to show them in the UI
-    const newFilePlaceholders = newFiles.map(file => ({
-      name: file.name,
-      size: file.size,
-      headers: [],
-      rowCount: 0,
-      serverPath: null,
-    }));
+    const newFilePlaceholders: ExtendedUploadedFile[] = newFiles.map(
+      (file: File) => ({
+        name: file.name,
+        size: file.size,
+        headers: [],
+        data: [],
+        type: file.type,
+        rowCount: 0,
+        serverPath: null,
+      })
+    );
     setUploadedFiles(prev => [...prev, ...newFilePlaceholders]);
 
-    const successfullyProcessed = [];
+    const successfullyProcessed: ExtendedUploadedFile[] = [];
     for (const file of newFiles) {
       try {
         setUploadProgress(prev => ({ ...prev, [file.name]: 'uploading' }));
@@ -142,20 +177,23 @@ const FileUploader: React.FC<FileUploaderProps> = ({
 
         // Process file locally for display purposes
         const processedFile = await fileAPI.processLocalFile(file);
-        processedFile.serverPath = uploadResult.file_path; // Store server path
+        (processedFile as ExtendedUploadedFile).serverPath =
+          uploadResult.file_path;
 
         setUploadedFiles(prev =>
-          prev.map(f => (f.name === file.name ? processedFile : f))
+          prev.map(f =>
+            f.name === file.name ? (processedFile as ExtendedUploadedFile) : f
+          )
         );
-        successfullyProcessed.push(processedFile);
+        successfullyProcessed.push(processedFile as ExtendedUploadedFile);
 
         setUploadProgress(prev => ({ ...prev, [file.name]: 'success' }));
 
         // Start ontology extraction with the server file path
-        await startOntologyExtraction(processedFile);
+        await startOntologyExtraction(processedFile as ExtendedUploadedFile);
       } catch (error) {
         console.error(`Error processing ${file.name}:`, error);
-        alert(`Error processing ${file.name}: ${error.message}`);
+        alert(`Error processing ${file.name}: ${(error as Error).message}`);
         setUploadProgress(prev => ({ ...prev, [file.name]: 'error' }));
       }
     }
@@ -165,7 +203,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     }
   };
 
-  const startOntologyExtraction = async file => {
+  const startOntologyExtraction = async (file: ExtendedUploadedFile) => {
     try {
       // Start extraction task with the uploaded file path
       const extractionResult = await ontologyAPI.extractOntology(
@@ -182,8 +220,10 @@ const FileUploader: React.FC<FileUploaderProps> = ({
             fileName: file.name,
             status: 'pending',
             message: 'Task created and queued',
-            createdAt: extractionResult.created_at,
-            estimatedCompletion: extractionResult.estimated_completion,
+            createdAt:
+              (extractionResult as any).created_at || new Date().toISOString(),
+            estimatedCompletion:
+              (extractionResult as any).estimated_completion || null,
           },
         }));
 
@@ -201,7 +241,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     }
   };
 
-  const pollExtractionStatus = async taskId => {
+  const pollExtractionStatus = async (taskId: string) => {
     const pollInterval = setInterval(async () => {
       try {
         const status = await ontologyAPI.getExtractionStatus(taskId);
@@ -212,11 +252,11 @@ const FileUploader: React.FC<FileUploaderProps> = ({
             ...prev[taskId],
             status: status.status,
             message: status.message,
-            startedAt: status.started_at,
-            completedAt: status.completed_at,
-            processingTime: status.processing_time,
-            results: status.results,
-            error: status.error,
+            startedAt: (status as any).started_at,
+            completedAt: (status as any).completed_at,
+            processingTime: (status as any).processing_time,
+            results: status.result,
+            error: (status as any).error,
           },
         }));
 
@@ -244,13 +284,13 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     }
   };
 
-  const getFileIcon = fileName => {
+  const getFileIcon = (fileName: string) => {
     if (fileName.endsWith('.csv')) return '📊';
     if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) return '📈';
     return '📁';
   };
 
-  const getProgressStatus = fileName => {
+  const getProgressStatus = (fileName: string) => {
     const status = uploadProgress[fileName];
     switch (status) {
       case 'uploading':
@@ -276,7 +316,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     }
   };
 
-  const getExtractionStatus = fileName => {
+  const getExtractionStatus = (fileName: string) => {
     const task = Object.values(extractionTasks).find(
       t => t.fileName === fileName
     );
@@ -308,7 +348,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     );
   };
 
-  const updateExtractionConfig = (key, value) => {
+  const updateExtractionConfig = (key: string, value: unknown) => {
     setExtractionConfig(prev => ({
       ...prev,
       [key]: value,

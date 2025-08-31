@@ -1,47 +1,125 @@
-import React from 'react';
-
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  SemanticQuery,
+  QueryNode,
+  QueryEdge,
+  NodeType,
+  EdgeType,
+  Insight,
+} from '@/types';
 import './VisualQueryBuilder.css';
 
+interface ExportFormat {
+  value: string;
+  label: string;
+  icon: string;
+}
+
 const VisualQueryBuilder: React.FC = () => {
-  const [queries, setQueries] = useState([]);
-  const [currentQuery, setCurrentQuery] = useState(null);
-  const [nodes, setNodes] = useState([]);
-  const [edges, setEdges] = useState([]);
-  const [selectedNode, setSelectedNode] = useState(null);
-  const [selectedEdge, setSelectedEdge] = useState(null);
+  const [queries, setQueries] = useState<SemanticQuery[]>([]);
+  const [currentQuery, setCurrentQuery] = useState<SemanticQuery | null>(null);
+  const [nodes, setNodes] = useState<QueryNode[]>([]);
+  const [edges, setEdges] = useState<QueryEdge[]>([]);
+  const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [showNodePanel, setShowNodePanel] = useState(false);
   const [showExportPanel, setShowExportPanel] = useState(false);
   const [naturalLanguage, setNaturalLanguage] = useState('');
-  const [insights, setInsights] = useState([]);
+  const [insights, setInsights] = useState<Insight[]>([]);
   const [exportContent, setExportContent] = useState('');
-  const [exportFormat, setExportFormat] = useState('sql');
+  const [exportFormat, setExportFormat] = useState<string>('sql');
 
-  const canvasRef = useRef(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
   const nodeIdCounter = useRef(0);
   const edgeIdCounter = useRef(0);
 
-  const nodeTypes = [
-    { type: 'table', label: 'Table', icon: '📊', color: '#4CAF50' },
-    { type: 'field', label: 'Field', icon: '🔍', color: '#2196F3' },
-    { type: 'aggregation', label: 'Aggregation', icon: '📈', color: '#FF9800' },
-    { type: 'filter', label: 'Filter', icon: '🔒', color: '#F44336' },
-    { type: 'join', label: 'Join', icon: '🔗', color: '#9C27B0' },
-    { type: 'subquery', label: 'Subquery', icon: '📋', color: '#607D8B' },
+  const nodeTypes: (NodeType & { color: string })[] = [
+    {
+      type: 'table',
+      label: 'Table',
+      icon: '📊',
+      description: 'Database table',
+      color: '#4CAF50',
+    },
+    {
+      type: 'field',
+      label: 'Field',
+      icon: '🔍',
+      description: 'Table field/column',
+      color: '#2196F3',
+    },
+    {
+      type: 'aggregation',
+      label: 'Aggregation',
+      icon: '📈',
+      description: 'Aggregation function',
+      color: '#FF9800',
+    },
+    {
+      type: 'filter',
+      label: 'Filter',
+      icon: '🔒',
+      description: 'Filter condition',
+      color: '#F44336',
+    },
+    {
+      type: 'join',
+      label: 'Join',
+      icon: '🔗',
+      description: 'Join operation',
+      color: '#9C27B0',
+    },
+    {
+      type: 'subquery',
+      label: 'Subquery',
+      icon: '📋',
+      description: 'Subquery',
+      color: '#607D8B',
+    },
   ];
 
-  const edgeTypes = [
-    { type: 'select', label: 'SELECT', color: '#4CAF50' },
-    { type: 'where', label: 'WHERE', color: '#F44336' },
-    { type: 'join', label: 'JOIN', color: '#2196F3' },
-    { type: 'group_by', label: 'GROUP BY', color: '#FF9800' },
-    { type: 'order_by', label: 'ORDER BY', color: '#9C27B0' },
-    { type: 'having', label: 'HAVING', color: '#607D8B' },
+  const edgeTypes: (EdgeType & { color: string })[] = [
+    {
+      type: 'select',
+      label: 'SELECT',
+      description: 'Select operation',
+      color: '#4CAF50',
+    },
+    {
+      type: 'where',
+      label: 'WHERE',
+      description: 'Where clause',
+      color: '#F44336',
+    },
+    {
+      type: 'join',
+      label: 'JOIN',
+      description: 'Join clause',
+      color: '#2196F3',
+    },
+    {
+      type: 'group_by',
+      label: 'GROUP BY',
+      description: 'Group by clause',
+      color: '#FF9800',
+    },
+    {
+      type: 'order_by',
+      label: 'ORDER BY',
+      description: 'Order by clause',
+      color: '#9C27B0',
+    },
+    {
+      type: 'having',
+      label: 'HAVING',
+      description: 'Having clause',
+      color: '#607D8B',
+    },
   ];
 
-  const exportFormats = [
+  const exportFormats: ExportFormat[] = [
     { value: 'sql', label: 'SQL', icon: '💾' },
     { value: 'python', label: 'Python', icon: '🐍' },
     { value: 'r', label: 'R', icon: '📊' },
@@ -65,7 +143,7 @@ const VisualQueryBuilder: React.FC = () => {
   const createNewQuery = () => {
     const queryName = prompt('Enter query name:');
     if (queryName) {
-      const newQuery = {
+      const newQuery: SemanticQuery = {
         id: `query_${Date.now()}`,
         name: queryName,
         description: '',
@@ -83,11 +161,11 @@ const VisualQueryBuilder: React.FC = () => {
     }
   };
 
-  const addNode = (nodeType, x, y) => {
-    const newNode = {
+  const addNode = (nodeType: string, x: number, y: number) => {
+    const newNode: QueryNode = {
       id: `node_${nodeIdCounter.current++}`,
       name: `${nodeType}_${nodeIdCounter.current}`,
-      node_type: nodeType,
+      node_type: nodeType as QueryNode['node_type'],
       metadata: {},
       position: { x, y },
       properties: {},
@@ -99,14 +177,14 @@ const VisualQueryBuilder: React.FC = () => {
     setShowNodePanel(false);
   };
 
-  const addEdge = (sourceId, targetId, edgeType) => {
-    const newEdge = {
+  const addEdge = (sourceId: string, targetId: string, edgeType: string) => {
+    const newEdge: QueryEdge = {
       id: `edge_${edgeIdCounter.current++}`,
       source_node_id: sourceId,
       target_node_id: targetId,
-      edge_type: edgeType,
+      edge_type: edgeType as QueryEdge['edge_type'],
       properties: {},
-      conditions: null,
+      conditions: {},
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -114,13 +192,13 @@ const VisualQueryBuilder: React.FC = () => {
     setEdges([...edges, newEdge]);
   };
 
-  const handleNodeDragStart = (e, nodeId) => {
+  const handleNodeDragStart = (e: React.MouseEvent, nodeId: string) => {
     setIsDragging(true);
     setDragStart({ x: e.clientX, y: e.clientY });
     setSelectedNode(nodeId);
   };
 
-  const handleNodeDrag = e => {
+  const handleNodeDrag = (e: React.MouseEvent) => {
     if (isDragging && selectedNode) {
       const deltaX = e.clientX - dragStart.x;
       const deltaY = e.clientY - dragStart.y;
@@ -148,24 +226,24 @@ const VisualQueryBuilder: React.FC = () => {
     setSelectedNode(null);
   };
 
-  const handleNodeClick = nodeId => {
+  const handleNodeClick = (nodeId: string) => {
     setSelectedNode(nodeId);
     setSelectedEdge(null);
   };
 
-  const handleEdgeClick = edgeId => {
+  const handleEdgeClick = (edgeId: string) => {
     setSelectedEdge(edgeId);
     setSelectedNode(null);
   };
 
-  const handleCanvasClick = e => {
+  const handleCanvasClick = (e: React.MouseEvent) => {
     if (e.target === canvasRef.current) {
       setSelectedNode(null);
       setSelectedEdge(null);
     }
   };
 
-  const handleNodeDoubleClick = nodeId => {
+  const handleNodeDoubleClick = (nodeId: string) => {
     const node = nodes.find(n => n.id === nodeId);
     if (node) {
       const newName = prompt('Enter new name:', node.name);

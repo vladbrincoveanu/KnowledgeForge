@@ -68,6 +68,12 @@ export interface GraphNode {
   confidence?: number;
   x?: number;
   y?: number;
+  metadata?: {
+    columns?: number;
+    uploadDate?: string;
+    [key: string]: unknown;
+  };
+  columns?: Record<string, unknown>;
 }
 
 export interface GraphLink {
@@ -76,6 +82,21 @@ export interface GraphLink {
   target: string;
   label: string;
   confidence?: number;
+  source_collection?: string;
+  target_collection?: string;
+  source_column?: string;
+  target_column?: string;
+  columnA?: string;
+  columnB?: string;
+  confidence_score?: number;
+  llm_analysis?: LLMAnalysis;
+  connection_type?: string;
+  type?: string;
+  created_at?: string;
+  createdAt?: string;
+  merged_metadata?: unknown;
+  mergedMetadata?: unknown;
+  join_strategy?: string;
 }
 
 export interface GraphData {
@@ -184,12 +205,21 @@ export interface LLMAnalysis {
 
 // Connection interface
 export interface Connection {
+  id?: string;
   fileA: string;
   fileB: string;
   columnA: string;
   columnB: string;
   confidence: number;
+  confidence_score?: number;
+  ai_score?: number;
+  source_collection?: string;
+  target_collection?: string;
+  source_column?: string;
+  target_column?: string;
+  connection_type?: string;
   llmAnalysis?: LLMAnalysis;
+  llm_analysis?: LLMAnalysis;
 }
 
 // Chart data interfaces

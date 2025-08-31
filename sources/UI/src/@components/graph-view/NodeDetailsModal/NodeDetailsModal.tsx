@@ -16,20 +16,20 @@ const NodeDetailsModal: React.FC<NodeDetailsModalProps> = ({
 }) => {
   if (!isOpen || !node) return null;
 
-  const formatDataType = dataType => {
+  const formatDataType = (dataType: unknown) => {
     if (typeof dataType === 'string') {
       return dataType.charAt(0).toUpperCase() + dataType.slice(1);
     }
     return 'Unknown';
   };
 
-  const safeString = value => {
+  const safeString = (value: unknown) => {
     if (value === null || value === undefined) return 'N/A';
     if (typeof value === 'object') return JSON.stringify(value);
     return String(value);
   };
 
-  const _getConfidenceLabel = confidence => {
+  const _getConfidenceLabel = (confidence: number) => {
     if (confidence >= 0.9) return 'Very High';
     if (confidence >= 0.7) return 'High';
     if (confidence >= 0.5) return 'Medium';
@@ -75,8 +75,8 @@ const NodeDetailsModal: React.FC<NodeDetailsModalProps> = ({
             <div className="columns-section">
               <h3>📋 Column Details</h3>
               <div className="columns-grid">
-                {Object.entries(node.columns).map(
-                  ([columnName, columnData]) => (
+                {Object.entries(node.columns || {}).map(
+                  ([columnName, columnData]: [string, any]) => (
                     <div key={columnName} className="column-card">
                       <div className="column-header">
                         <h4>{columnName}</h4>
@@ -143,7 +143,7 @@ const NodeDetailsModal: React.FC<NodeDetailsModalProps> = ({
                             <div className="sample-list">
                               {columnData.sample_values
                                 .slice(0, 5)
-                                .map((value, index) => (
+                                .map((value: unknown, index: number) => (
                                   <span key={index} className="sample-value">
                                     {String(value)}
                                   </span>

@@ -31,7 +31,7 @@ const ConnectionOverviewModal: React.FC<ConnectionOverviewModalProps> = ({
     setSelectedConnections(new Set(highConfidenceIds));
   }, [connections]);
 
-  const handleConnectionToggle = connectionId => {
+  const handleConnectionToggle = (connectionId: string) => {
     const newSelected = new Set(selectedConnections);
     if (newSelected.has(connectionId)) {
       newSelected.delete(connectionId);
@@ -41,7 +41,10 @@ const ConnectionOverviewModal: React.FC<ConnectionOverviewModalProps> = ({
     setSelectedConnections(newSelected);
   };
 
-  const handleConnectionAction = async (connectionId, action) => {
+  const handleConnectionAction = async (
+    connectionId: string,
+    action: string
+  ) => {
     setIsProcessing(true);
     try {
       await onConnectionAction(connectionId, action);
@@ -80,13 +83,13 @@ const ConnectionOverviewModal: React.FC<ConnectionOverviewModalProps> = ({
     }
   };
 
-  const getConfidenceColor = confidence => {
+  const getConfidenceColor = (confidence: number) => {
     if (confidence >= 0.9) return '#10b981';
     if (confidence >= 0.7) return '#f59e0b';
     return '#ef4444';
   };
 
-  const _getConfidenceLabel = confidence => {
+  const _getConfidenceLabel = (confidence: number) => {
     if (confidence >= 0.9) return 'High';
     if (confidence >= 0.7) return 'Medium';
     return 'Low';
@@ -275,7 +278,7 @@ const ConnectionOverviewModal: React.FC<ConnectionOverviewModalProps> = ({
                               <h5>⚠️ Potential Issues</h5>
                               <ul>
                                 {connection.llm_analysis.potential_issues.map(
-                                  (issue, idx) => (
+                                  (issue: string, idx: number) => (
                                     <li key={idx}>{issue}</li>
                                   )
                                 )}
@@ -289,7 +292,7 @@ const ConnectionOverviewModal: React.FC<ConnectionOverviewModalProps> = ({
                               <h5>💡 Recommendations</h5>
                               <ul>
                                 {connection.llm_analysis.recommendations.map(
-                                  (rec, idx) => (
+                                  (rec: string, idx: number) => (
                                     <li key={idx}>{rec}</li>
                                   )
                                 )}

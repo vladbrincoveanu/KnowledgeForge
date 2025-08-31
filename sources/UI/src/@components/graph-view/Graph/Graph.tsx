@@ -1,11 +1,9 @@
-import React from 'react';
-
-import { useRef, useCallback, useState } from 'react';
+import React, { useRef, useCallback, useState } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import EdgeDetailsModal from '../EdgeDetailsModal/EdgeDetailsModal';
 import NodeDetailsModal from '../NodeDetailsModal/NodeDetailsModal';
 import './Graph.scss';
-import { GraphData, GraphLink } from '../../../types';
+import { GraphData, GraphLink, GraphNode } from '../../../types';
 
 interface GraphProps {
   data: GraphData;
@@ -13,13 +11,13 @@ interface GraphProps {
 }
 
 const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
-  const graphRef = useRef();
-  const [selectedEdge, setSelectedEdge] = useState(null);
+  const graphRef = useRef<any>();
+  const [selectedEdge, setSelectedEdge] = useState<GraphLink | null>(null);
   const [showEdgeModal, setShowEdgeModal] = useState(false);
-  const [selectedNode, setSelectedNode] = useState(null);
+  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [showNodeModal, setShowNodeModal] = useState(false);
 
-  const handleNodeClick = useCallback(node => {
+  const handleNodeClick = useCallback((node: GraphNode) => {
     console.log('Clicked node:', node);
     // Clear edge selection when clicking on a node
     setSelectedEdge(null);
@@ -31,7 +29,7 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
   }, []);
 
   const handleLinkClick = useCallback(
-    link => {
+    (link: GraphLink) => {
       console.log('Clicked link:', link);
       setSelectedEdge(link);
       setShowEdgeModal(true);
@@ -44,29 +42,31 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
     [onEdgeClick]
   );
 
-  const nodeColor = useCallback(node => {
+  const nodeColor = useCallback((node: GraphNode) => {
     return node.type === 'file' ? '#007bff' : '#28a745';
   }, []);
 
-  const nodeLabel = useCallback(node => {
+  const nodeLabel = useCallback((node: GraphNode) => {
     return `${node.label}\n(${node.type})`;
   }, []);
 
-  const linkLabel = useCallback(link => {
+  const linkLabel = useCallback((link: GraphLink) => {
     return link.label || 'Connection';
   }, []);
 
-  const linkColor = useCallback(link => {
+  const linkColor = useCallback((link: GraphLink) => {
     // Color based on connection strength/confidence
-    if (link.confidence >= 0.9) return '#28a745'; // High confidence - green
-    if (link.confidence >= 0.7) return '#ffc107'; // Medium confidence - yellow
+    const confidence = link.confidence || 0;
+    if (confidence >= 0.9) return '#28a745'; // High confidence - green
+    if (confidence >= 0.7) return '#ffc107'; // Medium confidence - yellow
     return '#dc3545'; // Low confidence - red
   }, []);
 
-  const linkWidth = useCallback(link => {
+  const linkWidth = useCallback((link: GraphLink) => {
     // Width based on connection strength
-    if (link.confidence >= 0.9) return 4;
-    if (link.confidence >= 0.7) return 3;
+    const confidence = link.confidence || 0;
+    if (confidence >= 0.9) return 4;
+    if (confidence >= 0.7) return 3;
     return 2;
   }, []);
 
@@ -126,7 +126,7 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
             linkDirectionalArrowRelPos={1}
             linkCurvature={0.1}
             cooldownTicks={100}
-            onEngineStop={() => graphRef.current.zoomToFit(400)}
+            onEngineStop={() => graphRef.current?.zoomToFit(400)}
             backgroundColor="#ffffff"
             width={800}
             height={600}
@@ -144,13 +144,13 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
         <div className="graph-controls">
           <button
             className="btn-control"
-            onClick={() => graphRef.current.zoomToFit(400)}
+            onClick={() => graphRef.current?.zoomToFit(400)}
           >
             Fit to View
           </button>
           <button
             className="btn-control"
-            onClick={() => graphRef.current.centerAt(0, 0, 1000)}
+            onClick={() => graphRef.current?.centerAt(0, 0, 1000)}
           >
             Center
           </button>
@@ -166,20 +166,24 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
       )}
 
       {/* Edge Details Modal */}
-      <EdgeDetailsModal
-        key={`edge-modal-${selectedEdge?.id || 'default'}`}
-        edge={selectedEdge}
-        isOpen={showEdgeModal}
-        onClose={closeEdgeModal}
-      />
+      {selectedEdge && (
+        <EdgeDetailsModal
+          key={`edge-modal-${selectedEdge.id || 'default'}`}
+          edge={selectedEdge}
+          isOpen={showEdgeModal}
+          onClose={closeEdgeModal}
+        />
+      )}
 
       {/* Node Details Modal */}
-      <NodeDetailsModal
-        key={`node-modal-${selectedNode?.id || 'default'}`}
-        node={selectedNode}
-        isOpen={showNodeModal}
-        onClose={closeNodeModal}
-      />
+      {selectedNode && (
+        <NodeDetailsModal
+          key={`node-modal-${selectedNode.id || 'default'}`}
+          node={selectedNode}
+          isOpen={showNodeModal}
+          onClose={closeNodeModal}
+        />
+      )}
     </div>
   );
 };

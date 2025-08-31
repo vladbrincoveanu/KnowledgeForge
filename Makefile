@@ -1,7 +1,7 @@
 # KnowledgeForge - Unified Project Management
 # This Makefile provides commands to manage the entire KnowledgeForge stack
 
-.PHONY: help up down clean logs status install test tests e2e api ui dev prod build build-docker fix
+.PHONY: help up down clean logs status install test tests e2e api ui dev prod build build-docker fix validate
 
 # Default target
 help:
@@ -21,6 +21,7 @@ help:
 	@echo "  make build      - Build all projects with quality checks (format, lint, compile)"
 	@echo "  make build-docker - Build Docker images only"
 	@echo "  make fix        - Fix code formatting and linting issues (API: black, UI: fix-all)"
+	@echo "  make validate   - Run comprehensive validation (type-check, lint, format, tests)"
 	@echo ""
 	@echo "Individual Services:"
 	@echo "  make api-only   - Start API only (local development)"
@@ -110,14 +111,10 @@ build:
 	@echo "  ✅ Backend API checks passed!"
 	@echo ""
 	@echo "📋 Building Frontend UI..."
-	@echo "  - Running fix-all script..."
-	cd sources/ui && npm run fix-all
-	@echo "  - Type checking..."
-	cd sources/ui && npm run type-check || (echo "❌ TypeScript compilation failed" && exit 1)
-	@echo "  - Linting..."
-	cd sources/ui && npm run lint -- --max-warnings 0 || (echo "❌ ESLint failed or has warnings" && exit 1)
-	@echo "  - Format checking..."
-	cd sources/ui && npm run format:check || (echo "❌ Prettier format check failed" && exit 1)
+	@echo "  - Running comprehensive checks and fixes..."
+	cd sources/ui && npm run fix-all || (echo "❌ Fix-all failed (formatting, linting, or type errors)" && exit 1)
+	@echo "  - Final validation..."
+	cd sources/ui && npm run check-all || (echo "❌ Final validation failed" && exit 1)
 	@echo "  - Building production bundle..."
 	cd sources/ui && npm run build || (echo "❌ Production build failed" && exit 1)
 	@echo "  ✅ Frontend UI build completed!"
@@ -235,3 +232,19 @@ fix:
 	@echo "  ✅ UI code formatted and linted!"
 	@echo ""
 	@echo "✅ Code formatting and linting completed!"
+
+# Run comprehensive validation (type-check, lint, format, tests)
+validate:
+	@echo "🔍 Running comprehensive validation..."
+	@echo ""
+	@echo "📋 Validating API..."
+	cd sources && source venv/bin/activate && cd api && python -m black . --check --diff || (echo "❌ API formatting issues found" && exit 1)
+	cd sources && source venv/bin/activate && cd api && python -m ruff check . || (echo "❌ API linting issues found" && exit 1)
+	cd sources && source venv/bin/activate && cd api && python -m mypy . --ignore-missing-imports || (echo "❌ API type checking failed" && exit 1)
+	@echo "  ✅ API validation passed!"
+	@echo ""
+	@echo "📋 Validating UI..."
+	cd sources/ui && npm run validate || (echo "❌ UI validation failed" && exit 1)
+	@echo "  ✅ UI validation passed!"
+	@echo ""
+	@echo "✅ All validation checks passed!"

@@ -17,7 +17,7 @@ const EdgeDetailsModal: React.FC<EdgeDetailsModalProps> = ({
 }) => {
   // Handle escape key to close modal
   useEffect(() => {
-    const handleEscape = event => {
+    const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         onClose();
       }
@@ -34,7 +34,7 @@ const EdgeDetailsModal: React.FC<EdgeDetailsModalProps> = ({
   if (!isOpen || !edge) return null;
 
   // Helper function to safely extract string values
-  const safeString = value => {
+  const safeString = (value: unknown) => {
     if (value === null || value === undefined) return 'N/A';
     if (typeof value === 'object') {
       // If it's a node object, try to get the label or id
@@ -58,7 +58,7 @@ const EdgeDetailsModal: React.FC<EdgeDetailsModalProps> = ({
     merged_metadata: edge.merged_metadata || edge.mergedMetadata || null,
   };
 
-  const getConfidenceColor = confidence => {
+  const getConfidenceColor = (confidence: number) => {
     if (confidence >= 0.9) return '#10b981';
     if (confidence >= 0.7) return '#f59e0b';
     return '#ef4444';
@@ -186,7 +186,7 @@ const EdgeDetailsModal: React.FC<EdgeDetailsModalProps> = ({
                         <thead>
                           <tr>
                             {normalized.merged_metadata.sample_data.columns.map(
-                              (col, idx) => (
+                              (col: unknown, idx: number) => (
                                 <th key={idx}>{col}</th>
                               )
                             )}
@@ -195,9 +195,9 @@ const EdgeDetailsModal: React.FC<EdgeDetailsModalProps> = ({
                         <tbody>
                           {(
                             normalized.merged_metadata.sample_data.rows || []
-                          ).map((row, rIdx) => (
+                          ).map((row: unknown[], rIdx: number) => (
                             <tr key={rIdx}>
-                              {row.map((cell, cIdx) => (
+                              {row.map((cell: unknown, cIdx: number) => (
                                 <td key={cIdx}>{cell}</td>
                               ))}
                             </tr>
@@ -320,7 +320,7 @@ const EdgeDetailsModal: React.FC<EdgeDetailsModalProps> = ({
                     <h4>⚠️ Potential Issues</h4>
                     <ul>
                       {normalized.llm_analysis.potential_issues.map(
-                        (issue, index) => (
+                        (issue: string, index: number) => (
                           <li key={index}>{issue}</li>
                         )
                       )}
@@ -335,7 +335,7 @@ const EdgeDetailsModal: React.FC<EdgeDetailsModalProps> = ({
                     <h4>💡 Recommendations</h4>
                     <ul>
                       {normalized.llm_analysis.recommendations.map(
-                        (rec, index) => (
+                        (rec: string, index: number) => (
                           <li key={index}>{rec}</li>
                         )
                       )}

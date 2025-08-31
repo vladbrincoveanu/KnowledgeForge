@@ -46,7 +46,8 @@
     "start": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest",
+    "test": "vitest --run",
+    "test:dev": "vitest",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "lint:fix": "eslint . --ext ts,tsx --fix",
     "format": "npx prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,scss,md}\"",
@@ -55,14 +56,16 @@
     "start:prod": "npm run build && npm run preview",
     "clean": "rm -rf dist node_modules/.vite",
     "reinstall": "npm run clean && npm install",
-    "ci": "npm run type-check && npm run lint && npm run format:check && npm run build",
+    "ci": "npm run type-check && npm run lint && npm run format:check && npm run test && npm run build",
     "check-all": "npm run type-check && npm run lint && npm run format:check",
-    "fix-all": "npm run format && npm run lint:fix",
+    "fix-all": "npm run format && npm run lint:fix && npm run type-check",
     "test:watch": "vitest --watch",
     "test:ui": "vitest --ui",
     "serve": "vite preview --host 0.0.0.0 --port 3000",
     "dev:check": "npm run type-check && npm run lint && npm run format:check",
-    "dev:fix": "npm run format && npm run lint:fix"
+    "dev:fix": "npm run format && npm run lint:fix && npm run type-check",
+    "validate": "npm run type-check && npm run lint && npm run format:check && npm run test",
+    "precommit": "npm run fix-all"
   },
   "eslintConfig": {
     "extends": [
