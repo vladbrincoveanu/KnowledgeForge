@@ -1,0 +1,234 @@
+services:
+  # Neo4j Graph Database
+  neo4j:
+    image: neo4j:5.15-community
+    container_name: knowledgeforge-neo4j
+    environment:
+      - NEO4J_AUTH=neo4j/password
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_dbms_memory_heap_initial__size=512m
+      - NEO4J_dbms_memory_heap_max__size=2G
+      - NEO4J_dbms_memory_pagecache_size=1G
+    ports:
+      - "7474:7474"  # HTTP
+      - "7687:7687"  # Bolt
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - neo4j_import:/var/lib/neo4j/import
+      - neo4j_plugins:/plugins
+    networks:
+      - knowledgeforge-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:7474/browser/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: knowledgeforge-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: knowlly123
+      MONGO_INITDB_DATABASE: knowlly_data
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - knowledgeforge-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: knowledgeforge-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - knowledgeforge-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MinIO Object Storage
+  minio:
+    image: minio/minio:latest
+    container_name: knowledgeforge-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: knowlly123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - knowledgeforge-network
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MongoDB Express (Web-based admin interface)
+  mongo-express:
+    image: mongo-express:1.0.0
+    container_name: knowledgeforge-mongo-express
+    restart: unless-stopped
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: knowlly123
+      ME_CONFIG_MONGODB_URL: mongodb://admin:knowlly123@mongodb:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: knowlly123
+    ports:
+      - "8081:8081"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - knowledgeforge-network
+
+  # Redis Commander (Web-based Redis admin)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: knowledgeforge-redis-commander
+    restart: unless-stopped
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8082:8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - knowledgeforge-network
+
+  # KnowledgeForge API Service
+  api:
+    build:
+      context: ./sources/api
+      dockerfile: Dockerfile
+    container_name: knowledgeforge-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Neo4j Configuration
+      - ONTOLOGY_NEO4J__URI=bolt://neo4j:7687
+      - ONTOLOGY_NEO4J__USERNAME=neo4j
+      - ONTOLOGY_NEO4J__PASSWORD=password
+      # MongoDB Configuration
+      - MONGODB_URI=mongodb://admin:knowlly123@mongodb:27017/knowlly_data?authSource=admin
+      # Redis Configuration
+      - REDIS_URL=redis://redis:6379
+      # MinIO Configuration
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=knowlly123
+      # LM Studio Configuration (connects to host machine)
+      - ONTOLOGY_LMSTUDIO__BASE_URL=http://host.docker.internal:1234
+      - ONTOLOGY_LMSTUDIO__MODEL_NAME=llama2
+      # Application Configuration
+      - ONTOLOGY_CONFIG_FILE=/app/config.yaml
+      - ONTOLOGY_ENVIRONMENT=development
+      - ONTOLOGY_METADATA_STORAGE__DUCKDB_PATH=/app/data/metadata.db
+      - ONTOLOGY_LOGGING__FILE_PATH=/app/logs/api.log
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./sources/api/config.yaml:/app/config.yaml:ro
+      - ./sources/data:/app/data
+      - ./logs:/app/logs
+      - ./uploads:/app/uploads
+    networks:
+      - knowledgeforge-network
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # KnowledgeForge UI (Development)
+  ui:
+    build:
+      context: ./sources/ui
+      dockerfile: Dockerfile
+    container_name: knowledgeforge-ui
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./sources/ui:/app
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - VITE_API_URL=http://localhost:8000
+      - VITE_APP_API_URL=http://localhost:8000
+    networks:
+      - knowledgeforge-network
+    stdin_open: true
+    tty: true
+    depends_on:
+      - api
+
+  # Portainer (Docker management UI)
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: knowledgeforge-portainer
+    restart: unless-stopped
+    ports:
+      - "9002:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    networks:
+      - knowledgeforge-network
+
+volumes:
+  neo4j_data:
+    driver: local
+  neo4j_logs:
+    driver: local
+  neo4j_import:
+    driver: local
+  neo4j_plugins:
+    driver: local
+  mongodb_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+  portainer_data:
+    driver: local
+
+networks:
+  knowledgeforge-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
