@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 # Import actual backend services
 from app.infrastructure.graph.neo4j_manager import Neo4jGraphManager
+from app.infrastructure.storage.metadata_store import MetadataStore
 from utils.config import get_config
 
 logger = logging.getLogger(__name__)

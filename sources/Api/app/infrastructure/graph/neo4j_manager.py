@@ -889,6 +889,14 @@ class Neo4jGraphManager:
         """Get all relationships from the graph database."""
         query = """
         MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity)
+        """
+        params = {'limit': limit, 'offset': offset}
+        
+        if task_id:
+            query += " WHERE r.task_id = $task_id"
+            params['task_id'] = task_id
+        
+        query += """
         RETURN r.id as id, r.relationship_type as type, r.confidence as confidence,
                source.name as source_entity, target.name as target_entity,
                r.attributes as attributes
@@ -1046,4 +1054,94 @@ class Neo4jGraphManager:
                 result.single()
             return True
         except Exception:
+            return False
+    
+    def create_entity(self, entity: 'Entity') -> bool:
+        """Create an entity node in the graph database."""
+        logger.info(f"Creating entity in Neo4j: {getattr(entity, 'name', 'NO_NAME')}")
+        logger.info(f"  Entity details: id={getattr(entity, 'id', 'NO_ID')}, "
+                   f"type={getattr(entity, 'entity_type', 'NO_TYPE')}, "
+                   f"confidence={getattr(entity, 'confidence', 'NO_CONFIDENCE')}")
+        
+        query = """
+        CREATE (e:Entity {
+            id: $id,
+            name: $name,
+            entity_type: $entity_type,
+            confidence: $confidence,
+            attributes: $attributes,
+            created_at: datetime(),
+            task_id: $task_id
+        })
+        """
+        
+        # Prepare parameters
+        params = {
+            'id': getattr(entity, 'id', None),
+            'name': getattr(entity, 'name', None),
+            'entity_type': getattr(entity, 'entity_type', None),
+            'confidence': getattr(entity, 'confidence', 1.0),
+            'attributes': getattr(entity, 'attributes', {}),
+            'task_id': getattr(entity, 'task_id', None)
+        }
+        
+        logger.info(f"  Query parameters: {params}")
+        
+        try:
+            with self.driver.session(database=self.database) as session:
+                logger.info(f"  Neo4j session created successfully")
+                result = session.run(query, params)
+                logger.info(f"  Query executed successfully")
+                return True
+        except Exception as e:
+            logger.error(f"❌ Failed to create entity {getattr(entity, 'name', 'NO_NAME')}: {e}")
+            logger.error(f"  Error details: {type(e).__name__}: {str(e)}")
+            import traceback
+            logger.error(f"  Full traceback: {traceback.format_exc()}")
+            return False
+    
+    def create_relationship(self, relationship: 'Relationship') -> bool:
+        """Create a relationship between entities in the graph database."""
+        logger.info(f"Creating relationship in Neo4j: {getattr(relationship, 'relationship_type', 'NO_TYPE')}")
+        logger.info(f"  Relationship details: id={getattr(relationship, 'id', 'NO_ID')}, "
+                   f"source={getattr(relationship, 'source_entity_id', 'NO_SOURCE')}, "
+                   f"target={getattr(relationship, 'target_entity_id', 'NO_TARGET')}")
+        
+        query = """
+        MATCH (source:Entity {id: $source_id})
+        MATCH (target:Entity {id: $target_id})
+        CREATE (source)-[r:RELATES_TO {
+            id: $id,
+            relationship_type: $relationship_type,
+            confidence: $confidence,
+            attributes: $attributes,
+            created_at: datetime(),
+            task_id: $task_id
+        }]->(target)
+        """
+        
+        # Prepare parameters
+        params = {
+            'id': getattr(relationship, 'id', None),
+            'source_id': getattr(relationship, 'source_entity_id', None),
+            'target_id': getattr(relationship, 'target_entity_id', None),
+            'relationship_type': getattr(relationship, 'relationship_type', None),
+            'confidence': getattr(relationship, 'confidence', 1.0),
+            'attributes': getattr(relationship, 'attributes', {}),
+            'task_id': getattr(relationship, 'task_id', None)
+        }
+        
+        logger.info(f"  Query parameters: {params}")
+        
+        try:
+            with self.driver.session(database=self.database) as session:
+                logger.info(f"  Neo4j session created successfully")
+                result = session.run(query, params)
+                logger.info(f"  Query executed successfully")
+                return True
+        except Exception as e:
+            logger.error(f"❌ Failed to create relationship {getattr(relationship, 'id', 'NO_ID')}: {e}")
+            logger.error(f"  Error details: {type(e).__name__}: {str(e)}")
+            import traceback
+            logger.error(f"  Full traceback: {traceback.format_exc()}")
             return False

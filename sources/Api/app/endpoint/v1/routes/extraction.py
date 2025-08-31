@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from app.domain.models.entities import DatasetProfile, Entity, Relationship
 from app.infrastructure.graph.neo4j_manager import Neo4jGraphManager
 from app.infrastructure.storage.metadata_store import (
-    AdvancedMetadataStore as MetadataStore,
+    PostgreSQLMetadataStore as MetadataStore,
 )
 
 # Import actual backend services
@@ -69,6 +69,18 @@ router = APIRouter(prefix="/extract", tags=["extraction"])
 def get_entity_extractor():
     """Get entity extractor instance."""
     config = get_config()
+    
+    # Create LLM manager for enhanced entity extraction
+    try:
+        from app.infrastructure.llm.llm_manager import LLMManager
+        llm_manager = LLMManager(
+            lmstudio_url=config.lmstudio.base_url if hasattr(config, 'lmstudio') else "http://localhost:1234",
+            default_model=config.lmstudio.model_name if hasattr(config, 'lmstudio') else "deepseek/deepseek-r1-0528-qwen3-8b"
+        )
+    except Exception as e:
+        logger.warning(f"Failed to create LLM manager: {e}")
+        llm_manager = None
+    
     return EntityExtractor(
         cache_dir=(
             config.extraction.cache_dir
@@ -104,7 +116,7 @@ def get_neo4j_manager():
 def get_metadata_store():
     """Get metadata store instance."""
     config = get_config()
-    return MetadataStore(config=config)
+    return MetadataStore(config=config.dict() if hasattr(config, 'dict') else config)
 
 
 @router.post("/upload", response_model=dict[str, Any])
@@ -157,7 +169,6 @@ async def upload_csv_file(
             file_name=file.filename,
             file_size=len(content),
             file_type="csv",
-            metadata=file_metadata,
         )
 
         return {
@@ -280,7 +291,28 @@ async def run_extraction_pipeline(
 
         # Step 5: Store in Neo4j
         logger.info(f"Storing results in Neo4j for task {task_id}")
-        await store_in_neo4j(entities, relationships, neo4j_manager)
+        logger.info(f"About to store {len(entities)} entities and {len(relationships)} relationships")
+        
+        # Debug: Log entity details before storage
+        if entities:
+            logger.info("Entity details before storage:")
+            for i, entity in enumerate(entities[:5]):  # Log first 5 entities
+                logger.info(f"  Entity {i+1}: id={getattr(entity, 'id', 'NO_ID')}, "
+                          f"name='{getattr(entity, 'name', 'NO_NAME')}', "
+                          f"type='{getattr(entity, 'entity_type', 'NO_TYPE')}', "
+                          f"confidence={getattr(entity, 'confidence', 'NO_CONFIDENCE')}")
+        else:
+            logger.warning("No entities to store!")
+        
+        try:
+            await store_in_neo4j(entities, relationships, neo4j_manager)
+            logger.info("Neo4j storage completed successfully")
+        except Exception as e:
+            logger.error(f"Neo4j storage failed: {e}")
+            logger.error(f"Storage error details: {type(e).__name__}: {str(e)}")
+            import traceback
+            logger.error(f"Full traceback: {traceback.format_exc()}")
+        
         task.progress = 1.0
 
         # Step 6: Update metadata store
@@ -382,12 +414,10 @@ async def extract_entities(
 ) -> list[Entity]:
     """Extract entities from the dataset."""
     config = extraction_config or {}
-
     # Use the actual entity extractor
     entities = entity_extractor.extract_entities(
         file_path=file_path, columns=dataset_profile.columns, config=config
     )
-
     return entities
 
 
@@ -421,8 +451,12 @@ async def store_in_neo4j(
     neo4j_manager: Neo4jGraphManager,
 ):
     """Store extracted entities and relationships in Neo4j."""
+    logger.info(f"Starting Neo4j storage for {len(entities)} entities and {len(relationships)} relationships")
+    
     try:
         with neo4j_manager:
+            logger.info("Neo4j manager context entered successfully")
+            
             # Store entities
             for entity in entities:
                 neo4j_manager.store_entity_with_metadata(
@@ -440,6 +474,9 @@ async def store_in_neo4j(
 
     except Exception as e:
         logger.error(f"Failed to store in Neo4j: {e}")
+        logger.error(f"Storage error details: {type(e).__name__}: {str(e)}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         raise
 
 
@@ -460,6 +497,8 @@ async def get_extraction_status(task_id: str):
         "entities_count": len(task.entities),
         "relationships_count": len(task.relationships),
         "errors": task.errors,
+        "entities": [entity.dict() if hasattr(entity, 'dict') else entity.__dict__ for entity in task.entities],
+        "relationships": [rel.dict() if hasattr(rel, 'dict') else rel.__dict__ for rel in task.relationships],
     }
 
 

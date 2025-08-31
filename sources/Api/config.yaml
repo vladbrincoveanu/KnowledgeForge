@@ -28,7 +28,7 @@ neo4j:
   database: "neo4j"
   max_connection_pool_size: 50
   connection_timeout: 30
-  encrypted: true
+  encrypted: false
 
 # LM Studio LLM service configuration
 lmstudio:

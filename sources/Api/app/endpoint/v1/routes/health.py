@@ -42,7 +42,7 @@ def get_llm_manager():
 def get_metadata_store():
     """Get metadata store instance."""
     config = get_config()
-    return MetadataStore(config.metadata_storage.duckdb_path)
+    return MetadataStore(config=config.dict() if hasattr(config, 'dict') else config)
 
 
 @router.get("/", response_model=dict[str, Any])

@@ -92,9 +92,12 @@ class LLMManager:
             rate_limit_window: Time window in seconds for rate limiting
         """
         self.lmstudio_url = lmstudio_url.rstrip("/")
+        self.base_url = self.lmstudio_url  # Alias for compatibility
         self.default_model = default_model
+        self.model_name = default_model  # Alias for compatibility
         self.use_embeddings = use_embeddings
         self.max_retries = max_retries
+        self.timeout = 30  # Default timeout
 
         # Rate limiting
         self.rate_limit_requests = rate_limit_requests
@@ -932,6 +935,47 @@ Common relationship types:
                 "window_seconds": self.rate_limit_window,
                 "can_make_request": len(recent_requests) < self.rate_limit_requests,
             }
+
+    def list_models(self) -> list[dict[str, Any]]:
+        """List available models from LM Studio."""
+        try:
+            response = self.session.get(f"{self.lmstudio_url}/v1/models", timeout=5)
+            if response.status_code == 200:
+                return response.json().get("data", [])
+            else:
+                logger.warning(f"Failed to get models: {response.status_code}")
+                return []
+        except Exception as e:
+            logger.error(f"Failed to list models: {e}")
+            return []
+
+    def identify_business_entities(self, prompt: str, **kwargs) -> dict[str, Any]:
+        """Identify business entities from the given prompt."""
+        try:
+            response = self.generate_text(
+                prompt, 
+                max_tokens=kwargs.get('max_tokens', 500),
+                temperature=kwargs.get('temperature', 0.3)
+            )
+            
+            if response:
+                # Try to extract JSON from response
+                json_data = self._extract_json_from_response(response)
+                if json_data:
+                    return json_data
+                
+                # If no JSON found, return basic structure
+                return {
+                    "entities": [],
+                    "confidence": 0.5,
+                    "raw_response": response
+                }
+            
+            return {"entities": [], "confidence": 0.0}
+            
+        except Exception as e:
+            logger.error(f"Business entity identification failed: {e}")
+            return {"entities": [], "confidence": 0.0, "error": str(e)}
 
     def __del__(self):
         """Cleanup on deletion."""

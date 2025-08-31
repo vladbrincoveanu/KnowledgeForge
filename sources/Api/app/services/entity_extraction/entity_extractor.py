@@ -22,7 +22,7 @@ if not logger.handlers:
 # Utility: Regex patterns
 # -----------------------
 _REG_EMAIL = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
-_REG_URL = re.compile(r"^(https?://)?([\w-]+\.)+[\w-]+(/\S*)?$")
+_REG_URL = re.compile(r"^(https?://)?([a-zA-Z][\w-]*\.)+[\w-]+(/\S*)?$")
 _REG_IP = re.compile(r"^(?:\d{1,3}\.){3}\d{1,3}$")
 _REG_UUID = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
@@ -59,6 +59,18 @@ def _hash_file(path: str | Path) -> str:
 # ---------------------------------------
 # Main Extractor with three-gate pipeline
 # ---------------------------------------
+def _safe_config_get(config, key, default=None):
+    """Safely get configuration value from either dict or Config object."""
+    if hasattr(config, 'get'):
+        return config.get(key, default)
+    elif hasattr(config, key):
+        return getattr(config, key, default)
+    elif hasattr(config, 'extraction') and hasattr(config.extraction, key):
+        return getattr(config.extraction, key, default)
+    else:
+        return default
+
+
 class EntityExtractor:
     def __init__(
         self,
@@ -131,36 +143,230 @@ class EntityExtractor:
         df = self._safe_read_csv(file_path, usecols=[c.name for c in columns])
 
         per_column: list[Entity] = []
-        for col in columns[: int(config.get("max_columns_to_process", 10_000))]:
+        business_entities: list[Entity] = []  # Initialize business_entities list
+        
+        # Extract semantic entities based on dataset understanding
+        semantic_entities = self._extract_semantic_entities(df, columns, config)
+        per_column.extend(semantic_entities)
+        logger.info(f"Extracted {len(semantic_entities)} semantic entities")
+        
+        # Fallback: Extract entities per column if semantic extraction fails
+        if not semantic_entities:
+            logger.info("Semantic extraction failed, falling back to column-level extraction")
+            for col in columns[: int(_safe_config_get(config, "max_columns_to_process", 10_000))]:
+                try:
+                    logger.info(f"Extracting entities for column: {col.name}")
+                    col_entities = self._extract_column_entities(df, col, config)
+                    per_column.extend(col_entities)
+                    logger.info(f"Column {col.name}: extracted {len(col_entities)} entities")
+                except Exception as e:
+                    logger.warning(f"Entity extraction failed for column {col.name}: {e}")
+        
+        # Also try business entity extraction (if enabled)
+        if _safe_config_get(config, "extract_business_entities", False):
             try:
-                per_column.extend(self._extract_column_entities(df, col, config))
+                logger.info("Attempting LLM-based business entity extraction...")
+                llm_entities = self._extract_business_entities_enhanced(df, columns, config)
+                business_entities.extend(llm_entities)
+                logger.info(f"Business LLM extraction added {len(llm_entities)} entities")
             except Exception as e:
-                logger.exception(f"Column {col.name} extraction failed: {e}")
+                logger.warning(f"Business LLM extraction failed: {e}")
 
         # Optional business-level entities; gated & cached inside
         per_dataset: list[Entity] = []
-        if config.get("use_llm", True) and config.get(
-            "extract_business_entities", False
+        if _safe_config_get(config, "use_llm", True) and _safe_config_get(
+            config, "extract_business_entities", False
         ):
             try:
                 per_dataset = self._extract_business_entities_llm(df, columns, config)
             except Exception as e:
                 logger.warning(f"Business LLM extraction skipped: {e}")
 
-        entities = per_column + per_dataset
+        # Deduplicate by meaning
+        if _safe_config_get(config, "use_intelligent_consolidation", True):
+            business_entities = self._deduplicate_by_embeddings(business_entities, config)
 
-        # Deduplicate by meaning (configurable)
-        if config.get("use_intelligent_consolidation", True):
-            entities = self._deduplicate_by_embeddings(entities, config)
-
+        # Combine per-column and business entities
+        all_entities = per_column + business_entities + per_dataset
+        
         # Drop low-confidence
-        thr = float(config.get("confidence_threshold", 0.70))
-        entities = [e for e in entities if float(getattr(e, "confidence", 1.0)) >= thr]
+        thr = float(_safe_config_get(config, "confidence_threshold", 0.70))
+        entities = [e for e in all_entities if float(getattr(e, "confidence", 1.0)) >= thr]
 
         # Optionally cap count
-        max_entities = int(config.get("max_entities", 100_000))
+        max_entities = int(_safe_config_get(config, "max_entities", 100_000))
         if len(entities) > max_entities:
             entities = entities[:max_entities]
+        
+        logger.info(f"Total entities extracted: {len(entities)} (per-column: {len(per_column)}, business: {len(business_entities)}, dataset: {len(per_dataset)})")
+        return entities
+
+    # ---------- Business-focused entity extraction ----------
+    def _extract_business_entities_enhanced(
+        self, df: pd.DataFrame, columns: List[ColumnProfile], config: Dict[str, Any]
+    ) -> List[Entity]:
+        """Extract meaningful business entities from the dataset."""
+        if not self.llm_manager:
+            return []
+        
+        try:
+            logger.info(f"Creating dataset summary for LLM analysis...")
+            # Create a focused business analysis prompt
+            dataset_summary = {
+                "total_rows": len(df),
+                "total_columns": len(columns),
+                "column_types": {
+                    col.name: {
+                        "data_type": str(col.data_type),
+                        "unique_count": col.unique_count,
+                        "sample_values": col.sample_values[:3]
+                    }
+                    for col in columns
+                }
+            }
+            logger.info(f"Dataset summary created: {len(df)} rows, {len(columns)} columns")
+            
+            prompt = f"""
+Analyze this dataset and identify core entities based on data structure:
+
+Dataset Summary: {json.dumps(dataset_summary, indent=2)}
+
+Extract entities from:
+- String/categorical columns (group similar columns)
+- Numeric columns (group related numeric data)
+
+Rules:
+- Use column names as entity names
+- Use generic entity types: "categorical" or "numerical"
+- No domain-specific assumptions
+- Group related columns into single entities
+
+For each entity provide:
+- name: actual column name or descriptive name
+- entity_type: "categorical" or "numerical" 
+- confidence: 0.0-1.0
+- reason: data-based justification
+- source_columns: relevant column names
+
+Return JSON list with entities.
+"""
+            
+            # Use LLM to analyze the dataset
+            logger.info("Sending prompt to LLM for business entity analysis...")
+            response = self.llm_manager.generate_text(prompt, max_tokens=400, temperature=0.1)
+            
+            if response:
+                logger.info(f"LLM response received (length: {len(response)})")
+                logger.info(f"LLM response preview: {response[:200]}...")
+                
+                try:
+                    # Extract JSON from response
+                    json_start = response.find('[')
+                    json_end = response.rfind(']') + 1
+                    
+                    if json_start != -1 and json_end != -1:
+                        json_str = response[json_start:json_end]
+                        logger.info(f"Extracted JSON string: {json_str}")
+                        
+                        entities_data = json.loads(json_str)
+                        logger.info(f"Parsed JSON data: {len(entities_data)} entity records")
+                        
+                        entities = []
+                        for i, entity_data in enumerate(entities_data):
+                            try:
+                                logger.info(f"Creating entity {i+1} from LLM data: {entity_data}")
+                                entity = Entity(
+                                    id=str(uuid.uuid4()),
+                                    name=entity_data.get("name", "unknown"),
+                                    entity_type=entity_data.get("entity_type", "unknown"),
+                                    source_columns=entity_data.get("source_columns", []),
+                                    confidence=float(entity_data.get("confidence", 0.8)),
+                                    description=entity_data.get("reason", "Business domain analysis")
+                                )
+                                entities.append(entity)
+                                logger.info(f"✅ Created LLM entity: id={entity.id}, name='{entity.name}', type='{entity.entity_type}'")
+                            except Exception as e:
+                                logger.error(f"❌ Failed to create business entity from data {entity_data}: {e}")
+                        
+                        logger.info(f"LLM entity creation completed: {len(entities)} entities created")
+                        return entities
+                    else:
+                        logger.warning(f"Could not find JSON array in LLM response. json_start={json_start}, json_end={json_end}")
+                        logger.warning(f"Full LLM response: {response}")
+                except Exception as e:
+                    logger.error(f"❌ Failed to parse LLM response: {e}")
+                    logger.error(f"LLM response that failed to parse: {response}")
+            else:
+                logger.warning("LLM returned no response")
+            
+            return []
+            
+        except Exception as e:
+            logger.warning(f"Business entity extraction failed: {e}")
+            return []
+
+    def _extract_basic_entities(self, df: pd.DataFrame, columns: List[ColumnProfile], config: Dict[str, Any]) -> List[Entity]:
+        """Fallback basic entity extraction if LLM fails."""
+        entities = []
+        
+        logger.info(f"Starting basic entity extraction for {len(columns)} columns")
+        
+        # Look for obvious business entities
+        for col in columns:
+            col_name = col.name.lower()
+            logger.info(f"Analyzing column: '{col.name}' (type: {col.data_type}, unique: {col.unique_count})")
+            
+            # Country entity
+            if "country" in col_name:
+                logger.info(f"  Found country column: {col.name}")
+                entity = Entity(
+                    id=str(uuid.uuid4()),
+                    name="Country",
+                    entity_type="geographic_entity",
+                    source_columns=[col.name],
+                    confidence=0.95,
+                    description="Geographic entity representing countries"
+                )
+                entities.append(entity)
+                logger.info(f"  ✅ Created Country entity: id={entity.id}")
+            
+            # Look for measurement columns (numeric data that could be employment percentages)
+            elif col.data_type in ['float', 'integer'] and col.unique_count > 10:
+                logger.info(f"  Found numeric column: {col.name} (unique values: {col.unique_count})")
+                
+                # Check if this looks like employment data
+                if any(keyword in col_name for keyword in ['employment', 'worker', 'labor', 'work']):
+                    logger.info(f"    Column name suggests employment data")
+                    entity = Entity(
+                        id=str(uuid.uuid4()),
+                        name="Agricultural Employment",
+                        entity_type="measurement",
+                        source_columns=[col.name],
+                        confidence=0.9,
+                        description="Employment measurement in agriculture sector"
+                    )
+                    entities.append(entity)
+                    logger.info(f"    ✅ Created Agricultural Employment entity: id={entity.id}")
+                
+                # For agriculture workers dataset, the year columns contain employment percentages
+                elif col.name.isdigit() and 1900 <= int(col.name) <= 2100:
+                    logger.info(f"    Column name is a year: {col.name}")
+                    entity = Entity(
+                        id=str(uuid.uuid4()),
+                        name="Agricultural Employment",
+                        entity_type="measurement",
+                        source_columns=[col.name],
+                        confidence=0.85,
+                        description="Employment percentage data for specific year"
+                    )
+                    entities.append(entity)
+                    logger.info(f"    ✅ Created Agricultural Employment entity for year {col.name}: id={entity.id}")
+                else:
+                    logger.info(f"    Column does not match employment patterns")
+            else:
+                logger.info(f"  Column '{col.name}' does not match basic entity patterns")
+        
+        logger.info(f"Basic entity extraction completed: {len(entities)} entities created")
         return entities
 
     # ---------- Gate A + selection ----------
@@ -206,7 +412,7 @@ class EntityExtractor:
             entities.extend(self._extract_id_entities(s, column, config))
 
         # Strategy 3 (LLM): only if nothing else found with confidence
-        if config.get("use_llm", True) and not entities:
+        if _safe_config_get(config, "use_llm", True) and not entities:
             try:
                 entities.extend(self._extract_llm_entities(s, column, config))
             except Exception as e:
@@ -215,8 +421,11 @@ class EntityExtractor:
         # Strategy 4: pattern-based (percent/latlon/year/etc.)
         entities.extend(self._extract_pattern_entities(s, column, config))
 
+        # Strategy 5: basic categorical detection (generic)
+        entities.extend(self._extract_categorical_entities(s, column, config))
+
         # Final choice: pick exactly one entity per column (default)
-        if config.get("one_entity_per_column", True) and entities:
+        if _safe_config_get(config, "one_entity_per_column", True) and entities:
             return [self._choose_best_entity(entities, column, config)]
         return entities
 
@@ -240,12 +449,13 @@ class EntityExtractor:
         out: list[Entity] = []
         checks: list[tuple[str, re.Pattern]] = [
             ("email", _REG_EMAIL),
-            ("url", _REG_URL),
             ("ip_address", _REG_IP),
             ("uuid", _REG_UUID),
             ("credit_card", _REG_CREDIT_CARD),
             ("phone", _REG_PHONE),
             ("postal_code", _REG_POSTAL_5),
+            # URL check moved to end to avoid false positives with years
+            ("url", _REG_URL),
         ]
         for t, rx in checks:
             r = ratio(rx)
@@ -342,8 +552,11 @@ class EntityExtractor:
             rx = _REG_LAT if which == "lat" else _REG_LON
             hits = 0
             for v in values:
-                v = str(v).strip()
-                if rx.match(v):
+                v_str = str(v).strip()
+                # Skip if it looks like a year (4-digit number 1900-2100)
+                if len(v_str) == 4 and v_str.isdigit() and 1900 <= int(v_str) <= 2100:
+                    continue
+                if rx.match(v_str):
                     hits += 1
             return hits / n
 
@@ -390,17 +603,114 @@ class EntityExtractor:
             )
 
         yr = year_ratio()
-        if yr >= 0.90 or any(k in column.name.lower() for k in ("year", "yr")):
+        # Check if column name is a year (4-digit number 1900-2100)
+        is_year_column = (len(column.name) == 4 and column.name.isdigit() and 
+                         1900 <= int(column.name) <= 2100)
+        
+        if yr >= 0.90 or is_year_column or any(k in column.name.lower() for k in ("year", "yr")):
             out.append(
                 Entity(
                     name=column.name,
                     entity_type="time_dimension",
                     source_columns=[column.name],
-                    confidence=float(max(0.7, yr)),
+                    confidence=float(max(0.7, yr)) if yr > 0 else 0.9,
                     description="Year-like time dimension",
                 )
             )
         return out
+
+    # ---------- Generic Two-Entity Extraction ----------
+    def _extract_semantic_entities(
+        self, df: pd.DataFrame, columns: list[ColumnProfile], config: dict[str, Any]
+    ) -> list[Entity]:
+        """Generic extraction that produces entities based on data structure."""
+        entities: list[Entity] = []
+        
+        # Group string/categorical columns
+        string_cols = []
+        for col in columns:
+            if col.data_type == DataType.STRING:
+                string_cols.append(col)
+        
+        # Create entities from string columns (one entity per unique string column type)
+        for string_col in string_cols:
+            unique_count = df[string_col.name].nunique()
+            
+            entity = Entity(
+                name=string_col.name,
+                entity_type="categorical",
+                source_columns=[string_col.name],
+                confidence=0.95,
+                description=f"Categorical data with {unique_count} unique values"
+            )
+            entities.append(entity)
+            logger.info(f"Created categorical entity from column '{string_col.name}' with {unique_count} values")
+        
+        # Group numeric columns
+        numeric_cols = []
+        for col in columns:
+            if col.data_type in [DataType.FLOAT, DataType.INTEGER, DataType.NUMERICAL]:
+                numeric_cols.append(col)
+        
+        # Create entity from numeric columns (combine related numeric data)
+        if numeric_cols:
+            # If there are many numeric columns (like years), group them
+            if len(numeric_cols) > 5:
+                entity_name = "Numeric Data"
+                entity = Entity(
+                    name=entity_name,
+                    entity_type="numerical",
+                    source_columns=[col.name for col in numeric_cols],
+                    confidence=0.90,
+                    description=f"Numerical data across {len(numeric_cols)} dimensions"
+                )
+                entities.append(entity)
+                logger.info(f"Created grouped numerical entity from {len(numeric_cols)} columns")
+            else:
+                # If few numeric columns, create separate entities
+                for numeric_col in numeric_cols:
+                    entity = Entity(
+                        name=numeric_col.name,
+                        entity_type="numerical",
+                        source_columns=[numeric_col.name],
+                        confidence=0.90,
+                        description=f"Numerical data from column {numeric_col.name}"
+                    )
+                    entities.append(entity)
+                    logger.info(f"Created individual numerical entity from column '{numeric_col.name}'")
+        
+        logger.info(f"Final result: {len(entities)} entities extracted")
+        return entities
+
+    # ---------- Gate A: Basic categorical detection ----------
+    def _extract_categorical_entities(
+        self, s: pd.Series, column: ColumnProfile, config: dict[str, Any]
+    ) -> list[Entity]:
+        """Detect basic categorical entities (generic, no domain knowledge)."""
+        out: list[Entity] = []
+        values = self._det_sample_unique_sorted(s, config)
+        n = max(len(values), 1)
+
+        # Simple categorical detection based on data characteristics only
+        if column.data_type == DataType.STRING and len(values) > 0:
+            # Check if this looks like a categorical column
+            unique_ratio = len(values) / max(len(s.dropna()), 1)
+            
+            # If we have reasonable number of categories (not too many, not too few)
+            if 2 <= len(values) <= 1000 and unique_ratio < 0.8:
+                out.append(
+                    Entity(
+                        name=column.name,
+                        entity_type="categorical",
+                        source_columns=[column.name],
+                        confidence=0.8,
+                        description=f"Categorical data with {len(values)} unique values",
+                    )
+                )
+
+        return out
+
+
 
     # ---------- Gate C: LLM (last resort, deterministic & cached) ----------
     def _extract_llm_entities(
@@ -481,7 +791,7 @@ class EntityExtractor:
         if not self.llm_manager:
             return []
         # Small, deterministic context: schema + few representative rows
-        sample_rows = df.head(int(config.get("llm_context_rows", 20))).to_dict(
+        sample_rows = df.head(int(_safe_config_get(config, "llm_context_rows", 20))).to_dict(
             orient="records"
         )
         context = {
@@ -617,7 +927,7 @@ class EntityExtractor:
     ) -> list[Entity]:
         if not entities:
             return entities
-        thr = float(config.get("dedup_similarity_threshold", 0.90))
+        thr = float(_safe_config_get(config, "dedup_similarity_threshold", 0.90))
         if not self.embeddings:
             # basic textual dedup (exact same signature)
             seen = set()
@@ -694,8 +1004,9 @@ class EntityExtractor:
     @staticmethod
     def _prompt_for_business_entities(context: dict[str, Any]) -> str:
         return (
-            "Identify any high-level business entities implied by the dataset schema.\n"
-            "Return JSON list of objects: {name, entity_type, source_columns, confidence, reason}.\n"
+            "Identify exactly 2 core entities from the dataset schema.\n"
+            "Return JSON list with exactly 2 objects: {name, entity_type, source_columns, confidence, reason}.\n"
+            "Use generic names: 'Core Entity' and 'Measurement Entity'.\n"
             f"Context: {json.dumps(context, ensure_ascii=False)[:4000]}"
         )
 
@@ -710,7 +1021,7 @@ class EntityExtractor:
 
     @staticmethod
     def _det_sample_unique_sorted(s: pd.Series, config: dict[str, Any]) -> list[str]:
-        maxn = int(config.get("max_entities_per_column", 200))
+        maxn = int(_safe_config_get(config, "max_entities_per_column", 200))
         vals = (
             s.dropna()
             .astype(str)

@@ -16,6 +16,18 @@ from app.infrastructure.llm.llm_manager import LLMManager
 logger = logging.getLogger(__name__)
 
 
+def _safe_config_get(config, key, default=None):
+    """Safely get configuration value from either dict or Config object."""
+    if hasattr(config, 'get'):
+        return config.get(key, default)
+    elif hasattr(config, key):
+        return getattr(config, key, default)
+    elif hasattr(config, 'extraction') and hasattr(config.extraction, key):
+        return getattr(config.extraction, key, default)
+    else:
+        return default
+
+
 class RelationshipDiscoverer:
     """Discovers relationships between entities in CSV data."""
 
@@ -246,7 +258,7 @@ class RelationshipDiscoverer:
                     overlap_percentage = overlap_count / min(unique_col1, unique_col2)
 
                     # Determine relationship direction and type
-                    if overlap_percentage >= config.get("fk_overlap_threshold", 0.8):
+                    if overlap_percentage >= _safe_config_get(config, "fk_overlap_threshold", 0.8):
                         if unique_col1 <= unique_col2:
                             source_col, target_col = col1, col2
                             relationship_type = "references"
@@ -259,7 +271,7 @@ class RelationshipDiscoverer:
                             overlap_percentage, unique_col1, unique_col2, total_rows
                         )
 
-                        if confidence >= config.get("relationship_threshold", 0.6):
+                        if confidence >= _safe_config_get(config, "relationship_threshold", 0.6):
                             # Find representative entities
                             source_entity = self._find_representative_entity(
                                 source_col, entity_columns
@@ -428,7 +440,7 @@ class RelationshipDiscoverer:
                         embeddings[i : i + 1], embeddings[j : j + 1]
                     )[0][0]
 
-                    if similarity >= config.get("semantic_similarity_threshold", 0.7):
+                    if similarity >= _safe_config_get(config, "semantic_similarity_threshold", 0.7):
                         entity1 = entity_map[entity_texts[i]]
                         entity2 = entity_map[entity_texts[j]]
 
@@ -562,7 +574,7 @@ class RelationshipDiscoverer:
                     f"Processing LLM result: confidence={confidence}, type={relationship_type}"
                 )
 
-                if confidence >= config.get("relationship_threshold", 0.6):
+                if confidence >= _safe_config_get(config, "relationship_threshold", 0.6):
                     # Create relationships for entity pairs
                     for entity1 in col1_entities[
                         :5
@@ -1060,7 +1072,7 @@ class RelationshipDiscoverer:
                     # Calculate confidence based on co-occurrence frequency
                     confidence = min(co_count / total_rows * 10, 0.95)
 
-                    if confidence >= config.get("relationship_threshold", 0.6):
+                    if confidence >= _safe_config_get(config, "relationship_threshold", 0.6):
                         relationship = Relationship(
                             id=f"co_{entity1.id}_{entity2.id}_{hash(f'{val1}_{val2}')}",
                             source_entity_id=entity1.id,
@@ -1152,7 +1164,7 @@ class RelationshipDiscoverer:
                 # Calculate semantic similarity
                 similarity = self._calculate_semantic_similarity(entity1, entity2)
 
-                if similarity >= config.get("relationship_threshold", 0.6):
+                if similarity >= _safe_config_get(config, "relationship_threshold", 0.6):
                     relationship = Relationship(
                         id=f"sem_{entity1.id}_{entity2.id}_{hash(relationship_type)}",
                         source_entity_id=entity1.id,
