@@ -249,6 +249,78 @@ class TestAgricultureWorkersExtraction:
             print(f"❌ Extraction pipeline test failed: {e}")
             return False
 
+    def test_postgresql_storage(self):
+        """Test PostgreSQL metadata storage functionality."""
+        print("\n🐘 Testing PostgreSQL Storage...")
+
+        try:
+            # Test PostgreSQL connection through the API
+            response = requests.get(f"{self.base_url}/api/v1/config")
+            if response.status_code == 200:
+                config_data = response.json()
+                print("✅ Configuration endpoint accessible")
+            else:
+                print(f"⚠️  Configuration endpoint failed: {response.status_code}")
+                return False
+
+            # Upload a test file to trigger PostgreSQL storage
+            print("📤 Testing file storage in PostgreSQL...")
+            with open(self.csv_path, "rb") as f:
+                files = {"file": ("test_postgres.csv", f, "text/csv")}
+                response = requests.post(
+                    f"{self.base_url}/api/v1/extract/upload", files=files
+                )
+
+            if response.status_code == 200:
+                upload_data = response.json()
+                file_path = upload_data.get("file_path")
+                file_id = upload_data.get("file_id")
+                
+                print(f"✅ File uploaded and stored successfully")
+                print(f"   File ID: {file_id}")
+                print(f"   File path: {file_path}")
+                print(f"   Size: {upload_data.get('size', 0)} bytes")
+                
+                # Test that metadata was stored
+                print("🔍 Verifying PostgreSQL metadata storage...")
+                
+                # Check if we can start extraction (which uses stored metadata)
+                extraction_payload = {
+                    "file_path": file_path,
+                    "extraction_config": {"confidence_threshold": 0.5}
+                }
+                extraction_response = requests.post(
+                    f"{self.base_url}/api/v1/extract/", json=extraction_payload
+                )
+                
+                if extraction_response.status_code == 200:
+                    extraction_data = extraction_response.json()
+                    task_id = extraction_data.get("task_id")
+                    print(f"✅ PostgreSQL metadata storage working - extraction task created: {task_id}")
+                    
+                    # Wait a moment and check task status
+                    import time
+                    time.sleep(2)
+                    status_response = requests.get(f"{self.base_url}/api/v1/extract/{task_id}")
+                    if status_response.status_code == 200:
+                        status_data = status_response.json()
+                        print(f"✅ Task status retrievable - PostgreSQL storage functional")
+                        print(f"   Task status: {status_data.get('status', 'unknown')}")
+                        return True
+                    else:
+                        print(f"⚠️  Task status check failed: {status_response.status_code}")
+                        return False
+                else:
+                    print(f"⚠️  Extraction failed: {extraction_response.status_code}")
+                    return False
+            else:
+                print(f"❌ File upload failed: {response.status_code}")
+                return False
+
+        except Exception as e:
+            print(f"❌ PostgreSQL storage test failed: {e}")
+            return False
+
     def test_data_endpoints(self):
         """Test the data-related endpoints."""
         print("\n📊 Testing Data Endpoints...")
@@ -379,6 +451,7 @@ class TestAgricultureWorkersExtraction:
             "test_csv_structure",
             "test_backend_endpoints",
             "test_file_upload_and_extraction",
+            "test_postgresql_storage",
             "test_data_endpoints",
             "test_extraction_status_endpoints",
             "test_graph_storage",

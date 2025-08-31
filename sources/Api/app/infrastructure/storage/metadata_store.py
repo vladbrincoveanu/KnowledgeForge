@@ -42,14 +42,14 @@ class PostgreSQLMetadataStore:
             else:
                 # Use config-based connection
                 if hasattr(self.config, 'neo4j'):
-                    # If it's a Config object, use defaults since PostgreSQL config isn't defined
+                    # If it's a Config object, use Docker PostgreSQL defaults
                     self.connection_pool = SimpleConnectionPool(
                         1, 10,
                         host="localhost",
                         port=5432,
                         database="knowledgeforge",
-                        user="postgres",
-                        password="password"
+                        user="knowledgeforge",
+                        password="knowledgeforge123"
                     )
                 else:
                     # If it's a dict, use .get() method
