@@ -82,7 +82,9 @@ describe('FileUploader Component', () => {
   it('handles file drop correctly', async () => {
     const { fileAPI } = await import('@/services/api');
     const mockUploadFile = fileAPI.uploadFile as ReturnType<typeof vi.fn>;
-    const mockProcessLocalFile = fileAPI.processLocalFile as ReturnType<typeof vi.fn>;
+    const mockProcessLocalFile = fileAPI.processLocalFile as ReturnType<
+      typeof vi.fn
+    >;
 
     mockUploadFile.mockResolvedValue({
       file_id: 'test-id',
@@ -205,7 +207,9 @@ describe('FileUploader Component', () => {
   it('shows upload progress when uploading', async () => {
     const { fileAPI } = await import('@/services/api');
     const mockUploadFile = fileAPI.uploadFile as ReturnType<typeof vi.fn>;
-    const mockProcessLocalFile = fileAPI.processLocalFile as ReturnType<typeof vi.fn>;
+    const mockProcessLocalFile = fileAPI.processLocalFile as ReturnType<
+      typeof vi.fn
+    >;
 
     let resolveUpload;
     const uploadPromise = new Promise(resolve => {
@@ -263,7 +267,9 @@ describe('FileUploader Component', () => {
   it('calls onFilesUploaded with correct data', async () => {
     const { fileAPI } = await import('@/services/api');
     const mockUploadFile = fileAPI.uploadFile as ReturnType<typeof vi.fn>;
-    const mockProcessLocalFile = fileAPI.processLocalFile as ReturnType<typeof vi.fn>;
+    const mockProcessLocalFile = fileAPI.processLocalFile as ReturnType<
+      typeof vi.fn
+    >;
 
     const uploadResponse = {
       file_id: 'test-id-123',

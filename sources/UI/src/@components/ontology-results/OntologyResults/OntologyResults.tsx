@@ -61,11 +61,7 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
 
         let data: PaginatedResponse<Entity> | PaginatedResponse<Relationship>;
         if (type === 'entities') {
-          data = await ontologyAPI.getEntities(
-            taskId,
-            20,
-            (page - 1) * 20
-          );
+          data = await ontologyAPI.getEntities(taskId, 20, (page - 1) * 20);
           if (reset) {
             setEntities(data.items || []);
           } else {
@@ -180,13 +176,21 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
         setEntities(entitiesData.items || []);
 
         // Load relationships
-        const relationshipsData = await ontologyAPI.getRelationships(taskId, 20, 0);
+        const relationshipsData = await ontologyAPI.getRelationships(
+          taskId,
+          20,
+          0
+        );
         setRelationships(relationshipsData.items || []);
 
         // Update pagination
         setPagination({
           entities: { page: 2, limit: 20, total: entitiesData.total || 0 },
-          relationships: { page: 2, limit: 20, total: relationshipsData.total || 0 },
+          relationships: {
+            page: 2,
+            limit: 20,
+            total: relationshipsData.total || 0,
+          },
         });
       } catch (error: unknown) {
         const errorMessage =

@@ -1,7 +1,7 @@
 # KnowledgeForge - Unified Project Management
 # This Makefile provides commands to manage the entire KnowledgeForge stack
 
-.PHONY: help up down clean logs status install test tests e2e api ui dev prod build build-docker
+.PHONY: help up down clean logs status install test tests e2e api ui dev prod build build-docker fix
 
 # Default target
 help:
@@ -20,6 +20,7 @@ help:
 	@echo "  make tests      - Run all tests (API, UI, E2E)"
 	@echo "  make build      - Build all projects with quality checks (format, lint, compile)"
 	@echo "  make build-docker - Build Docker images only"
+	@echo "  make fix        - Fix code formatting and linting issues (API: black, UI: fix-all)"
 	@echo ""
 	@echo "Individual Services:"
 	@echo "  make api-only   - Start API only (local development)"
@@ -220,3 +221,17 @@ health:
 resources:
 	@echo "💾 Docker resource usage:"
 	docker stats --no-stream
+
+# Fix code formatting and linting issues
+fix:
+	@echo "🔧 Fixing code formatting and linting issues..."
+	@echo ""
+	@echo "📋 Fixing API code formatting..."
+	cd sources && source venv/bin/activate && cd api && python -m black . --exclude "(tests/test_pipeline.py)" || echo "⚠️ Some files could not be formatted due to syntax errors"
+	@echo "  ✅ API code formatting attempted!"
+	@echo ""
+	@echo "📋 Fixing UI code formatting and linting..."
+	cd sources/ui && npm run fix-all
+	@echo "  ✅ UI code formatted and linted!"
+	@echo ""
+	@echo "✅ Code formatting and linting completed!"

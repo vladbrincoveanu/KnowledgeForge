@@ -63,9 +63,9 @@ describe('OntologyResults Component', () => {
     (ontologyAPI.getEntities as ReturnType<typeof vi.fn>).mockResolvedValue(
       mockApiResponse(mockEntities)
     );
-    (ontologyAPI.getRelationships as ReturnType<typeof vi.fn>).mockResolvedValue(
-      mockApiResponse(mockRelationships)
-    );
+    (
+      ontologyAPI.getRelationships as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(mockApiResponse(mockRelationships));
   });
 
   it('renders loading state initially', async () => {
@@ -74,8 +74,12 @@ describe('OntologyResults Component', () => {
     const loadingPromise = new Promise(resolve => {
       resolveLoading = resolve;
     });
-    (ontologyAPI.getEntities as ReturnType<typeof vi.fn>).mockReturnValue(loadingPromise);
-    (ontologyAPI.getRelationships as ReturnType<typeof vi.fn>).mockReturnValue(loadingPromise);
+    (ontologyAPI.getEntities as ReturnType<typeof vi.fn>).mockReturnValue(
+      loadingPromise
+    );
+    (ontologyAPI.getRelationships as ReturnType<typeof vi.fn>).mockReturnValue(
+      loadingPromise
+    );
 
     render(
       <OntologyResults
@@ -87,7 +91,7 @@ describe('OntologyResults Component', () => {
     // Check that the component renders (initially no entities loaded)
     expect(screen.getByText('Extraction Results')).toBeInTheDocument();
     expect(screen.getByText('Entities (0)')).toBeInTheDocument();
-    
+
     resolveLoading!(mockApiResponse(mockEntities));
     await waitFor(() => {
       expect(screen.getByText('Entities (2)')).toBeInTheDocument();
@@ -144,7 +148,9 @@ describe('OntologyResults Component', () => {
 
   it('handles feedback submission for entities', async () => {
     const { ontologyAPI } = await import('@/services/api');
-    (ontologyAPI.submitFeedback as ReturnType<typeof vi.fn>).mockResolvedValue({ success: true });
+    (ontologyAPI.submitFeedback as ReturnType<typeof vi.fn>).mockResolvedValue({
+      success: true,
+    });
 
     render(
       <OntologyResults
@@ -180,7 +186,9 @@ describe('OntologyResults Component', () => {
 
   it('handles API errors gracefully', async () => {
     const { ontologyAPI } = await import('@/services/api');
-    (ontologyAPI.getEntities as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('API Error'));
+    (ontologyAPI.getEntities as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error('API Error')
+    );
 
     render(
       <OntologyResults
@@ -256,7 +264,9 @@ describe('OntologyResults Component', () => {
 
   it('shows empty state when no data', async () => {
     const { ontologyAPI } = await import('@/services/api');
-    (ontologyAPI.getEntities as ReturnType<typeof vi.fn>).mockResolvedValue(mockApiResponse([]));
+    (ontologyAPI.getEntities as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockApiResponse([])
+    );
 
     render(
       <OntologyResults
