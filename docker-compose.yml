@@ -119,6 +119,30 @@ services:
     networks:
       - knowledgeforge-network
 
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: knowledgeforge-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: knowledgeforge
+      POSTGRES_USER: knowledgeforge
+      POSTGRES_PASSWORD: knowledgeforge123
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sources/api/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - knowledgeforge-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U knowledgeforge -d knowledgeforge"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   # KnowledgeForge API Service
   api:
     build:
@@ -129,6 +153,14 @@ services:
     ports:
       - "8000:8000"
     environment:
+      # PostgreSQL Configuration
+      - DATABASE_TYPE=postgresql
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=knowledgeforge
+      - DATABASE_USERNAME=knowledgeforge
+      - DATABASE_PASSWORD=knowledgeforge123
+      - DATABASE_URL=postgresql://knowledgeforge:knowledgeforge123@postgres:5432/knowledgeforge
       # Neo4j Configuration
       - ONTOLOGY_NEO4J__URI=bolt://neo4j:7687
       - ONTOLOGY_NEO4J__USERNAME=neo4j
@@ -147,7 +179,6 @@ services:
       # Application Configuration
       - ONTOLOGY_CONFIG_FILE=/app/config.yaml
       - ONTOLOGY_ENVIRONMENT=development
-      - ONTOLOGY_METADATA_STORAGE__DUCKDB_PATH=/app/data/metadata.db
       - ONTOLOGY_LOGGING__FILE_PATH=/app/logs/api.log
       - LOG_LEVEL=INFO
     volumes:
@@ -158,6 +189,8 @@ services:
     networks:
       - knowledgeforge-network
     depends_on:
+      postgres:
+        condition: service_healthy
       neo4j:
         condition: service_healthy
       mongodb:
@@ -224,6 +257,8 @@ volumes:
   minio_data:
     driver: local
   portainer_data:
+    driver: local
+  postgres_data:
     driver: local
 
 networks:

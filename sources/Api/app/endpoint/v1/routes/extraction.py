@@ -17,7 +17,7 @@ from app.services.entity_extraction.entity_extractor import EntityExtractor
 from app.services.ontology_mapping.ontology_mapper import OntologyMapper
 from app.services.relationship_discovery.relationship_discoverer import RelationshipDiscoverer
 from app.infrastructure.graph.neo4j_manager import Neo4jGraphManager
-from app.infrastructure.storage.metadata_store import AdvancedMetadataStore as MetadataStore
+from app.infrastructure.storage.metadata_store import PostgreSQLMetadataStore as MetadataStore
 from app.domain.models.entities import DatasetProfile, Entity, Relationship
 from utils.config import get_config
 
@@ -78,7 +78,7 @@ def get_neo4j_manager():
 def get_metadata_store():
     """Get metadata store instance."""
     config = get_config()
-    return MetadataStore(config.metadata_storage.duckdb_path)
+    return MetadataStore(config=config)
 
 @router.post("/upload", response_model=Dict[str, Any])
 async def upload_csv_file(

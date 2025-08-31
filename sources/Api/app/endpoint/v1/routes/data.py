@@ -4,11 +4,12 @@ from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import List, Dict, Any, Optional
 import uuid
 import logging
+import os
 from datetime import datetime
 
 # Import actual backend services
 from app.infrastructure.graph.neo4j_manager import Neo4jGraphManager
-from app.infrastructure.storage.metadata_store import MetadataStore
+from app.infrastructure.storage.metadata_store import PostgreSQLMetadataStore as MetadataStore
 from app.domain.models.entities import Entity, Relationship
 from utils.config import get_config
 
