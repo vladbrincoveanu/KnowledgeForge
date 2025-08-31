@@ -194,28 +194,67 @@ const MainContent: React.FC = () => {
     links: [],
   });
 
-  const handleWebSocketMessage = useCallback(
-    (data: WebSocketMessage) => {
-      if (data.task_id && extractionTasks[data.task_id]) {
-        setExtractionTasks(prev => ({
-          ...prev,
-          [data.task_id!]: {
-            ...prev[data.task_id!],
-            status:
-              (data.status as ExtractionTask['status']) ||
-              prev[data.task_id!].status,
-            message: data.message || prev[data.task_id!].message,
-            timestamp: data.timestamp,
-          },
-        }));
+  const loadGraphData = useCallback(
+    async (taskId: string) => {
+      try {
+        // const graphDataResponse = await ontologyAPI.getGraphVisualization(taskId);
 
-        // Update graph data when extraction completes
-        if (data.status === 'completed') {
-          loadGraphData(data.task_id);
+        // Convert Cypher queries to graph data
+        const nodes: GraphNode[] = [];
+        const links: GraphLink[] = [];
+
+        // This is a simplified conversion - in production you'd parse the Cypher queries
+        // For now, we'll create basic graph data from entities and relationships
+        if (extractionTasks[taskId]?.results) {
+          const { entities, relationships } = extractionTasks[taskId].results!;
+
+          entities.forEach(entity => {
+            nodes.push({
+              id: entity.id,
+              label: entity.name,
+              type: 'entity',
+              entityType: entity.entity_type,
+              confidence: entity.confidence,
+            });
+          });
+
+          relationships.forEach(rel => {
+            links.push({
+              id: rel.id,
+              source: rel.source_entity_id,
+              target: rel.target_entity_id,
+              label: rel.relationship_type,
+              confidence: rel.confidence,
+            });
+          });
         }
+
+        setGraphData({ nodes, links });
+      } catch (error) {
+        console.error('Failed to load graph data:', error);
       }
     },
-    [extractionTasks, loadGraphData]
+    [extractionTasks]
+  );
+
+  const handleWebSocketMessage = useCallback(
+    (data?: unknown) => {
+      const wsData = data as WebSocketMessage;
+      if (wsData?.task_id && extractionTasks[wsData.task_id]) {
+        setExtractionTasks(prev => ({
+          ...prev,
+          [wsData.task_id!]: {
+            ...prev[wsData.task_id!],
+            status:
+              (wsData.status as ExtractionTask['status']) ||
+              prev[wsData.task_id!].status,
+            message: wsData.message || prev[wsData.task_id!].message,
+            timestamp: wsData.timestamp,
+          },
+        }));
+      }
+    },
+    [extractionTasks]
   );
 
   useEffect(() => {
@@ -229,6 +268,19 @@ const MainContent: React.FC = () => {
       wsService.disconnect();
     };
   }, [handleWebSocketMessage]);
+
+  // Effect to load graph data when tasks are completed
+  useEffect(() => {
+    Object.values(extractionTasks).forEach(task => {
+      if (task.status === 'completed' && task.results) {
+        // Only load if we don't already have graph data for this task
+        // This prevents infinite reloading
+        if (graphData.nodes.length === 0) {
+          loadGraphData(task.taskId);
+        }
+      }
+    });
+  }, [extractionTasks, loadGraphData, graphData.nodes.length]);
 
   const calculateSimilarity = useCallback(
     (str1: string, str2: string): number => {
@@ -269,6 +321,42 @@ const MainContent: React.FC = () => {
       return connections;
     },
     [calculateSimilarity]
+  );
+
+  const checkSemanticConnections = useCallback(
+    async (fileHeaders: FileHeader[]): Promise<PotentialConnection[]> => {
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      const potentialConnections: PotentialConnection[] = [];
+
+      // Simple mock logic to find potential connections
+      for (let i = 0; i < fileHeaders.length; i++) {
+        for (let j = i + 1; j < fileHeaders.length; j++) {
+          const fileA = fileHeaders[i];
+          const fileB = fileHeaders[j];
+
+          // Check for common patterns in column names
+          const connections = findPotentialConnections(
+            fileA.headers,
+            fileB.headers
+          );
+
+          connections.forEach(connection => {
+            potentialConnections.push({
+              fileA: fileA.name,
+              fileB: fileB.name,
+              columnA: connection.columnA,
+              columnB: connection.columnB,
+              confidence: connection.confidence,
+            });
+          });
+        }
+      }
+
+      return potentialConnections;
+    },
+    [findPotentialConnections]
   );
 
   const handleFilesUploaded = useCallback(
@@ -320,42 +408,6 @@ const MainContent: React.FC = () => {
     [activeTaskId]
   );
 
-  const checkSemanticConnections = useCallback(
-    async (fileHeaders: FileHeader[]): Promise<PotentialConnection[]> => {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      const potentialConnections: PotentialConnection[] = [];
-
-      // Simple mock logic to find potential connections
-      for (let i = 0; i < fileHeaders.length; i++) {
-        for (let j = i + 1; j < fileHeaders.length; j++) {
-          const fileA = fileHeaders[i];
-          const fileB = fileHeaders[j];
-
-          // Check for common patterns in column names
-          const connections = findPotentialConnections(
-            fileA.headers,
-            fileB.headers
-          );
-
-          connections.forEach(connection => {
-            potentialConnections.push({
-              fileA: fileA.name,
-              fileB: fileB.name,
-              columnA: connection.columnA,
-              columnB: connection.columnB,
-              confidence: connection.confidence,
-            });
-          });
-        }
-      }
-
-      return potentialConnections;
-    },
-    [findPotentialConnections]
-  );
-
   const handleConnectionResponse = useCallback(
     (accepted: boolean, connection: PotentialConnection) => {
       if (accepted) {
@@ -370,49 +422,6 @@ const MainContent: React.FC = () => {
       // For now, we'll just clear the pending connection
     },
     []
-  );
-
-  const loadGraphData = useCallback(
-    async (taskId: string) => {
-      try {
-        // const graphDataResponse = await ontologyAPI.getGraphVisualization(taskId);
-
-        // Convert Cypher queries to graph data
-        const nodes: GraphNode[] = [];
-        const links: GraphLink[] = [];
-
-        // This is a simplified conversion - in production you'd parse the Cypher queries
-        // For now, we'll create basic graph data from entities and relationships
-        if (extractionTasks[taskId]?.results) {
-          const { entities, relationships } = extractionTasks[taskId].results!;
-
-          entities.forEach(entity => {
-            nodes.push({
-              id: entity.id,
-              label: entity.name,
-              type: 'entity',
-              entityType: entity.entity_type,
-              confidence: entity.confidence,
-            });
-          });
-
-          relationships.forEach(rel => {
-            links.push({
-              id: rel.id,
-              source: rel.source_entity_id,
-              target: rel.target_entity_id,
-              label: rel.relationship_type,
-              confidence: rel.confidence,
-            });
-          });
-        }
-
-        setGraphData({ nodes, links });
-      } catch (error) {
-        console.error('Failed to load graph data:', error);
-      }
-    },
-    [extractionTasks]
   );
 
   const handleFeedbackSubmitted = useCallback((feedback: unknown) => {
@@ -560,7 +569,10 @@ const MainContent: React.FC = () => {
                     </p>
                   </div>
 
-                  <Graph data={graphData} />
+                  <Graph 
+                    data={graphData} 
+                    onEdgeClick={(edge) => console.log('Edge clicked:', edge)}
+                  />
                 </div>
               }
             />
