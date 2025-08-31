@@ -186,7 +186,7 @@ export const ontologyAPI = {
     extractionConfig: ExtractConfig = {}
   ): Promise<ExtractResponse> => {
     const response: AxiosResponse<ExtractResponse> = await api.post(
-      '/extract',
+      '/api/v1/extract/',
       {
         file_path: filePath,
         extraction_config: extractionConfig,
@@ -198,7 +198,7 @@ export const ontologyAPI = {
   // Get extraction task status
   getExtractionStatus: async (taskId: string): Promise<ExtractionStatus> => {
     const response: AxiosResponse<ExtractionStatus> = await api.get(
-      `/extract/${taskId}`
+      `/api/v1/extract/${taskId}`
     );
     return response.data;
   },
@@ -213,7 +213,7 @@ export const ontologyAPI = {
     if (taskId) params.task_id = taskId;
 
     const response: AxiosResponse<PaginatedResponse<Entity>> = await api.get(
-      '/entities',
+      '/api/v1/entities',
       { params }
     );
     return response.data;
@@ -229,14 +229,14 @@ export const ontologyAPI = {
     if (taskId) params.task_id = taskId;
 
     const response: AxiosResponse<PaginatedResponse<Relationship>> =
-      await api.get('/relationships', { params });
+      await api.get('/api/v1/relationships', { params });
     return response.data;
   },
 
   // Submit feedback
   submitFeedback: async (feedbackData: FeedbackData): Promise<unknown> => {
     const response: AxiosResponse<unknown> = await api.post(
-      '/feedback',
+      '/api/v1/feedback',
       feedbackData
     );
     return response.data;
@@ -247,7 +247,7 @@ export const ontologyAPI = {
     taskId: string
   ): Promise<GraphVisualization> => {
     const response: AxiosResponse<GraphVisualization> = await api.get(
-      '/graph/visualize',
+      '/api/v1/graph/visualize',
       {
         params: { task_id: taskId },
       }
@@ -257,19 +257,19 @@ export const ontologyAPI = {
 
   // Get system metrics
   getMetrics: async (): Promise<SystemMetrics> => {
-    const response: AxiosResponse<SystemMetrics> = await api.get('/metrics');
+    const response: AxiosResponse<SystemMetrics> = await api.get('/api/v1/health/metrics');
     return response.data;
   },
 
   // Health check
   healthCheck: async (): Promise<HealthStatus> => {
-    const response: AxiosResponse<HealthStatus> = await api.get('/health');
+    const response: AxiosResponse<HealthStatus> = await api.get('/api/v1/health/');
     return response.data;
   },
 
   // Readiness check
   readinessCheck: async (): Promise<HealthStatus> => {
-    const response: AxiosResponse<HealthStatus> = await api.get('/ready');
+    const response: AxiosResponse<HealthStatus> = await api.get('/api/v1/health/ready');
     return response.data;
   },
 };
@@ -334,7 +334,7 @@ export const fileAPI = {
       // For file uploads, we need to remove the default Content-Type header
       // and let the browser set it automatically with the boundary
       const response: AxiosResponse<UploadResponse> = await fileUploadApi.post(
-        '/upload',
+        '/api/v1/extract/upload',
         formData
       );
 
