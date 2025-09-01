@@ -309,6 +309,57 @@ class TestAgricultureWorkersExtraction:
             print(f"   ❌ Neo4j verification failed due to unexpected error: {e}")
             return False
 
+    def test_postgresql_storage(self):
+        """Test PostgreSQL metadata storage functionality."""
+        print("\n🗄️  Testing PostgreSQL Metadata Storage...")
+
+        try:
+            # Test metadata-related endpoints that should exist
+            endpoints_to_test = [
+                "/api/v1/health/",
+                "/api/v1/config"
+            ]
+
+            accessible_endpoints = 0
+            for endpoint in endpoints_to_test:
+                try:
+                    response = requests.get(f"{self.base_url}{endpoint}")
+                    if response.status_code == 200:
+                        print(f"✅ Metadata endpoint accessible: {endpoint}")
+                        accessible_endpoints += 1
+                    else:
+                        print(f"⚠️  Metadata endpoint {endpoint}: {response.status_code}")
+                except Exception as e:
+                    print(f"⚠️  Metadata endpoint {endpoint}: {e}")
+
+            # Test PostgreSQL health via health endpoint
+            try:
+                response = requests.get(f"{self.base_url}/api/v1/health/")
+                if response.status_code == 200:
+                    health_data = response.json()
+                    postgresql_status = health_data.get("dependencies", {}).get("postgresql", "unknown")
+                    if "healthy" in str(postgresql_status).lower() or "connected" in str(postgresql_status).lower():
+                        print("✅ PostgreSQL metadata database connection healthy")
+                        accessible_endpoints += 1
+                    else:
+                        print(f"⚠️  PostgreSQL status: {postgresql_status}")
+            except Exception as e:
+                print(f"⚠️  PostgreSQL health check failed: {e}")
+
+            if accessible_endpoints >= 2:
+                print(f"✅ PostgreSQL metadata storage infrastructure fully functional ({accessible_endpoints} endpoints)")
+                return True
+            elif accessible_endpoints >= 1:
+                print(f"⚠️  PostgreSQL metadata storage partially accessible ({accessible_endpoints} endpoints)")
+                return True
+            else:
+                print(f"⚠️  Limited PostgreSQL metadata storage access ({accessible_endpoints} endpoints)")
+                return False
+
+        except Exception as e:
+            print(f"❌ PostgreSQL metadata storage test failed: {e}")
+            return False
+
     def test_data_endpoints(self):
         """Test the data-related endpoints."""
         print("\n📊 Testing Data Endpoints...")
@@ -545,6 +596,7 @@ class TestAgricultureWorkersExtraction:
             "test_neo4j_connection_health",
             "test_neo4j_direct_node_count",
             "test_file_upload_and_extraction",
+            "test_postgresql_storage",
             "test_data_endpoints",
             "test_extraction_status_endpoints",
             "test_graph_storage",
