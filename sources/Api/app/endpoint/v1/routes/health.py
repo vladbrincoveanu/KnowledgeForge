@@ -14,7 +14,7 @@ from utils.config import get_config
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/health", tags=["health"])
+router = APIRouter(tags=["health"])
 
 
 # Dependency injection

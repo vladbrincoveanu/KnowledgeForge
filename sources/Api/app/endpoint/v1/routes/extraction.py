@@ -502,32 +502,56 @@ async def store_in_neo4j(
     logger.info(f"Starting Neo4j storage for {len(entities)} entities and {len(relationships)} relationships")
     
     try:
-        # Connect to Neo4j without using context manager to avoid closing the connection
-        neo4j_manager.connect()
-        logger.info("Neo4j manager connected successfully")
+        # Ensure connection is established
+        if not neo4j_manager.is_connected():
+            logger.info("Neo4j not connected, attempting to connect...")
+            success = neo4j_manager.connect()
+            if not success:
+                logger.error("Failed to connect to Neo4j")
+                raise Exception("Cannot connect to Neo4j database")
+            logger.info("Neo4j manager connected successfully")
+        else:
+            logger.info("Neo4j manager already connected")
+        
+        # Verify connection is working
+        if not neo4j_manager.is_connected():
+            logger.error("Neo4j connection verification failed")
+            raise Exception("Neo4j connection verification failed")
         
         # Store entities
+        entities_stored = 0
         for entity in entities:
-            success = neo4j_manager.store_entity_with_metadata(
-                entity=entity,
-                source_file="extraction_pipeline",  # Could be parameterized
-                extraction_timestamp=datetime.now(),
-            )
-            if success:
-                logger.info(f"Successfully stored entity: {getattr(entity, 'name', 'NO_NAME')}")
-            else:
-                logger.error(f"Failed to store entity: {getattr(entity, 'name', 'NO_NAME')}")
+            try:
+                success = neo4j_manager.store_entity_with_metadata(
+                    entity=entity,
+                    source_file="extraction_pipeline",  # Could be parameterized
+                    extraction_timestamp=datetime.now(),
+                )
+                if success:
+                    logger.info(f"Successfully stored entity: {getattr(entity, 'name', 'NO_NAME')}")
+                    entities_stored += 1
+                else:
+                    logger.error(f"Failed to store entity: {getattr(entity, 'name', 'NO_NAME')}")
+            except Exception as e:
+                logger.error(f"Error storing entity {getattr(entity, 'name', 'NO_NAME')}: {e}")
 
         # Store relationships
+        relationships_stored = 0
         for relationship in relationships:
-            success = neo4j_manager.store_relationship_with_metadata(
-                relationship=relationship,
-                discovered_at=datetime.now(),
-            )
-            if success:
-                logger.info(f"Successfully stored relationship: {getattr(relationship, 'id', 'NO_ID')}")
-            else:
-                logger.error(f"Failed to store relationship: {getattr(relationship, 'id', 'NO_ID')}")
+            try:
+                success = neo4j_manager.store_relationship_with_metadata(
+                    relationship=relationship,
+                    discovered_at=datetime.now(),
+                )
+                if success:
+                    logger.info(f"Successfully stored relationship: {getattr(relationship, 'id', 'NO_ID')}")
+                    relationships_stored += 1
+                else:
+                    logger.error(f"Failed to store relationship: {getattr(relationship, 'id', 'NO_ID')}")
+            except Exception as e:
+                logger.error(f"Error storing relationship {getattr(relationship, 'id', 'NO_ID')}: {e}")
+        
+        logger.info(f"Neo4j storage completed: {entities_stored}/{len(entities)} entities, {relationships_stored}/{len(relationships)} relationships")
 
     except Exception as e:
         logger.error(f"Failed to store in Neo4j: {e}")
