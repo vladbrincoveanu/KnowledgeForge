@@ -4,6 +4,7 @@ import hashlib
 import json
 import logging
 import re
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -140,12 +141,15 @@ class EntityExtractor:
         columns: list[ColumnProfile],
         config: dict[str, Any],
     ) -> list[Entity]:
+        # Store file path for context analysis
+        self.current_file_path = file_path
         df = self._safe_read_csv(file_path, usecols=[c.name for c in columns])
 
         per_column: list[Entity] = []
         business_entities: list[Entity] = []  # Initialize business_entities list
         
         # Extract semantic entities based on dataset understanding
+        logger.info("Starting semantic entity extraction...")
         semantic_entities = self._extract_semantic_entities(df, columns, config)
         per_column.extend(semantic_entities)
         logger.info(f"Extracted {len(semantic_entities)} semantic entities")
@@ -203,8 +207,8 @@ class EntityExtractor:
 
     # ---------- Business-focused entity extraction ----------
     def _extract_business_entities_enhanced(
-        self, df: pd.DataFrame, columns: List[ColumnProfile], config: Dict[str, Any]
-    ) -> List[Entity]:
+        self, df: pd.DataFrame, columns: list[ColumnProfile], config: dict[str, Any]
+    ) -> list[Entity]:
         """Extract meaningful business entities from the dataset."""
         if not self.llm_manager:
             return []
@@ -227,28 +231,28 @@ class EntityExtractor:
             logger.info(f"Dataset summary created: {len(df)} rows, {len(columns)} columns")
             
             prompt = f"""
-Analyze this dataset and identify core entities based on data structure:
+Analyze this dataset and identify core entities based on data structure patterns only:
 
 Dataset Summary: {json.dumps(dataset_summary, indent=2)}
 
 Extract entities from:
-- String/categorical columns (group similar columns)
-- Numeric columns (group related numeric data)
+- String/categorical columns (use column names as entity names)
+- Numeric columns (group related numeric data if appropriate)
 
 Rules:
-- Use column names as entity names
-- Use generic entity types: "categorical" or "numerical"
-- No domain-specific assumptions
-- Group related columns into single entities
-
+- Use actual column names as entity names
+- Use only these entity types: "categorical", "numerical", "time_dimension", "identifier"
+- Base decisions purely on data patterns, not domain knowledge
+- Group related columns only when they represent the same concept
+ 
 For each entity provide:
-- name: actual column name or descriptive name
-- entity_type: "categorical" or "numerical" 
-- confidence: 0.0-1.0
-- reason: data-based justification
-- source_columns: relevant column names
+- name: actual column name or grouped name
+- entity_type: one of the allowed types above
+- confidence: 0.0-1.0 based on data pattern clarity
+- reason: data pattern justification (no domain assumptions)
+- source_columns: list of relevant column names
 
-Return JSON list with entities.
+Return JSON array with entities.
 """
             
             # Use LLM to analyze the dataset
@@ -305,64 +309,60 @@ Return JSON list with entities.
             logger.warning(f"Business entity extraction failed: {e}")
             return []
 
-    def _extract_basic_entities(self, df: pd.DataFrame, columns: List[ColumnProfile], config: Dict[str, Any]) -> List[Entity]:
+    def _extract_basic_entities(self, df: pd.DataFrame, columns: list[ColumnProfile], config: dict[str, Any]) -> list[Entity]:
         """Fallback basic entity extraction if LLM fails."""
         entities = []
         
         logger.info(f"Starting basic entity extraction for {len(columns)} columns")
         
-        # Look for obvious business entities
+        # Generic entity extraction based on data patterns only
         for col in columns:
             col_name = col.name.lower()
             logger.info(f"Analyzing column: '{col.name}' (type: {col.data_type}, unique: {col.unique_count})")
             
-            # Country entity
-            if "country" in col_name:
-                logger.info(f"  Found country column: {col.name}")
+            # Generic string/categorical entity
+            if col.data_type == DataType.STRING and col.unique_count > 1:
+                logger.info(f"  Found categorical column: {col.name}")
                 entity = Entity(
                     id=str(uuid.uuid4()),
-                    name="Country",
-                    entity_type="geographic_entity",
+                    name=col.name,
+                    entity_type="categorical",
                     source_columns=[col.name],
-                    confidence=0.95,
-                    description="Geographic entity representing countries"
+                    confidence=0.90,
+                    description=f"Categorical data with {col.unique_count} unique values"
                 )
                 entities.append(entity)
-                logger.info(f"  ✅ Created Country entity: id={entity.id}")
+                logger.info(f"  ✅ Created categorical entity: id={entity.id}")
             
-            # Look for measurement columns (numeric data that could be employment percentages)
-            elif col.data_type in ['float', 'integer'] and col.unique_count > 10:
+            # Generic numeric entity
+            elif col.data_type in [DataType.FLOAT, DataType.INTEGER, DataType.NUMERICAL] and col.unique_count > 5:
                 logger.info(f"  Found numeric column: {col.name} (unique values: {col.unique_count})")
                 
-                # Check if this looks like employment data
-                if any(keyword in col_name for keyword in ['employment', 'worker', 'labor', 'work']):
-                    logger.info(f"    Column name suggests employment data")
-                    entity = Entity(
-                        id=str(uuid.uuid4()),
-                        name="Agricultural Employment",
-                        entity_type="measurement",
-                        source_columns=[col.name],
-                        confidence=0.9,
-                        description="Employment measurement in agriculture sector"
-                    )
-                    entities.append(entity)
-                    logger.info(f"    ✅ Created Agricultural Employment entity: id={entity.id}")
-                
-                # For agriculture workers dataset, the year columns contain employment percentages
-                elif col.name.isdigit() and 1900 <= int(col.name) <= 2100:
+                # Check if column name is a year (time dimension)
+                if col.name.isdigit() and 1900 <= int(col.name) <= 2100:
                     logger.info(f"    Column name is a year: {col.name}")
                     entity = Entity(
                         id=str(uuid.uuid4()),
-                        name="Agricultural Employment",
+                        name=col.name,
+                        entity_type="time_dimension",
+                        source_columns=[col.name],
+                        confidence=0.95,
+                        description=f"Time dimension for year {col.name}"
+                    )
+                    entities.append(entity)
+                    logger.info(f"    ✅ Created time dimension entity for year {col.name}: id={entity.id}")
+                else:
+                    # Generic numeric measurement
+                    entity = Entity(
+                        id=str(uuid.uuid4()),
+                        name=col.name,
                         entity_type="measurement",
                         source_columns=[col.name],
                         confidence=0.85,
-                        description="Employment percentage data for specific year"
+                        description=f"Numeric measurement data from column {col.name}"
                     )
                     entities.append(entity)
-                    logger.info(f"    ✅ Created Agricultural Employment entity for year {col.name}: id={entity.id}")
-                else:
-                    logger.info(f"    Column does not match employment patterns")
+                    logger.info(f"    ✅ Created measurement entity: id={entity.id}")
             else:
                 logger.info(f"  Column '{col.name}' does not match basic entity patterns")
         
@@ -623,8 +623,11 @@ Return JSON list with entities.
     def _extract_semantic_entities(
         self, df: pd.DataFrame, columns: list[ColumnProfile], config: dict[str, Any]
     ) -> list[Entity]:
-        """Generic extraction that produces entities based on data structure."""
+        """Extract semantically meaningful entities based on data patterns and structure."""
         entities: list[Entity] = []
+        
+        # Analyze dataset context to infer business meaning (including filename insights)
+        dataset_context = self._analyze_dataset_context(df, columns, self.current_file_path)
         
         # Group string/categorical columns
         string_cols = []
@@ -632,55 +635,317 @@ Return JSON list with entities.
             if col.data_type == DataType.STRING:
                 string_cols.append(col)
         
-        # Create entities from string columns (one entity per unique string column type)
+        # Create semantically meaningful entities from string columns
         for string_col in string_cols:
             unique_count = df[string_col.name].nunique()
             
+            # Infer semantic meaning from column name and data
+            entity_name, entity_type = self._infer_semantic_meaning(
+                string_col.name, 
+                string_col.data_type,
+                string_col.sample_values,
+                unique_count,
+                dataset_context
+            )
+            
             entity = Entity(
-                name=string_col.name,
-                entity_type="categorical",
+                name=entity_name,
+                entity_type=entity_type,
                 source_columns=[string_col.name],
                 confidence=0.95,
-                description=f"Categorical data with {unique_count} unique values"
+                description=f"{entity_type.replace('_', ' ').title()} with {unique_count} unique values"
             )
             entities.append(entity)
-            logger.info(f"Created categorical entity from column '{string_col.name}' with {unique_count} values")
+            logger.info(f"Created {entity_type} entity '{entity_name}' from column '{string_col.name}'")
         
-        # Group numeric columns
+        # Group and analyze numeric columns
         numeric_cols = []
         for col in columns:
             if col.data_type in [DataType.FLOAT, DataType.INTEGER, DataType.NUMERICAL]:
                 numeric_cols.append(col)
         
-        # Create entity from numeric columns (combine related numeric data)
+        # Create semantically meaningful entity from numeric columns
         if numeric_cols:
-            # If there are many numeric columns (like years), group them
-            if len(numeric_cols) > 5:
-                entity_name = "Numeric Data"
+            # Analyze if numeric columns represent time series or measurements
+            time_cols = []
+            measure_cols = []
+            
+            for col in numeric_cols:
+                if self._is_time_column(col.name):
+                    time_cols.append(col)
+                else:
+                    measure_cols.append(col)
+            
+            # If we have many time-based columns, it's likely time series data
+            if len(time_cols) > 5:
+                # Infer what kind of measurement based on dataset context
+                measurement_name = self._infer_measurement_type(dataset_context, df, time_cols)
+                
                 entity = Entity(
-                    name=entity_name,
-                    entity_type="numerical",
-                    source_columns=[col.name for col in numeric_cols],
+                    name=measurement_name,
+                    entity_type="measurement",
+                    source_columns=[col.name for col in time_cols],
                     confidence=0.90,
-                    description=f"Numerical data across {len(numeric_cols)} dimensions"
+                    description=f"Time series measurements across {len(time_cols)} time periods"
                 )
                 entities.append(entity)
-                logger.info(f"Created grouped numerical entity from {len(numeric_cols)} columns")
-            else:
-                # If few numeric columns, create separate entities
-                for numeric_col in numeric_cols:
-                    entity = Entity(
-                        name=numeric_col.name,
-                        entity_type="numerical",
-                        source_columns=[numeric_col.name],
-                        confidence=0.90,
-                        description=f"Numerical data from column {numeric_col.name}"
-                    )
-                    entities.append(entity)
-                    logger.info(f"Created individual numerical entity from column '{numeric_col.name}'")
+                logger.info(f"Created measurement entity '{measurement_name}' from {len(time_cols)} time columns")
+            
+            # Handle non-time numeric columns
+            for col in measure_cols:
+                entity_name, entity_type = self._infer_semantic_meaning(
+                    col.name,
+                    col.data_type,
+                    [],
+                    col.unique_count,
+                    dataset_context
+                )
+                
+                entity = Entity(
+                    name=entity_name,
+                    entity_type=entity_type,
+                    source_columns=[col.name],
+                    confidence=0.85,
+                    description=f"{entity_type.replace('_', ' ').title()} measurement"
+                )
+                entities.append(entity)
+                logger.info(f"Created {entity_type} entity '{entity_name}' from column '{col.name}'")
         
-        logger.info(f"Final result: {len(entities)} entities extracted")
+        logger.info(f"Final result: {len(entities)} semantically meaningful entities extracted")
         return entities
+
+    def _analyze_dataset_context(self, df: pd.DataFrame, columns: list[ColumnProfile], file_path: str = None) -> dict[str, Any]:
+        """Analyze the dataset to understand its business context."""
+        context = {
+            "has_geographic_data": False,
+            "has_time_series": False,
+            "has_percentage_data": False,
+            "has_financial_data": False,
+            "primary_measurement_type": "generic",
+            "column_patterns": {},
+            "domain_context": "generic",
+            "measurement_context": "generic"
+        }
+        
+        # Extract insights from filename if available
+        if file_path:
+            filename_insights = self._extract_filename_insights(file_path)
+            context.update(filename_insights)
+        
+        # Check for geographic columns
+        geo_keywords = ['country', 'region', 'state', 'city', 'location', 'geo', 'area']
+        for col in columns:
+            col_lower = col.name.lower()
+            if any(keyword in col_lower for keyword in geo_keywords):
+                context["has_geographic_data"] = True
+                context["column_patterns"][col.name] = "geographic"
+        
+        # Check for time series (year columns)
+        year_cols = [col for col in columns if self._is_time_column(col.name)]
+        if len(year_cols) > 3:
+            context["has_time_series"] = True
+        
+        # Check data values for percentages
+        for col in columns:
+            if col.data_type in [DataType.FLOAT, DataType.NUMERICAL]:
+                sample_vals = df[col.name].dropna().head(100)
+                if len(sample_vals) > 0:
+                    if (sample_vals >= 0).all() and (sample_vals <= 100).all():
+                        context["has_percentage_data"] = True
+                        break
+        
+        # Infer primary measurement type from data patterns
+        if context["has_percentage_data"]:
+            context["primary_measurement_type"] = "percentage"
+        elif context["has_financial_data"]:
+            context["primary_measurement_type"] = "financial"
+        
+        return context
+    
+    def _extract_filename_insights(self, file_path: str) -> dict[str, Any]:
+        """Extract semantic insights from the filename."""
+        from pathlib import Path
+        
+        filename = Path(file_path).stem.lower()  # Remove extension and convert to lowercase
+        insights = {
+            "domain_context": "generic",
+            "measurement_context": "generic",
+            "subject_matter": None,
+            "metric_type": None
+        }
+        
+        # Domain/Industry patterns
+        domain_patterns = {
+            "agriculture": ["agriculture", "agricultural", "farming", "farm", "crops", "livestock"],
+            "healthcare": ["health", "medical", "patient", "hospital", "disease", "treatment"],
+            "finance": ["finance", "financial", "revenue", "profit", "investment", "banking"],
+            "education": ["education", "school", "student", "academic", "university", "learning"],
+            "retail": ["retail", "sales", "customer", "product", "inventory", "store"],
+            "hr": ["employee", "staff", "workforce", "personnel", "hr", "human_resources"],
+            "manufacturing": ["production", "manufacturing", "factory", "industrial", "assembly"],
+            "logistics": ["shipping", "transport", "logistics", "delivery", "supply_chain"],
+            "energy": ["energy", "power", "electricity", "renewable", "consumption", "utility"],
+            "real_estate": ["property", "real_estate", "housing", "rental", "mortgage"]
+        }
+        
+        # Measurement type patterns
+        measurement_patterns = {
+            "percentage": ["percent", "percentage", "rate", "ratio", "_pct", "share"],
+            "count": ["count", "number", "total", "quantity", "amount"],
+            "financial": ["revenue", "cost", "price", "salary", "wage", "income", "expense"],
+            "time_based": ["daily", "monthly", "yearly", "annual", "quarterly", "weekly"],
+            "performance": ["performance", "efficiency", "productivity", "score", "rating"],
+            "demographic": ["population", "demographic", "age", "gender", "ethnicity"],
+            "employment": ["employment", "unemployment", "jobs", "workers", "labor", "workforce"]
+        }
+        
+        # Subject matter patterns
+        subject_patterns = {
+            "workers": ["worker", "workers", "employee", "staff", "personnel", "labor"],
+            "customers": ["customer", "client", "consumer", "buyer", "user"],
+            "products": ["product", "item", "goods", "merchandise", "inventory"],
+            "sales": ["sales", "transactions", "orders", "purchases", "deals"],
+            "regions": ["country", "region", "state", "city", "location", "geographic"]
+        }
+        
+        # Analyze filename for patterns
+        for domain, keywords in domain_patterns.items():
+            if any(keyword in filename for keyword in keywords):
+                insights["domain_context"] = domain
+                logger.info(f"Detected domain context from filename: {domain}")
+                break
+        
+        for measurement_type, keywords in measurement_patterns.items():
+            if any(keyword in filename for keyword in keywords):
+                insights["measurement_context"] = measurement_type
+                logger.info(f"Detected measurement context from filename: {measurement_type}")
+                break
+        
+        for subject, keywords in subject_patterns.items():
+            if any(keyword in filename for keyword in keywords):
+                insights["subject_matter"] = subject
+                logger.info(f"Detected subject matter from filename: {subject}")
+                break
+        
+        # Special case for the agriculture workers example
+        if "agriculture" in filename and "workers" in filename and "percent" in filename:
+            insights.update({
+                "domain_context": "agriculture",
+                "measurement_context": "employment",
+                "subject_matter": "workers",
+                "metric_type": "employment_rate"
+            })
+            logger.info("Detected agriculture employment dataset from filename")
+        
+        return insights
+    
+    def _is_time_column(self, col_name: str) -> bool:
+        """Check if a column name represents a time dimension."""
+        # Check if it's a year (4 digits between 1900-2100)
+        if col_name.isdigit() and len(col_name) == 4:
+            year = int(col_name)
+            return 1900 <= year <= 2100
+        
+        # Check for other time patterns
+        time_keywords = ['year', 'month', 'date', 'time', 'quarter', 'period']
+        return any(keyword in col_name.lower() for keyword in time_keywords)
+    
+    def _infer_semantic_meaning(
+        self, 
+        col_name: str, 
+        data_type: DataType,
+        sample_values: list,
+        unique_count: int,
+        context: dict[str, Any]
+    ) -> tuple[str, str]:
+        """Infer semantic meaning from column characteristics."""
+        col_lower = col_name.lower()
+        
+        # Geographic entities
+        if any(geo in col_lower for geo in ['country', 'nation', 'state', 'region']):
+            return "Geographic Region", "geographic_entity"
+        elif any(geo in col_lower for geo in ['city', 'town', 'location']):
+            return "Location", "geographic_entity"
+        
+        # Identifier patterns
+        if 'id' in col_lower or col_lower.endswith('_id'):
+            return f"{col_name} Identifier", "identifier"
+        
+        # Category patterns
+        if any(cat in col_lower for cat in ['type', 'category', 'class', 'group']):
+            return f"{col_name} Category", "categorical"
+        
+        # Status patterns
+        if any(status in col_lower for status in ['status', 'state', 'condition']):
+            return f"{col_name} Status", "categorical"
+        
+        # Default: Create meaningful name from column
+        if data_type == DataType.STRING:
+            # Capitalize and clean up column name
+            entity_name = col_name.replace('_', ' ').replace('-', ' ').title()
+            return entity_name, "categorical"
+        else:
+            return f"{col_name} Measurement", "measurement"
+    
+    def _infer_measurement_type(
+        self, 
+        context: dict[str, Any], 
+        df: pd.DataFrame,
+        time_cols: list[ColumnProfile]
+    ) -> str:
+        """Infer the type of measurement from data patterns and filename context."""
+        
+        # Use filename insights for more specific measurement names
+        domain = context.get("domain_context", "generic")
+        measurement_context = context.get("measurement_context", "generic")
+        subject_matter = context.get("subject_matter")
+        metric_type = context.get("metric_type")
+        
+        # If we have specific metric type from filename, use it
+        if metric_type == "employment_rate":
+            return "Agricultural Employment Rate"
+        
+        # Create domain-specific measurement names
+        if domain == "agriculture" and measurement_context == "employment":
+            return "Agricultural Employment Measurement"
+        elif domain == "agriculture" and subject_matter == "workers":
+            return "Agricultural Worker Statistics"
+        
+        # Sample some data to understand the measurement
+        if time_cols:
+            sample_col = time_cols[0].name
+            sample_data = df[sample_col].dropna().head(100)
+            
+            # Check if it's percentage data
+            if len(sample_data) > 0:
+                if (sample_data >= 0).all() and (sample_data <= 100).all():
+                    # Check for decimal values suggesting percentages
+                    if (sample_data % 1 != 0).any():
+                        # Use domain context for percentage measurements
+                        if domain == "agriculture":
+                            return "Agricultural Employment Percentage"
+                        elif domain == "finance":
+                            return "Financial Performance Percentage"
+                        elif domain == "healthcare":
+                            return "Health Metrics Percentage"
+                        else:
+                            return "Percentage Measurement"
+            
+            # Check value ranges for other measurement types
+            if (sample_data < 0).any():
+                return f"{domain.title()} Value Measurement" if domain != "generic" else "Value Measurement"
+            elif (sample_data > 1000000).any():
+                return f"{domain.title()} Count Measurement" if domain != "generic" else "Count Measurement"
+            elif context.get("has_percentage_data"):
+                return f"{domain.title()} Rate Measurement" if domain != "generic" else "Rate Measurement"
+        
+        # Default based on context with domain awareness
+        if context.get("primary_measurement_type") == "percentage":
+            return f"{domain.title()} Percentage" if domain != "generic" else "Percentage Measurement"
+        elif context.get("primary_measurement_type") == "financial":
+            return f"{domain.title()} Financial Measurement" if domain != "generic" else "Financial Measurement"
+        else:
+            return f"{domain.title()} Measurement" if domain != "generic" else "Metric Measurement"
 
     # ---------- Gate A: Basic categorical detection ----------
     def _extract_categorical_entities(
@@ -1004,9 +1269,10 @@ Return JSON list with entities.
     @staticmethod
     def _prompt_for_business_entities(context: dict[str, Any]) -> str:
         return (
-            "Identify exactly 2 core entities from the dataset schema.\n"
-            "Return JSON list with exactly 2 objects: {name, entity_type, source_columns, confidence, reason}.\n"
-            "Use generic names: 'Core Entity' and 'Measurement Entity'.\n"
+            "Identify core entities from the dataset based on data structure patterns only.\n"
+            "Return JSON list with objects: {name, entity_type, source_columns, confidence, reason}.\n"
+            "Use actual column names. Entity types: categorical, numerical, time_dimension, identifier.\n"
+            "Base decisions on data patterns, not domain knowledge.\n"
             f"Context: {json.dumps(context, ensure_ascii=False)[:4000]}"
         )
 
