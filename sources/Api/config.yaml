@@ -22,7 +22,7 @@ database:
 
 # Neo4j database configuration
 neo4j:
-  uri: "bolt://localhost:7687"
+  uri: "bolt://localhost:7687"  # Use localhost when running locally, neo4j:7687 when in Docker
   username: "neo4j"
   password: "password"
   database: "neo4j"
@@ -61,7 +61,6 @@ extraction:
 
 # Metadata storage configuration
 metadata_storage:
-  duckdb_path: "./metadata.db"
   cache_enabled: true
   cache_size_mb: 100
   auto_cleanup: true

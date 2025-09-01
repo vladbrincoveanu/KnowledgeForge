@@ -10,7 +10,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-import duckdb
 import numpy as np
 import pandas as pd
 
@@ -34,16 +33,13 @@ class DataProfiler:
     """Profiles CSV datasets to understand structure and content."""
 
     def __init__(
-        self, duckdb_path: Optional[str] = None, cache_dir: Optional[str] = None
+        self, cache_dir: Optional[str] = None
     ):
         """Initialize the data profiler.
 
         Args:
-            duckdb_path: Optional path to DuckDB database file
             cache_dir: Directory for profile caching
         """
-        self.duckdb_path = duckdb_path or ":memory:"
-        self.con = duckdb.connect(self.duckdb_path)
         self.cache_dir = Path(cache_dir) if cache_dir else None
 
         # Regex patterns for common data types
@@ -147,8 +143,8 @@ class DataProfiler:
             # Get file metadata
             file_info = self._get_file_info(file_path)
 
-            # Read dataset with DuckDB for efficient processing
-            df = self._read_csv_with_duckdb(file_path, sample_size)
+            # Read dataset with pandas
+            df = self._read_csv_with_pandas(file_path, sample_size)
 
             # Generate comprehensive column profiles
             columns = []
@@ -202,10 +198,10 @@ class DataProfiler:
             "file_path": str(path.absolute()),
         }
 
-    def _read_csv_with_duckdb(
+    def _read_csv_with_pandas(
         self, file_path: str, sample_size: int = 1000
     ) -> pd.DataFrame:
-        """Read CSV file using DuckDB for efficient processing.
+        """Read CSV file using pandas.
 
         Args:
             file_path: Path to the CSV file
@@ -215,88 +211,19 @@ class DataProfiler:
             Pandas DataFrame with the data
         """
         try:
-            # First, read the headers manually to ensure we get the correct column names
-            with open(file_path, encoding="utf-8") as f:
-                first_line = f.readline().strip()
-                if first_line:
-                    # Parse headers manually and clean them
-                    headers = [
-                        col.strip().strip('"').strip("'")
-                        for col in first_line.split(",")
-                    ]
-                    logger.info(f"Detected headers: {headers}")
+            if sample_size > 0:
+                df = pd.read_csv(file_path, nrows=sample_size)
+            else:
+                df = pd.read_csv(file_path)
 
-                    # Use explicit column names with DuckDB
-                    if sample_size > 0:
-                        query = f"""
-                        SELECT * FROM read_csv_auto('{file_path}',
-                            header=false,
-                            names={headers},
-                            all_varchar=true)
-                        LIMIT {sample_size + 1}
-                        """
-                    else:
-                        query = f"""
-                        SELECT * FROM read_csv_auto('{file_path}',
-                            header=false,
-                            names={headers},
-                            all_varchar=true)
-                        """
-
-                    try:
-                        # Execute query and convert to pandas DataFrame
-                        result = self.con.execute(query)
-                        df = result.df()
-
-                        # Remove the first row (which was the header) since we're not using header=true
-                        if len(df) > 0:
-                            df = df.iloc[1:].reset_index(drop=True)
-
-                        # Verify column names are correct
-                        if list(df.columns) == headers:
-                            logger.info(
-                                f"Successfully read CSV with manual header handling: {len(df)} rows and {len(df.columns)} columns"
-                            )
-                            logger.debug(f"Column names: {df.columns.tolist()}")
-                            return df
-                        else:
-                            logger.warning(
-                                f"Column name mismatch. Expected: {headers}, Got: {list(df.columns)}"
-                            )
-                            raise Exception(
-                                "Column name mismatch in manual header handling"
-                            )
-                    except Exception as db_error:
-                        logger.warning(f"DuckDB query failed: {db_error}")
-                        raise Exception(f"DuckDB failed to read CSV: {db_error}")
-                else:
-                    raise Exception("Could not read CSV headers")
-
-        except Exception as duckdb_error:
-            logger.warning(
-                f"DuckDB reading failed, falling back to pandas: {duckdb_error}"
+            logger.info(
+                f"Successfully read CSV file with pandas: {len(df)} rows and {len(df.columns)} columns"
             )
-            # Fallback to pandas if DuckDB fails
-            try:
-                if sample_size > 0:
-                    df = pd.read_csv(file_path, nrows=sample_size)
-                else:
-                    df = pd.read_csv(file_path)
-
-                logger.info(
-                    f"Successfully read CSV file with pandas: {len(df)} rows and {len(df.columns)} columns"
-                )
-                logger.debug(f"Column names: {df.columns.tolist()}")
-                return df
-            except Exception as pandas_error:
-                logger.error(f"Both DuckDB and pandas failed: {pandas_error}")
-                raise Exception(
-                    f"Failed to read CSV file with both methods: {str(pandas_error)}"
-                )
-
-        except Exception as e:
-            logger.error(f"Error reading CSV file {file_path}: {str(e)}")
-            raise Exception(f"Failed to read CSV file: {str(e)}")
+            logger.debug(f"Column names: {df.columns.tolist()}")
+            return df
+        except Exception as pandas_error:
+            logger.error(f"Failed to read CSV with pandas: {pandas_error}")
+            raise Exception(f"Failed to read CSV: {pandas_error}")
 
     def _profile_column_comprehensive(
         self, df: pd.DataFrame, column_name: str, file_path: str

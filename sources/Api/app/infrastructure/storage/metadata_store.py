@@ -26,11 +26,6 @@ class PostgreSQLMetadataStore:
         """
         self.database_url = database_url
         self.config = config or {}
-        # Handle both dict and Config object
-        if hasattr(self.config, 'metadata_storage'):
-            self.db_path = Path(self.config.metadata_storage.duckdb_path)
-        else:
-            self.db_path = Path(self.config.get("duckdb_path", "metadata.db"))
         
         # Initialize connection pool
         self.connection_pool = None

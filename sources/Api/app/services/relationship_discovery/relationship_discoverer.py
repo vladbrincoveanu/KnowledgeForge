@@ -3,8 +3,6 @@
 import logging
 from collections import defaultdict
 from typing import Any, Optional
-
-import duckdb
 import networkx as nx
 from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer

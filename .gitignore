@@ -128,3 +128,7 @@ yarn-debug.log*
 yarn-error.log*
 .npm
 .yarn-integrity 
+
+# Uploaded files
+uploads/
+

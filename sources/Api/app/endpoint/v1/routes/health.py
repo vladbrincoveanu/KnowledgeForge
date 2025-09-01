@@ -21,21 +21,25 @@ router = APIRouter(prefix="/health", tags=["health"])
 def get_neo4j_manager():
     """Get Neo4j manager instance."""
     config = get_config()
-    return Neo4jGraphManager(
+    manager = Neo4jGraphManager(
         uri=config.neo4j.uri,
         username=config.neo4j.username,
         password=config.neo4j.password,
         database=config.neo4j.database,
+        encrypted=config.neo4j.encrypted,
     )
+    # Connect immediately to ensure the connection is established
+    manager.connect()
+    return manager
 
 
 def get_llm_manager():
     """Get LLM manager instance."""
     config = get_config()
     return LLMManager(
-        base_url=config.lmstudio.base_url,
-        model_name=config.lmstudio.model_name,
-        timeout=config.lmstudio.timeout,
+        lmstudio_url=config.lmstudio.base_url,
+        default_model=config.lmstudio.model_name,
+        max_retries=getattr(config.lmstudio, 'max_retries', 3),
     )
 
 
@@ -56,8 +60,8 @@ async def health_check(
         # Check Neo4j connection
         neo4j_status = "healthy"
         try:
-            with neo4j_manager:
-                result = neo4j_manager.driver.run("RETURN 1 as test")
+            with neo4j_manager.driver.session(database=neo4j_manager.database) as session:
+                result = session.run("RETURN 1 as test")
                 result.single()
         except Exception as e:
             neo4j_status = f"unhealthy: {str(e)}"
@@ -127,9 +131,10 @@ async def readiness_check(
 
         # Check Neo4j
         try:
-            with neo4j_manager:
-                neo4j_manager.driver.run("RETURN 1 as test")
-                ready_checks.append("neo4j")
+            with neo4j_manager.driver.session(database=neo4j_manager.database) as session:
+                result = session.run("RETURN 1 as test")
+                result.single()
+            ready_checks.append("neo4j")
         except Exception as e:
             logger.warning(f"Neo4j not ready: {e}")
 
@@ -194,19 +199,18 @@ async def get_system_metrics(
 
         # Neo4j metrics
         try:
-            with neo4j_manager:
-                # Get graph statistics
-                graph_stats = neo4j_manager.get_graph_statistics()
-                system_metrics.update(
-                    {
-                        "total_nodes": graph_stats.get("total_nodes", 0),
-                        "total_relationships": graph_stats.get(
-                            "total_relationships", 0
-                        ),
-                        "database_size_mb": graph_stats.get("database_size_mb", 0),
-                        "index_count": graph_stats.get("index_count", 0),
-                    }
-                )
+            # Get graph statistics
+            graph_stats = neo4j_manager.get_graph_statistics()
+            system_metrics.update(
+                {
+                    "total_nodes": graph_stats.get("total_nodes", 0),
+                    "total_relationships": graph_stats.get(
+                        "total_relationships", 0
+                    ),
+                    "database_size_mb": graph_stats.get("database_size_mb", 0),
+                    "index_count": graph_stats.get("index_count", 0),
+                }
+            )
         except Exception as e:
             logger.warning(f"Could not get Neo4j metrics: {e}")
 
@@ -272,19 +276,18 @@ async def detailed_health_check(
 
         # Neo4j detailed check
         try:
-            with neo4j_manager:
-                # Check connection pool
-                pool_info = neo4j_manager.driver._pool
-                detailed_status["neo4j"] = {
-                    "status": "healthy",
-                    "connection_pool_size": (
-                        pool_info.size if hasattr(pool_info, "size") else "unknown"
-                    ),
-                    "active_connections": (
-                        pool_info.in_use if hasattr(pool_info, "in_use") else "unknown"
-                    ),
-                    "database_version": "unknown",  # Would get from actual query
-                }
+            # Check connection pool
+            pool_info = neo4j_manager.driver._pool
+            detailed_status["neo4j"] = {
+                "status": "healthy",
+                "connection_pool_size": (
+                    pool_info.size if hasattr(pool_info, "size") else "unknown"
+                ),
+                "active_connections": (
+                    pool_info.in_use if hasattr(pool_info, "in_use") else "unknown"
+                ),
+                "database_version": "unknown",  # Would get from actual query
+            }
         except Exception as e:
             detailed_status["neo4j"] = {"status": "unhealthy", "error": str(e)}
 

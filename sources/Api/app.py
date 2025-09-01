@@ -57,9 +57,9 @@ app.add_middleware(
 try:
     from app.endpoint.v1.routes import data, extraction, health, websocket
 
-    app.include_router(health.router, prefix="/api/v1")
+    app.include_router(health.router, prefix="/api/v1/health")
     app.include_router(data.router, prefix="/api/v1")
-    app.include_router(extraction.router, prefix="/api/v1")
+    app.include_router(extraction.router, prefix="/api/v1/extract")
     app.include_router(websocket.router)  # WebSocket doesn't need prefix
 
     logging.info("All route modules loaded successfully")

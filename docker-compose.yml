@@ -10,7 +10,6 @@ services:
       - NEO4J_dbms_memory_heap_max__size=2G
       - NEO4J_dbms_memory_pagecache_size=1G
       - NEO4J_dbms_connector_bolt_enabled=true
-      - NEO4J_dbms_connector_bolt_tls__enabled=false
       - NEO4J_dbms_connector_bolt_advertised__address=localhost
       - NEO4J_server_config_strict__validation_enabled=false
       - NEO4J_dbms_connector_bolt_listen__address=0.0.0.0:7687
@@ -29,100 +28,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
-  # MongoDB Database
-  mongodb:
-    image: mongo:7.0
-    container_name: knowledgeforge-mongodb
-    restart: unless-stopped
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: knowlly123
-      MONGO_INITDB_DATABASE: knowlly_data
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
-    networks:
-      - knowledgeforge-network
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # Redis Cache
-  redis:
-    image: redis:7-alpine
-    container_name: knowledgeforge-redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - knowledgeforge-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # MinIO Object Storage
-  minio:
-    image: minio/minio:latest
-    container_name: knowledgeforge-minio
-    restart: unless-stopped
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: knowlly123
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - minio_data:/data
-    networks:
-      - knowledgeforge-network
-    command: server /data --console-address ":9001"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # MongoDB Express (Web-based admin interface)
-  mongo-express:
-    image: mongo-express:1.0.0
-    container_name: knowledgeforge-mongo-express
-    restart: unless-stopped
-    environment:
-      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
-      ME_CONFIG_MONGODB_ADMINPASSWORD: knowlly123
-      ME_CONFIG_MONGODB_URL: mongodb://admin:knowlly123@mongodb:27017/
-      ME_CONFIG_BASICAUTH_USERNAME: admin
-      ME_CONFIG_BASICAUTH_PASSWORD: knowlly123
-    ports:
-      - "8081:8081"
-    depends_on:
-      mongodb:
-        condition: service_healthy
-    networks:
-      - knowledgeforge-network
-
-  # Redis Commander (Web-based Redis admin)
-  redis-commander:
-    image: rediscommander/redis-commander:latest
-    container_name: knowledgeforge-redis-commander
-    restart: unless-stopped
-    environment:
-      - REDIS_HOSTS=local:redis:6379
-    ports:
-      - "8082:8081"
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - knowledgeforge-network
 
   # PostgreSQL Database
   postgres:
@@ -167,17 +72,10 @@ services:
       - DATABASE_PASSWORD=knowledgeforge123
       - DATABASE_URL=postgresql://knowledgeforge:knowledgeforge123@postgres:5432/knowledgeforge
       # Neo4j Configuration
-      - ONTOLOGY_NEO4J__URI=bolt://neo4j:7687
-      - ONTOLOGY_NEO4J__USERNAME=neo4j
-      - ONTOLOGY_NEO4J__PASSWORD=password
-      # MongoDB Configuration
-      - MONGODB_URI=mongodb://admin:knowlly123@mongodb:27017/knowlly_data?authSource=admin
-      # Redis Configuration
-      - REDIS_URL=redis://redis:6379
-      # MinIO Configuration
-      - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=knowlly123
+      - KF_NEO4J__URI=bolt://neo4j:7687
+      - KF_NEO4J__USERNAME=neo4j
+      - KF_NEO4J__PASSWORD=password
+      - KF_NEO4J__ENCRYPTED=false
       # LM Studio Configuration (connects to host machine)
       - ONTOLOGY_LMSTUDIO__BASE_URL=http://host.docker.internal:1234
       - ONTOLOGY_LMSTUDIO__MODEL_NAME=llama2
@@ -197,12 +95,6 @@ services:
       postgres:
         condition: service_healthy
       neo4j:
-        condition: service_healthy
-      mongodb:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      minio:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -254,12 +146,6 @@ volumes:
   neo4j_import:
     driver: local
   neo4j_plugins:
-    driver: local
-  mongodb_data:
-    driver: local
-  redis_data:
-    driver: local
-  minio_data:
     driver: local
   portainer_data:
     driver: local

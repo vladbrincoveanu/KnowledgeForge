@@ -88,14 +88,25 @@ class Neo4jGraphManager:
     def connect(self) -> bool:
         """Connect to Neo4j with connection pooling."""
         try:
-            # Create driver with connection pooling
-            self.driver = GraphDatabase.driver(
-                self.uri,
-                auth=(self.username, self.password),
-                max_connection_pool_size=self.max_connection_pool_size,
-                connection_timeout=self.connection_timeout,
-                encrypted=self.encrypted,
-            )
+            # Create driver with explicit encryption settings
+            if self.encrypted:
+                self.driver = GraphDatabase.driver(
+                    self.uri,
+                    auth=(self.username, self.password),
+                    max_connection_pool_size=self.max_connection_pool_size,
+                    connection_timeout=self.connection_timeout,
+                    encrypted=True,
+                    trust="TRUST_SYSTEM_CA_SIGNED_CERTIFICATES"
+                )
+            else:
+                # For unencrypted connections
+                self.driver = GraphDatabase.driver(
+                    self.uri,
+                    auth=(self.username, self.password),
+                    max_connection_pool_size=self.max_connection_pool_size,
+                    connection_timeout=self.connection_timeout,
+                    encrypted=False
+                )
 
             # Test connection and initialize schema
             with self.driver.session(database=self.database) as session:
@@ -256,6 +267,14 @@ class Neo4jGraphManager:
         transaction_id: Optional[str] = None,
     ) -> bool:
         """Store entity with comprehensive metadata using MERGE operations."""
+        # Try to connect if not already connected
+        if not self.driver:
+            logger.info("No driver found, attempting to connect to Neo4j...")
+            if not self.connect():
+                logger.error("Cannot store entity: failed to connect to database")
+                return False
+        
+        # Double-check connection
         if not self.is_connected():
             logger.error("Cannot store entity: not connected to database")
             return False
@@ -264,6 +283,8 @@ class Neo4jGraphManager:
 
         query = """
         MERGE (e:Entity {id: $entity_id})
+        ON CREATE SET e.created_at = $created_at
+        ON MATCH SET e.updated_at = $updated_at
         SET e.name = $name,
             e.entity_type = $entity_type,
             e.confidence = $confidence,
@@ -273,9 +294,7 @@ class Neo4jGraphManager:
             e.source_file = $source_file,
             e.extraction_timestamp = $extraction_timestamp,
             e.version = $version,
-            e.lineage = $lineage,
-            e.updated_at = $updated_at
-        ON CREATE SET e.created_at = $created_at
+            e.lineage = $lineage
         """
 
         params = {
@@ -292,6 +311,7 @@ class Neo4jGraphManager:
             "lineage": lineage or "unknown",
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat(),
+
         }
 
         try:
@@ -335,13 +355,13 @@ class Neo4jGraphManager:
         MATCH (source:Entity {id: $source_id})
         MATCH (target:Entity {id: $target_id})
         MERGE (source)-[r:RELATES_TO {id: $rel_id}]->(target)
+        ON CREATE SET r.created_at = $created_at
+        ON MATCH SET r.updated_at = $updated_at
         SET r.type = $rel_type,
             r.confidence = $confidence,
             r.attributes = $attributes,
             r.discovered_at = $discovered_at,
-            r.evidence = $evidence,
-            r.updated_at = $updated_at
-        ON CREATE SET r.created_at = $created_at
+            r.evidence = $evidence
         """
 
         params = {
@@ -853,19 +873,28 @@ class Neo4jGraphManager:
             logger.error(f"Failed to refresh materialized view '{view_name}': {e}")
             return False
 
-    def get_entities(self, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
+    def get_entities(self, limit: int = 100, offset: int = 0, task_id: Optional[str] = None) -> list[dict[str, Any]]:
         """Get all entities from the graph database."""
         query = """
         MATCH (e:Entity)
+        """
+        params = {"limit": limit, "offset": offset}
+        
+        # Add task_id filter if provided (filter by ID prefix)
+        if task_id:
+            query += " WHERE e.id STARTS WITH $task_id_prefix"
+            params["task_id_prefix"] = f"{task_id}_"
+        
+        query += """
         RETURN e.id as id, e.name as name, e.entity_type as entity_type,
                e.confidence as confidence, e.attributes as attributes
         ORDER BY e.name
-        LIMIT $limit SKIP $offset
+        SKIP $offset LIMIT $limit
         """
 
         try:
             with self.driver.session(database=self.database) as session:
-                result = session.run(query, {"limit": limit, "offset": offset})
+                result = session.run(query, params)
                 entities = []
                 for record in result:
                     entity = {
@@ -883,8 +912,28 @@ class Neo4jGraphManager:
             logger.error(f"Failed to get entities: {e}")
             return []
 
+    def count_entities(self, task_id: Optional[str] = None) -> int:
+        """Count total entities in the graph database."""
+        query = "MATCH (e:Entity)"
+        params = {}
+        
+        # Add task_id filter if provided (filter by ID prefix)
+        if task_id:
+            query += " WHERE e.id STARTS WITH $task_id_prefix"
+            params["task_id_prefix"] = f"{task_id}_"
+        
+        query += " RETURN count(e) as count"
+        
+        try:
+            with self.driver.session(database=self.database) as session:
+                result = session.run(query, params)
+                return result.single()["count"]
+        except Exception as e:
+            logger.error(f"Failed to count entities: {e}")
+            return 0
+
     def get_relationships(
-        self, limit: int = 100, offset: int = 0
+        self, limit: int = 100, offset: int = 0, task_id: Optional[str] = None
     ) -> list[dict[str, Any]]:
         """Get all relationships from the graph database."""
         query = """
@@ -901,12 +950,12 @@ class Neo4jGraphManager:
                source.name as source_entity, target.name as target_entity,
                r.attributes as attributes
         ORDER BY r.relationship_type
-        LIMIT $limit SKIP $offset
+        SKIP $offset LIMIT $limit
         """
 
         try:
             with self.driver.session(database=self.database) as session:
-                result = session.run(query, {"limit": limit, "offset": offset})
+                result = session.run(query, params)
                 relationships = []
                 for record in result:
                     rel = {
@@ -925,6 +974,29 @@ class Neo4jGraphManager:
             logger.error(f"Failed to get relationships: {e}")
             return []
 
+    def count_rels(self, task_id: Optional[str] = None) -> int:
+        """Count total relationships in the graph database."""
+        query = "MATCH ()-[r:RELATES_TO]->()"
+        params = {}
+        
+        if task_id:
+            query += " WHERE r.task_id = $task_id"
+            params["task_id"] = task_id
+        
+        query += " RETURN count(r) as count"
+        
+        try:
+            with self.driver.session(database=self.database) as session:
+                result = session.run(query, params)
+                return result.single()["count"]
+        except Exception as e:
+            logger.error(f"Failed to count relationships: {e}")
+            return 0
+
+    def count_relationships(self, task_id: Optional[str] = None) -> int:
+        """Alias for count_rels for backward compatibility."""
+        return self.count_rels(task_id)
+
     def get_graph_statistics(self) -> dict[str, Any]:
         """Get basic statistics about the graph database."""
         stats = {
@@ -933,6 +1005,10 @@ class Neo4jGraphManager:
             "database_size_mb": 0,
             "index_count": 0,
         }
+
+        if not self.is_connected():
+            logger.error("Cannot get graph statistics: not connected to database")
+            return stats
 
         try:
             with self.driver.session(database=self.database) as session:
@@ -1145,3 +1221,59 @@ class Neo4jGraphManager:
             import traceback
             logger.error(f"  Full traceback: {traceback.format_exc()}")
             return False
+
+    def get_graph_visualization_data(self, task_id: str) -> dict[str, Any]:
+        """Get graph data for visualization purposes."""
+        try:
+            with self.driver.session(database=self.database) as session:
+                # Get entities for the task (filter by ID prefix)
+                entities_query = """
+                MATCH (e:Entity)
+                WHERE e.id STARTS WITH $task_id_prefix
+                RETURN e.id as id, e.name as name, e.entity_type as entity_type,
+                       e.confidence as confidence
+                """
+                
+                entities_result = session.run(entities_query, {"task_id_prefix": f"{task_id}_"})
+                entities = [dict(record) for record in entities_result]
+                
+                # Get relationships for the task (filter by ID prefix)
+                relationships_query = """
+                MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity)
+                WHERE source.id STARTS WITH $task_id_prefix AND target.id STARTS WITH $task_id_prefix
+                RETURN r.id as id, r.relationship_type as type,
+                       source.id as source_id, target.id as target_id,
+                       r.confidence as confidence
+                """
+                
+                relationships_result = session.run(relationships_query, {"task_id_prefix": f"{task_id}_"})
+                relationships = [dict(record) for record in relationships_result]
+                
+                # Generate basic Cypher queries for visualization
+                cypher_queries = [
+                    f"MATCH (e:Entity) WHERE e.task_id = '{task_id}' RETURN e",
+                    f"MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity) WHERE source.task_id = '{task_id}' RETURN source, r, target"
+                ]
+                
+                return {
+                    "entity_count": len(entities),
+                    "relationship_count": len(relationships),
+                    "node_count": len(entities),
+                    "edge_count": len(relationships),
+                    "cypher_queries": cypher_queries,
+                    "graph_structure": {
+                        "entities": entities,
+                        "relationships": relationships
+                    }
+                }
+                
+        except Exception as e:
+            logger.error(f"Failed to get graph visualization data: {e}")
+            return {
+                "entity_count": 0,
+                "relationship_count": 0,
+                "node_count": 0,
+                "edge_count": 0,
+                "cypher_queries": [],
+                "graph_structure": {"entities": [], "relationships": []}
+            }

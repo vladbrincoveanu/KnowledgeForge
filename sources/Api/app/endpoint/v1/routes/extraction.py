@@ -11,13 +11,12 @@ from pydantic import BaseModel, Field
 
 from app.domain.models.entities import DatasetProfile, Entity, Relationship
 from app.infrastructure.graph.neo4j_manager import Neo4jGraphManager
-from app.infrastructure.storage.metadata_store import (
-    PostgreSQLMetadataStore as MetadataStore,
-)
+from app.infrastructure.storage.metadata_store import PostgreSQLMetadataStore as MetadataStore
 
 # Import actual backend services
 from app.services.entity_extraction.entity_extractor import EntityExtractor
 from app.services.ontology_mapping.ontology_mapper import OntologyMapper
+from app.services.relationship_discovery.relationship_discoverer import RelationshipDiscoverer
 from utils.config import get_config
 
 logger = logging.getLogger(__name__)
@@ -62,12 +61,14 @@ class ExtractionTask:
 # In-memory task storage (replace with Redis/database in production)
 extraction_tasks: dict[str, ExtractionTask] = {}
 
-router = APIRouter(prefix="/extract", tags=["extraction"])
+router = APIRouter(tags=["extraction"])
 
 
 # Dependency injection
 def get_entity_extractor():
     """Get entity extractor instance."""
+
+    
     config = get_config()
     
     # Create LLM manager for enhanced entity extraction
@@ -105,18 +106,22 @@ def get_ontology_mapper():
 def get_neo4j_manager():
     """Get Neo4j manager instance."""
     config = get_config()
-    return Neo4jGraphManager(
+    manager = Neo4jGraphManager(
         uri=config.neo4j.uri,
         username=config.neo4j.username,
         password=config.neo4j.password,
         database=config.neo4j.database,
+        encrypted=config.neo4j.encrypted,
     )
+    # Connect immediately to ensure the connection is established
+    manager.connect()
+    return manager
 
 
 def get_metadata_store():
     """Get metadata store instance."""
     config = get_config()
-    return MetadataStore(config=config.dict() if hasattr(config, 'dict') else config)
+    return MetadataStore(config=config)
 
 
 @router.post("/upload", response_model=dict[str, Any])
@@ -187,6 +192,36 @@ async def upload_csv_file(
         raise HTTPException(status_code=500, detail=f"Failed to upload file: {str(e)}")
 
 
+@router.get("/tasks")
+async def list_extraction_tasks():
+    """List all extraction tasks and their status."""
+    try:
+        tasks_summary = []
+        for task_id, task in extraction_tasks.items():
+            tasks_summary.append({
+                "task_id": task_id,
+                "status": task.status,
+                "progress": task.progress,
+                "created_at": task.created_at.isoformat(),
+                "completed_at": task.completed_at.isoformat() if task.completed_at else None,
+                "entities_count": len(task.entities),
+                "relationships_count": len(task.relationships),
+                "has_errors": len(task.errors) > 0,
+            })
+        
+        return {
+            "tasks": tasks_summary,
+            "total_tasks": len(tasks_summary),
+            "timestamp": datetime.now().isoformat(),
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to list extraction tasks: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to list extraction tasks: {str(e)}"
+        )
+
+
 @router.post("/", response_model=ExtractionResponse)
 async def extract_ontology(
     request: ExtractionRequest,
@@ -243,6 +278,7 @@ async def extract_ontology(
         )
 
 
+
 async def run_extraction_pipeline(
     task_id: str,
     file_path: str,
@@ -293,6 +329,15 @@ async def run_extraction_pipeline(
         logger.info(f"Storing results in Neo4j for task {task_id}")
         logger.info(f"About to store {len(entities)} entities and {len(relationships)} relationships")
         
+        # Assign task-specific IDs to entities before storage
+        for entity in entities:
+            if entity.id:
+                # Prefix existing ID with task_id
+                entity.id = f"{task_id}_{entity.id}"
+            else:
+                # Generate new ID with task_id prefix
+                entity.id = f"{task_id}_entity_{hash(entity.name) % 100000}"
+        
         # Debug: Log entity details before storage
         if entities:
             logger.info("Entity details before storage:")
@@ -305,7 +350,7 @@ async def run_extraction_pipeline(
             logger.warning("No entities to store!")
         
         try:
-            await store_in_neo4j(entities, relationships, neo4j_manager)
+            await store_in_neo4j(entities, relationships, neo4j_manager, task_id)
             logger.info("Neo4j storage completed successfully")
         except Exception as e:
             logger.error(f"Neo4j storage failed: {e}")
@@ -414,10 +459,12 @@ async def extract_entities(
 ) -> list[Entity]:
     """Extract entities from the dataset."""
     config = extraction_config or {}
+
     # Use the actual entity extractor
     entities = entity_extractor.extract_entities(
         file_path=file_path, columns=dataset_profile.columns, config=config
     )
+
     return entities
 
 
@@ -449,28 +496,38 @@ async def store_in_neo4j(
     entities: list[Entity],
     relationships: list[Relationship],
     neo4j_manager: Neo4jGraphManager,
+    task_id: str,
 ):
     """Store extracted entities and relationships in Neo4j."""
     logger.info(f"Starting Neo4j storage for {len(entities)} entities and {len(relationships)} relationships")
     
     try:
-        with neo4j_manager:
-            logger.info("Neo4j manager context entered successfully")
-            
-            # Store entities
-            for entity in entities:
-                neo4j_manager.store_entity_with_metadata(
-                    entity=entity,
-                    source_file="extraction_pipeline",  # Could be parameterized
-                    extraction_timestamp=datetime.now(),
-                )
+        # Connect to Neo4j without using context manager to avoid closing the connection
+        neo4j_manager.connect()
+        logger.info("Neo4j manager connected successfully")
+        
+        # Store entities
+        for entity in entities:
+            success = neo4j_manager.store_entity_with_metadata(
+                entity=entity,
+                source_file="extraction_pipeline",  # Could be parameterized
+                extraction_timestamp=datetime.now(),
+            )
+            if success:
+                logger.info(f"Successfully stored entity: {getattr(entity, 'name', 'NO_NAME')}")
+            else:
+                logger.error(f"Failed to store entity: {getattr(entity, 'name', 'NO_NAME')}")
 
-            # Store relationships
-            for relationship in relationships:
-                neo4j_manager.store_relationship_with_metadata(
-                    relationship=relationship,
-                    discovered_at=datetime.now(),
-                )
+        # Store relationships
+        for relationship in relationships:
+            success = neo4j_manager.store_relationship_with_metadata(
+                relationship=relationship,
+                discovered_at=datetime.now(),
+            )
+            if success:
+                logger.info(f"Successfully stored relationship: {getattr(relationship, 'id', 'NO_ID')}")
+            else:
+                logger.error(f"Failed to store relationship: {getattr(relationship, 'id', 'NO_ID')}")
 
     except Exception as e:
         logger.error(f"Failed to store in Neo4j: {e}")

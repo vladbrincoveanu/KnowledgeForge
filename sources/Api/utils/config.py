@@ -25,7 +25,7 @@ class Neo4jConfig(BaseModel):
     connection_timeout: int = Field(
         default=30, ge=1, description="Connection timeout in seconds"
     )
-    encrypted: bool = Field(default=True, description="Use encrypted connections")
+    encrypted: bool = Field(default=False, description="Use encrypted connections")
 
     @validator("uri")
     def validate_uri(cls, v):
@@ -112,9 +112,6 @@ class ExtractionConfig(BaseModel):
 class MetadataStorageConfig(BaseModel):
     """Metadata storage configuration."""
 
-    duckdb_path: str = Field(
-        default="./metadata.db", description="DuckDB database path"
-    )
     cache_enabled: bool = Field(default=True, description="Enable metadata caching")
     cache_size_mb: int = Field(
         default=100, ge=1, le=1000, description="Cache size in MB"

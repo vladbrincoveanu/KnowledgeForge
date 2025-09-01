@@ -25,13 +25,15 @@ help:
 # Install dependencies
 install:
 	@echo "Installing Python dependencies..."
-	pip install -r requirements.txt
+	python3 -m venv ../venv || echo "Virtual environment already exists"
+	source ../venv/bin/activate && python3 -m pip install -r requirements.txt
 	@echo "✅ Dependencies installed"
 
 # Run tests
 test:
 	@echo "Running API tests..."
-	python test_api.py
+	@echo "Activating virtual environment and running pipeline tests..."
+	source ../venv/bin/activate && pytest tests/test_pipeline.py -v
 	@echo "✅ Tests completed"
 
 # Run API locally

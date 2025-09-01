@@ -15,9 +15,9 @@ help:
 	@echo "  make logs       - View logs from all services"
 	@echo "  make status     - Show status of all services"
 	@echo "  make install    - Install dependencies for API and UI"
-	@echo "  make test       - Run API tests only"
+	@echo "  make test-api   - Run API tests only (unit + pipeline)"
 	@echo "  make e2e        - Run end-to-end tests"
-	@echo "  make tests      - Run all tests (API, UI, E2E)"
+	@echo "  make tests      - Run all tests (API unit + pipeline + UI + E2E)"
 	@echo "  make build      - Build all projects with quality checks (format, lint, compile)"
 	@echo "  make build-docker - Build Docker images only"
 	@echo "  make fix        - Fix code formatting and linting issues (API: black, UI: fix-all)"
@@ -92,7 +92,7 @@ install:
 	@echo "📦 Installing dependencies..."
 	@echo "Installing API dependencies..."
 	cd sources && python3 -m venv venv || echo "Virtual environment already exists"
-	cd sources && source venv/bin/activate && python3 -m pip install -r api/requirements.txt
+	cd sources && source venv/bin/activate && pip install -r api/requirements.txt
 	@echo "Installing UI dependencies..."
 	cd sources/ui && npm install
 	@echo "✅ Installation complete!"
@@ -127,10 +127,13 @@ build-docker:
 	docker-compose build
 	@echo "✅ Docker build complete!"
 
-# Run API tests only
+# Run API tests only (including pipeline test)
 test:
 	@echo "🧪 Running API tests..."
+	@echo "📋 Running API unit tests..."
 	cd sources && source venv/bin/activate && cd api && python3 -m pytest tests/ -v
+	@echo "📋 Running API pipeline integration test..."
+	cd sources && source venv/bin/activate && cd api && python tests/test_pipeline.py
 	@echo "✅ API tests completed!"
 
 # Run end-to-end tests
@@ -141,10 +144,13 @@ e2e:
 
 # Run all tests (API, UI, E2E)
 tests:
-	@echo "🧪 Running all tests..."
+	@echo "🧪 Running comprehensive test suite..."
 	@echo ""
-	@echo "📋 Running API tests..."
+	@echo "📋 Running API unit tests..."
 	cd sources && source venv/bin/activate && cd api && python3 -m pytest tests/ -v
+	@echo ""
+	@echo "📋 Running API pipeline integration test..."
+	cd sources && source venv/bin/activate && cd api && python tests/test_pipeline.py
 	@echo ""
 	@echo "📋 Running UI tests..."
 	cd sources/ui && npm run test
@@ -152,7 +158,7 @@ tests:
 	@echo "📋 Running E2E tests..."
 	cd sources/e2e && source ../venv/bin/activate && ./run_tests.sh --verbose
 	@echo ""
-	@echo "✅ All tests completed!"
+	@echo "✅ All tests completed successfully!"
 
 # Start API only (local development)
 api-only:
