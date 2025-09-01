@@ -1,7 +1,6 @@
 """Data access endpoints for entities, relationships, and graph visualization."""
 
 import logging
-import uuid
 from datetime import datetime
 from typing import Optional
 
@@ -85,15 +84,12 @@ async def list_relationships(
     """List discovered relationships with pagination."""
     try:
         # Use actual Neo4j manager to retrieve relationships
-        # TODO: Fix the get_relationships method issue
-        # relationships = neo4j_manager.get_relationships(
-        #     limit=limit, offset=offset, task_id=task_id
-        # )
-        relationships = []  # Temporary fix
+        relationships = neo4j_manager.get_relationships(
+            limit=limit, offset=offset, task_id=task_id
+        )
 
-        # Get total count for pagination FIRST using wrapper method
-        # TODO: Fix the count_relationships method issue
-        total_count = len(relationships)  # Temporary fix
+        # Get total count for pagination using the proper count_relationships method
+        total_count = neo4j_manager.count_relationships(task_id=task_id)
 
         return {
             "relationships": [rel.dict() for rel in relationships],
