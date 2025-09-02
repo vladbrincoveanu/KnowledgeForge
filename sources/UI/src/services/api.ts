@@ -40,7 +40,7 @@ interface Relationship {
 }
 
 interface PaginatedResponse<T> {
-b  items?: T[];
+  items?: T[];
   entities?: T[];
   relationships?: T[];
   total?: number;
