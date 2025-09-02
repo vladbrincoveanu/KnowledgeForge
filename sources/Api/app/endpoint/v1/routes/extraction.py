@@ -1,5 +1,6 @@
 """Ontology extraction endpoints."""
 
+import hashlib
 import logging
 import uuid
 from datetime import datetime, timedelta
@@ -124,6 +125,39 @@ def get_metadata_store():
     return MetadataStore(config=config)
 
 
+def get_relationship_discoverer():
+    """Get relationship discoverer instance."""
+    from app.infrastructure.llm.llm_manager import LLMManager
+    
+    config = get_config()
+    llm_manager = None
+    metadata_store = None
+    
+    # Initialize LLM manager if configured
+    if hasattr(config, 'llm') and config.llm.enabled:
+        try:
+            llm_manager = LLMManager(
+                base_url=config.llm.base_url,
+                api_key=config.llm.api_key,
+                model=config.llm.model,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to initialize LLM manager: {e}")
+    
+    # Initialize metadata store for PostgreSQL access
+    try:
+        metadata_store = MetadataStore(config=config)
+    except Exception as e:
+        logger.warning(f"Failed to initialize metadata store: {e}")
+    
+    return RelationshipDiscoverer(
+        llm_manager=llm_manager,
+        use_sbert=True,  # Enable SBERT for semantic similarity
+        cache_dir=None,  # Use default cache directory
+        metadata_store=metadata_store,
+    )
+
+
 @router.post("/upload", response_model=dict[str, Any])
 async def upload_csv_file(
     file: UploadFile = File(...),
@@ -230,6 +264,7 @@ async def extract_ontology(
     ontology_mapper: OntologyMapper = Depends(get_ontology_mapper),
     neo4j_manager: Neo4jGraphManager = Depends(get_neo4j_manager),
     metadata_store: MetadataStore = Depends(get_metadata_store),
+    relationship_discoverer: RelationshipDiscoverer = Depends(get_relationship_discoverer),
 ):
     """
     Process CSV file and extract ontology.
@@ -261,6 +296,7 @@ async def extract_ontology(
             ontology_mapper,
             neo4j_manager,
             metadata_store,
+            relationship_discoverer,
         )
 
         return ExtractionResponse(
@@ -287,6 +323,7 @@ async def run_extraction_pipeline(
     ontology_mapper: OntologyMapper,
     neo4j_manager: Neo4jGraphManager,
     metadata_store: MetadataStore,
+    relationship_discoverer: RelationshipDiscoverer,
 ):
     """Run the complete extraction pipeline in the background."""
     task = extraction_tasks.get(task_id)
@@ -313,7 +350,7 @@ async def run_extraction_pipeline(
         # Step 3: Discover relationships
         logger.info(f"Discovering relationships for task {task_id}")
         relationships = await discover_relationships(
-            entities, extraction_config, neo4j_manager
+            entities, extraction_config, neo4j_manager, relationship_discoverer, file_path, dataset_profile.columns
         )
         task.relationships = relationships
         task.progress = 0.7
@@ -329,14 +366,19 @@ async def run_extraction_pipeline(
         logger.info(f"Storing results in Neo4j for task {task_id}")
         logger.info(f"About to store {len(entities)} entities and {len(relationships)} relationships")
         
-        # Assign task-specific IDs to entities before storage
+        # Ensure all entities have deterministic IDs (no task ID prefixing to avoid duplicates)
         for entity in entities:
-            if entity.id:
-                # Prefix existing ID with task_id
-                entity.id = f"{task_id}_{entity.id}"
-            else:
-                # Generate new ID with task_id prefix
-                entity.id = f"{task_id}_entity_{hash(entity.name) % 100000}"
+            if not entity.id:
+                # Generate deterministic ID based on entity content
+                content = f"{entity.name}_{entity.entity_type}_{','.join(sorted(entity.source_columns))}"
+                entity.id = f"entity_{hashlib.sha256(content.encode('utf-8')).hexdigest()[:12]}"
+        
+        # Ensure all relationships have deterministic IDs
+        for relationship in relationships:
+            if not relationship.id:
+                # Generate deterministic ID based on relationship content
+                content = f"{relationship.source_entity_id}_{relationship.target_entity_id}_{relationship.relationship_type}"
+                relationship.id = f"rel_{hashlib.sha256(content.encode('utf-8')).hexdigest()[:12]}"
         
         # Debug: Log entity details before storage
         if entities:
@@ -485,11 +527,29 @@ async def discover_relationships(
     entities: list[Entity],
     extraction_config: Optional[dict[str, Any]],
     neo4j_manager: Neo4jGraphManager,
+    relationship_discoverer: RelationshipDiscoverer,
+    file_path: str,
+    columns: list,
 ) -> list[Relationship]:
     """Discover relationships between entities."""
-    # This would use your relationship discovery service
-    # For now, return empty list
-    return []
+    logger.info(f"Starting relationship discovery for {len(entities)} entities")
+    
+    try:
+        # Use the relationship discoverer to find relationships
+        relationships = relationship_discoverer.discover_relationships(
+            file_path=file_path,
+            entities=entities,
+            columns=columns,
+            config=extraction_config or {},
+        )
+        
+        logger.info(f"Discovered {len(relationships)} relationships")
+        return relationships
+        
+    except Exception as e:
+        logger.error(f"Error during relationship discovery: {e}")
+        # Return empty list on error to not break the pipeline
+        return []
 
 
 async def store_in_neo4j(

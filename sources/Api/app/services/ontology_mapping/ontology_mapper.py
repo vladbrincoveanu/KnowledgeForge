@@ -1,5 +1,6 @@
 """Ontology mapping module for mapping extracted entities to standard ontologies."""
 
+import hashlib
 import json
 import logging
 from datetime import datetime
@@ -297,7 +298,9 @@ class OntologyMapper:
         for i, entity in enumerate(entities):
             if entity.id is None or entity.id == "":
                 # Create a stable ID based on entity name and index
-                entity.id = f"entity_{i}_{abs(hash(str(entity.name))) % 1000000}"
+                # Generate deterministic ID based on entity content
+                content = f"{entity.name}_{entity.entity_type}_{','.join(sorted(entity.source_columns))}"
+                entity.id = f"entity_{hashlib.sha256(content.encode('utf-8')).hexdigest()[:12]}"
 
         # Map each entity
         for i, entity in enumerate(entities):

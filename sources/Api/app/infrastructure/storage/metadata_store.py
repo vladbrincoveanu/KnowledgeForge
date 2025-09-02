@@ -53,8 +53,8 @@ class PostgreSQLMetadataStore:
                         host=self.config.get("host", "localhost"),
                         port=self.config.get("port", 5432),
                         database=self.config.get("database", "knowledgeforge"),
-                        user=self.config.get("user", "postgres"),
-                        password=self.config.get("password", "password")
+                        user=self.config.get("user", "knowledgeforge"),
+                        password=self.config.get("password", "knowledgeforge123")
                     )
             logger.info("PostgreSQL connection pool initialized successfully")
         except Exception as e:

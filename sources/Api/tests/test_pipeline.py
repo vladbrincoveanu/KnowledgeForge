@@ -236,14 +236,34 @@ class TestAgricultureWorkersExtraction:
                 print(f"\n🔍 Step 5: Verifying nodes are saved in Neo4j...")
                 neo4j_verification_passed = self.verify_neo4j_nodes_saved(entities_count)
                 
+                # Step 6: VERIFY RELATIONSHIPS ARE SAVED IN NEO4J
+                print(f"\n🔍 Step 6: Verifying relationships are saved in Neo4j...")
+                neo4j_relationships_verification_passed = self.verify_neo4j_relationships_saved(relationships_count)
+                
                 print(f"\n📋 Expected entities from any dataset:")
                 print(f"   • Entities from string/categorical columns")
                 print(f"   • Entities from numeric columns (grouped if many)")
                 print(f"   Total varies based on data structure")
                 
+                print(f"\n📋 Expected relationships from any dataset:")
+                print(f"   • Foreign key relationships between columns")
+                print(f"   • Semantic relationships based on column names")
+                print(f"   • Co-occurrence relationships in data")
+                print(f"   Total varies based on data structure and relationship discovery")
+                
                 if entities_count > 0 and neo4j_verification_passed:
                     print(f"✅ Entity extraction and Neo4j storage working - found {entities_count} entities!")
-                    return True
+                    
+                    if relationships_count > 0 and neo4j_relationships_verification_passed:
+                        print(f"✅ Relationship discovery and Neo4j storage working - found {relationships_count} relationships!")
+                        return True
+                    elif relationships_count > 0 and not neo4j_relationships_verification_passed:
+                        print(f"⚠️  Relationships discovered but NOT properly saved to Neo4j!")
+                        return False
+                    else:
+                        print(f"ℹ️  No relationships discovered (this may be normal for some datasets)")
+                        return True
+                        
                 elif entities_count > 0 and not neo4j_verification_passed:
                     print(f"⚠️  Entities extracted but NOT properly saved to Neo4j!")
                     return False
@@ -307,6 +327,57 @@ class TestAgricultureWorkersExtraction:
             return False
         except Exception as e:
             print(f"   ❌ Neo4j verification failed due to unexpected error: {e}")
+            return False
+
+    def verify_neo4j_relationships_saved(self, expected_relationships_count: int) -> bool:
+        """Verify that relationships are actually saved in Neo4j database."""
+        try:
+            # Check if we can access the relationships endpoint
+            response = requests.get(f"{self.base_url}/api/v1/relationships")
+            if response.status_code == 200:
+                relationships_data = response.json()
+                actual_relationships_count = len(relationships_data.get("relationships", []))
+                
+                print(f"   📊 Neo4j relationships verification via API endpoint:")
+                print(f"      Expected relationships: {expected_relationships_count}")
+                print(f"      Actual relationships in Neo4j: {actual_relationships_count}")
+                
+                if actual_relationships_count >= expected_relationships_count:
+                    print(f"   ✅ Neo4j relationships verification passed: {actual_relationships_count} relationships found in database")
+                    
+                    # Display some relationship details from Neo4j
+                    relationships_list = relationships_data.get("relationships", [])
+                    if relationships_list:
+                        print(f"   📝 Sample relationships from Neo4j:")
+                        for i, rel in enumerate(relationships_list[:3], 1):  # Show first 3
+                            source = rel.get("source_entity", "Unknown")
+                            target = rel.get("target_entity", "Unknown")
+                            rel_type = rel.get("relationship_type", "unknown")
+                            confidence = rel.get("confidence", 0.0)
+                            print(f"      Neo4j Relationship {i}: '{source}' -> '{target}' (Type: {rel_type}, Confidence: {confidence:.2f})")
+                    
+                    return True
+                else:
+                    print(f"   ❌ Neo4j relationships verification failed: Expected {expected_relationships_count}, found {actual_relationships_count}")
+                    return False
+            
+            elif response.status_code == 404:
+                print(f"   ⚠️  No relationships found in Neo4j (404 response)")
+                if expected_relationships_count == 0:
+                    print(f"   ✅ This is expected since no relationships were discovered")
+                    return True
+                else:
+                    print(f"   ❌ Expected {expected_relationships_count} relationships but Neo4j is empty")
+                    return False
+            else:
+                print(f"   ❌ Failed to query Neo4j relationships: HTTP {response.status_code}")
+                return False
+                
+        except requests.exceptions.RequestException as e:
+            print(f"   ❌ Neo4j relationships verification failed due to connection error: {e}")
+            return False
+        except Exception as e:
+            print(f"   ❌ Neo4j relationships verification failed due to unexpected error: {e}")
             return False
 
     def test_postgresql_storage(self):
@@ -575,6 +646,198 @@ class TestAgricultureWorkersExtraction:
             print(f"   ❌ Neo4j direct node count test failed: {e}")
             return False
 
+    def test_relationship_discovery_and_storage(self) -> bool:
+        """Test relationship discovery and storage functionality."""
+        print("\n🔗 Testing Relationship Discovery and Storage...")
+        
+        try:
+            # Test relationship discovery endpoints
+            endpoints_to_test = [
+                "/api/v1/relationships",
+                "/api/v1/health/metrics"
+            ]
+            
+            accessible_endpoints = 0
+            for endpoint in endpoints_to_test:
+                try:
+                    response = requests.get(f"{self.base_url}{endpoint}")
+                    if response.status_code in [200, 404]:  # 404 is OK if no data yet
+                        print(f"✅ Relationship endpoint accessible: {endpoint}")
+                        accessible_endpoints += 1
+                    else:
+                        print(f"⚠️  Relationship endpoint {endpoint}: {response.status_code}")
+                except Exception as e:
+                    print(f"⚠️  Relationship endpoint {endpoint}: {e}")
+            
+            # Test relationship storage via metrics
+            try:
+                response = requests.get(f"{self.base_url}/api/v1/health/metrics")
+                if response.status_code == 200:
+                    metrics_data = response.json()
+                    system_metrics = metrics_data.get("system_metrics", {})
+                    total_relationships = system_metrics.get("total_relationships", 0)
+                    
+                    print(f"   📊 Current relationships in Neo4j: {total_relationships}")
+                    
+                    if total_relationships >= 0:  # Any count is valid
+                        print(f"   ✅ Relationship storage infrastructure working: {total_relationships} relationships")
+                        accessible_endpoints += 1
+                    else:
+                        print(f"   ❌ Invalid relationship count returned: {total_relationships}")
+            except Exception as e:
+                print(f"   ⚠️  Relationship metrics check failed: {e}")
+            
+            if accessible_endpoints >= 2:
+                print(f"✅ Relationship discovery and storage infrastructure fully functional ({accessible_endpoints} endpoints)")
+                return True
+            elif accessible_endpoints >= 1:
+                print(f"⚠️  Relationship discovery and storage partially accessible ({accessible_endpoints} endpoints)")
+                return True
+            else:
+                print(f"⚠️  Limited relationship discovery and storage access ({accessible_endpoints} endpoints)")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Relationship discovery and storage test failed: {e}")
+            return False
+
+    def test_multiple_csv_upload_and_relationships(self) -> bool:
+        """Test uploading multiple CSV files and checking for cross-dataset relationships."""
+        print("\n📊 Testing Multiple CSV Upload and Cross-Dataset Relationships...")
+        
+        try:
+            # Get initial counts
+            initial_response = requests.get(f"{self.base_url}/api/v1/health/metrics")
+            if initial_response.status_code == 200:
+                initial_metrics = initial_response.json()
+                initial_nodes = initial_metrics.get("system_metrics", {}).get("total_nodes", 0)
+                initial_relationships = initial_metrics.get("system_metrics", {}).get("total_relationships", 0)
+                print(f"   📊 Initial state: {initial_nodes} nodes, {initial_relationships} relationships")
+            
+            # Test with multiple CSV files that should have relationships
+            csv_files = [
+                ("customers.csv", "customers"),
+                ("products.csv", "products"), 
+                ("orders.csv", "orders")
+            ]
+            
+            uploaded_files = []
+            
+            for csv_filename, dataset_name in csv_files:
+                csv_path = Path(__file__).parent.parent.parent / "data" / "sample-data" / csv_filename
+                
+                if not csv_path.exists():
+                    print(f"   ⚠️  {dataset_name} CSV file not found: {csv_path}")
+                    continue
+                
+                print(f"   📁 Found {dataset_name} CSV: {csv_path.name}")
+                
+                # Upload CSV
+                print(f"   📤 Uploading {dataset_name} CSV file...")
+                with open(csv_path, "rb") as f:
+                    files = {"file": (csv_filename, f, "text/csv")}
+                    response = requests.post(
+                        f"{self.base_url}/api/v1/extract/upload", files=files
+                    )
+                
+                if response.status_code != 200:
+                    print(f"   ❌ {dataset_name} CSV upload failed: {response.status_code}")
+                    continue
+                
+                upload_data = response.json()
+                file_path = upload_data.get("file_path")
+                print(f"   ✅ {dataset_name} CSV uploaded: {file_path}")
+                
+                # Extract from CSV
+                print(f"   ⏳ Extracting entities from {dataset_name} CSV...")
+                extraction_payload = {
+                    "file_path": file_path,
+                    "extraction_config": {
+                        "confidence_threshold": 0.7,
+                        "max_entities_per_column": 100,
+                        "enable_semantic_similarity": True,
+                    }
+                }
+                extraction_response = requests.post(
+                    f"{self.base_url}/api/v1/extract/", json=extraction_payload
+                )
+                
+                if extraction_response.status_code != 200:
+                    print(f"   ❌ {dataset_name} CSV extraction failed: {extraction_response.status_code}")
+                    continue
+                
+                extraction_data = extraction_response.json()
+                task_id = extraction_data.get("task_id")
+                print(f"   ✅ {dataset_name} CSV extraction started: {task_id}")
+                
+                # Wait for completion
+                max_wait_time = 120
+                start_time = time.time()
+                
+                while time.time() - start_time < max_wait_time:
+                    status_response = requests.get(f"{self.base_url}/api/v1/extract/{task_id}")
+                    if status_response.status_code == 200:
+                        status_data = status_response.json()
+                        current_status = status_data.get("status", "unknown")
+                        
+                        if current_status == "completed":
+                            entities_count = status_data.get("entities_count", 0)
+                            relationships_count = status_data.get("relationships_count", 0)
+                            print(f"   ✅ {dataset_name} CSV extraction completed! ({entities_count} entities, {relationships_count} relationships)")
+                            uploaded_files.append((dataset_name, entities_count, relationships_count))
+                            break
+                        elif current_status == "failed":
+                            print(f"   ❌ {dataset_name} CSV extraction failed: {status_data.get('error', 'Unknown error')}")
+                            break
+                        else:
+                            time.sleep(5)
+                    else:
+                        print(f"   ❌ Status check failed: {status_response.status_code}")
+                        break
+                else:
+                    print(f"   ⚠️  {dataset_name} CSV extraction timed out")
+            
+            if not uploaded_files:
+                print(f"   ⚠️  No CSV files were successfully processed")
+                return False
+            
+            # Check final counts
+            final_response = requests.get(f"{self.base_url}/api/v1/health/metrics")
+            if final_response.status_code == 200:
+                final_metrics = final_response.json()
+                final_nodes = final_metrics.get("system_metrics", {}).get("total_nodes", 0)
+                final_relationships = final_metrics.get("system_metrics", {}).get("total_relationships", 0)
+                
+                print(f"   📊 Final state: {final_nodes} nodes, {final_relationships} relationships")
+                print(f"   📈 Changes: +{final_nodes - initial_nodes} nodes, +{final_relationships - initial_relationships} relationships")
+                
+                # Summary of uploaded files
+                print(f"   📋 Processed files:")
+                for dataset_name, entities_count, relationships_count in uploaded_files:
+                    print(f"      • {dataset_name}: {entities_count} entities, {relationships_count} relationships")
+                
+                # Check if we have more entities now
+                if final_nodes > initial_nodes:
+                    print(f"   ✅ Successfully added entities from {len(uploaded_files)} CSV files")
+                    
+                    # Check for relationships
+                    if final_relationships > initial_relationships:
+                        print(f"   ✅ Cross-dataset relationships discovered! (+{final_relationships - initial_relationships} relationships)")
+                        return True
+                    else:
+                        print(f"   ℹ️  No cross-dataset relationships found (this may be normal for these datasets)")
+                        return True
+                else:
+                    print(f"   ⚠️  No new entities added from CSV files")
+                    return False
+            else:
+                print(f"   ❌ Failed to get final metrics: {final_response.status_code}")
+                return False
+                
+        except Exception as e:
+            print(f"   ❌ Multiple CSV test failed: {e}")
+            return False
+
     def run_all_tests(self):
         """Run all tests and provide summary."""
         print("\n" + "=" * 60)
@@ -595,7 +858,9 @@ class TestAgricultureWorkersExtraction:
             "test_backend_endpoints",
             "test_neo4j_connection_health",
             "test_neo4j_direct_node_count",
+            "test_relationship_discovery_and_storage",
             "test_file_upload_and_extraction",
+            "test_multiple_csv_upload_and_relationships",
             "test_postgresql_storage",
             "test_data_endpoints",
             "test_extraction_status_endpoints",

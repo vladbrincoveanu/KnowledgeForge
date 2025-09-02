@@ -92,7 +92,7 @@ async def list_relationships(
         total_count = neo4j_manager.count_relationships(task_id=task_id)
 
         return {
-            "relationships": [rel.dict() for rel in relationships],
+            "relationships": relationships,
             "total_count": total_count,
             "discovery_metadata": {
                 "limit": limit,

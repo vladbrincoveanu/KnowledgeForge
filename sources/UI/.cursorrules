@@ -108,6 +108,12 @@
 - Test accessibility with screen reader simulation
 - Implement integration tests for critical user flows
 - Maintain high test coverage for business logic
+- **MANDATORY: Always run UI tests after any UI changes**
+- **MANDATORY: Always run test_pipeline.py after any API changes**
+- Use `make tests` command to run all tests (not `npm test` directly)
+- The 'npm run check-all' command should also run tests after any changes to UI files
+- Tests are located in @/Tests folder and new tests should only be created there
+- Integration tests should test basic browser functionalities to verify an OK status
 
 ## Build & Development
 - Use Vite for fast development and optimized builds
@@ -176,3 +182,15 @@
 - Use kebab-case for CSS files and assets
 - Keep component and test files co-located
 - Use descriptive file names that reflect functionality
+
+## Project Workflow & Testing Requirements
+- **ALWAYS run UI tests after making UI changes**
+- **ALWAYS run test_pipeline.py after making API changes**
+- Use the project's Makefile for all commands (single top-level Makefile preferred)
+- The 'npm run check-all' command should also run tests after any changes to UI files
+- Never send connection test successful messages to the main Telegram channel
+- Project .gitignore should ignore config.json; only config.default.json is allowed to be committed
+- Always verify that UI components render correctly and handle user interactions properly
+- Test both component functionality and integration with backend APIs
+- Verify UI responsiveness and accessibility compliance
+- Run comprehensive testing including unit tests, integration tests, and visual regression tests

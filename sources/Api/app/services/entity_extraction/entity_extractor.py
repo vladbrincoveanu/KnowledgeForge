@@ -60,6 +60,7 @@ def _hash_file(path: str | Path) -> str:
 # ---------------------------------------
 # Main Extractor with three-gate pipeline
 # ---------------------------------------
+
 def _safe_config_get(config, key, default=None):
     """Safely get configuration value from either dict or Config object."""
     if hasattr(config, 'get'):
@@ -84,6 +85,12 @@ class EntityExtractor:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.llm_manager = llm_manager
         self.embeddings = embeddings_manager
+
+    def _generate_entity_id(self, entity: Entity) -> str:
+        """Generate a deterministic ID for an entity based on its content."""
+        # Create a stable hash based on entity properties
+        content = f"{entity.name}_{entity.entity_type}_{','.join(sorted(entity.source_columns))}"
+        return f"entity_{_stable_hash_text(content)[:12]}"
 
     # ---------- public API ----------
     def extract_entities(
@@ -460,15 +467,15 @@ Return JSON array with entities.
         for t, rx in checks:
             r = ratio(rx)
             if r >= 0.70:  # strong validator
-                out.append(
-                    Entity(
-                        name=column.name,
-                        entity_type=t,
-                        source_columns=[column.name],
-                        confidence=float(r),
-                        description=f"Validated as {t} by pattern checks",
-                    )
+                entity = Entity(
+                    name=column.name,
+                    entity_type=t,
+                    source_columns=[column.name],
+                    confidence=float(r),
+                    description=f"Validated as {t} by pattern checks",
                 )
+                entity.id = self._generate_entity_id(entity)
+                out.append(entity)
         return out
 
     # ---------- Gate A: ID/sequential/uniqueness ----------
@@ -503,25 +510,25 @@ Return JSON array with entities.
         id_prior = ("id" in name_lower) or (name_lower.endswith("_id"))
 
         if ur >= 0.98 and (monotonic or id_prior):
-            out.append(
-                Entity(
-                    name=column.name,
-                    entity_type="sequential_id" if monotonic else "identifier",
-                    source_columns=[column.name],
-                    confidence=float(min(1.0, 0.7 + 0.3 * ur)),
-                    description="High uniqueness; ID/name prior/sequence detected",
-                )
+            entity = Entity(
+                name=column.name,
+                entity_type="sequential_id" if monotonic else "identifier",
+                source_columns=[column.name],
+                confidence=float(min(1.0, 0.7 + 0.3 * ur)),
+                description="High uniqueness; ID/name prior/sequence detected",
             )
+            entity.id = self._generate_entity_id(entity)
+            out.append(entity)
         elif ur >= 0.95 or loose_ratio >= 0.7:
-            out.append(
-                Entity(
-                    name=column.name,
-                    entity_type="identifier",
-                    source_columns=[column.name],
-                    confidence=float(max(0.70, min(0.95, ur))),
-                    description="High uniqueness suggests identifier",
-                )
+            entity = Entity(
+                name=column.name,
+                entity_type="identifier",
+                source_columns=[column.name],
+                confidence=float(max(0.70, min(0.95, ur))),
+                description="High uniqueness suggests identifier",
             )
+            entity.id = self._generate_entity_id(entity)
+            out.append(entity)
         return out
 
     # ---------- Gate A: other patterns (percent/latlon/year) ----------
@@ -569,38 +576,38 @@ Return JSON array with entities.
 
         pr = pct_ratio()
         if pr >= 0.80:
-            out.append(
-                Entity(
-                    name=column.name,
-                    entity_type="measurement",
-                    source_columns=[column.name],
-                    confidence=float(pr),
-                    description="Percentage measurement (0–100%)",
-                )
+            entity = Entity(
+                name=column.name,
+                entity_type="measurement",
+                source_columns=[column.name],
+                confidence=float(pr),
+                description="Percentage measurement (0–100%)",
             )
+            entity.id = self._generate_entity_id(entity)
+            out.append(entity)
 
         latr = latlon_ratio("lat")
         lonr = latlon_ratio("lon")
         if latr >= 0.80:
-            out.append(
-                Entity(
-                    name=column.name,
-                    entity_type="location_latitude",
-                    source_columns=[column.name],
-                    confidence=float(latr),
-                    description="Latitude values",
-                )
+            entity = Entity(
+                name=column.name,
+                entity_type="location_latitude",
+                source_columns=[column.name],
+                confidence=float(latr),
+                description="Latitude values",
             )
+            entity.id = self._generate_entity_id(entity)
+            out.append(entity)
         if lonr >= 0.80:
-            out.append(
-                Entity(
-                    name=column.name,
-                    entity_type="location_longitude",
-                    source_columns=[column.name],
-                    confidence=float(lonr),
-                    description="Longitude values",
-                )
+            entity = Entity(
+                name=column.name,
+                entity_type="location_longitude",
+                source_columns=[column.name],
+                confidence=float(lonr),
+                description="Longitude values",
             )
+            entity.id = self._generate_entity_id(entity)
+            out.append(entity)
 
         yr = year_ratio()
         # Check if column name is a year (4-digit number 1900-2100)
@@ -608,15 +615,15 @@ Return JSON array with entities.
                          1900 <= int(column.name) <= 2100)
         
         if yr >= 0.90 or is_year_column or any(k in column.name.lower() for k in ("year", "yr")):
-            out.append(
-                Entity(
-                    name=column.name,
-                    entity_type="time_dimension",
-                    source_columns=[column.name],
-                    confidence=float(max(0.7, yr)) if yr > 0 else 0.9,
-                    description="Year-like time dimension",
-                )
+            entity = Entity(
+                name=column.name,
+                entity_type="time_dimension",
+                source_columns=[column.name],
+                confidence=float(max(0.7, yr)) if yr > 0 else 0.9,
+                description="Year-like time dimension",
             )
+            entity.id = self._generate_entity_id(entity)
+            out.append(entity)
         return out
 
     # ---------- Generic Two-Entity Extraction ----------
@@ -655,6 +662,7 @@ Return JSON array with entities.
                 confidence=0.95,
                 description=f"{entity_type.replace('_', ' ').title()} with {unique_count} unique values"
             )
+            entity.id = self._generate_entity_id(entity)
             entities.append(entity)
             logger.info(f"Created {entity_type} entity '{entity_name}' from column '{string_col.name}'")
         
@@ -688,6 +696,7 @@ Return JSON array with entities.
                     confidence=0.90,
                     description=f"Time series measurements across {len(time_cols)} time periods"
                 )
+                entity.id = self._generate_entity_id(entity)
                 entities.append(entity)
                 logger.info(f"Created measurement entity '{measurement_name}' from {len(time_cols)} time columns")
             
@@ -708,6 +717,7 @@ Return JSON array with entities.
                     confidence=0.85,
                     description=f"{entity_type.replace('_', ' ').title()} measurement"
                 )
+                entity.id = self._generate_entity_id(entity)
                 entities.append(entity)
                 logger.info(f"Created {entity_type} entity '{entity_name}' from column '{col.name}'")
         

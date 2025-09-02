@@ -946,10 +946,10 @@ class Neo4jGraphManager:
             params['task_id'] = task_id
         
         query += """
-        RETURN r.id as id, r.relationship_type as type, r.confidence as confidence,
+        RETURN r.id as id, r.type as type, r.confidence as confidence,
                source.name as source_entity, target.name as target_entity,
                r.attributes as attributes
-        ORDER BY r.relationship_type
+        ORDER BY r.type
         SKIP $offset LIMIT $limit
         """
 

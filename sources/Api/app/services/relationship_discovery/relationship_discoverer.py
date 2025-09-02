@@ -1,8 +1,10 @@
 """Relationship discovery module for finding connections between entities."""
 
+import hashlib
 import logging
 from collections import defaultdict
 from typing import Any, Optional
+import pandas as pd
 import networkx as nx
 from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -34,6 +36,7 @@ class RelationshipDiscoverer:
         llm_manager: Optional[LLMManager] = None,
         use_sbert: bool = True,
         cache_dir: Optional[str] = None,
+        metadata_store=None,
     ):
         """Initialize the relationship discoverer.
 
@@ -41,9 +44,10 @@ class RelationshipDiscoverer:
             llm_manager: Optional LLM manager for semantic analysis
             use_sbert: Whether to use SBERT embeddings for similarity
             cache_dir: Directory for caching embeddings
+            metadata_store: PostgreSQL metadata store for data analysis
         """
         self.llm_manager = llm_manager
-        self.con = duckdb.connect(":memory:")
+        self.metadata_store = metadata_store
         self.use_sbert = use_sbert
         self.cache_dir = cache_dir
 
@@ -59,11 +63,6 @@ class RelationshipDiscoverer:
 
         # Relationship type patterns
         self.relationship_patterns = self._initialize_relationship_patterns()
-
-    def __del__(self):
-        """Clean up database connection."""
-        if hasattr(self, "con"):
-            self.con.close()
 
     def _initialize_relationship_patterns(self) -> dict[str, list[str]]:
         """Initialize patterns for common relationship types."""
@@ -100,7 +99,9 @@ class RelationshipDiscoverer:
         for i, entity in enumerate(entities):
             if entity.id is None or entity.id == "":
                 # Create a stable ID based on entity name and index
-                entity.id = f"entity_{i}_{abs(hash(str(entity.name))) % 1000000}"
+                # Generate deterministic ID based on entity content
+                content = f"{entity.name}_{entity.entity_type}_{','.join(sorted(entity.source_columns))}"
+                entity.id = f"entity_{hashlib.sha256(content.encode('utf-8')).hexdigest()[:12]}"
 
         relationships = []
 
@@ -210,99 +211,82 @@ class RelationshipDiscoverer:
                     ]
                     logger.debug(f"Detected headers: {headers}")
 
+                    # Load CSV data for analysis using pandas
+                    df = pd.read_csv(file_path)
+                    
                     # Check if the provided column names are valid
-                    if col1.name not in headers or col2.name not in headers:
+                    if col1.name not in df.columns or col2.name not in df.columns:
                         logger.warning(
                             f"Column names not found in CSV: {col1.name}, {col2.name}"
                         )
                         return []
 
-                    # Get unique values from both columns using explicit column names
-                    query = f"""
-                    SELECT
-                        COUNT(DISTINCT "{col1.name}") as unique_col1,
-                        COUNT(DISTINCT "{col2.name}") as unique_col2,
-                        COUNT(*) as total_rows
-                    FROM read_csv_auto('{file_path}', header=false, names={headers}, all_varchar=true)
-                    WHERE "{col1.name}" IS NOT NULL AND "{col2.name}" IS NOT NULL
-                    """
-
-            stats = self.con.execute(query).fetchone()
-            if not stats:
-                return []
-
-            unique_col1, unique_col2, total_rows = stats
+                    # Remove null values and get statistics
+                    df_clean = df[[col1.name, col2.name]].dropna()
+                    
+                    if len(df_clean) == 0:
+                        return []
+                    
+                    unique_col1 = df_clean[col1.name].nunique()
+                    unique_col2 = df_clean[col2.name].nunique()
+                    total_rows = len(df_clean)
 
             # Check for foreign key patterns
             if unique_col1 > 0 and unique_col2 > 0:
-                # Calculate overlap percentage
-                overlap_query = f"""
-                SELECT COUNT(*) as overlap_count
-                FROM (
-                    SELECT DISTINCT "{col1.name}" as val1
-                    FROM read_csv_auto('{file_path}', header=false, names={headers}, all_varchar=true)
-                    WHERE "{col1.name}" IS NOT NULL
-                ) t1
-                JOIN (
-                    SELECT DISTINCT "{col2.name}" as val2
-                    FROM read_csv_auto('{file_path}', header=false, names={headers}, all_varchar=true)
-                    WHERE "{col2.name}" IS NOT NULL
-                ) t2 ON t1.val1 = t2.val2
-                """
+                # Calculate overlap percentage using pandas
+                unique_vals_col1 = set(df_clean[col1.name].unique())
+                unique_vals_col2 = set(df_clean[col2.name].unique())
+                overlap_count = len(unique_vals_col1.intersection(unique_vals_col2))
+                overlap_percentage = overlap_count / min(unique_col1, unique_col2)
 
-                overlap_result = self.con.execute(overlap_query).fetchone()
-                if overlap_result:
-                    overlap_count = overlap_result[0]
-                    overlap_percentage = overlap_count / min(unique_col1, unique_col2)
+                # Determine relationship direction and type
+                if overlap_percentage >= _safe_config_get(config, "fk_overlap_threshold", 0.8):
+                    if unique_col1 <= unique_col2:
+                        source_col, target_col = col1, col2
+                        relationship_type = "references"
+                    else:
+                        source_col, target_col = col2, col1
+                        relationship_type = "is_referenced_by"
 
-                    # Determine relationship direction and type
-                    if overlap_percentage >= _safe_config_get(config, "fk_overlap_threshold", 0.8):
-                        if unique_col1 <= unique_col2:
-                            source_col, target_col = col1, col2
-                            relationship_type = "references"
-                        else:
-                            source_col, target_col = col2, col1
-                            relationship_type = "is_referenced_by"
+                    # Calculate confidence based on overlap and data characteristics
+                    confidence = self._calculate_fk_confidence(
+                        overlap_percentage, unique_col1, unique_col2, total_rows
+                    )
 
-                        # Calculate confidence based on overlap and data characteristics
-                        confidence = self._calculate_fk_confidence(
-                            overlap_percentage, unique_col1, unique_col2, total_rows
+                    if confidence >= _safe_config_get(config, "relationship_threshold", 0.6):
+                        # Find representative entities
+                        source_entity = self._find_representative_entity(
+                            source_col, entity_columns
+                        )
+                        target_entity = self._find_representative_entity(
+                            target_col, entity_columns
                         )
 
-                        if confidence >= _safe_config_get(config, "relationship_threshold", 0.6):
-                            # Find representative entities
-                            source_entity = self._find_representative_entity(
-                                source_col, entity_columns
-                            )
-                            target_entity = self._find_representative_entity(
-                                target_col, entity_columns
+                        if source_entity and target_entity:
+                            # Get sample evidence
+                            evidence = self._get_fk_evidence(
+                                file_path, source_col, target_col
                             )
 
-                            if source_entity and target_entity:
-                                # Get sample evidence
-                                evidence = self._get_fk_evidence(
-                                    file_path, source_col, target_col
-                                )
-
-                                relationship = Relationship(
-                                    id=f"fk_{source_entity.id}_{target_entity.id}_{hash(relationship_type)}",
-                                    source_entity_id=source_entity.id,
-                                    target_entity_id=target_entity.id,
-                                    relationship_type=relationship_type,
-                                    attributes={
-                                        "overlap_percentage": overlap_percentage,
-                                        "overlap_count": overlap_count,
-                                        "source_column": source_col.name,
-                                        "target_column": target_col.name,
-                                        "unique_source_values": unique_col1,
-                                        "unique_target_values": unique_col2,
-                                        "evidence": evidence,
-                                        "extraction_method": "foreign_key_analysis",
-                                    },
-                                    confidence=confidence,
-                                    source_columns=[source_col.name, target_col.name],
-                                )
-                                relationships.append(relationship)
+                            relationship = Relationship(
+                                id=f"fk_{source_entity.id}_{target_entity.id}_{hash(relationship_type)}",
+                                source_entity_id=source_entity.id,
+                                target_entity_id=target_entity.id,
+                                relationship_type=relationship_type,
+                                attributes={
+                                    "overlap_percentage": overlap_percentage,
+                                    "overlap_count": overlap_count,
+                                    "source_column": source_col.name,
+                                    "target_column": target_col.name,
+                                    "unique_source_values": unique_col1,
+                                    "unique_target_values": unique_col2,
+                                    "evidence": evidence,
+                                    "extraction_method": "foreign_key_analysis",
+                                },
+                                confidence=confidence,
+                                source_columns=[source_col.name, target_col.name],
+                            )
+                            relationships.append(relationship)
 
         except Exception as e:
             logger.warning(f"Error analyzing foreign key candidate: {e}")
@@ -356,48 +340,30 @@ class RelationshipDiscoverer:
     ) -> list[dict[str, Any]]:
         """Get sample evidence for foreign key relationship."""
         try:
-            # Get the actual column names from the CSV
-            with open(file_path, encoding="utf-8") as f:
-                first_line = f.readline().strip()
-                if first_line:
-                    headers = [
-                        col.strip().strip('"').strip("'")
-                        for col in first_line.split(",")
-                    ]
+            # Load CSV data using pandas
+            df = pd.read_csv(file_path)
+            
+            # Check if the provided column names are valid
+            if source_col.name not in df.columns or target_col.name not in df.columns:
+                logger.warning(
+                    f"Column names not found in CSV: {source_col.name}, {target_col.name}"
+                )
+                return []
 
-                    # Check if the provided column names are valid
-                    if source_col.name not in headers or target_col.name not in headers:
-                        logger.warning(
-                            f"Column names not found in CSV: {source_col.name}, {target_col.name}"
-                        )
-                        return []
+            # Get sample evidence (up to 5 rows)
+            df_clean = df[[source_col.name, target_col.name]].dropna()
+            df_sample = df_clean.head(5)
+            
+            evidence = []
+            for _, row in df_sample.iterrows():
+                evidence.append(
+                    {
+                        "source_value": str(row[source_col.name]),
+                        "target_value": str(row[target_col.name]),
+                    }
+                )
 
-                    query = f"""
-                    SELECT DISTINCT "{source_col.name}", "{target_col.name}"
-                    FROM read_csv_auto('{file_path}', header=false, names={headers}, all_varchar=true)
-                    WHERE "{source_col.name}" IS NOT NULL AND "{target_col.name}" IS NOT NULL
-                    LIMIT 5
-                    """
-
-                    try:
-                        df = self.con.execute(query).df()
-                        evidence = []
-
-                        for _, row in df.iterrows():
-                            evidence.append(
-                                {
-                                    "source_value": str(row[source_col.name]),
-                                    "target_value": str(row[target_col.name]),
-                                }
-                            )
-
-                        return evidence
-                    except Exception as db_error:
-                        logger.warning(f"DuckDB query failed: {db_error}")
-                        return []
-                else:
-                    logger.warning("Could not read CSV headers")
-                    return []
+            return evidence
 
         except Exception as e:
             logger.warning(f"Error getting FK evidence: {e}")
@@ -612,52 +578,31 @@ class RelationshipDiscoverer:
     ) -> list[dict[str, Any]]:
         """Get sample data for LLM relationship analysis."""
         try:
-            # First, let's get the actual column names from the CSV using the same approach as profiler
-            with open(file_path, encoding="utf-8") as f:
-                first_line = f.readline().strip()
-                if first_line:
-                    # Parse headers manually and clean them
-                    headers = [
-                        col.strip().strip('"').strip("'")
-                        for col in first_line.split(",")
-                    ]
-                    logger.debug(f"Detected headers: {headers}")
+            # Load CSV data using pandas
+            df = pd.read_csv(file_path)
+            
+            # Check if the provided column names are valid
+            if col1_name not in df.columns or col2_name not in df.columns:
+                logger.warning(
+                    f"Column names not found in CSV: {col1_name}, {col2_name}"
+                )
+                logger.info(f"Available columns: {list(df.columns)}")
+                return []
 
-                    # Check if the provided column names are valid
-                    if col1_name not in headers or col2_name not in headers:
-                        logger.warning(
-                            f"Column names not found in CSV: {col1_name}, {col2_name}"
-                        )
-                        logger.info(f"Available columns: {headers}")
-                        return []
+            # Get sample data (up to 10 rows)
+            df_clean = df[[col1_name, col2_name]].dropna()
+            df_sample = df_clean.head(10)
+            
+            sample_data = []
+            for _, row in df_sample.iterrows():
+                sample_data.append(
+                    {
+                        "column1_value": str(row[col1_name]),
+                        "column2_value": str(row[col2_name]),
+                    }
+                )
 
-                    # Use explicit column names with DuckDB
-                    query = f"""
-                    SELECT "{col1_name}", "{col2_name}"
-                    FROM read_csv_auto('{file_path}', header=false, names={headers}, all_varchar=true)
-                    WHERE "{col1_name}" IS NOT NULL AND "{col2_name}" IS NOT NULL
-                    LIMIT 10
-                    """
-
-                    try:
-                        df = self.con.execute(query).df()
-                        sample_data = []
-
-                        for _, row in df.iterrows():
-                            sample_data.append(
-                                {
-                                    "column1_value": str(row[col1_name]),
-                                    "column2_value": str(row[col2_name]),
-                                }
-                            )
-
-                        return sample_data
-                    except Exception as db_error:
-                        logger.warning(f"DuckDB query failed: {db_error}")
-                        return []
-                else:
-                    logger.warning("Could not read CSV headers")
-                    return []
+            return sample_data
 
         except Exception as e:
             logger.warning(f"Error getting sample data: {e}")
@@ -846,40 +791,25 @@ class RelationshipDiscoverer:
     ) -> str:
         """Calculate cardinality between two columns."""
         try:
-            # Get the actual column names from the CSV
-            with open(file_path, encoding="utf-8") as f:
-                first_line = f.readline().strip()
-                if first_line:
-                    headers = [
-                        col.strip().strip('"').strip("'")
-                        for col in first_line.split(",")
-                    ]
+            # Load CSV data using pandas
+            df = pd.read_csv(file_path)
+            
+            # Check if the provided column names are valid
+            if source_col not in df.columns or target_col not in df.columns:
+                logger.warning(
+                    f"Column names not found in CSV: {source_col}, {target_col}"
+                )
+                return "unknown"
 
-                    # Check if the provided column names are valid
-                    if source_col not in headers or target_col not in headers:
-                        logger.warning(
-                            f"Column names not found in CSV: {source_col}, {target_col}"
-                        )
-                        return "unknown"
-
-                    query = f"""
-                    SELECT
-                        COUNT(DISTINCT "{source_col}") as unique_source,
-                        COUNT(DISTINCT "{target_col}") as unique_target,
-                        COUNT(*) as total_rows
-                    FROM read_csv_auto('{file_path}', header=false, names={headers}, all_varchar=true)
-                    WHERE "{source_col}" IS NOT NULL AND "{target_col}" IS NOT NULL
-                    """
-
-                    try:
-                        result = self.con.execute(query).fetchone()
-                        if not result:
-                            return "unknown"
-
-                        unique_source, unique_target, total_rows = result
-                    except Exception as db_error:
-                        logger.warning(f"DuckDB query failed: {db_error}")
-                        return "unknown"
+            # Calculate cardinality using pandas
+            df_clean = df[[source_col, target_col]].dropna()
+            
+            if len(df_clean) == 0:
+                return "unknown"
+            
+            unique_source = df_clean[source_col].nunique()
+            unique_target = df_clean[target_col].nunique()
+            total_rows = len(df_clean)
 
             if unique_source == 0 or unique_target == 0:
                 return "unknown"
@@ -1017,50 +947,37 @@ class RelationshipDiscoverer:
         """Analyze relationship between two columns."""
         relationships = []
 
-        # Get the actual column names from the CSV
-        with open(file_path, encoding="utf-8") as f:
-            first_line = f.readline().strip()
-            if first_line:
-                headers = [
-                    col.strip().strip('"').strip("'") for col in first_line.split(",")
-                ]
-
-                # Check if the provided column names are valid
-                if col1.name not in headers or col2.name not in headers:
-                    logger.warning(
-                        f"Column names not found in CSV: {col1.name}, {col2.name}"
-                    )
-                    return []
-
-                # Get co-occurrence data using explicit column names
-                query = f"""
-                SELECT "{col1.name}", "{col2.name}", COUNT(*) as co_count
-                FROM read_csv_auto('{file_path}', header=false, names={headers}, all_varchar=true)
-                WHERE "{col1.name}" IS NOT NULL AND "{col2.name}" IS NOT NULL
-                GROUP BY "{col1.name}", "{col2.name}"
-                HAVING co_count > 1
-                ORDER BY co_count DESC
-                LIMIT 100
-                """
-            else:
-                logger.warning("Could not read CSV headers")
-                return []
-
         try:
-            try:
-                df = self.con.execute(query).df()
-            except Exception as db_error:
-                logger.warning(f"DuckDB query failed: {db_error}")
+            # Load CSV data using pandas
+            df = pd.read_csv(file_path)
+            
+            # Check if the provided column names are valid
+            if col1.name not in df.columns or col2.name not in df.columns:
+                logger.warning(
+                    f"Column names not found in CSV: {col1.name}, {col2.name}"
+                )
                 return []
 
-            if df.empty:
+            # Get co-occurrence data using pandas
+            df_clean = df[[col1.name, col2.name]].dropna()
+            
+            if len(df_clean) == 0:
+                return []
+            
+            # Group by both columns and count occurrences
+            co_occurrence = df_clean.groupby([col1.name, col2.name]).size().reset_index(name='co_count')
+            co_occurrence = co_occurrence[co_occurrence['co_count'] > 1].sort_values('co_count', ascending=False).head(100)
+            
+            if len(co_occurrence) == 0:
                 return []
 
             # Calculate relationship strength
-            total_rows = df["co_count"].sum()
+            total_rows = co_occurrence["co_count"].sum()
 
-            for _, row in df.iterrows():
-                val1, val2, co_count = row
+            for _, row in co_occurrence.iterrows():
+                val1 = row[col1.name]
+                val2 = row[col2.name]
+                co_count = row['co_count']
 
                 # Find corresponding entities
                 entity1 = self._find_entity_by_value(val1, entity_columns[col1.name])
