@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Generator, Dict, Any
 import httpx
 import neo4j
-import duckdb
 from fastapi.testclient import TestClient
 
 # Import the main FastAPI app
@@ -36,7 +35,11 @@ def test_config() -> Dict[str, Any]:
             "database": "neo4j"  # Use default database for tests
         },
         "metadata_storage": {
-            "duckdb_path": ":memory:",  # Use in-memory for tests
+            "host": "localhost",
+            "port": 5432,
+            "database": "knowledgeforge_test",
+            "user": "knowledgeforge",
+            "password": "knowledgeforge123"
         },
         "lmstudio": {
             "base_url": "http://localhost:1234",
@@ -134,7 +137,11 @@ def setup_test_environment(test_config: Dict[str, Any], monkeypatch):
     """Setup test environment variables."""
     # Override configuration for tests
     monkeypatch.setenv("KF_NEO4J__DATABASE", test_config["neo4j"]["database"])
-    monkeypatch.setenv("KF_METADATA_STORAGE__DUCKDB_PATH", test_config["metadata_storage"]["duckdb_path"])
+    monkeypatch.setenv("KF_METADATA_STORAGE__HOST", test_config["metadata_storage"]["host"])
+    monkeypatch.setenv("KF_METADATA_STORAGE__PORT", str(test_config["metadata_storage"]["port"]))
+    monkeypatch.setenv("KF_METADATA_STORAGE__DATABASE", test_config["metadata_storage"]["database"])
+    monkeypatch.setenv("KF_METADATA_STORAGE__USER", test_config["metadata_storage"]["user"])
+    monkeypatch.setenv("KF_METADATA_STORAGE__PASSWORD", test_config["metadata_storage"]["password"])
     monkeypatch.setenv("KF_EXTRACTION__CONFIDENCE_THRESHOLD", str(test_config["extraction"]["confidence_threshold"]))
     monkeypatch.setenv("KF_EXTRACTION__BATCH_SIZE", str(test_config["extraction"]["batch_size"]))
     monkeypatch.setenv("KF_EXTRACTION__SAMPLE_SIZE", str(test_config["extraction"]["sample_size"]))

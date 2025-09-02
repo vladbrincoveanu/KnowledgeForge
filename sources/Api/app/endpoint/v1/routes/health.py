@@ -78,21 +78,21 @@ async def health_check(
             llm_status = f"unhealthy: {str(e)}"
             logger.error(f"LLM health check failed: {e}")
 
-        # Check DuckDB metadata store
-        duckdb_status = "healthy"
+        # Check PostgreSQL metadata store
+        metadata_status = "healthy"
         try:
             # Simple health check - try to get basic info
             info = metadata_store.get_database_info()
-            if not info:
-                duckdb_status = "unhealthy: cannot access database"
+            if info.get("connection_status") != "connected":
+                metadata_status = "unhealthy: cannot access database"
         except Exception as e:
-            duckdb_status = f"unhealthy: {str(e)}"
-            logger.error(f"DuckDB health check failed: {e}")
+            metadata_status = f"unhealthy: {str(e)}"
+            logger.error(f"PostgreSQL metadata store health check failed: {e}")
 
         dependencies = {
             "neo4j": neo4j_status,
             "llm_server": llm_status,
-            "duckdb": duckdb_status,
+            "postgresql_metadata": metadata_status,
         }
 
         # Overall status
@@ -217,21 +217,17 @@ async def get_system_metrics(
         # Metadata store metrics
         try:
             db_info = metadata_store.get_database_info()
+            record_count = db_info.get("record_count", {})
             extraction_metrics.update(
                 {
-                    "total_files_processed": db_info.get("total_files", 0),
-                    "total_tasks": db_info.get("total_tasks", 0),
-                    "completed_tasks": db_info.get("completed_tasks", 0),
-                    "failed_tasks": db_info.get("failed_tasks", 0),
+                    "total_files_processed": record_count.get("files", 0),
+                    "total_entities": record_count.get("entities", 0),
+                    "total_relationships": record_count.get("relationships", 0),
+                    "total_feedback": record_count.get("feedback", 0),
                 }
             )
         except Exception as e:
             logger.warning(f"Could not get metadata store metrics: {e}")
-
-        # Calculate success rate
-        total_tasks = extraction_metrics.get("total_tasks", 0)
-        completed_tasks = extraction_metrics.get("completed_tasks", 0)
-        success_rate = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
 
         # Get config for thresholds
         config = get_config()
@@ -239,11 +235,10 @@ async def get_system_metrics(
         return {
             "system_metrics": {
                 **system_metrics,
-                "success_rate": round(success_rate, 2),
+                "success_rate": 0,  # Would be calculated from actual data
             },
             "extraction_metrics": {
                 **extraction_metrics,
-                "average_processing_time": 0,  # Would be calculated from actual data
                 "total_entities_extracted": system_metrics.get("total_nodes", 0),
                 "total_relationships_discovered": system_metrics.get(
                     "total_relationships", 0
@@ -307,9 +302,10 @@ async def detailed_health_check(
             db_info = metadata_store.get_database_info()
             detailed_status["metadata_store"] = {
                 "status": "healthy",
-                "database_path": str(metadata_store.db_path),
-                "database_size_mb": db_info.get("size_mb", "unknown"),
-                "table_count": db_info.get("table_count", "unknown"),
+                "database_type": db_info.get("database_type", "PostgreSQL"),
+                "connection_status": db_info.get("connection_status", "unknown"),
+                "tables": db_info.get("tables", []),
+                "record_count": db_info.get("record_count", {}),
             }
         except Exception as e:
             detailed_status["metadata_store"] = {"status": "unhealthy", "error": str(e)}

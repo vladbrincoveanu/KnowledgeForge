@@ -7,7 +7,7 @@ This directory contains comprehensive end-to-end tests for the KnowledgeForge CS
 The E2E tests validate the complete workflow:
 
 1. **File Upload** - CSV file upload through FastAPI endpoints
-2. **Metadata Storage** - File metadata persistence in DuckDB
+2. **Metadata Storage** - File metadata persistence
 3. **Entity Extraction** - LLM-powered entity extraction from CSV data
 4. **Ontology Mapping** - Mapping extracted entities to standard ontologies
 5. **Relationship Discovery** - Finding relationships between entities
@@ -103,7 +103,6 @@ export KF_EXTRACTION__CONFIDENCE_THRESHOLD=0.5
 ### Custom Configuration
 
 Tests use a test-specific configuration that:
-- Uses in-memory DuckDB for metadata storage
 - Connects to test Neo4j database
 - Uses lower confidence thresholds for entity extraction
 - Processes smaller data samples for faster execution

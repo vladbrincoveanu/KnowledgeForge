@@ -46,7 +46,11 @@ setup_test_env() {
     # Set test environment variables
     export KF_ENVIRONMENT="test"
     export KF_NEO4J__DATABASE="$TEST_DATABASE"
-    export KF_METADATA_STORAGE__DUCKDB_PATH=":memory:"
+    export KF_METADATA_STORAGE__HOST="localhost"
+    export KF_METADATA_STORAGE__PORT="5432"
+    export KF_METADATA_STORAGE__DATABASE="knowledgeforge_test"
+    export KF_METADATA_STORAGE__USER="knowledgeforge"
+    export KF_METADATA_STORAGE__PASSWORD="knowledgeforge123"
     export KF_EXTRACTION__CONFIDENCE_THRESHOLD="0.5"
     export KF_EXTRACTION__BATCH_SIZE="100"
     export KF_EXTRACTION__SAMPLE_SIZE="100"

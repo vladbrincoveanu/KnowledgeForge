@@ -13,7 +13,6 @@ requests>=2.31.0
 
 # Database testing
 neo4j>=5.15.0
-duckdb>=0.9.0
 
 # Data validation
 pandas>=2.0.0

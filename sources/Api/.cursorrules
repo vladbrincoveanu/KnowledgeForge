@@ -68,7 +68,6 @@
 - Handle database connection errors gracefully
 - Use proper indexing strategies for performance
 - **CRITICAL: Use PostgreSQL for metadata storage, Neo4j for nodes and relationships**
-- **NEVER use DuckDB or other databases - only PostgreSQL and Neo4j**
 - PostgreSQL is used for: metadata, configuration, task tracking, and data profiling
 - Neo4j is used for: entity nodes, relationship edges, and graph operations
 - Always use pandas for CSV data analysis instead of database-specific query engines

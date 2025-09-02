@@ -45,7 +45,7 @@ Each extracted entity includes:
 
 ### Dependencies
 ```bash
-pip install pandas duckdb scikit-learn sentence-transformers pydantic
+pip install pandas scikit-learn sentence-transformers pydantic
 ```
 
 ### Optional LLM Support
@@ -303,7 +303,6 @@ The test script demonstrates:
 ## 📈 Performance
 
 ### Optimization Features
-- **DuckDB Integration**: Fast CSV processing with SQL queries
 - **Batch Processing**: Configurable batch sizes for large datasets
 - **Intelligent Caching**: Skip reprocessing for unchanged files
 - **Parallel Processing**: LLM requests with rate limiting

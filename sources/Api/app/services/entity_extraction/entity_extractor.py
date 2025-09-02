@@ -1291,7 +1291,6 @@ Return JSON array with entities.
     def _safe_read_csv(
         path: str | Path, usecols: list[str] | None = None
     ) -> pd.DataFrame:
-        # You can swap this for DuckDB/Polars if desired. Keep deterministic.
         df = pd.read_csv(path, usecols=usecols, low_memory=False)
         return df
 

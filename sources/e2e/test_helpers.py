@@ -6,7 +6,8 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 import pandas as pd
 import neo4j
-import duckdb
+import psycopg2
+from psycopg2.extras import RealDictCursor
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -67,64 +68,88 @@ class Neo4jTestHelper:
 
 
 class MetadataTestHelper:
-    """Helper class for metadata store operations in tests."""
+    """Helper class for PostgreSQL metadata store operations in tests."""
     
-    def __init__(self, db_path: str = ":memory:"):
-        self.db_path = db_path
-        self.connection = duckdb.connect(db_path)
+    def __init__(self, config: Dict[str, Any]):
+        self.config = config
+        self.connection = None
+        try:
+            self.connection = psycopg2.connect(
+                host=config.get("host", "localhost"),
+                port=config.get("port", 5432),
+                database=config.get("database", "knowledgeforge_test"),
+                user=config.get("user", "knowledgeforge"),
+                password=config.get("password", "knowledgeforge123")
+            )
+        except Exception as e:
+            logger.warning(f"Could not connect to PostgreSQL metadata store: {e}")
+            self.connection = None
     
     def table_exists(self, table_name: str) -> bool:
         """Check if a table exists in the metadata store."""
+        if not self.connection:
+            return False
         try:
-            result = self.connection.execute(
-                "SELECT count(*) FROM information_schema.tables WHERE table_name = ?",
-                [table_name]
-            ).fetchone()
-            return result[0] > 0
+            with self.connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT count(*) FROM information_schema.tables WHERE table_name = %s",
+                    [table_name]
+                )
+                result = cursor.fetchone()
+                return result[0] > 0
         except Exception:
             return False
     
     def count_records(self, table_name: str) -> int:
         """Count records in a table."""
+        if not self.connection:
+            return 0
         try:
-            result = self.connection.execute(f"SELECT count(*) FROM {table_name}").fetchone()
-            return result[0]
+            with self.connection.cursor() as cursor:
+                cursor.execute(f"SELECT count(*) FROM {table_name}")
+                result = cursor.fetchone()
+                return result[0]
         except Exception:
             return 0
     
     def get_file_metadata(self, file_id: str) -> Optional[Dict[str, Any]]:
         """Get file metadata by file_id."""
-        try:
-            result = self.connection.execute(
-                "SELECT * FROM file_metadata WHERE file_id = ?",
-                [file_id]
-            ).fetchone()
-            if result:
-                columns = [desc[0] for desc in self.connection.description]
-                return dict(zip(columns, result))
+        if not self.connection:
             return None
+        try:
+            with self.connection.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(
+                    "SELECT * FROM file_metadata WHERE file_id = %s",
+                    [file_id]
+                )
+                result = cursor.fetchone()
+                return dict(result) if result else None
         except Exception:
             return None
     
     def get_extraction_runs(self, file_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get extraction run records."""
+        if not self.connection:
+            return []
         try:
-            if file_id:
-                results = self.connection.execute(
-                    "SELECT * FROM extraction_runs WHERE file_id = ?",
-                    [file_id]
-                ).fetchall()
-            else:
-                results = self.connection.execute("SELECT * FROM extraction_runs").fetchall()
-            
-            columns = [desc[0] for desc in self.connection.description]
-            return [dict(zip(columns, row)) for row in results]
+            with self.connection.cursor(cursor_factory=RealDictCursor) as cursor:
+                if file_id:
+                    cursor.execute(
+                        "SELECT * FROM extraction_runs WHERE file_id = %s",
+                        [file_id]
+                    )
+                else:
+                    cursor.execute("SELECT * FROM extraction_runs")
+                
+                results = cursor.fetchall()
+                return [dict(row) for row in results]
         except Exception:
             return []
     
     def close(self):
         """Close the database connection."""
-        self.connection.close()
+        if self.connection:
+            self.connection.close()
 
 
 class APITestHelper:

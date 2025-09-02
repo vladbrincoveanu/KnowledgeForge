@@ -108,7 +108,6 @@ config = get_config("path/to/custom-config.yaml")
 - Feature toggles
 
 ### Metadata Storage Configuration
-- DuckDB settings
 - Caching configuration
 - Backup settings
 

@@ -46,7 +46,7 @@ class TestCSVUploadPipeline:
         
         # Initialize test helpers
         neo4j_helper = Neo4jTestHelper(neo4j_connection, test_config["neo4j"]["database"])
-        metadata_helper = MetadataTestHelper(test_config["metadata_storage"]["duckdb_path"])
+        metadata_helper = MetadataTestHelper(test_config["metadata_storage"])
         
         try:
             # Step 1: Validate test data

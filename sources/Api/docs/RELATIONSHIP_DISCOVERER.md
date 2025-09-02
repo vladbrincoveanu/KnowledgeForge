@@ -5,7 +5,7 @@ A comprehensive relationship discovery system for CSV data that implements multi
 ## 🚀 Features
 
 ### ✅ Multi-Strategy Relationship Discovery
-- **Foreign Key Detection**: Value overlap analysis using DuckDB for identifying referential relationships
+- **Foreign Key Detection**: Value overlap analysis for identifying referential relationships
 - **SBERT Semantic Similarity**: Advanced embedding-based similarity using sentence-transformers
 - **LLM Inference**: Intelligent relationship type inference using local LLM (LM Studio)
 - **Co-occurrence Analysis**: Row-level relationship detection based on value co-occurrence
@@ -52,7 +52,7 @@ A comprehensive relationship discovery system for CSV data that implements multi
 
 ### Dependencies
 ```bash
-pip install pandas duckdb scikit-learn sentence-transformers pydantic networkx
+pip install pandas scikit-learn sentence-transformers pydantic networkx
 ```
 
 ### Optional LLM Support
@@ -355,7 +355,6 @@ The test script demonstrates:
 ## 📈 Performance
 
 ### Optimization Features
-- **DuckDB Integration**: Fast SQL-based data analysis
 - **Efficient Embeddings**: SBERT model optimization
 - **Batch Processing**: Configurable batch sizes
 - **Intelligent Filtering**: Early filtering of low-confidence candidates
