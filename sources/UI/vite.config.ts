@@ -29,7 +29,7 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '')
+        secure: false
       }
     }
   },
@@ -39,7 +39,7 @@ export default defineConfig({
   },
   define: {
     global: 'globalThis',
-    'import.meta.env.VITE_API_URL': JSON.stringify('http://localhost:8000'),
+    'import.meta.env.VITE_API_URL': JSON.stringify('/api'),
     'import.meta.env.VITE_API_KEY': JSON.stringify('test-api-key-12345')
   }
 })

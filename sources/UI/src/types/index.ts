@@ -3,22 +3,23 @@ import React from 'react';
 
 // Base entity interfaces
 export interface Entity {
-  id: string;
+  id?: string;
   name: string;
   entity_type: string;
   confidence: number;
-  source_column?: string;
-  attributes?: Record<string, string | number | boolean>;
+  source_columns?: string[];
+  source_value?: string;
+  attributes?: Record<string, any>;
 }
 
 export interface Relationship {
-  id: string;
-  source_entity_id: string;
-  target_entity_id: string;
+  id?: string;
+  source_entity_id?: string;
+  target_entity_id?: string;
   relationship_type: string;
   confidence: number;
   source_columns?: string[];
-  attributes?: Record<string, string | number | boolean>;
+  attributes?: Record<string, any>;
 }
 
 // Task and status interfaces

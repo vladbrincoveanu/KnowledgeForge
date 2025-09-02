@@ -23,7 +23,7 @@ interface ExtractionTask {
   fileName: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   message: string;
-  progress: number;
+  progress?: number;
   createdAt: string;
   estimatedCompletion?: string;
   startedAt?: string;
@@ -62,21 +62,22 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   });
 
   const handleWebSocketMessage = useCallback(
-    (data: {
-      task_id?: string;
-      status?: string;
-      message?: string;
-      timestamp?: string;
-    }) => {
-      if (data.task_id && extractionTasks[data.task_id]) {
+    (data?: unknown) => {
+      const wsData = data as {
+        task_id?: string;
+        status?: string;
+        message?: string;
+        timestamp?: string;
+      };
+      if (wsData.task_id && extractionTasks[wsData.task_id]) {
         setExtractionTasks(prev => ({
           ...prev,
-          [data.task_id!]: {
-            ...prev[data.task_id!],
+          [wsData.task_id!]: {
+            ...prev[wsData.task_id!],
             status:
-              (data.status as ExtractionTask['status']) ||
-              prev[data.task_id!].status,
-            message: data.message || prev[data.task_id!].message,
+              (wsData.status as ExtractionTask['status']) ||
+              prev[wsData.task_id!].status,
+            message: wsData.message || prev[wsData.task_id!].message,
           },
         }));
       }
@@ -206,6 +207,9 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   const startOntologyExtraction = async (file: ExtendedUploadedFile) => {
     try {
       // Start extraction task with the uploaded file path
+      if (!file.serverPath) {
+        throw new Error('File server path is not available');
+      }
       const extractionResult = await ontologyAPI.extractOntology(
         file.serverPath,
         extractionConfig
@@ -220,6 +224,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
             fileName: file.name,
             status: 'pending',
             message: 'Task created and queued',
+            progress: 0,
             createdAt:
               (extractionResult as any).created_at || new Date().toISOString(),
             estimatedCompletion:
@@ -250,8 +255,9 @@ const FileUploader: React.FC<FileUploaderProps> = ({
           ...prev,
           [taskId]: {
             ...prev[taskId],
-            status: status.status,
-            message: status.message,
+            status: status.status === 'running' ? 'processing' : status.status,
+            message: status.message || prev[taskId].message,
+            progress: status.progress || prev[taskId].progress || 0,
             startedAt: (status as any).started_at,
             completedAt: (status as any).completed_at,
             processingTime: (status as any).processing_time,

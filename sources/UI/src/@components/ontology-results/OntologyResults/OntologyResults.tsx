@@ -59,7 +59,7 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
         // Use default pagination values, let the component manage its own state
         const page = reset ? 1 : 1;
 
-        let data: PaginatedResponse<Entity> | PaginatedResponse<Relationship>;
+        let data: any;
         if (type === 'entities') {
           data = await ontologyAPI.getEntities(taskId, 20, (page - 1) * 20);
           if (reset) {
@@ -119,7 +119,7 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
       });
 
       // Notify parent component
-      onFeedbackSubmitted(result);
+      onFeedbackSubmitted(result as FeedbackResponse);
 
       // Refresh data
       loadData(activeTab, true);
@@ -285,9 +285,9 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
                     <div className="detail-item">
                       <strong>Type:</strong> {entity.entity_type}
                     </div>
-                    {entity.source_column && (
+                    {entity.source_columns && entity.source_columns.length > 0 && (
                       <div className="detail-item">
-                        <strong>Source Column:</strong> {entity.source_column}
+                        <strong>Source Columns:</strong> {entity.source_columns.join(', ')}
                       </div>
                     )}
                     {entity.attributes &&

@@ -20,27 +20,38 @@ interface ExtractionStatus {
 }
 
 interface Entity {
-  id: string;
+  id?: string;
   name: string;
-  type: string;
+  entity_type: string;
   confidence: number;
-  attributes?: Record<string, unknown>;
+  source_columns?: string[];
+  source_value?: string;
+  attributes?: Record<string, any>;
 }
 
 interface Relationship {
-  id: string;
-  source_entity: string;
-  target_entity: string;
-  type: string;
+  id?: string;
+  source_entity_id?: string;
+  target_entity_id?: string;
+  relationship_type: string;
   confidence: number;
-  attributes?: Record<string, unknown>;
+  source_columns?: string[];
+  attributes?: Record<string, any>;
 }
 
 interface PaginatedResponse<T> {
-  items: T[];
-  total: number;
-  limit: number;
-  offset: number;
+b  items?: T[];
+  entities?: T[];
+  relationships?: T[];
+  total?: number;
+  total_count?: number;
+  limit?: number;
+  offset?: number;
+  extraction_metadata?: {
+    limit: number;
+    offset: number;
+    has_more: boolean;
+  };
 }
 
 interface AxiosErrorResponse {
@@ -186,7 +197,7 @@ export const ontologyAPI = {
     extractionConfig: ExtractConfig = {}
   ): Promise<ExtractResponse> => {
     const response: AxiosResponse<ExtractResponse> = await api.post(
-      '/api/v1/extract/',
+      '/v1/extract/',
       {
         file_path: filePath,
         extraction_config: extractionConfig,
@@ -198,7 +209,7 @@ export const ontologyAPI = {
   // Get extraction task status
   getExtractionStatus: async (taskId: string): Promise<ExtractionStatus> => {
     const response: AxiosResponse<ExtractionStatus> = await api.get(
-      `/api/v1/extract/${taskId}`
+      `/v1/extract/${taskId}`
     );
     return response.data;
   },
@@ -213,10 +224,17 @@ export const ontologyAPI = {
     if (taskId) params.task_id = taskId;
 
     const response: AxiosResponse<PaginatedResponse<Entity>> = await api.get(
-      '/api/v1/entities',
+      '/v1/entities',
       { params }
     );
-    return response.data;
+    const data = response.data;
+    // Normalize the response to match expected format
+    return {
+      items: data.entities || [],
+      total: data.total_count || 0,
+      limit: data.extraction_metadata?.limit || limit,
+      offset: data.extraction_metadata?.offset || offset,
+    };
   },
 
   // Get relationships with pagination
@@ -229,14 +247,21 @@ export const ontologyAPI = {
     if (taskId) params.task_id = taskId;
 
     const response: AxiosResponse<PaginatedResponse<Relationship>> =
-      await api.get('/api/v1/relationships', { params });
-    return response.data;
+      await api.get('/v1/relationships', { params });
+    const data = response.data;
+    // Normalize the response to match expected format
+    return {
+      items: data.relationships || [],
+      total: data.total_count || 0,
+      limit: data.extraction_metadata?.limit || limit,
+      offset: data.extraction_metadata?.offset || offset,
+    };
   },
 
   // Submit feedback
   submitFeedback: async (feedbackData: FeedbackData): Promise<unknown> => {
     const response: AxiosResponse<unknown> = await api.post(
-      '/api/v1/feedback',
+      '/v1/feedback',
       feedbackData
     );
     return response.data;
@@ -247,7 +272,7 @@ export const ontologyAPI = {
     taskId: string
   ): Promise<GraphVisualization> => {
     const response: AxiosResponse<GraphVisualization> = await api.get(
-      '/api/v1/graph/visualize',
+      '/v1/graph/visualize',
       {
         params: { task_id: taskId },
       }
@@ -258,7 +283,7 @@ export const ontologyAPI = {
   // Get system metrics
   getMetrics: async (): Promise<SystemMetrics> => {
     const response: AxiosResponse<SystemMetrics> = await api.get(
-      '/api/v1/health/metrics'
+      '/v1/health/metrics'
     );
     return response.data;
   },
@@ -266,14 +291,14 @@ export const ontologyAPI = {
   // Health check
   healthCheck: async (): Promise<HealthStatus> => {
     const response: AxiosResponse<HealthStatus> =
-      await api.get('/api/v1/health/');
+      await api.get('/v1/health/');
     return response.data;
   },
 
   // Readiness check
   readinessCheck: async (): Promise<HealthStatus> => {
     const response: AxiosResponse<HealthStatus> = await api.get(
-      '/api/v1/health/ready'
+      '/v1/health/ready'
     );
     return response.data;
   },
@@ -339,7 +364,7 @@ export const fileAPI = {
       // For file uploads, we need to remove the default Content-Type header
       // and let the browser set it automatically with the boundary
       const response: AxiosResponse<UploadResponse> = await fileUploadApi.post(
-        '/api/v1/extract/upload',
+        '/v1/extract/upload',
         formData
       );
 
@@ -376,7 +401,10 @@ export class WebSocketService {
 
   connect(): void {
     try {
-      const wsUrl = API_BASE_URL.replace('http', 'ws') + '/ws';
+      // Use direct WebSocket connection to backend since proxy doesn't handle WebSocket
+      const wsUrl = API_BASE_URL === '/api' 
+        ? 'ws://localhost:8000/ws' 
+        : API_BASE_URL.replace('http', 'ws') + '/ws';
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {

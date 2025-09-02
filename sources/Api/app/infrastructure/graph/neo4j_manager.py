@@ -877,20 +877,12 @@ class Neo4jGraphManager:
         """Get all entities from the graph database."""
         query = """
         MATCH (e:Entity)
-        """
-        params = {"limit": limit, "offset": offset}
-        
-        # Add task_id filter if provided (filter by ID prefix)
-        if task_id:
-            query += " WHERE e.id STARTS WITH $task_id_prefix"
-            params["task_id_prefix"] = f"{task_id}_"
-        
-        query += """
         RETURN e.id as id, e.name as name, e.entity_type as entity_type,
                e.confidence as confidence, e.attributes as attributes
         ORDER BY e.name
         SKIP $offset LIMIT $limit
         """
+        params = {"limit": limit, "offset": offset}
 
         try:
             with self.driver.session(database=self.database) as session:
@@ -914,15 +906,8 @@ class Neo4jGraphManager:
 
     def count_entities(self, task_id: Optional[str] = None) -> int:
         """Count total entities in the graph database."""
-        query = "MATCH (e:Entity)"
+        query = "MATCH (e:Entity) RETURN count(e) as count"
         params = {}
-        
-        # Add task_id filter if provided (filter by ID prefix)
-        if task_id:
-            query += " WHERE e.id STARTS WITH $task_id_prefix"
-            params["task_id_prefix"] = f"{task_id}_"
-        
-        query += " RETURN count(e) as count"
         
         try:
             with self.driver.session(database=self.database) as session:
@@ -938,20 +923,13 @@ class Neo4jGraphManager:
         """Get all relationships from the graph database."""
         query = """
         MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity)
-        """
-        params = {'limit': limit, 'offset': offset}
-        
-        if task_id:
-            query += " WHERE r.task_id = $task_id"
-            params['task_id'] = task_id
-        
-        query += """
         RETURN r.id as id, r.type as type, r.confidence as confidence,
                source.name as source_entity, target.name as target_entity,
                r.attributes as attributes
         ORDER BY r.type
         SKIP $offset LIMIT $limit
         """
+        params = {'limit': limit, 'offset': offset}
 
         try:
             with self.driver.session(database=self.database) as session:
@@ -976,14 +954,8 @@ class Neo4jGraphManager:
 
     def count_rels(self, task_id: Optional[str] = None) -> int:
         """Count total relationships in the graph database."""
-        query = "MATCH ()-[r:RELATES_TO]->()"
+        query = "MATCH ()-[r:RELATES_TO]->() RETURN count(r) as count"
         params = {}
-        
-        if task_id:
-            query += " WHERE r.task_id = $task_id"
-            params["task_id"] = task_id
-        
-        query += " RETURN count(r) as count"
         
         try:
             with self.driver.session(database=self.database) as session:
