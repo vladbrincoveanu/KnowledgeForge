@@ -1,0 +1,196 @@
+# KnowledgeForge UI - React/Vite Project Rules
+
+## Core Principles
+- Write modern, performant React code using functional components and hooks
+- Prioritize accessibility (a11y) in all UI components
+- Implement responsive design for all screen sizes
+- Focus on user experience and intuitive interfaces
+- Optimize for performance and minimize unnecessary re-renders
+
+## React Best Practices
+- Use functional components with React Hooks exclusively
+- Prefer const declarations for component definitions
+- Use React.memo() for expensive components to prevent unnecessary re-renders
+- Implement proper error boundaries for graceful error handling
+- Use React.Suspense for code splitting and lazy loading
+- Keep component logic focused and break down complex components
+- Use custom hooks for reusable stateful logic
+
+## State Management
+- Use useState and useReducer for local component state
+- Implement useContext for shared state across component trees
+- Use useCallback and useMemo to optimize performance-critical functions
+- Avoid prop drilling by using context or state management libraries
+- Keep state as close to where it's used as possible
+- Use useEffect for side effects with proper dependency arrays
+
+## Component Design
+- Create reusable, composable components
+- Use meaningful prop names with proper TypeScript interfaces
+- Implement proper default props and prop validation
+- Keep components pure when possible (same input = same output)
+- Use compound components pattern for complex UI elements
+- Separate presentation components from container components
+
+## Performance Optimization
+- Use React.memo() for components that receive stable props
+- Implement useCallback for event handlers passed to child components
+- Use useMemo for expensive calculations
+- Implement proper keys for list items
+- Lazy load components and images when appropriate
+- Optimize bundle size with code splitting
+- Monitor and minimize DOM manipulations
+
+## Accessibility (a11y)
+- Use semantic HTML elements (button, nav, main, aside, etc.)
+- Implement proper ARIA labels and roles
+- Ensure keyboard navigation works for all interactive elements
+- Maintain proper color contrast ratios (WCAG AA compliance)
+- Add alt text for all images and icons
+- Use proper heading hierarchy (h1, h2, h3...)
+- Test with screen readers and keyboard-only navigation
+
+## Styling & CSS
+- Use CSS modules or styled-components for component-scoped styles
+- Follow BEM methodology or similar naming conventions
+- Use lowercase for all CSS class names (e.g., .user-profile, .nav-item)
+- Implement responsive design with mobile-first approach
+- Use CSS custom properties (variables) for consistent theming
+- Prefer flexbox and CSS Grid for layouts
+- Keep CSS specificity low and avoid !important
+- Use semantic class names that describe purpose, not appearance
+
+## Error Handling
+- Implement error boundaries to catch and handle React errors gracefully
+- Use try-catch blocks for async operations
+- Provide meaningful error messages to users
+- Log errors to monitoring services for debugging
+- Implement fallback UI states for error conditions
+- Handle network errors and API failures gracefully
+
+## API Integration
+- Use async/await for API calls with proper error handling
+- Implement loading states for all async operations
+- Cache API responses when appropriate
+- Use abort controllers to cancel ongoing requests
+- Implement proper retry logic for failed requests
+- Handle different HTTP status codes appropriately
+
+## Code Organization
+- All components must be placed inside the @components/ folder structure
+- Group related components in feature-based folders within @components/
+- Use index.js files for clean imports
+- Separate business logic from UI components
+- Create custom hooks for reusable logic
+- Use TypeScript interfaces for prop and state typing
+- Keep utility functions in dedicated modules
+
+## File and Directory Management
+- **NEVER create empty folders or placeholder files without explicit permission**
+- Ask user before creating new directories or major structural changes
+- Only create files that contain meaningful implementation
+- Avoid creating stub components with TODO comments unless specifically requested
+- When creating new components, include proper implementation with tests
+
+## TypeScript (if using)
+- Define interfaces for all props and state objects
+- Use union types for component variants
+- Implement proper generic types for reusable components
+- Use type guards for runtime type checking
+- Prefer interfaces over types for object shapes
+- Use strict TypeScript configuration
+
+## Testing
+- Write unit tests for all components using React Testing Library
+- Test user interactions and behavior, not implementation details
+- Use descriptive test names that explain the expected behavior
+- Mock external dependencies and API calls
+- Test accessibility with screen reader simulation
+- Implement integration tests for critical user flows
+- Maintain high test coverage for business logic
+- **MANDATORY: Always run UI tests after any UI changes**
+- **MANDATORY: Always run test_pipeline.py after any API changes**
+- Use `make tests` command to run all tests (not `npm test` directly)
+- The 'npm run check-all' command should also run tests after any changes to UI files
+- Tests are located in @/Tests folder and new tests should only be created there
+- Integration tests should test basic browser functionalities to verify an OK status
+
+## Build & Development
+- Use Vite for fast development and optimized builds
+- Configure proper environment variables for different stages
+- Implement proper code splitting for optimal bundle sizes
+- Use source maps for debugging in development
+- Configure proper proxy settings for API development
+- Use ESLint and Prettier for consistent code formatting
+
+## Code Quality & Formatting Automation
+- **CRITICAL**: After any changes to files in the @components/ directory or any other UI files, ALWAYS run the following commands in sequence:
+  1. `npm run fix-all` - This runs both prettier formatting and eslint fixes automatically
+  2. If there are still linting issues, run `npm run lint:fix` for additional fixes
+  3. For manual lint checking, use `npm run lint` to verify all issues are resolved
+  4. `npm run test` - Run all tests to ensure changes don't break functionality
+- **MANDATORY**: Before completing any task that involves UI changes, run the complete verification process:
+  1. `npm run check-all` - Run type-check + lint + format check
+  2. `npm run test` - Run all tests to verify functionality
+- Available quality scripts:
+  - `npm run fix-all`: Runs prettier format + eslint fix (USE THIS FIRST)
+  - `npm run format`: Run prettier formatting only
+  - `npm run lint:fix`: Run eslint fixes only
+  - `npm run check-all`: Run type-check + lint + format check (for code quality verification)
+  - `npm run test`: Run all tests (for functionality verification)
+  - `npm run dev:fix`: Same as fix-all (alternative command)
+- **NEVER** leave code with linting errors, formatting issues, or failing tests
+- **ALWAYS** verify both code quality AND test functionality before declaring a task complete
+- **TEST REQUIREMENT**: All changes must pass existing tests and new functionality must include appropriate tests
+
+## Security
+- Sanitize user input to prevent XSS attacks
+- Use environment variables for sensitive configuration
+- Implement proper CORS configuration
+- Validate API responses before using in UI
+- Use HTTPS in production
+- Implement proper authentication flows
+
+## User Experience
+- Implement proper loading states and skeleton screens
+- Provide immediate feedback for user actions
+- Use progressive enhancement for better perceived performance
+- Implement proper form validation with clear error messages
+- Use animations and transitions to guide user attention
+- Design for mobile-first and touch interactions
+
+## Browser Compatibility
+- Test on major browsers (Chrome, Firefox, Safari, Edge)
+- Use proper polyfills for newer JavaScript features
+- Implement graceful degradation for older browsers
+- Test on different screen sizes and orientations
+- Use autoprefixer for CSS vendor prefixes
+
+## Comments & Documentation
+- Use JSDoc comments for complex components and functions
+- Document props interfaces with clear descriptions
+- Keep inline comments for complex business logic
+- Maintain README with setup and development instructions
+- Document component usage with examples
+- Use Storybook for component documentation (if applicable)
+
+## File Naming & Structure
+- Use lowercase for all folder names (e.g., user-profile/, components/)
+- Use lowercase for all file names (e.g., user-profile.tsx, api-service.ts)
+- Use PascalCase for component files (e.g., UserProfile.tsx)
+- Use camelCase for utility functions and hooks
+- Use kebab-case for CSS files and assets
+- Keep component and test files co-located
+- Use descriptive file names that reflect functionality
+
+## Project Workflow & Testing Requirements
+- **ALWAYS run UI tests after making UI changes**
+- **ALWAYS run test_pipeline.py after making API changes**
+- Use the project's Makefile for all commands (single top-level Makefile preferred)
+- The 'npm run check-all' command should also run tests after any changes to UI files
+- Never send connection test successful messages to the main Telegram channel
+- Project .gitignore should ignore config.json; only config.default.json is allowed to be committed
+- Always verify that UI components render correctly and handle user interactions properly
+- Test both component functionality and integration with backend APIs
+- Verify UI responsiveness and accessibility compliance
+- Run comprehensive testing including unit tests, integration tests, and visual regression tests

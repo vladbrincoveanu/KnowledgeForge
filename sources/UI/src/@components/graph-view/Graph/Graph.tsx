@@ -1,0 +1,191 @@
+import React, { useRef, useCallback, useState } from 'react';
+import ForceGraph2D from 'react-force-graph-2d';
+import EdgeDetailsModal from '../EdgeDetailsModal/EdgeDetailsModal';
+import NodeDetailsModal from '../NodeDetailsModal/NodeDetailsModal';
+import './Graph.scss';
+import { GraphData, GraphLink, GraphNode } from '../../../types';
+
+interface GraphProps {
+  data: GraphData;
+  onEdgeClick: (edge: GraphLink) => void;
+}
+
+const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
+  const graphRef = useRef<any>();
+  const [selectedEdge, setSelectedEdge] = useState<GraphLink | null>(null);
+  const [showEdgeModal, setShowEdgeModal] = useState(false);
+  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+  const [showNodeModal, setShowNodeModal] = useState(false);
+
+  const handleNodeClick = useCallback((node: GraphNode) => {
+    console.log('Clicked node:', node);
+    // Clear edge selection when clicking on a node
+    setSelectedEdge(null);
+    setShowEdgeModal(false);
+
+    // Set node selection and show modal
+    setSelectedNode(node);
+    setShowNodeModal(true);
+  }, []);
+
+  const handleLinkClick = useCallback(
+    (link: GraphLink) => {
+      console.log('Clicked link:', link);
+      setSelectedEdge(link);
+      setShowEdgeModal(true);
+
+      // Call parent callback if provided
+      if (onEdgeClick) {
+        onEdgeClick(link);
+      }
+    },
+    [onEdgeClick]
+  );
+
+  const nodeColor = useCallback((node: GraphNode) => {
+    return node.type === 'file' ? '#007bff' : '#28a745';
+  }, []);
+
+  const nodeLabel = useCallback((node: GraphNode) => {
+    return `${node.label}\n(${node.type})`;
+  }, []);
+
+  const linkLabel = useCallback((link: GraphLink) => {
+    return link.label || 'Connection';
+  }, []);
+
+  const linkColor = useCallback((link: GraphLink) => {
+    // Color based on connection strength/confidence
+    const confidence = link.confidence || 0;
+    if (confidence >= 0.9) return '#28a745'; // High confidence - green
+    if (confidence >= 0.7) return '#ffc107'; // Medium confidence - yellow
+    return '#dc3545'; // Low confidence - red
+  }, []);
+
+  const linkWidth = useCallback((link: GraphLink) => {
+    // Width based on connection strength
+    const confidence = link.confidence || 0;
+    if (confidence >= 0.9) return 4;
+    if (confidence >= 0.7) return 3;
+    return 2;
+  }, []);
+
+  const closeEdgeModal = () => {
+    setShowEdgeModal(false);
+    setSelectedEdge(null);
+  };
+
+  const closeNodeModal = () => {
+    setShowNodeModal(false);
+    setSelectedNode(null);
+  };
+
+  return (
+    <div className="graph-container">
+      <div className="graph-header">
+        <h3>AI-Powered Visual Knowledge Discovery</h3>
+        <div className="graph-stats">
+          <span>{data.nodes.length} Files</span>
+          <span>{data.links.length} AI-Detected Connections</span>
+          {selectedEdge && (
+            <span className="selected-edge">
+              Selected: {selectedEdge.columnA} ↔ {selectedEdge.columnB}
+            </span>
+          )}
+        </div>
+        <div className="discovery-insights">
+          <div className="insight-item">
+            <span className="insight-icon">🔍</span>
+            <span>AI analyzes patterns in your data</span>
+          </div>
+          <div className="insight-item">
+            <span className="insight-icon">💡</span>
+            <span>Discover hidden relationships</span>
+          </div>
+          <div className="insight-item">
+            <span className="insight-icon">✅</span>
+            <span>Validate connections visually</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="graph-visualization">
+        {data.nodes.length > 0 ? (
+          <ForceGraph2D
+            ref={graphRef}
+            graphData={data}
+            nodeLabel={nodeLabel}
+            linkLabel={linkLabel}
+            nodeColor={nodeColor}
+            linkColor={linkColor}
+            linkWidth={linkWidth}
+            onNodeClick={handleNodeClick}
+            onLinkClick={handleLinkClick}
+            nodeRelSize={8}
+            linkDirectionalArrowLength={6}
+            linkDirectionalArrowRelPos={1}
+            linkCurvature={0.1}
+            cooldownTicks={100}
+            onEngineStop={() => graphRef.current?.zoomToFit(400)}
+            backgroundColor="#ffffff"
+            width={800}
+            height={600}
+          />
+        ) : (
+          <div className="empty-graph">
+            <div className="empty-icon">📊</div>
+            <h4>No Files Uploaded</h4>
+            <p>Upload CSV files to see the network graph visualization</p>
+          </div>
+        )}
+      </div>
+
+      {data.nodes.length > 0 && (
+        <div className="graph-controls">
+          <button
+            className="btn-control"
+            onClick={() => graphRef.current?.zoomToFit(400)}
+          >
+            Fit to View
+          </button>
+          <button
+            className="btn-control"
+            onClick={() => graphRef.current?.centerAt(0, 0, 1000)}
+          >
+            Center
+          </button>
+          <button
+            className="btn-control"
+            onClick={() => {
+              setSelectedEdge(null);
+            }}
+          >
+            Clear Selection
+          </button>
+        </div>
+      )}
+
+      {/* Edge Details Modal */}
+      {selectedEdge && (
+        <EdgeDetailsModal
+          key={`edge-modal-${selectedEdge.id || 'default'}`}
+          edge={selectedEdge}
+          isOpen={showEdgeModal}
+          onClose={closeEdgeModal}
+        />
+      )}
+
+      {/* Node Details Modal */}
+      {selectedNode && (
+        <NodeDetailsModal
+          key={`node-modal-${selectedNode.id || 'default'}`}
+          node={selectedNode}
+          isOpen={showNodeModal}
+          onClose={closeNodeModal}
+        />
+      )}
+    </div>
+  );
+};
+
+export default Graph;

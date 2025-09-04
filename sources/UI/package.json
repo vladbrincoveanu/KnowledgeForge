@@ -1,0 +1,88 @@
+{
+  "name": "knowledgeforge-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "lucide-react": "^0.263.1",
+    "papaparse": "^5.4.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-force-graph": "^1.29.3",
+    "react-force-graph-2d": "^1.28.0",
+    "react-hot-toast": "^2.4.1",
+    "react-json-pretty": "^2.2.0",
+    "react-query": "^3.39.3",
+    "react-router-dom": "^6.8.0",
+    "recharts": "^2.8.0",
+    "web-vitals": "^3.5.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.8.0",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/papaparse": "^5.3.16",
+    "@types/react": "^18.2.37",
+    "@types/react-dom": "^18.2.15",
+    "@typescript-eslint/eslint-plugin": "^8.41.0",
+    "@typescript-eslint/parser": "^8.41.0",
+    "@vitejs/plugin-react": "^4.1.1",
+    "@vitest/ui": "^3.2.4",
+    "eslint": "^9.34.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
+    "jsdom": "^26.1.0",
+    "prettier": "^3.6.2",
+    "sass": "^1.91.0",
+    "typescript": "^5.9.2",
+    "vite": "^4.5.0",
+    "vite-plugin-node-polyfills": "^0.24.0",
+    "vitest": "^3.2.4"
+  },
+  "scripts": {
+    "dev": "vite",
+    "start": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest --run",
+    "test:dev": "vitest",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint . --ext ts,tsx --fix",
+    "format": "npx prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,scss,md}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,scss,md}\"",
+    "type-check": "tsc --noEmit",
+    "start:prod": "npm run build && npm run preview",
+    "clean": "rm -rf dist node_modules/.vite",
+    "reinstall": "npm run clean && npm install",
+    "ci": "npm run type-check && npm run lint && npm run format:check && npm run test && npm run build",
+    "check-all": "npm run type-check && npm run lint && npm run format:check",
+    "fix-all": "npm run format && npm run lint:fix && npm run type-check",
+    "test:watch": "vitest --watch",
+    "test:ui": "vitest --ui",
+    "serve": "vite preview --host 0.0.0.0 --port 3000",
+    "dev:check": "npm run type-check && npm run lint && npm run format:check",
+    "dev:fix": "npm run format && npm run lint:fix && npm run type-check",
+    "validate": "npm run type-check && npm run lint && npm run format:check && npm run test",
+    "precommit": "npm run fix-all"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}

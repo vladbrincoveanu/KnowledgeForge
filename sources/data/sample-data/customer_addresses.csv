@@ -1,0 +1,8 @@
+address_id,customer_id,address_type,address_line1,address_line2,city,state,postal_code,country
+ADDR1,1,Billing,123 Main St,,New York,NY,10001,USA
+ADDR2,1,Shipping,500 Park Ave,Apt 12B,New York,NY,10022,USA
+ADDR3,2,Billing,45 Ocean Blvd,,Los Angeles,CA,90001,USA
+ADDR4,3,Shipping,789 Lake Shore Dr,Unit 8,Chicago,IL,60601,USA
+ADDR5,4,Billing,250 Market St,,Houston,TX,77002,USA
+ADDR6,5,Shipping,100 Desert Rd,,Phoenix,AZ,85001,USA
+

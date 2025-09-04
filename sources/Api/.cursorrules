@@ -1,0 +1,137 @@
+# KnowledgeForge API - Python/FastAPI Project Rules
+
+## Core Principles
+- Always use Pydantic models for data validation and serialization instead of dataclasses
+- Follow strict type hints for all function parameters and return values
+- Use FastAPI best practices for async operations and dependency injection
+- Prioritize clear error handling with specific exception types
+- Write comprehensive tests for all business logic
+
+## Python Standards
+- Use Python 3.9+ features and type annotations
+- Follow PEP 8 style guidelines strictly
+- Prefer f-strings for string formatting over .format() or % formatting
+- Use pathlib instead of os.path for file operations
+- Always use context managers for resource management (files, database connections)
+- Handle errors with specific exception types, never use bare except clauses
+
+## Code Quality & Formatting
+- Use Black for code formatting with line length of 88 characters
+- Use Ruff for linting with the configured rules in pyproject.toml
+- Use mypy for static type checking with strict mode enabled
+- Add docstrings for all public functions using Google style format
+- Include type hints for all function parameters and return values
+- Use meaningful variable names, avoid single letters except for common loop variables
+
+## File and Directory Management
+- **NEVER create empty folders or placeholder files without explicit permission**
+- Ask user before creating new directories or major structural changes
+- Only create files that contain meaningful implementation
+- Avoid creating stub files with TODO comments unless specifically requested
+- When creating new modules, include proper implementation, not just imports
+
+## Pydantic & Data Modeling
+- Always use Pydantic BaseModel for domain models, DTOs, and API schemas
+- Use Pydantic Field() for validation constraints and documentation
+- Implement custom validators with @field_validator for complex validation logic
+- Use Pydantic's built-in serialization for JSON responses
+- Handle numpy type conversion properly in Pydantic models
+- Use Enums for categorical data types and status fields
+
+## FastAPI Best Practices
+- Use dependency injection for database connections, authentication, and services
+- Implement proper HTTP status codes and error responses
+- Use Pydantic models for request/response validation
+- Add comprehensive OpenAPI documentation with examples
+- Use async/await for I/O operations (database, file operations, API calls)
+- Implement proper CORS and security middleware
+- Use FastAPI's built-in validation and serialization features
+
+## Testing
+- Write pytest tests for all business logic with descriptive test names
+- Use pytest-asyncio for testing async functions
+- Create fixtures for common test data using Pydantic models
+- Test API endpoints with httpx.AsyncClient
+- Mock external dependencies (LLM services, databases) in tests
+- Test error conditions and edge cases explicitly
+- Maintain high test coverage (aim for 80%+)
+- **MANDATORY: Always run test_pipeline.py after any API changes**
+- **MANDATORY: Always run UI tests after any UI changes**
+- Use `make tests` command to run all tests (not `npm test` directly)
+- Tests are located in @/Tests folder and new tests should only be created there
+- Integration tests should test basic browser functionalities to verify OK status
+
+## Database & Storage
+- Use async database operations with proper connection management
+- Implement proper transaction handling for data consistency
+- Use Neo4j driver best practices for graph operations
+- Handle database connection errors gracefully
+- Use proper indexing strategies for performance
+- **CRITICAL: Use PostgreSQL for metadata storage, Neo4j for nodes and relationships**
+- PostgreSQL is used for: metadata, configuration, task tracking, and data profiling
+- Neo4j is used for: entity nodes, relationship edges, and graph operations
+- Always use pandas for CSV data analysis instead of database-specific query engines
+
+## LLM & AI Integration
+- Handle LLM API failures gracefully with retries and fallbacks
+- Implement proper rate limiting for external AI services
+- Use structured outputs from LLMs with Pydantic validation
+- Cache expensive LLM operations when appropriate
+- Log LLM interactions for debugging and monitoring
+
+## Error Handling & Logging
+- Use structured logging with proper log levels
+- Create custom exception classes for domain-specific errors
+- Implement global exception handlers in FastAPI
+- Return consistent error response formats
+- Never expose internal error details to API consumers
+- Use proper HTTP status codes for different error types
+
+## Performance & Scalability
+- Use async operations for I/O-bound tasks
+- Implement proper caching strategies for expensive operations
+- Use background tasks for long-running operations
+- Optimize database queries and avoid N+1 problems
+- Monitor memory usage when processing large datasets
+- Use streaming responses for large data exports
+
+## Security
+- Validate all input data using Pydantic models
+- Implement proper authentication and authorization
+- Use environment variables for sensitive configuration
+- Never log sensitive information (API keys, passwords)
+- Implement rate limiting for API endpoints
+- Use HTTPS in production configurations
+
+## File Organization
+- Follow the established domain-driven design structure
+- Use lowercase for all folder names (e.g., domain/, services/, infrastructure/)
+- Use lowercase for all file names (e.g., entities.py, graph_manager.py)
+- Keep related functionality in the same module
+- Use clear, descriptive module and function names
+- Separate domain models, services, and infrastructure concerns
+- Keep configuration in dedicated files with proper validation
+
+## Dependencies & Requirements
+- Use specific version ranges in requirements.txt
+- Keep development dependencies separate
+- Document any special setup requirements
+- Use virtual environments for isolation
+- Pin major version numbers to avoid breaking changes
+
+## Comments & Documentation
+- Write docstrings for all public functions and classes
+- Use inline comments for complex algorithms or business logic
+- Document API endpoints with clear descriptions and examples
+- Keep README.md updated with setup and usage instructions
+- Document configuration options and environment variables
+
+## Project Workflow & Testing Requirements
+- **ALWAYS run test_pipeline.py after making API changes**
+- Use the project's Makefile for all commands (single top-level Makefile preferred)
+- The 'npm run check-all' command should also run tests after any changes to UI files
+- Never send connection test successful messages to the main Telegram channel
+- Project .gitignore should ignore config.json; only config.default.json is allowed to be committed
+- Always verify that entities AND relationships are properly saved to Neo4j after extraction
+- Test both entity extraction and relationship discovery in the pipeline
+- Verify Neo4j storage through both API endpoints and direct metrics queries
