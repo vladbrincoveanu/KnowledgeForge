@@ -69,7 +69,8 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
   );
 
   const nodeColor = useCallback((node: GraphNode) => {
-    return node.type === 'file' ? '#007bff' : '#28a745';
+    // Simple single color for all nodes
+    return '#007bff'; // Blue
   }, []);
 
   const nodeLabel = useCallback((node: GraphNode) => {
@@ -85,7 +86,8 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
     const confidence = link.confidence || 0;
     console.log('Link color for:', link.id, 'confidence:', confidence);
     if (confidence >= 0.9) return '#28a745'; // High confidence - green
-    if (confidence >= 0.7) return '#ffc107'; // Medium confidence - yellow
+    if (confidence >= 0.7) return '#fd7e14'; // Medium confidence - orange
+    if (confidence >= 0.5) return '#ffc107'; // Lower confidence - yellow
     return '#dc3545'; // Low confidence - red
   }, []);
 
@@ -93,8 +95,9 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
     // Width based on connection strength
     const confidence = link.confidence || 0;
     console.log('Link width for:', link.id, 'confidence:', confidence);
-    if (confidence >= 0.9) return 4;
-    if (confidence >= 0.7) return 3;
+    if (confidence >= 0.9) return 6;
+    if (confidence >= 0.7) return 4;
+    if (confidence >= 0.5) return 3;
     return 2;
   }, []);
 
@@ -135,6 +138,30 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
             <span>Validate connections visually</span>
           </div>
         </div>
+        
+        <div className="graph-legend">
+          <div className="legend-section">
+            <h4>Link Confidence:</h4>
+            <div className="legend-items">
+              <div className="legend-item">
+                <span className="legend-color" style={{ backgroundColor: '#28a745' }}></span>
+                <span>High (&gt;=90%)</span>
+              </div>
+              <div className="legend-item">
+                <span className="legend-color" style={{ backgroundColor: '#fd7e14' }}></span>
+                <span>Medium (&gt;=70%)</span>
+              </div>
+              <div className="legend-item">
+                <span className="legend-color" style={{ backgroundColor: '#ffc107' }}></span>
+                <span>Lower (&gt;=50%)</span>
+              </div>
+              <div className="legend-item">
+                <span className="legend-color" style={{ backgroundColor: '#dc3545' }}></span>
+                <span>Low (&lt;50%)</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="graph-visualization">
@@ -150,13 +177,36 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
             graphData={{
               nodes: data.nodes,
               links: data.links.filter(link => {
-                const sourceExists = data.nodes.some(node => node.id === link.source);
-                const targetExists = data.nodes.some(node => node.id === link.target);
+                // ForceGraph2D might be converting string IDs to objects
+                // Let's ensure we're working with string IDs
+                const sourceId = typeof link.source === 'object' && link.source !== null ? (link.source as any).id : String(link.source);
+                const targetId = typeof link.target === 'object' && link.target !== null ? (link.target as any).id : String(link.target);
+                
+                console.log('Checking link:', link);
+                console.log('Original source:', link.source, 'type:', typeof link.source);
+                console.log('Original target:', link.target, 'type:', typeof link.target);
+                console.log('Processed sourceId:', sourceId);
+                console.log('Processed targetId:', targetId);
+                
+                const sourceExists = data.nodes.some(node => {
+                  const nodeId = String(node.id);
+                  const matches = nodeId === sourceId;
+                  console.log('Comparing node ID:', nodeId, 'with sourceId:', sourceId, 'matches:', matches);
+                  return matches;
+                });
+                const targetExists = data.nodes.some(node => {
+                  const nodeId = String(node.id);
+                  const matches = nodeId === targetId;
+                  console.log('Comparing node ID:', nodeId, 'with targetId:', targetId, 'matches:', matches);
+                  return matches;
+                });
+                
                 const isValid = sourceExists && targetExists;
                 if (!isValid) {
-                  console.warn(`Invalid link: ${link.source} -> ${link.target}`);
+                  console.warn(`Invalid link: ${sourceId} -> ${targetId}`);
+                  console.warn('Source exists:', sourceExists, 'Target exists:', targetExists);
                 } else {
-                  console.log(`Valid link: ${link.source} -> ${link.target}`);
+                  console.log(`Valid link: ${sourceId} -> ${targetId}`);
                 }
                 return isValid;
               })
@@ -175,14 +225,19 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
             linkWidth={linkWidth}
             onNodeClick={handleNodeClick}
             onLinkClick={handleLinkClick}
-            nodeRelSize={8}
-            linkDirectionalArrowLength={6}
+            nodeRelSize={12}
+            linkDirectionalArrowLength={8}
             linkDirectionalArrowRelPos={1}
-            linkCurvature={0.1}
-            cooldownTicks={100}
+            linkCurvature={0.2}
+            cooldownTicks={200}
+            d3AlphaDecay={0.02}
+            d3VelocityDecay={0.3}
             onEngineStop={() => {
               console.log('Graph engine stopped, zooming to fit');
-              graphRef.current?.zoomToFit(400);
+              // Add a small delay to ensure the graph has settled
+              setTimeout(() => {
+                graphRef.current?.zoomToFit(400, 50);
+              }, 100);
             }}
             backgroundColor="#ffffff"
             width={800}

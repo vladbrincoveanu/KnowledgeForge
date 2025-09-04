@@ -244,10 +244,12 @@ const MainContent: React.FC = () => {
         console.log('Sample relationship:', relationships[0]);
         console.log('All relationships:', relationships);
         console.log('Entity names:', entities.map(e => e.name));
+        console.log('Entity IDs:', entities.map(e => ({ name: e.name, id: e.id, idType: typeof e.id })));
+        console.log('Entity types:', entities.map(e => ({ name: e.name, entityType: e.entity_type })));
 
         // Convert to graph data
         const nodes: GraphNode[] = entities.map(entity => ({
-          id: entity.id || `entity-${entity.name}`,
+          id: String(entity.id || `entity-${entity.name}`),
           label: entity.name,
           type: 'entity',
           entityType: entity.entity_type,
@@ -274,12 +276,16 @@ const MainContent: React.FC = () => {
           
           const link = {
             id: rel.id || `rel-${sourceEntity.id}-${targetEntity.id}`,
-            source: sourceEntity.id || `entity-${sourceEntity.name}`,
-            target: targetEntity.id || `entity-${targetEntity.name}`,
+            source: String(sourceEntity.id || `entity-${sourceEntity.name}`),
+            target: String(targetEntity.id || `entity-${targetEntity.name}`),
             label: rel.relationship_type,
             confidence: rel.confidence,
           };
           console.log('Created link:', link);
+          console.log('Source entity ID type:', typeof sourceEntity.id, 'Value:', sourceEntity.id);
+          console.log('Target entity ID type:', typeof targetEntity.id, 'Value:', targetEntity.id);
+          console.log('Link source type:', typeof link.source, 'Value:', link.source);
+          console.log('Link target type:', typeof link.target, 'Value:', link.target);
           return link;
         }).filter(Boolean) as GraphLink[];
 
@@ -320,6 +326,18 @@ const MainContent: React.FC = () => {
         console.log('Final graph data:', { nodes, links: validLinks });
         console.log('Number of valid links:', validLinks.length);
         console.log('Valid links details:', validLinks);
+        
+        // Test: Create a simple link to see if the issue is with our data or ForceGraph2D
+        const testLink = {
+          id: 'test-link',
+          source: 'test-source',
+          target: 'test-target',
+          label: 'Test Link',
+          confidence: 0.9
+        };
+        console.log('Test link:', testLink);
+        console.log('Test link source type:', typeof testLink.source);
+        
         setGraphData({ nodes, links: validLinks });
       } catch (error) {
         console.error('Failed to load graph data:', error);
