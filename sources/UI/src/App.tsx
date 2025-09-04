@@ -684,49 +684,22 @@ const MainContent: React.FC = () => {
                       Interactive visualization of extracted ontology
                       relationships
                     </p>
-                    <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                      {activeTaskId && (
-                        <button
-                          onClick={() => loadGraphData(activeTaskId)}
-                          style={{
-                            padding: '8px 16px',
-                            backgroundColor: '#007bff',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Refresh Graph Data
-                        </button>
-                      )}
+                    {activeTaskId && (
                       <button
-                        onClick={() => {
-                          // Test with simple hardcoded data
-                          const testData: GraphData = {
-                            nodes: [
-                              { id: '1', label: 'Test Node 1', type: 'entity', entityType: 'Test', confidence: 0.9 },
-                              { id: '2', label: 'Test Node 2', type: 'entity', entityType: 'Test', confidence: 0.9 }
-                            ],
-                            links: [
-                              { id: 'test-link', source: '1', target: '2', label: 'Test Link', confidence: 0.9 }
-                            ]
-                          };
-                          console.log('Setting test data:', testData);
-                          setGraphData(testData);
-                        }}
+                        onClick={() => loadGraphData(activeTaskId)}
                         style={{
                           padding: '8px 16px',
-                          backgroundColor: '#28a745',
+                          backgroundColor: '#007bff',
                           color: 'white',
                           border: 'none',
                           borderRadius: '4px',
-                          cursor: 'pointer'
+                          cursor: 'pointer',
+                          marginTop: '10px'
                         }}
                       >
-                        Test Simple Graph
+                        Refresh Graph Data
                       </button>
-                    </div>
+                    )}
                   </div>
 
                   <Graph
