@@ -17,6 +17,32 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [showNodeModal, setShowNodeModal] = useState(false);
 
+  // Debug logging
+  console.log('Graph component received data:', data);
+  console.log('Graph nodes count:', data.nodes.length);
+  console.log('Graph links count:', data.links.length);
+
+  // Validate data structure
+  const isValidData = data && Array.isArray(data.nodes) && Array.isArray(data.links);
+  console.log('Graph data is valid:', isValidData);
+
+  // Debug: Check for orphaned links
+  if (data.links && data.links.length > 0) {
+    const nodeIds = new Set(data.nodes.map(n => n.id));
+    const orphanedLinks = data.links.filter(link => 
+      !nodeIds.has(link.source) || !nodeIds.has(link.target)
+    );
+    if (orphanedLinks.length > 0) {
+      console.warn('Found orphaned links:', orphanedLinks);
+    }
+    
+    // Log valid links
+    const validLinks = data.links.filter(link => 
+      nodeIds.has(link.source) && nodeIds.has(link.target)
+    );
+    console.log('Valid links for graph:', validLinks);
+  }
+
   const handleNodeClick = useCallback((node: GraphNode) => {
     console.log('Clicked node:', node);
     // Clear edge selection when clicking on a node
@@ -57,6 +83,7 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
   const linkColor = useCallback((link: GraphLink) => {
     // Color based on connection strength/confidence
     const confidence = link.confidence || 0;
+    console.log('Link color for:', link.id, 'confidence:', confidence);
     if (confidence >= 0.9) return '#28a745'; // High confidence - green
     if (confidence >= 0.7) return '#ffc107'; // Medium confidence - yellow
     return '#dc3545'; // Low confidence - red
@@ -65,6 +92,7 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
   const linkWidth = useCallback((link: GraphLink) => {
     // Width based on connection strength
     const confidence = link.confidence || 0;
+    console.log('Link width for:', link.id, 'confidence:', confidence);
     if (confidence >= 0.9) return 4;
     if (confidence >= 0.7) return 3;
     return 2;
@@ -110,10 +138,36 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
       </div>
 
       <div className="graph-visualization">
-        {data.nodes.length > 0 ? (
+        {!isValidData ? (
+          <div className="empty-graph">
+            <div className="empty-icon">⚠️</div>
+            <h4>Invalid Graph Data</h4>
+            <p>The graph data structure is invalid. Please check the console for details.</p>
+          </div>
+                ) : data.nodes.length > 0 ? (
           <ForceGraph2D
             ref={graphRef}
-            graphData={data}
+            graphData={{
+              nodes: data.nodes,
+              links: data.links.filter(link => {
+                const sourceExists = data.nodes.some(node => node.id === link.source);
+                const targetExists = data.nodes.some(node => node.id === link.target);
+                const isValid = sourceExists && targetExists;
+                if (!isValid) {
+                  console.warn(`Invalid link: ${link.source} -> ${link.target}`);
+                } else {
+                  console.log(`Valid link: ${link.source} -> ${link.target}`);
+                }
+                return isValid;
+              })
+            }}
+            onLinkHover={(link) => {
+              console.log('Link hovered:', link);
+            }}
+            onNodeHover={(node) => {
+              console.log('Node hovered:', node);
+            }}
+
             nodeLabel={nodeLabel}
             linkLabel={linkLabel}
             nodeColor={nodeColor}
@@ -126,7 +180,10 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
             linkDirectionalArrowRelPos={1}
             linkCurvature={0.1}
             cooldownTicks={100}
-            onEngineStop={() => graphRef.current?.zoomToFit(400)}
+            onEngineStop={() => {
+              console.log('Graph engine stopped, zooming to fit');
+              graphRef.current?.zoomToFit(400);
+            }}
             backgroundColor="#ffffff"
             width={800}
             height={600}
@@ -134,8 +191,10 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
         ) : (
           <div className="empty-graph">
             <div className="empty-icon">📊</div>
-            <h4>No Files Uploaded</h4>
-            <p>Upload CSV files to see the network graph visualization</p>
+            <h4>No Graph Data Available</h4>
+            <p>Complete an ontology extraction to see the network graph visualization</p>
+            <p>This graph shows the same entities and relationships as the Ontology Results section</p>
+            <p>Current data: {data.nodes.length} nodes, {data.links.length} links</p>
           </div>
         )}
       </div>

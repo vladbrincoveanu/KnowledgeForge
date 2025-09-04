@@ -33,6 +33,8 @@ interface Relationship {
   id?: string;
   source_entity_id?: string;
   target_entity_id?: string;
+  source_entity?: string;  // Entity name
+  target_entity?: string;  // Entity name
   relationship_type: string;
   confidence: number;
   source_columns?: string[];

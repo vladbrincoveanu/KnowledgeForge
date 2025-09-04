@@ -7,7 +7,7 @@ import {
   Link,
   useLocation,
 } from 'react-router-dom';
-import { wsService } from './services/api';
+import { wsService, ontologyAPI } from './services/api';
 import FileUploader from './@components/upload-extract/FileUploader/FileUploader';
 import Graph from './@components/graph-view/Graph/Graph';
 import ConnectionPrompt from './@components/upload-extract/ConnectionPrompt/ConnectionPrompt';
@@ -198,44 +198,136 @@ const MainContent: React.FC = () => {
   const loadGraphData = useCallback(
     async (taskId: string) => {
       try {
-        // const graphDataResponse = await ontologyAPI.getGraphVisualization(taskId);
-
-        // Convert Cypher queries to graph data
-        const nodes: GraphNode[] = [];
-        const links: GraphLink[] = [];
-
-        // This is a simplified conversion - in production you'd parse the Cypher queries
-        // For now, we'll create basic graph data from entities and relationships
-        if (extractionTasks[taskId]?.results) {
-          const { entities, relationships } = extractionTasks[taskId].results!;
-
-          entities.forEach(entity => {
-            nodes.push({
-              id: entity.id,
-              label: entity.name,
-              type: 'entity',
-              entityType: entity.entity_type,
-              confidence: entity.confidence,
-            });
-          });
-
-          relationships.forEach(rel => {
-            links.push({
-              id: rel.id,
-              source: rel.source_entity_id,
-              target: rel.target_entity_id,
-              label: rel.relationship_type,
-              confidence: rel.confidence,
-            });
-          });
+        console.log('Loading graph data for task:', taskId);
+        
+        // First try to get graph data from the dedicated graph API endpoint
+        try {
+          const graphDataResponse = await ontologyAPI.getGraphVisualization(taskId);
+          console.log('Graph data from API:', graphDataResponse);
+          
+          // Convert API response to our GraphData format
+          const nodes: GraphNode[] = graphDataResponse.nodes.map((node: any) => ({
+            id: node.id,
+            label: node.label,
+            type: node.type,
+            entityType: node.properties?.entityType || node.type,
+            confidence: node.properties?.confidence || 1.0,
+          }));
+          
+          const links: GraphLink[] = graphDataResponse.edges.map((edge: any) => ({
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+            label: edge.type,
+            confidence: edge.properties?.confidence || 1.0,
+          }));
+          
+          setGraphData({ nodes, links });
+          return;
+        } catch (apiError) {
+          console.log('Graph API not available, loading from entities and relationships:', apiError);
         }
 
-        setGraphData({ nodes, links });
+        // Fallback: Load entities and relationships directly from API (same as Ontology Results)
+        console.log('Loading entities and relationships from API...');
+        
+        // Load entities and relationships the same way as Ontology Results
+        const entitiesData = await ontologyAPI.getEntities(taskId, 100, 0);
+        const relationshipsData = await ontologyAPI.getRelationships(taskId, 100, 0);
+        
+        const entities = entitiesData.items || [];
+        const relationships = relationshipsData.items || [];
+        
+        console.log('Loaded entities:', entities.length);
+        console.log('Loaded relationships:', relationships.length);
+        console.log('Sample entity:', entities[0]);
+        console.log('Sample relationship:', relationships[0]);
+        console.log('All relationships:', relationships);
+        console.log('Entity names:', entities.map(e => e.name));
+
+        // Convert to graph data
+        const nodes: GraphNode[] = entities.map(entity => ({
+          id: entity.id || `entity-${entity.name}`,
+          label: entity.name,
+          type: 'entity',
+          entityType: entity.entity_type,
+          confidence: entity.confidence,
+        }));
+
+        // Debug: Log all node IDs
+        console.log('Node IDs:', nodes.map(n => n.id));
+
+        const links: GraphLink[] = relationships.map(rel => {
+          console.log('Processing relationship:', rel);
+          
+          // The API returns source_entity and target_entity (names) instead of IDs
+          // We need to find the corresponding entity IDs by matching the names
+          const sourceEntity = entities.find(entity => entity.name === rel.source_entity);
+          const targetEntity = entities.find(entity => entity.name === rel.target_entity);
+          
+          if (!sourceEntity || !targetEntity) {
+            console.warn('Could not find entities for relationship:', rel);
+            console.warn('Source entity name:', rel.source_entity, 'Found:', sourceEntity);
+            console.warn('Target entity name:', rel.target_entity, 'Found:', targetEntity);
+            return null;
+          }
+          
+          const link = {
+            id: rel.id || `rel-${sourceEntity.id}-${targetEntity.id}`,
+            source: sourceEntity.id || `entity-${sourceEntity.name}`,
+            target: targetEntity.id || `entity-${targetEntity.name}`,
+            label: rel.relationship_type,
+            confidence: rel.confidence,
+          };
+          console.log('Created link:', link);
+          return link;
+        }).filter(Boolean) as GraphLink[];
+
+        // Debug: Log all relationship references
+        console.log('Relationship source IDs:', links.map(l => l.source));
+        console.log('Relationship target IDs:', links.map(l => l.target));
+        
+        // Check if relationship IDs match entity IDs
+        const entityIds = new Set(nodes.map(n => n.id));
+        console.log('Available entity IDs:', Array.from(entityIds));
+        
+        links.forEach(link => {
+          if (!entityIds.has(link.source)) {
+            console.warn(`Link source ID not found in entities: ${link.source}`);
+          }
+          if (!entityIds.has(link.target)) {
+            console.warn(`Link target ID not found in entities: ${link.target}`);
+          }
+        });
+
+        // Filter out relationships that reference non-existent nodes
+        const validLinks = links.filter(link => {
+          const sourceExists = nodes.some(node => node.id === link.source);
+          const targetExists = nodes.some(node => node.id === link.target);
+          
+          if (!sourceExists) {
+            console.warn(`Relationship source node not found: ${link.source}`);
+          }
+          if (!targetExists) {
+            console.warn(`Relationship target node not found: ${link.target}`);
+          }
+          
+          return sourceExists && targetExists;
+        });
+
+        console.log(`Filtered ${links.length - validLinks.length} invalid relationships`);
+
+        console.log('Final graph data:', { nodes, links: validLinks });
+        console.log('Number of valid links:', validLinks.length);
+        console.log('Valid links details:', validLinks);
+        setGraphData({ nodes, links: validLinks });
       } catch (error) {
         console.error('Failed to load graph data:', error);
+        // Set empty graph data on error
+        setGraphData({ nodes: [], links: [] });
       }
     },
-    [extractionTasks]
+    []
   );
 
   const handleWebSocketMessage = useCallback(
@@ -273,15 +365,12 @@ const MainContent: React.FC = () => {
   // Effect to load graph data when tasks are completed
   useEffect(() => {
     Object.values(extractionTasks).forEach(task => {
-      if (task.status === 'completed' && task.results) {
-        // Only load if we don't already have graph data for this task
-        // This prevents infinite reloading
-        if (graphData.nodes.length === 0) {
-          loadGraphData(task.taskId);
-        }
+      if (task.status === 'completed') {
+        console.log('Task completed, loading graph data:', task.taskId);
+        loadGraphData(task.taskId);
       }
     });
-  }, [extractionTasks, loadGraphData, graphData.nodes.length]);
+  }, [extractionTasks, loadGraphData]);
 
   const calculateSimilarity = useCallback(
     (str1: string, str2: string): number => {
@@ -433,9 +522,18 @@ const MainContent: React.FC = () => {
   // Update graph data when active task changes
   useEffect(() => {
     if (activeTaskId && extractionTasks[activeTaskId]?.status === 'completed') {
+      console.log('Active task changed, loading graph data:', activeTaskId);
       loadGraphData(activeTaskId);
     }
   }, [activeTaskId, extractionTasks, loadGraphData]);
+
+  // Load graph data when navigating to graph view
+  useEffect(() => {
+    if (location.pathname === '/graph' && activeTaskId) {
+      console.log('Navigated to graph view, loading graph data:', activeTaskId);
+      loadGraphData(activeTaskId);
+    }
+  }, [location.pathname, activeTaskId, loadGraphData]);
 
   // Determine active tab based on location
   const getActiveTab = (): string => {
@@ -568,6 +666,49 @@ const MainContent: React.FC = () => {
                       Interactive visualization of extracted ontology
                       relationships
                     </p>
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                      {activeTaskId && (
+                        <button
+                          onClick={() => loadGraphData(activeTaskId)}
+                          style={{
+                            padding: '8px 16px',
+                            backgroundColor: '#007bff',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Refresh Graph Data
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          // Test with simple hardcoded data
+                          const testData: GraphData = {
+                            nodes: [
+                              { id: '1', label: 'Test Node 1', type: 'entity', entityType: 'Test', confidence: 0.9 },
+                              { id: '2', label: 'Test Node 2', type: 'entity', entityType: 'Test', confidence: 0.9 }
+                            ],
+                            links: [
+                              { id: 'test-link', source: '1', target: '2', label: 'Test Link', confidence: 0.9 }
+                            ]
+                          };
+                          console.log('Setting test data:', testData);
+                          setGraphData(testData);
+                        }}
+                        style={{
+                          padding: '8px 16px',
+                          backgroundColor: '#28a745',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Test Simple Graph
+                      </button>
+                    </div>
                   </div>
 
                   <Graph
