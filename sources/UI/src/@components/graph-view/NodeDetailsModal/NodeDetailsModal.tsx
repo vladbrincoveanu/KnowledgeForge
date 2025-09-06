@@ -48,32 +48,71 @@ const NodeDetailsModal: React.FC<NodeDetailsModalProps> = ({
 
         <div className="node-details-content">
           <div className="node-info-section">
-            <h3>📊 File Information</h3>
+            <h3>📊 Entity Information</h3>
             <div className="info-grid">
               <div className="info-item">
-                <span className="label">File Type:</span>
-                <span className="value">{safeString(node.type)}</span>
+                <span className="label">Entity Name:</span>
+                <span className="value">{safeString(node.label)}</span>
               </div>
               <div className="info-item">
-                <span className="label">Total Columns:</span>
+                <span className="label">Entity Type:</span>
+                <span className="value">{safeString(node.entityType || node.type)}</span>
+              </div>
+              <div className="info-item">
+                <span className="label">Confidence:</span>
                 <span className="value">
-                  {safeString(node.metadata?.columns || 0)}
+                  <span className={`confidence-badge confidence-${_getConfidenceLabel(node.confidence || 0).toLowerCase().replace(' ', '-')}`}>
+                    {Math.round((node.confidence || 0) * 100)}% ({_getConfidenceLabel(node.confidence || 0)})
+                  </span>
                 </span>
               </div>
               <div className="info-item">
-                <span className="label">Upload Date:</span>
+                <span className="label">Source Columns:</span>
                 <span className="value">
-                  {node.metadata?.uploadDate
-                    ? new Date(node.metadata.uploadDate).toLocaleDateString()
-                    : 'Unknown'}
+                  {node.metadata?.sourceColumns?.length || 0} columns
                 </span>
+              </div>
+              <div className="info-item">
+                <span className="label">Source Value:</span>
+                <span className="value">{safeString(node.metadata?.sourceValue || 'N/A')}</span>
+              </div>
+              <div className="info-item">
+                <span className="label">Entity ID:</span>
+                <span className="value">{safeString(node.id)}</span>
               </div>
             </div>
           </div>
 
+          {node.metadata?.sourceColumns && node.metadata.sourceColumns.length > 0 && (
+            <div className="source-columns-section">
+              <h3>📋 Source Columns</h3>
+              <div className="source-columns-list">
+                {node.metadata.sourceColumns.map((column: string, index: number) => (
+                  <div key={index} className="source-column-item">
+                    <span className="column-name">{column}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {node.metadata?.attributes && Object.keys(node.metadata.attributes).length > 0 && (
+            <div className="attributes-section">
+              <h3>🔧 Entity Attributes</h3>
+              <div className="attributes-grid">
+                {Object.entries(node.metadata.attributes).map(([key, value]) => (
+                  <div key={key} className="attribute-item">
+                    <span className="attribute-key">{key}:</span>
+                    <span className="attribute-value">{safeString(value)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {node.columns && Object.keys(node.columns).length > 0 && (
             <div className="columns-section">
-              <h3>📋 Column Details</h3>
+              <h3>📊 Column Statistics</h3>
               <div className="columns-grid">
                 {Object.entries(node.columns || {}).map(
                   ([columnName, columnData]: [string, any]) => (
@@ -163,9 +202,12 @@ const NodeDetailsModal: React.FC<NodeDetailsModalProps> = ({
             </div>
           )}
 
-          {(!node.columns || Object.keys(node.columns).length === 0) && (
-            <div className="no-columns">
-              <p>⚠️ No column metadata available for this file.</p>
+          {(!node.metadata?.sourceColumns || node.metadata.sourceColumns.length === 0) && 
+           (!node.metadata?.attributes || Object.keys(node.metadata.attributes).length === 0) && 
+           (!node.columns || Object.keys(node.columns).length === 0) && (
+            <div className="no-metadata">
+              <p>⚠️ No detailed metadata available for this entity.</p>
+              <p>This entity was extracted from your data but doesn't have additional metadata stored in PostgreSQL.</p>
             </div>
           )}
         </div>

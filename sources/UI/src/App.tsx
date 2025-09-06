@@ -254,6 +254,14 @@ const MainContent: React.FC = () => {
           type: 'entity',
           entityType: entity.entity_type,
           confidence: entity.confidence,
+          metadata: {
+            columns: entity.source_columns?.length || 0,
+            uploadDate: new Date().toISOString(),
+            sourceColumns: entity.source_columns || [],
+            sourceValue: entity.source_value,
+            attributes: entity.attributes || {}
+          },
+          columns: entity.attributes || {}
         }));
 
         // Debug: Log all node IDs
