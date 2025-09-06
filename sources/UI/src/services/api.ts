@@ -271,13 +271,12 @@ export const ontologyAPI = {
 
   // Get graph visualization
   getGraphVisualization: async (
-    taskId: string
+    taskId?: string
   ): Promise<GraphVisualization> => {
+    const params = taskId ? { task_id: taskId } : {};
     const response: AxiosResponse<GraphVisualization> = await api.get(
       '/v1/graph/visualize',
-      {
-        params: { task_id: taskId },
-      }
+      { params }
     );
     return response.data;
   },

@@ -7,7 +7,7 @@ import { GraphData, GraphLink, GraphNode } from '../../../types';
 
 interface GraphProps {
   data: GraphData;
-  onEdgeClick: (edge: GraphLink) => void;
+  onEdgeClick?: (edge: GraphLink) => void;
 }
 
 const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
@@ -250,9 +250,18 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
             <p>Complete an ontology extraction to see the network graph visualization</p>
             <p>This graph shows the same entities and relationships as the Ontology Results section</p>
             <p>Current data: {data.nodes.length} nodes, {data.links.length} links</p>
-            <div className="loading-indicator">
-              <div className="spinner"></div>
-              <p>Loading graph data...</p>
+            <div className="empty-state-actions">
+              <p>To get started:</p>
+              <ol>
+                <li>Go to the "Upload & Extract" tab</li>
+                <li>Upload a CSV file</li>
+                <li>Wait for the extraction to complete</li>
+                <li>Return to this Graph View to see the results</li>
+              </ol>
+              <p style={{ marginTop: '16px', fontSize: '12px', color: '#6c757d' }}>
+                <strong>Note:</strong> This view only shows data from your current session. 
+                If you want to see all data from previous extractions, use the "Load All Data from Database" button above.
+              </p>
             </div>
           </div>
         )}

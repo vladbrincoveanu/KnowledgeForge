@@ -1,6 +1,7 @@
 """Data access endpoints for entities, relationships, and graph visualization."""
 
 import logging
+import uuid
 from datetime import datetime
 from typing import Optional
 

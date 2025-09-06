@@ -94,7 +94,7 @@ const NodeDetailsModal: React.FC<NodeDetailsModalProps> = ({
                 <span className="label">Source Columns:</span>
                 <div className="value-with-tooltip">
                   <span className="value">
-                    {node.metadata?.sourceColumns?.length || 0} columns
+                    {Array.isArray(node.metadata?.sourceColumns) ? node.metadata.sourceColumns.length : 0} columns
                   </span>
                   <div className="tooltip">
                     <img src="/src/assets/info.svg" alt="info" className="tooltip-icon" />
@@ -148,7 +148,7 @@ const NodeDetailsModal: React.FC<NodeDetailsModalProps> = ({
             </div>
           </div>
 
-          {node.metadata?.sourceColumns && node.metadata.sourceColumns.length > 0 && (
+          {Array.isArray(node.metadata?.sourceColumns) && node.metadata.sourceColumns.length > 0 && (
             <div className="source-columns-section">
               <div className="section-header-with-tooltip">
                 <h3>📋 Source Columns</h3>
@@ -160,7 +160,7 @@ const NodeDetailsModal: React.FC<NodeDetailsModalProps> = ({
                 </div>
               </div>
               <div className="source-columns-list">
-                {node.metadata.sourceColumns.map((column: string, index: number) => (
+                {Array.isArray(node.metadata.sourceColumns) && node.metadata.sourceColumns.map((column: string, index: number) => (
                   <div key={index} className="source-column-item">
                     <span className="column-name">{column}</span>
                   </div>
@@ -169,7 +169,7 @@ const NodeDetailsModal: React.FC<NodeDetailsModalProps> = ({
             </div>
           )}
 
-          {node.metadata?.attributes && Object.keys(node.metadata.attributes).length > 0 && (
+          {node.metadata?.attributes && typeof node.metadata.attributes === 'object' && Object.keys(node.metadata.attributes).length > 0 && (
             <div className="attributes-section">
               <h3>🔧 Entity Attributes</h3>
               <div className="attributes-grid">
@@ -275,7 +275,7 @@ const NodeDetailsModal: React.FC<NodeDetailsModalProps> = ({
             </div>
           )}
 
-          {(!node.metadata?.sourceColumns || node.metadata.sourceColumns.length === 0) && 
+          {(!Array.isArray(node.metadata?.sourceColumns) || node.metadata.sourceColumns.length === 0) && 
            (!node.metadata?.attributes || Object.keys(node.metadata.attributes).length === 0) && 
            (!node.columns || Object.keys(node.columns).length === 0) && (
             <div className="no-metadata">

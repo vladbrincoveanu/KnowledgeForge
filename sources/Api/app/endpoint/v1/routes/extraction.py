@@ -407,6 +407,7 @@ async def run_extraction_pipeline(
         # Get the file_id from the task
         metadata_store.complete_extraction_run(
             task_id,
+            "completed",
             {
                 "entities_count": len(entities),
                 "relationships_count": len(relationships),
@@ -428,6 +429,19 @@ async def run_extraction_pipeline(
         logger.error(f"Extraction pipeline failed for task {task_id}: {e}")
         task.status = "failed"
         task.errors.append(str(e))
+        
+        # Update metadata store with failure status
+        try:
+            metadata_store.complete_extraction_run(
+                task_id,
+                "failed",
+                {
+                    "error": str(e),
+                    "failed_at": datetime.now().isoformat(),
+                },
+            )
+        except Exception as store_error:
+            logger.error(f"Failed to update metadata store with failure status: {store_error}")
 
 
 async def profile_dataset(
@@ -591,6 +605,7 @@ async def store_in_neo4j(
                     entity=entity,
                     source_file=file_name,
                     extraction_timestamp=datetime.now(),
+                    task_id=task_id,
                 )
                 if success:
                     logger.info(f"Successfully stored entity: {getattr(entity, 'name', 'NO_NAME')}")
