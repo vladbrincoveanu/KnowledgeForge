@@ -52,40 +52,113 @@ const NodeDetailsModal: React.FC<NodeDetailsModalProps> = ({
             <div className="info-grid">
               <div className="info-item">
                 <span className="label">Entity Name:</span>
-                <span className="value">{safeString(node.label)}</span>
+                <div className="value-with-tooltip">
+                  <span className="value">{safeString(node.label)}</span>
+                  <div className="tooltip">
+                    <img src="/src/assets/info.svg" alt="info" className="tooltip-icon" />
+                    <div className="tooltip-content">
+                      The name of the data concept that AI identified in your dataset. This represents what the data represents (e.g., "product_id", "customer_name").
+                    </div>
+                  </div>
+                </div>
               </div>
               <div className="info-item">
                 <span className="label">Entity Type:</span>
-                <span className="value">{safeString(node.entityType || node.type)}</span>
+                <div className="value-with-tooltip">
+                  <span className="value">{safeString(node.entityType || node.type)}</span>
+                  <div className="tooltip">
+                    <img src="/src/assets/info.svg" alt="info" className="tooltip-icon" />
+                    <div className="tooltip-content">
+                      The category of data this represents: identifier (unique IDs), measurement (numbers/quantities), categorical (categories/labels), or geographic (locations).
+                    </div>
+                  </div>
+                </div>
               </div>
               <div className="info-item">
                 <span className="label">Confidence:</span>
-                <span className="value">
-                  <span className={`confidence-badge confidence-${_getConfidenceLabel(node.confidence || 0).toLowerCase().replace(' ', '-')}`}>
-                    {Math.round((node.confidence || 0) * 100)}% ({_getConfidenceLabel(node.confidence || 0)})
+                <div className="value-with-tooltip">
+                  <span className="value">
+                    <span className={`confidence-badge confidence-${_getConfidenceLabel(node.confidence || 0).toLowerCase().replace(' ', '-')}`}>
+                      {Math.round((node.confidence || 0) * 100)}% ({_getConfidenceLabel(node.confidence || 0)})
+                    </span>
                   </span>
-                </span>
+                  <div className="tooltip">
+                    <img src="/src/assets/info.svg" alt="info" className="tooltip-icon" />
+                    <div className="tooltip-content">
+                      How certain the AI is about this classification. Higher percentages mean the AI is more confident this is correctly identified.
+                    </div>
+                  </div>
+                </div>
               </div>
               <div className="info-item">
                 <span className="label">Source Columns:</span>
-                <span className="value">
-                  {node.metadata?.sourceColumns?.length || 0} columns
-                </span>
+                <div className="value-with-tooltip">
+                  <span className="value">
+                    {node.metadata?.sourceColumns?.length || 0} columns
+                  </span>
+                  <div className="tooltip">
+                    <img src="/src/assets/info.svg" alt="info" className="tooltip-icon" />
+                    <div className="tooltip-content">
+                      The specific columns in your CSV file where this entity was found. Shows which data columns the AI analyzed to identify this concept.
+                    </div>
+                  </div>
+                </div>
               </div>
               <div className="info-item">
                 <span className="label">Source Value:</span>
-                <span className="value">{safeString(node.metadata?.sourceValue || 'N/A')}</span>
+                <div className="value-with-tooltip">
+                  <span className="value">
+                    {node.metadata?.sourceValue && node.metadata.sourceValue !== 'N/A' 
+                      ? safeString(node.metadata.sourceValue)
+                      : 'Not available - entity extracted from column structure'
+                    }
+                  </span>
+                  <div className="tooltip">
+                    <img src="/src/assets/info.svg" alt="info" className="tooltip-icon" />
+                    <div className="tooltip-content">
+                      An example actual value from your data that the AI used to identify this entity. Shows what the data looks like in practice.
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="info-item">
+                <span className="label">Source File:</span>
+                <div className="value-with-tooltip">
+                  <span className="value">{safeString(node.metadata?.sourceFile || 'Unknown')}</span>
+                  <div className="tooltip">
+                    <img src="/src/assets/info.svg" alt="info" className="tooltip-icon" />
+                    <div className="tooltip-content">
+                      The original CSV file where this entity was discovered. Shows which file the AI analyzed to identify this data concept.
+                    </div>
+                  </div>
+                </div>
               </div>
               <div className="info-item">
                 <span className="label">Entity ID:</span>
-                <span className="value">{safeString(node.id)}</span>
+                <div className="value-with-tooltip">
+                  <span className="value">{safeString(node.id)}</span>
+                  <div className="tooltip">
+                    <img src="/src/assets/info.svg" alt="info" className="tooltip-icon" />
+                    <div className="tooltip-content">
+                      A unique identifier for this entity in the system. Used internally to track and reference this specific data concept.
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
           {node.metadata?.sourceColumns && node.metadata.sourceColumns.length > 0 && (
             <div className="source-columns-section">
-              <h3>📋 Source Columns</h3>
+              <div className="section-header-with-tooltip">
+                <h3>📋 Source Columns</h3>
+                <div className="tooltip">
+                  <img src="/src/assets/info.svg" alt="info" className="tooltip-icon" />
+                  <div className="tooltip-content">
+                    These are the actual column names from your CSV file where this entity was found. Click on any column to see more details about the data in that column.
+                  </div>
+                </div>
+              </div>
               <div className="source-columns-list">
                 {node.metadata.sourceColumns.map((column: string, index: number) => (
                   <div key={index} className="source-column-item">

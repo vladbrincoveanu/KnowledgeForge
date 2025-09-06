@@ -212,6 +212,15 @@ const MainContent: React.FC = () => {
             type: node.type,
             entityType: node.properties?.entityType || node.type,
             confidence: node.properties?.confidence || 1.0,
+            metadata: {
+              columns: node.properties?.sourceColumns?.length || 0,
+              uploadDate: node.properties?.createdAt || new Date().toISOString(),
+              sourceColumns: node.properties?.sourceColumns || [],
+              sourceValue: node.properties?.sourceValue,
+              sourceFile: node.properties?.sourceFile,
+              attributes: node.properties?.attributes || {}
+            },
+            columns: node.properties?.attributes || {}
           }));
           
           const links: GraphLink[] = graphDataResponse.edges.map((edge: any) => ({
@@ -555,11 +564,98 @@ const MainContent: React.FC = () => {
 
   // Load graph data when navigating to graph view
   useEffect(() => {
-    if (location.pathname === '/graph' && activeTaskId) {
-      console.log('Navigated to graph view, loading graph data:', activeTaskId);
-      loadGraphData(activeTaskId);
+    if (location.pathname === '/graph') {
+      if (activeTaskId) {
+        console.log('Navigated to graph view, loading graph data for active task:', activeTaskId);
+        loadGraphData(activeTaskId);
+      } else {
+        // If no active task ID, try to load data from the most recent completed task
+        console.log('No active task ID, attempting to load graph data without task filter');
+        loadGraphDataWithoutTask();
+      }
     }
   }, [location.pathname, activeTaskId, loadGraphData]);
+
+  const loadGraphDataWithoutTask = useCallback(async () => {
+    try {
+      console.log('Loading graph data without task filter...');
+      
+      // Try to get graph data from the dedicated graph API endpoint without task filter
+      try {
+        // First, let's try to get any available task ID from the backend
+        const entitiesData = await ontologyAPI.getEntities(null, 1, 0);
+        if (entitiesData.items && entitiesData.items.length > 0) {
+          // Use the first entity's task ID (extracted from entity ID)
+          const firstEntity = entitiesData.items[0];
+          if (firstEntity.id && firstEntity.id.includes('_')) {
+            const taskId = firstEntity.id.split('_')[0];
+            console.log('Found task ID from entity:', taskId);
+            loadGraphData(taskId);
+            return;
+          }
+        }
+      } catch (apiError) {
+        console.log('Could not determine task ID, trying direct graph API:', apiError);
+      }
+
+      // Fallback: Load entities and relationships directly without task filter
+      console.log('Loading entities and relationships without task filter...');
+      
+      const entitiesData = await ontologyAPI.getEntities(null, 100, 0);
+      const relationshipsData = await ontologyAPI.getRelationships(null, 100, 0);
+      
+      const entities = entitiesData.items || [];
+      const relationships = relationshipsData.items || [];
+      
+      console.log('Loaded entities:', entities.length);
+      console.log('Loaded relationships:', relationships.length);
+      
+      if (entities.length === 0) {
+        console.log('No entities found, setting empty graph data');
+        setGraphData({ nodes: [], links: [] });
+        return;
+      }
+
+      // Convert to graph data
+      const nodes: GraphNode[] = entities.map(entity => ({
+        id: String(entity.id || `entity-${entity.name}`),
+        label: entity.name,
+        type: 'entity',
+        entityType: entity.entity_type,
+        confidence: entity.confidence,
+        metadata: {
+          columns: entity.source_columns?.length || 0,
+          uploadDate: new Date().toISOString(),
+          sourceColumns: entity.source_columns || [],
+          sourceValue: entity.source_value,
+          sourceFile: 'Unknown', // Will be updated when we have better file tracking
+          attributes: entity.attributes || {}
+        },
+        columns: entity.attributes || {}
+      }));
+
+      const links: GraphLink[] = relationships.map(relationship => ({
+        id: relationship.id || `rel-${Math.random()}`,
+        source: String(relationship.source_entity_id || relationship.source_entity || ''),
+        target: String(relationship.target_entity_id || relationship.target_entity || ''),
+        label: relationship.relationship_type,
+        confidence: relationship.confidence,
+      }));
+
+      // Filter out invalid links
+      const validLinks = links.filter(link => {
+        const sourceExists = nodes.some(node => node.id === link.source);
+        const targetExists = nodes.some(node => node.id === link.target);
+        return sourceExists && targetExists;
+      });
+
+      console.log('Valid links after filtering:', validLinks.length);
+      setGraphData({ nodes, links: validLinks });
+    } catch (error) {
+      console.error('Failed to load graph data without task:', error);
+      setGraphData({ nodes: [], links: [] });
+    }
+  }, [loadGraphData]);
 
   // Determine active tab based on location
   const getActiveTab = (): string => {

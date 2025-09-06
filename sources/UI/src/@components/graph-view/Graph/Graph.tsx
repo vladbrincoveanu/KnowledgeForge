@@ -68,7 +68,7 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
     [onEdgeClick]
   );
 
-  const nodeColor = useCallback((node: GraphNode) => {
+  const nodeColor = useCallback((_node: GraphNode) => {
     // Simple single color for all nodes
     return '#007bff'; // Blue
   }, []);
@@ -250,6 +250,10 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
             <p>Complete an ontology extraction to see the network graph visualization</p>
             <p>This graph shows the same entities and relationships as the Ontology Results section</p>
             <p>Current data: {data.nodes.length} nodes, {data.links.length} links</p>
+            <div className="loading-indicator">
+              <div className="spinner"></div>
+              <p>Loading graph data...</p>
+            </div>
           </div>
         )}
       </div>

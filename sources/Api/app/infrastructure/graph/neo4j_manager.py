@@ -1194,38 +1194,89 @@ class Neo4jGraphManager:
             logger.error(f"  Full traceback: {traceback.format_exc()}")
             return False
 
-    def get_graph_visualization_data(self, task_id: str) -> dict[str, Any]:
+    def get_graph_visualization_data(self, task_id: Optional[str] = None) -> dict[str, Any]:
         """Get graph data for visualization purposes."""
         try:
             with self.driver.session(database=self.database) as session:
-                # Get entities for the task (filter by ID prefix)
-                entities_query = """
-                MATCH (e:Entity)
-                WHERE e.id STARTS WITH $task_id_prefix
-                RETURN e.id as id, e.name as name, e.entity_type as entity_type,
-                       e.confidence as confidence
-                """
-                
-                entities_result = session.run(entities_query, {"task_id_prefix": f"{task_id}_"})
-                entities = [dict(record) for record in entities_result]
+                # Get entities for the task (filter by ID prefix) with all properties
+                if task_id:
+                    entities_query = """
+                    MATCH (e:Entity)
+                    WHERE e.id STARTS WITH $task_id_prefix
+                    RETURN e.id as id, e.name as name, e.entity_type as entity_type,
+                           e.confidence as confidence, e.source_columns as source_columns,
+                           e.attributes as attributes, e.created_at as created_at, 
+                           e.updated_at as updated_at, e.source_file as source_file, 
+                           e.extraction_timestamp as extraction_timestamp, e.lineage as lineage,
+                           e.version as version
+                    """
+                    entities_result = session.run(entities_query, {"task_id_prefix": f"{task_id}_"})
+                else:
+                    # Get all entities when no task_id is provided
+                    entities_query = """
+                    MATCH (e:Entity)
+                    RETURN e.id as id, e.name as name, e.entity_type as entity_type,
+                           e.confidence as confidence, e.source_columns as source_columns,
+                           e.attributes as attributes, e.created_at as created_at, 
+                           e.updated_at as updated_at, e.source_file as source_file, 
+                           e.extraction_timestamp as extraction_timestamp, e.lineage as lineage,
+                           e.version as version
+                    """
+                    entities_result = session.run(entities_query)
+                entities = []
+                for record in entities_result:
+                    entity_data = dict(record)
+                    # Parse JSON strings back to objects
+                    try:
+                        if entity_data.get('source_columns'):
+                            entity_data['source_columns'] = json.loads(entity_data['source_columns'])
+                        else:
+                            entity_data['source_columns'] = []
+                    except (json.JSONDecodeError, TypeError):
+                        entity_data['source_columns'] = []
+                    
+                    try:
+                        if entity_data.get('attributes'):
+                            entity_data['attributes'] = json.loads(entity_data['attributes'])
+                        else:
+                            entity_data['attributes'] = {}
+                    except (json.JSONDecodeError, TypeError):
+                        entity_data['attributes'] = {}
+                    
+                    entities.append(entity_data)
                 
                 # Get relationships for the task (filter by ID prefix)
-                relationships_query = """
-                MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity)
-                WHERE source.id STARTS WITH $task_id_prefix AND target.id STARTS WITH $task_id_prefix
-                RETURN r.id as id, r.relationship_type as type,
-                       source.id as source_id, target.id as target_id,
-                       r.confidence as confidence
-                """
-                
-                relationships_result = session.run(relationships_query, {"task_id_prefix": f"{task_id}_"})
+                if task_id:
+                    relationships_query = """
+                    MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity)
+                    WHERE source.id STARTS WITH $task_id_prefix AND target.id STARTS WITH $task_id_prefix
+                    RETURN r.id as id, r.type as type,
+                           source.id as source_id, target.id as target_id,
+                           r.confidence as confidence
+                    """
+                    relationships_result = session.run(relationships_query, {"task_id_prefix": f"{task_id}_"})
+                else:
+                    # Get all relationships when no task_id is provided
+                    relationships_query = """
+                    MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity)
+                    RETURN r.id as id, r.type as type,
+                           source.id as source_id, target.id as target_id,
+                           r.confidence as confidence
+                    """
+                    relationships_result = session.run(relationships_query)
                 relationships = [dict(record) for record in relationships_result]
                 
                 # Generate basic Cypher queries for visualization
-                cypher_queries = [
-                    f"MATCH (e:Entity) WHERE e.task_id = '{task_id}' RETURN e",
-                    f"MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity) WHERE source.task_id = '{task_id}' RETURN source, r, target"
-                ]
+                if task_id:
+                    cypher_queries = [
+                        f"MATCH (e:Entity) WHERE e.task_id = '{task_id}' RETURN e",
+                        f"MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity) WHERE source.task_id = '{task_id}' RETURN source, r, target"
+                    ]
+                else:
+                    cypher_queries = [
+                        "MATCH (e:Entity) RETURN e",
+                        "MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity) RETURN source, r, target"
+                    ]
                 
                 return {
                     "entity_count": len(entities),
