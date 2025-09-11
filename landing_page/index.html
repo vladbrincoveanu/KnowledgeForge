@@ -1157,16 +1157,22 @@
         }
 
         .feature-icon {
-            width: 60px;
-            height: 60px;
+            width: 64px;
+            height: 64px;
             background: linear-gradient(135deg, var(--secondary), var(--accent));
             border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
             margin-bottom: 24px;
             transition: transform 0.3s ease;
+            color: white;
+        }
+        
+        .feature-icon svg {
+            width: 32px;
+            height: 32px;
+            stroke: currentColor;
         }
 
         .feature-card:hover .feature-icon {
@@ -1790,7 +1796,14 @@
 
             <div class="features-grid">
                 <div class="feature-card">
-                    <div class="feature-icon">🎯</div>
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="14" cy="14" r="12" stroke="currentColor" stroke-width="2"/>
+                            <circle cx="14" cy="14" r="8" stroke="currentColor" stroke-width="2"/>
+                            <circle cx="14" cy="14" r="4" stroke="currentColor" stroke-width="2"/>
+                            <circle cx="14" cy="14" r="1.5" fill="currentColor"/>
+                        </svg>
+                    </div>
                     <h3 class="feature-title">Ontology-First Approach</h3>
                     <p class="feature-description">
                         Establish shared business vocabulary with AI-suggested concepts, attributes, 
@@ -1799,7 +1812,12 @@
                 </div>
 
                 <div class="feature-card">
-                    <div class="feature-icon">🔗</div>
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M11 7L17 7C19.7614 7 22 9.23858 22 12C22 14.7614 19.7614 17 17 17H11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            <path d="M17 21L11 21C8.23858 21 6 18.7614 6 16C6 13.2386 8.23858 11 11 11H17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </div>
                     <h3 class="feature-title">Explainable Entity Matching</h3>
                     <p class="feature-description">
                         Create unified entities through transparent matching with full provenance 
@@ -1808,7 +1826,14 @@
                 </div>
 
                 <div class="feature-card">
-                    <div class="feature-icon">👥</div>
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="9" cy="8" r="4" stroke="currentColor" stroke-width="2"/>
+                            <circle cx="19" cy="8" r="4" stroke="currentColor" stroke-width="2"/>
+                            <path d="M3 20C3 16.6863 5.68629 14 9 14C12.3137 14 15 16.6863 15 20V22H3V20Z" stroke="currentColor" stroke-width="2"/>
+                            <path d="M13 20C13 16.6863 15.6863 14 19 14C22.3137 14 25 16.6863 25 20V22H13V20Z" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                    </div>
                     <h3 class="feature-title">Human-in-the-Loop Validation</h3>
                     <p class="feature-description">
                         Accept or reject AI suggestions with reason codes. Every decision is 
@@ -1817,7 +1842,18 @@
                 </div>
 
                 <div class="feature-card">
-                    <div class="feature-icon">📊</div>
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="7" cy="14" r="3" stroke="currentColor" stroke-width="2"/>
+                            <circle cx="14" cy="7" r="3" stroke="currentColor" stroke-width="2"/>
+                            <circle cx="21" cy="14" r="3" stroke="currentColor" stroke-width="2"/>
+                            <circle cx="14" cy="21" r="3" stroke="currentColor" stroke-width="2"/>
+                            <path d="M10 12L12 9" stroke="currentColor" stroke-width="2"/>
+                            <path d="M16 9L18 12" stroke="currentColor" stroke-width="2"/>
+                            <path d="M16 19L18 16" stroke="currentColor" stroke-width="2"/>
+                            <path d="M12 19L10 16" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                    </div>
                     <h3 class="feature-title">Universal Data Integration</h3>
                     <p class="feature-description">
                         Connect files, databases, and enterprise systems including SAP, 
@@ -1826,7 +1862,11 @@
                 </div>
 
                 <div class="feature-card">
-                    <div class="feature-icon">⚡</div>
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M16 4L8 14H12L10 24L18 14H14L16 4Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
                     <h3 class="feature-title">Instant Insights & Actions</h3>
                     <p class="feature-description">
                         Quick Facts cards show KPIs, anomalies, and changes with 1-click 
@@ -1835,7 +1875,13 @@
                 </div>
 
                 <div class="feature-card">
-                    <div class="feature-icon">🔍</div>
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M21 6H7C5.89543 6 5 6.89543 5 8V16C5 17.1046 5.89543 18 7 18H10L14 22L18 18H21C22.1046 18 23 17.1046 23 16V8C23 6.89543 22.1046 6 21 6Z" stroke="currentColor" stroke-width="2"/>
+                            <path d="M9 11H19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            <path d="M9 14H15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </div>
                     <h3 class="feature-title">Conversational Analytics</h3>
                     <p class="feature-description">
                         Natural language queries grounded in your knowledge graph with 
