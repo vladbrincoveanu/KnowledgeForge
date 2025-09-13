@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import psycopg2
-from psycopg2.extras import RealDictCursor
+from psycopg2.extras import RealDictCursor, Json
 from psycopg2.pool import SimpleConnectionPool
 
 logger = logging.getLogger(__name__)
@@ -71,8 +71,25 @@ class PostgreSQLMetadataStore:
             file_id = str(hashlib.sha256(f"{file_name}{checksum}".encode()).hexdigest()[:16])
             
             if self.connection_pool:
-                # TODO: Store in PostgreSQL when available
-                logger.info(f"Registered file '{file_name}' with ID {file_id} in PostgreSQL")
+                # Store in PostgreSQL
+                conn = self.connection_pool.getconn()
+                try:
+                    with conn.cursor() as cursor:
+                        cursor.execute("""
+                            INSERT INTO files (id, file_path, file_name, file_size, file_type, checksum, processing_status)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (id) DO UPDATE SET
+                                file_path = EXCLUDED.file_path,
+                                file_name = EXCLUDED.file_name,
+                                file_size = EXCLUDED.file_size,
+                                file_type = EXCLUDED.file_type,
+                                checksum = EXCLUDED.checksum,
+                                updated_at = CURRENT_TIMESTAMP
+                        """, (file_id, file_path, file_name, file_size, file_type, checksum, 'uploaded'))
+                    conn.commit()
+                    logger.info(f"Registered file '{file_name}' with ID {file_id} in PostgreSQL")
+                finally:
+                    self.connection_pool.putconn(conn)
             else:
                 # Mock mode - just log the registration
                 logger.info(f"Registered file '{file_name}' with ID {file_id} (mock mode)")
@@ -82,8 +99,6 @@ class PostgreSQLMetadataStore:
         except Exception as e:
             logger.error(f"Failed to register file: {e}")
             raise
-        finally:
-            pass
 
 
     def add_user_feedback(self, entity_id: str = None, relationship_id: str = None,
@@ -96,8 +111,23 @@ class PostgreSQLMetadataStore:
                 f"{entity_id}{relationship_id}{feedback_type}{feedback_value}{datetime.now().isoformat()}".encode()
             ).hexdigest()[:16])
             
-            # In a real implementation, this would store to PostgreSQL
-            logger.info(f"Added user feedback with ID {feedback_id}")
+            if self.connection_pool:
+                conn = self.connection_pool.getconn()
+                try:
+                    with conn.cursor() as cursor:
+                        cursor.execute("""
+                            INSERT INTO user_feedback (id, entity_id, relationship_id, feedback_type, 
+                                                     feedback_value, confidence_adjustment, user_id, feedback_source)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (feedback_id, entity_id, relationship_id, feedback_type, 
+                              feedback_value, confidence_adjustment, user_id, feedback_source))
+                        conn.commit()
+                        logger.info(f"Added user feedback with ID {feedback_id} to PostgreSQL")
+                finally:
+                    self.connection_pool.putconn(conn)
+            else:
+                logger.info(f"Added user feedback with ID {feedback_id} (mock mode)")
+            
             return feedback_id
             
         except Exception as e:
@@ -107,19 +137,48 @@ class PostgreSQLMetadataStore:
     def get_database_info(self) -> Dict[str, Any]:
         """Get database information and statistics."""
         try:
-            # In a real implementation, this would query PostgreSQL
-            return {
-                "database_type": "PostgreSQL",
-                "connection_status": "connected",
-                "database_path": str(self.db_path),
-                "tables": ["files", "entities", "relationships", "feedback"],
-                "record_count": {
-                    "files": 0,
-                    "entities": 0,
-                    "relationships": 0,
-                    "feedback": 0
+            if self.connection_pool:
+                # Test actual connection and get real statistics
+                conn = self.connection_pool.getconn()
+                try:
+                    with conn.cursor() as cursor:
+                        # Test connection
+                        cursor.execute("SELECT 1")
+                        cursor.fetchone()
+                        
+                        # Get actual record counts
+                        cursor.execute("SELECT COUNT(*) FROM files")
+                        files_count = cursor.fetchone()[0]
+                        
+                        cursor.execute("SELECT COUNT(*) FROM extraction_runs")
+                        extraction_runs_count = cursor.fetchone()[0]
+                        
+                        cursor.execute("SELECT COUNT(*) FROM user_feedback")
+                        feedback_count = cursor.fetchone()[0]
+                        
+                        cursor.execute("SELECT COUNT(*) FROM system_metrics")
+                        metrics_count = cursor.fetchone()[0]
+                        
+                    return {
+                        "database_type": "PostgreSQL",
+                        "connection_status": "connected",
+                        "database_name": "knowledgeforge",
+                        "tables": ["files", "extraction_runs", "user_feedback", "system_metrics"],
+                        "record_count": {
+                            "files": files_count,
+                            "extraction_runs": extraction_runs_count,
+                            "user_feedback": feedback_count,
+                            "system_metrics": metrics_count
+                        }
+                    }
+                finally:
+                    self.connection_pool.putconn(conn)
+            else:
+                return {
+                    "database_type": "PostgreSQL",
+                    "connection_status": "disconnected",
+                    "error": "No connection pool available"
                 }
-            }
         except Exception as e:
             logger.error(f"Failed to get database info: {e}")
             return {
@@ -132,8 +191,32 @@ class PostgreSQLMetadataStore:
                               metadata: Dict[str, Any] = None):
         """Mark an extraction run as completed."""
         try:
-            logger.info(f"Marked extraction run {task_id} as {status}")
-            # In a real implementation, this would update PostgreSQL
+            if self.connection_pool:
+                conn = self.connection_pool.getconn()
+                try:
+                    with conn.cursor() as cursor:
+                        # Update extraction run status
+                        cursor.execute("""
+                            UPDATE extraction_runs 
+                            SET status = %s, 
+                                completed_at = CURRENT_TIMESTAMP,
+                                metadata = %s
+                            WHERE id = %s
+                        """, (status, Json(metadata or {}), task_id))
+                        
+                        # If this is a new extraction run, insert it
+                        if cursor.rowcount == 0:
+                            cursor.execute("""
+                                INSERT INTO extraction_runs (id, status, metadata, completed_at)
+                                VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
+                            """, (task_id, status, Json(metadata or {})))
+                        
+                        conn.commit()
+                        logger.info(f"Marked extraction run {task_id} as {status} in PostgreSQL")
+                finally:
+                    self.connection_pool.putconn(conn)
+            else:
+                logger.info(f"Marked extraction run {task_id} as {status} (mock mode)")
         except Exception as e:
             logger.error(f"Failed to complete extraction run: {e}")
             raise

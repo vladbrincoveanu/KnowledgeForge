@@ -1,6 +1,7 @@
 """Data access endpoints for entities, relationships, and graph visualization."""
 
 import logging
+import uuid
 from datetime import datetime
 from typing import Optional
 
@@ -160,14 +161,51 @@ async def submit_feedback(
 
 @router.get("/graph/visualize")
 async def get_graph_visualization(
-    task_id: str, neo4j_manager: Neo4jGraphManager = Depends(get_neo4j_manager)
+    task_id: Optional[str] = None, neo4j_manager: Neo4jGraphManager = Depends(get_neo4j_manager)
 ):
-    """Return Cypher queries for graph visualization."""
+    """Return graph data for visualization in the format expected by the frontend."""
     try:
         # Use actual Neo4j manager to get graph data
         graph_data = neo4j_manager.get_graph_visualization_data(task_id)
 
+        # Convert entities to the format expected by frontend
+        nodes = []
+        for entity in graph_data.get("graph_structure", {}).get("entities", []):
+            node = {
+                "id": entity["id"],
+                "label": entity["name"],
+                "type": "entity",
+                "properties": {
+                    "entityType": entity["entity_type"],
+                    "confidence": entity["confidence"],
+                    "sourceColumns": entity.get("source_columns", []),
+                    "sourceValue": entity.get("source_value", "N/A"),
+                    "attributes": entity.get("attributes", {}),
+                    "createdAt": entity.get("created_at"),
+                    "updatedAt": entity.get("updated_at"),
+                    "sourceFile": entity.get("source_file", "Unknown"),
+                    "extractionTimestamp": entity.get("extraction_timestamp")
+                }
+            }
+            nodes.append(node)
+
+        # Convert relationships to the format expected by frontend
+        edges = []
+        for relationship in graph_data.get("graph_structure", {}).get("relationships", []):
+            edge = {
+                "id": relationship["id"],
+                "source": relationship["source_id"],
+                "target": relationship["target_id"],
+                "type": relationship["type"],
+                "properties": {
+                    "confidence": relationship["confidence"]
+                }
+            }
+            edges.append(edge)
+
         return {
+            "nodes": nodes,
+            "edges": edges,
             "cypher_queries": graph_data.get("cypher_queries", []),
             "graph_metadata": {
                 "task_id": task_id,
@@ -176,7 +214,6 @@ async def get_graph_visualization(
             },
             "node_count": graph_data.get("node_count", 0),
             "edge_count": graph_data.get("edge_count", 0),
-            "graph_structure": graph_data.get("graph_structure", {}),
         }
 
     except Exception as e:

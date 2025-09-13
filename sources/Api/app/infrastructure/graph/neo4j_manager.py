@@ -265,6 +265,7 @@ class Neo4jGraphManager:
         version: str = "1.0",
         lineage: Optional[str] = None,
         transaction_id: Optional[str] = None,
+        task_id: Optional[str] = None,
     ) -> bool:
         """Store entity with comprehensive metadata using MERGE operations."""
         # Try to connect if not already connected
@@ -294,7 +295,8 @@ class Neo4jGraphManager:
             e.source_file = $source_file,
             e.extraction_timestamp = $extraction_timestamp,
             e.version = $version,
-            e.lineage = $lineage
+            e.lineage = $lineage,
+            e.task_id = $task_id
         """
 
         params = {
@@ -309,9 +311,9 @@ class Neo4jGraphManager:
             "extraction_timestamp": extraction_timestamp.isoformat(),
             "version": version,
             "lineage": lineage or "unknown",
+            "task_id": task_id,
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat(),
-
         }
 
         try:
@@ -875,28 +877,54 @@ class Neo4jGraphManager:
 
     def get_entities(self, limit: int = 100, offset: int = 0, task_id: Optional[str] = None) -> list[dict[str, Any]]:
         """Get all entities from the graph database."""
-        query = """
-        MATCH (e:Entity)
-        RETURN e.id as id, e.name as name, e.entity_type as entity_type,
-               e.confidence as confidence, e.attributes as attributes
-        ORDER BY e.name
-        SKIP $offset LIMIT $limit
-        """
-        params = {"limit": limit, "offset": offset}
+        if task_id:
+            query = """
+            MATCH (e:Entity)
+            WHERE e.task_id = $task_id
+            RETURN e.id as id, e.name as name, e.entity_type as entity_type,
+                   e.confidence as confidence, e.attributes as attributes,
+                   e.source_columns as source_columns, 
+                   COALESCE(e.source_value, "N/A") as source_value
+            ORDER BY e.name
+            SKIP $offset LIMIT $limit
+            """
+            params = {"limit": limit, "offset": offset, "task_id": task_id}
+        else:
+            query = """
+            MATCH (e:Entity)
+            RETURN e.id as id, e.name as name, e.entity_type as entity_type,
+                   e.confidence as confidence, e.attributes as attributes,
+                   e.source_columns as source_columns, 
+                   COALESCE(e.source_value, "N/A") as source_value
+            ORDER BY e.name
+            SKIP $offset LIMIT $limit
+            """
+            params = {"limit": limit, "offset": offset}
 
         try:
             with self.driver.session(database=self.database) as session:
                 result = session.run(query, params)
                 entities = []
                 for record in result:
+                    # Parse JSON strings back to objects
+                    try:
+                        source_columns = json.loads(record["source_columns"]) if record["source_columns"] else []
+                    except (json.JSONDecodeError, TypeError):
+                        source_columns = []
+                    
+                    try:
+                        attributes = json.loads(record["attributes"]) if record["attributes"] else {}
+                    except (json.JSONDecodeError, TypeError):
+                        attributes = {}
+                    
                     entity = {
                         "id": record["id"],
                         "name": record["name"],
                         "entity_type": record["entity_type"],
                         "confidence": record["confidence"],
-                        "attributes": (
-                            record["attributes"] if record["attributes"] else {}
-                        ),
+                        "source_columns": source_columns,
+                        "source_value": record["source_value"],
+                        "attributes": attributes,
                     }
                     entities.append(entity)
                 return entities
@@ -906,8 +934,12 @@ class Neo4jGraphManager:
 
     def count_entities(self, task_id: Optional[str] = None) -> int:
         """Count total entities in the graph database."""
-        query = "MATCH (e:Entity) RETURN count(e) as count"
-        params = {}
+        if task_id:
+            query = "MATCH (e:Entity) WHERE e.task_id = $task_id RETURN count(e) as count"
+            params = {"task_id": task_id}
+        else:
+            query = "MATCH (e:Entity) RETURN count(e) as count"
+            params = {}
         
         try:
             with self.driver.session(database=self.database) as session:
@@ -921,30 +953,51 @@ class Neo4jGraphManager:
         self, limit: int = 100, offset: int = 0, task_id: Optional[str] = None
     ) -> list[dict[str, Any]]:
         """Get all relationships from the graph database."""
-        query = """
-        MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity)
-        RETURN r.id as id, r.type as type, r.confidence as confidence,
-               source.name as source_entity, target.name as target_entity,
-               r.attributes as attributes
-        ORDER BY r.type
-        SKIP $offset LIMIT $limit
-        """
-        params = {'limit': limit, 'offset': offset}
+        if task_id:
+            query = """
+            MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity)
+            WHERE source.task_id = $task_id AND target.task_id = $task_id
+            RETURN r.id as id, r.type as type, r.confidence as confidence,
+                   source.name as source_entity, target.name as target_entity,
+                   source.id as source_entity_id, target.id as target_entity_id,
+                   r.attributes as attributes
+            ORDER BY r.type
+            SKIP $offset LIMIT $limit
+            """
+            params = {'limit': limit, 'offset': offset, 'task_id': task_id}
+        else:
+            query = """
+            MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity)
+            RETURN r.id as id, r.type as type, r.confidence as confidence,
+                   source.name as source_entity, target.name as target_entity,
+                   source.id as source_entity_id, target.id as target_entity_id,
+                   r.attributes as attributes
+            ORDER BY r.type
+            SKIP $offset LIMIT $limit
+            """
+            params = {'limit': limit, 'offset': offset}
 
         try:
             with self.driver.session(database=self.database) as session:
                 result = session.run(query, params)
                 relationships = []
                 for record in result:
+                    # Parse JSON strings back to objects
+                    try:
+                        attributes = json.loads(record["attributes"]) if record["attributes"] else {}
+                    except (json.JSONDecodeError, TypeError):
+                        attributes = {}
+                    
                     rel = {
                         "id": record["id"],
+                        "relationship_type": record["type"],
                         "type": record["type"],
                         "confidence": record["confidence"],
                         "source_entity": record["source_entity"],
                         "target_entity": record["target_entity"],
-                        "attributes": (
-                            record["attributes"] if record["attributes"] else {}
-                        ),
+                        "source_entity_id": record["source_entity_id"],
+                        "target_entity_id": record["target_entity_id"],
+                        "attributes": attributes,
                     }
                     relationships.append(rel)
                 return relationships
@@ -1008,21 +1061,39 @@ class Neo4jGraphManager:
 
         return stats
 
-    def search_graph(self, query: str, limit: int = 50) -> list[dict[str, Any]]:
+    def search_graph(self, query: str, search_type: str = "both", limit: int = 50) -> list[dict[str, Any]]:
         """Search for entities and relationships in the graph."""
-        search_query = """
-        MATCH (e:Entity)
-        WHERE e.name CONTAINS $query OR e.entity_type CONTAINS $query
-        RETURN e.id as id, e.name as name, e.entity_type as entity_type,
-               e.confidence as confidence, 'entity' as result_type
-        UNION
-        MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity)
-        WHERE r.relationship_type CONTAINS $query
-        RETURN r.id as id, r.relationship_type as name,
-               source.name + ' -> ' + target.name as description,
-               r.confidence as confidence, 'relationship' as result_type
-        LIMIT $limit
-        """
+        if search_type == "entities":
+            search_query = """
+            MATCH (e:Entity)
+            WHERE e.name CONTAINS $query OR e.entity_type CONTAINS $query
+            RETURN e.id as id, e.name as name, e.entity_type as entity_type,
+                   e.confidence as confidence, 'entity' as result_type
+            LIMIT $limit
+            """
+        elif search_type == "relationships":
+            search_query = """
+            MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity)
+            WHERE r.type CONTAINS $query
+            RETURN r.id as id, r.type as name,
+                   source.name + ' -> ' + target.name as description,
+                   r.confidence as confidence, 'relationship' as result_type
+            LIMIT $limit
+            """
+        else:  # both
+            search_query = """
+            MATCH (e:Entity)
+            WHERE e.name CONTAINS $query OR e.entity_type CONTAINS $query
+            RETURN e.id as id, e.name as name, e.entity_type as entity_type,
+                   e.confidence as confidence, 'entity' as result_type
+            UNION
+            MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity)
+            WHERE r.type CONTAINS $query
+            RETURN r.id as id, r.type as name,
+                   source.name + ' -> ' + target.name as description,
+                   r.confidence as confidence, 'relationship' as result_type
+            LIMIT $limit
+            """
 
         try:
             with self.driver.session(database=self.database) as session:
@@ -1041,6 +1112,83 @@ class Neo4jGraphManager:
         except Exception as e:
             logger.error(f"Failed to search graph: {e}")
             return []
+
+    def get_entity_by_id(self, entity_id: str) -> Optional[dict[str, Any]]:
+        """Get a specific entity by its ID."""
+        query = """
+        MATCH (e:Entity {id: $entity_id})
+        RETURN e.id as id, e.name as name, e.entity_type as entity_type,
+               e.confidence as confidence, e.attributes as attributes,
+               e.source_columns as source_columns, 
+               COALESCE(e.source_value, "N/A") as source_value
+        """
+
+        try:
+            with self.driver.session(database=self.database) as session:
+                result = session.run(query, {"entity_id": entity_id})
+                record = result.single()
+                if record:
+                    # Parse JSON strings back to objects
+                    try:
+                        source_columns = json.loads(record["source_columns"]) if record["source_columns"] else []
+                    except (json.JSONDecodeError, TypeError):
+                        source_columns = []
+                    
+                    try:
+                        attributes = json.loads(record["attributes"]) if record["attributes"] else {}
+                    except (json.JSONDecodeError, TypeError):
+                        attributes = {}
+                    
+                    return {
+                        "id": record["id"],
+                        "name": record["name"],
+                        "entity_type": record["entity_type"],
+                        "confidence": record["confidence"],
+                        "source_columns": source_columns,
+                        "source_value": record["source_value"],
+                        "attributes": attributes,
+                    }
+                return None
+        except Exception as e:
+            logger.error(f"Failed to get entity by ID: {e}")
+            return None
+
+    def get_relationship_by_id(self, relationship_id: str) -> Optional[dict[str, Any]]:
+        """Get a specific relationship by its ID."""
+        query = """
+        MATCH (source:Entity)-[r:RELATES_TO {id: $rel_id}]->(target:Entity)
+        RETURN r.id as id, r.type as type, r.confidence as confidence,
+               source.name as source_entity, target.name as target_entity,
+               source.id as source_entity_id, target.id as target_entity_id,
+               r.attributes as attributes
+        """
+
+        try:
+            with self.driver.session(database=self.database) as session:
+                result = session.run(query, {"rel_id": relationship_id})
+                record = result.single()
+                if record:
+                    # Parse JSON strings back to objects
+                    try:
+                        attributes = json.loads(record["attributes"]) if record["attributes"] else {}
+                    except (json.JSONDecodeError, TypeError):
+                        attributes = {}
+                    
+                    return {
+                        "id": record["id"],
+                        "relationship_type": record["type"],
+                        "type": record["type"],
+                        "confidence": record["confidence"],
+                        "source_entity": record["source_entity"],
+                        "target_entity": record["target_entity"],
+                        "source_entity_id": record["source_entity_id"],
+                        "target_entity_id": record["target_entity_id"],
+                        "attributes": attributes,
+                    }
+                return None
+        except Exception as e:
+            logger.error(f"Failed to get relationship by ID: {e}")
+            return None
 
     def get_performance_metrics(self) -> dict[str, Any]:
         """Get performance metrics for the graph manager."""
@@ -1194,38 +1342,89 @@ class Neo4jGraphManager:
             logger.error(f"  Full traceback: {traceback.format_exc()}")
             return False
 
-    def get_graph_visualization_data(self, task_id: str) -> dict[str, Any]:
+    def get_graph_visualization_data(self, task_id: Optional[str] = None) -> dict[str, Any]:
         """Get graph data for visualization purposes."""
         try:
             with self.driver.session(database=self.database) as session:
-                # Get entities for the task (filter by ID prefix)
-                entities_query = """
-                MATCH (e:Entity)
-                WHERE e.id STARTS WITH $task_id_prefix
-                RETURN e.id as id, e.name as name, e.entity_type as entity_type,
-                       e.confidence as confidence
-                """
+                # Get entities for the task (filter by task_id property) with all properties
+                if task_id:
+                    entities_query = """
+                    MATCH (e:Entity)
+                    WHERE e.task_id = $task_id
+                    RETURN e.id as id, e.name as name, e.entity_type as entity_type,
+                           e.confidence as confidence, e.source_columns as source_columns,
+                           e.attributes as attributes, e.created_at as created_at, 
+                           e.updated_at as updated_at, e.source_file as source_file, 
+                           e.extraction_timestamp as extraction_timestamp, e.lineage as lineage,
+                           e.version as version, COALESCE(e.source_value, "N/A") as source_value
+                    """
+                    entities_result = session.run(entities_query, {"task_id": task_id})
+                else:
+                    # Get all entities when no task_id is provided
+                    entities_query = """
+                    MATCH (e:Entity)
+                    RETURN e.id as id, e.name as name, e.entity_type as entity_type,
+                           e.confidence as confidence, e.source_columns as source_columns,
+                           e.attributes as attributes, e.created_at as created_at, 
+                           e.updated_at as updated_at, e.source_file as source_file, 
+                           e.extraction_timestamp as extraction_timestamp, e.lineage as lineage,
+                           e.version as version, COALESCE(e.source_value, "N/A") as source_value
+                    """
+                    entities_result = session.run(entities_query)
+                entities = []
+                for record in entities_result:
+                    entity_data = dict(record)
+                    # Parse JSON strings back to objects
+                    try:
+                        if entity_data.get('source_columns'):
+                            entity_data['source_columns'] = json.loads(entity_data['source_columns'])
+                        else:
+                            entity_data['source_columns'] = []
+                    except (json.JSONDecodeError, TypeError):
+                        entity_data['source_columns'] = []
+                    
+                    try:
+                        if entity_data.get('attributes'):
+                            entity_data['attributes'] = json.loads(entity_data['attributes'])
+                        else:
+                            entity_data['attributes'] = {}
+                    except (json.JSONDecodeError, TypeError):
+                        entity_data['attributes'] = {}
+                    
+                    entities.append(entity_data)
                 
-                entities_result = session.run(entities_query, {"task_id_prefix": f"{task_id}_"})
-                entities = [dict(record) for record in entities_result]
-                
-                # Get relationships for the task (filter by ID prefix)
-                relationships_query = """
-                MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity)
-                WHERE source.id STARTS WITH $task_id_prefix AND target.id STARTS WITH $task_id_prefix
-                RETURN r.id as id, r.relationship_type as type,
-                       source.id as source_id, target.id as target_id,
-                       r.confidence as confidence
-                """
-                
-                relationships_result = session.run(relationships_query, {"task_id_prefix": f"{task_id}_"})
+                # Get relationships for the task (filter by task_id property)
+                if task_id:
+                    relationships_query = """
+                    MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity)
+                    WHERE source.task_id = $task_id AND target.task_id = $task_id
+                    RETURN r.id as id, r.type as type,
+                           source.id as source_id, target.id as target_id,
+                           r.confidence as confidence
+                    """
+                    relationships_result = session.run(relationships_query, {"task_id": task_id})
+                else:
+                    # Get all relationships when no task_id is provided
+                    relationships_query = """
+                    MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity)
+                    RETURN r.id as id, r.type as type,
+                           source.id as source_id, target.id as target_id,
+                           r.confidence as confidence
+                    """
+                    relationships_result = session.run(relationships_query)
                 relationships = [dict(record) for record in relationships_result]
                 
                 # Generate basic Cypher queries for visualization
-                cypher_queries = [
-                    f"MATCH (e:Entity) WHERE e.task_id = '{task_id}' RETURN e",
-                    f"MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity) WHERE source.task_id = '{task_id}' RETURN source, r, target"
-                ]
+                if task_id:
+                    cypher_queries = [
+                        f"MATCH (e:Entity) WHERE e.task_id = '{task_id}' RETURN e",
+                        f"MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity) WHERE source.task_id = '{task_id}' RETURN source, r, target"
+                    ]
+                else:
+                    cypher_queries = [
+                        "MATCH (e:Entity) RETURN e",
+                        "MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity) RETURN source, r, target"
+                    ]
                 
                 return {
                     "entity_count": len(entities),

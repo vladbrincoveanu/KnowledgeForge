@@ -33,6 +33,8 @@ interface Relationship {
   id?: string;
   source_entity_id?: string;
   target_entity_id?: string;
+  source_entity?: string;  // Entity name
+  target_entity?: string;  // Entity name
   relationship_type: string;
   confidence: number;
   source_columns?: string[];
@@ -269,13 +271,12 @@ export const ontologyAPI = {
 
   // Get graph visualization
   getGraphVisualization: async (
-    taskId: string
+    taskId?: string
   ): Promise<GraphVisualization> => {
+    const params = taskId ? { task_id: taskId } : {};
     const response: AxiosResponse<GraphVisualization> = await api.get(
       '/v1/graph/visualize',
-      {
-        params: { task_id: taskId },
-      }
+      { params }
     );
     return response.data;
   },

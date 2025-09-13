@@ -2,6 +2,7 @@
 
 import hashlib
 import logging
+import os
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -392,7 +393,7 @@ async def run_extraction_pipeline(
             logger.warning("No entities to store!")
         
         try:
-            await store_in_neo4j(entities, relationships, neo4j_manager, task_id)
+            await store_in_neo4j(entities, relationships, neo4j_manager, task_id, file_path)
             logger.info("Neo4j storage completed successfully")
         except Exception as e:
             logger.error(f"Neo4j storage failed: {e}")
@@ -406,6 +407,7 @@ async def run_extraction_pipeline(
         # Get the file_id from the task
         metadata_store.complete_extraction_run(
             task_id,
+            "completed",
             {
                 "entities_count": len(entities),
                 "relationships_count": len(relationships),
@@ -427,6 +429,19 @@ async def run_extraction_pipeline(
         logger.error(f"Extraction pipeline failed for task {task_id}: {e}")
         task.status = "failed"
         task.errors.append(str(e))
+        
+        # Update metadata store with failure status
+        try:
+            metadata_store.complete_extraction_run(
+                task_id,
+                "failed",
+                {
+                    "error": str(e),
+                    "failed_at": datetime.now().isoformat(),
+                },
+            )
+        except Exception as store_error:
+            logger.error(f"Failed to update metadata store with failure status: {store_error}")
 
 
 async def profile_dataset(
@@ -557,6 +572,7 @@ async def store_in_neo4j(
     relationships: list[Relationship],
     neo4j_manager: Neo4jGraphManager,
     task_id: str,
+    file_path: str,
 ):
     """Store extracted entities and relationships in Neo4j."""
     logger.info(f"Starting Neo4j storage for {len(entities)} entities and {len(relationships)} relationships")
@@ -582,10 +598,14 @@ async def store_in_neo4j(
         entities_stored = 0
         for entity in entities:
             try:
+                # Extract just the filename from the full path
+                file_name = os.path.basename(file_path)
+                
                 success = neo4j_manager.store_entity_with_metadata(
                     entity=entity,
-                    source_file="extraction_pipeline",  # Could be parameterized
+                    source_file=file_name,
                     extraction_timestamp=datetime.now(),
+                    task_id=task_id,
                 )
                 if success:
                     logger.info(f"Successfully stored entity: {getattr(entity, 'name', 'NO_NAME')}")

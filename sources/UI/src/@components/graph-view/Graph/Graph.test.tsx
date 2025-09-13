@@ -196,7 +196,8 @@ describe('Graph Component', () => {
   });
 
   it('works without onEdgeClick prop', () => {
-    render(<Graph data={mockGraphData} onEdgeClick={undefined} />);
+    const mockOnEdgeClick = vi.fn();
+    render(<Graph data={mockGraphData} onEdgeClick={mockOnEdgeClick} />);
 
     expect(() => {
       const testLink = screen.getByTestId('test-link');
