@@ -1,7 +1,9 @@
 """Data models for ontology extraction."""
 
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Optional, List, Dict
+import os
+import re
 
 import numpy as np
 from pydantic import BaseModel, Field, field_validator
@@ -46,6 +48,23 @@ class DataType(str, Enum):
     DATETIME = "datetime"
     CATEGORICAL = "categorical"
     NUMERICAL = "numerical"
+    MEASUREMENT = "measurement"
+
+
+class Attribute(BaseModel):
+    """Represents an attribute of an entity."""
+    
+    name: str
+    data_type: DataType
+    source_column: str
+    confidence: float = Field(ge=0.0, le=1.0)
+    statistics: dict[str, Any] = Field(default_factory=dict)
+    sample_values: list[Any] = Field(default_factory=list)
+
+    @field_validator("statistics", "sample_values", mode="before")
+    @classmethod
+    def convert_numpy_types(cls, v):
+        return convert_numpy_types(v)
 
 
 class ColumnProfile(BaseModel):
@@ -85,11 +104,10 @@ class Entity(BaseModel):
 
     id: Optional[str] = None
     name: str
-    entity_type: str
-    attributes: dict[str, Any] = Field(default_factory=dict)
+    entity_type: str = "table"
+    attributes: List[Attribute] = Field(default_factory=list)
     confidence: float = Field(ge=0.0, le=1.0)
-    source_columns: list[str] = Field(default_factory=list)
-    source_value: Optional[str] = None
+    source_table: str
 
     @field_validator("attributes", mode="before")
     @classmethod
@@ -139,3 +157,71 @@ class ExtractionConfig(BaseModel):
     llm_model: str = ""
     batch_size: int = Field(default=1000, ge=1)
     enable_semantic_similarity: bool = True
+
+
+def infer_entity_name(file_path: str) -> str:
+    """
+    Infer the entity name from the file path.
+    Removes file extension, UUID prefixes, and pluralization.
+    """
+    filename = os.path.basename(file_path)
+    name = os.path.splitext(filename)[0]
+    
+    # Remove UUID prefix if present (format: uuid_filename)
+    # UUID pattern: 8-4-4-4-12 characters separated by hyphens
+    uuid_pattern = r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_'
+    name = re.sub(uuid_pattern, '', name, flags=re.IGNORECASE)
+    
+    # Remove common plural endings
+    if name.endswith('s'):
+        name = name[:-1]
+    elif name.endswith('ies'):
+        name = name[:-3] + 'y'
+    
+    # Convert to title case
+    name = re.sub(r'[_-]', ' ', name)
+    name = name.title()
+    name = re.sub(r'\s+', '', name)
+    
+    result = name or "Entity"
+    print(f"DEBUG: infer_entity_name('{file_path}') -> '{result}'")
+    return result
+
+
+def extract_ontology_from_profile(profile: DatasetProfile, config: ExtractionConfig) -> Ontology:
+    """
+    Extract ontology from dataset profile using table-level entity recognition.
+    """
+    # Infer entity name from file path
+    entity_name = infer_entity_name(profile.file_path)
+    
+    # Convert column profiles to attributes
+    attributes = []
+    for column in profile.columns:
+        attribute = Attribute(
+            name=column.name,
+            data_type=column.data_type,
+            source_column=column.name,
+            confidence=0.95,  # High confidence for direct column mapping
+            statistics=column.statistics,
+            sample_values=column.sample_values
+        )
+        attributes.append(attribute)
+    
+    # Create the main entity
+    entity = Entity(
+        name=entity_name,
+        attributes=attributes,
+        confidence=1.0,  # High confidence for table-level entity
+        source_table=profile.file_path
+    )
+    
+    # Create ontology with single entity and no relationships
+    ontology = Ontology(
+        entities=[entity],
+        relationships=[],
+        metadata=profile.metadata,
+        created_at=profile.created_at
+    )
+    
+    return ontology

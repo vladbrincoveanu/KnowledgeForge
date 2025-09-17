@@ -371,8 +371,10 @@ async def run_extraction_pipeline(
         for entity in entities:
             if not entity.id:
                 # Generate deterministic ID based on entity content
-                content = f"{entity.name}_{entity.entity_type}_{','.join(sorted(entity.source_columns))}"
+                source_cols = [attr.source_column for attr in entity.attributes if attr.source_column]
+                content = f"{entity.name}_{entity.entity_type}_{','.join(sorted(source_cols))}"
                 entity.id = f"entity_{hashlib.sha256(content.encode('utf-8')).hexdigest()[:12]}"
+                logger.info(f"Generated deterministic ID for entity: name='{entity.name}' -> id='{entity.id}'")
         
         # Ensure all relationships have deterministic IDs
         for relationship in relationships:
@@ -535,7 +537,8 @@ async def map_to_ontologies(
     mapping_results = ontology_mapper.map_entities_to_ontologies(
         entities, relationships
     )
-    return mapping_results
+    # Convert OntologyMappingResult to dictionary
+    return mapping_results.model_dump()
 
 
 async def discover_relationships(
@@ -596,8 +599,13 @@ async def store_in_neo4j(
         
         # Store entities
         entities_stored = 0
-        for entity in entities:
+        logger.info(f"Starting to store {len(entities)} entities")
+        for i, entity in enumerate(entities):
             try:
+                logger.info(f"Processing entity {i+1}/{len(entities)}: {getattr(entity, 'name', 'NO_NAME')}")
+                logger.info(f"Entity ID: {getattr(entity, 'id', 'NO_ID')}")
+                logger.info(f"Entity type: {getattr(entity, 'entity_type', 'NO_TYPE')}")
+                
                 # Extract just the filename from the full path
                 file_name = os.path.basename(file_path)
                 
@@ -614,6 +622,8 @@ async def store_in_neo4j(
                     logger.error(f"Failed to store entity: {getattr(entity, 'name', 'NO_NAME')}")
             except Exception as e:
                 logger.error(f"Error storing entity {getattr(entity, 'name', 'NO_NAME')}: {e}")
+                import traceback
+                logger.error(f"Full traceback: {traceback.format_exc()}")
 
         # Store relationships
         relationships_stored = 0

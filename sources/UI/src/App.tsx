@@ -434,7 +434,7 @@ const MainContent: React.FC = () => {
     return () => {
       wsService.disconnect();
     };
-  }, [handleWebSocketMessage, loadAvailableTasks]);
+  }, []); // Remove dependencies to prevent infinite re-renders
 
   // Effect to load graph data when tasks are completed
   useEffect(() => {
@@ -444,7 +444,7 @@ const MainContent: React.FC = () => {
         loadGraphData(task.taskId);
       }
     });
-  }, [extractionTasks, loadGraphData]);
+  }, [extractionTasks]); // Remove loadGraphData from dependencies
 
   const calculateSimilarity = useCallback(
     (str1: string, str2: string): number => {
@@ -597,7 +597,7 @@ const MainContent: React.FC = () => {
       console.log('Active task changed, loading graph data:', activeTaskId);
       loadGraphData(activeTaskId);
     }
-  }, [activeTaskId, extractionTasks, loadGraphData]);
+  }, [activeTaskId, extractionTasks]); // Remove loadGraphData from dependencies
 
   // Load graph data when navigating to graph view
   useEffect(() => {
@@ -611,7 +611,7 @@ const MainContent: React.FC = () => {
         loadGraphDataWithoutTask();
       }
     }
-  }, [location.pathname, activeTaskId, loadGraphData]);
+  }, [location.pathname, activeTaskId]); // Remove loadGraphData from dependencies
 
 
   const loadGraphDataWithoutTask = useCallback(async () => {

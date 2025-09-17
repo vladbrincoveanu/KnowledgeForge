@@ -142,10 +142,11 @@ class Neo4jGraphManager:
             labels_result = session.run(labels_query)
             rel_types_result = session.run(rel_types_query)
 
-            labels = labels_result.single()["labels"] if labels_result.single() else []
-            rel_types = (
-                rel_types_result.single()["types"] if rel_types_result.single() else []
-            )
+            labels_record = labels_result.single()
+            rel_types_record = rel_types_result.single()
+            
+            labels = labels_record["labels"] if labels_record else []
+            rel_types = rel_types_record["types"] if rel_types_record else []
 
             self.graph_schema = GraphSchema(
                 node_labels=labels,
@@ -299,14 +300,17 @@ class Neo4jGraphManager:
             e.task_id = $task_id
         """
 
+        # Extract source columns from attributes
+        source_columns = [attr.source_column for attr in entity.attributes if attr.source_column]
+        
         params = {
             "entity_id": entity.id,
             "name": entity.name,
             "entity_type": entity.entity_type,
             "confidence": entity.confidence,
-            "source_columns": json.dumps(entity.source_columns),
-            "source_value": entity.source_value,
-            "attributes": json.dumps(entity.attributes),
+            "source_columns": json.dumps(source_columns),
+            "source_value": "N/A",  # Entity model doesn't have source_value
+            "attributes": json.dumps([attr.model_dump() for attr in entity.attributes]),
             "source_file": source_file,
             "extraction_timestamp": extraction_timestamp.isoformat(),
             "version": version,
@@ -317,17 +321,25 @@ class Neo4jGraphManager:
         }
 
         try:
+            logger.info(f"Attempting to store entity: {entity.id}, name: {entity.name}")
+            logger.info(f"Entity attributes count: {len(entity.attributes)}")
+            
             if transaction_id and transaction_id in self.active_transactions:
                 transaction = self.active_transactions[transaction_id]
-                transaction.run(query, params)
+                result = transaction.run(query, params)
+                logger.info(f"Entity stored in transaction: {entity.id}")
             else:
                 with self.driver.session(database=self.database) as session:
-                    session.run(query, params)
+                    result = session.run(query, params)
+                    logger.info(f"Entity stored in session: {entity.id}")
 
             return True
 
         except Exception as e:
             logger.error(f"Failed to store entity {entity.id}: {e}")
+            logger.error(f"Entity data: {entity.dict()}")
+            import traceback
+            logger.error(f"Full traceback: {traceback.format_exc()}")
             return False
 
     def store_relationship_with_metadata(
@@ -913,9 +925,9 @@ class Neo4jGraphManager:
                         source_columns = []
                     
                     try:
-                        attributes = json.loads(record["attributes"]) if record["attributes"] else {}
+                        attributes = json.loads(record["attributes"]) if record["attributes"] else []
                     except (json.JSONDecodeError, TypeError):
-                        attributes = {}
+                        attributes = []
                     
                     entity = {
                         "id": record["id"],
@@ -984,9 +996,9 @@ class Neo4jGraphManager:
                 for record in result:
                     # Parse JSON strings back to objects
                     try:
-                        attributes = json.loads(record["attributes"]) if record["attributes"] else {}
+                        attributes = json.loads(record["attributes"]) if record["attributes"] else []
                     except (json.JSONDecodeError, TypeError):
-                        attributes = {}
+                        attributes = []
                     
                     rel = {
                         "id": record["id"],
@@ -1135,9 +1147,9 @@ class Neo4jGraphManager:
                         source_columns = []
                     
                     try:
-                        attributes = json.loads(record["attributes"]) if record["attributes"] else {}
+                        attributes = json.loads(record["attributes"]) if record["attributes"] else []
                     except (json.JSONDecodeError, TypeError):
-                        attributes = {}
+                        attributes = []
                     
                     return {
                         "id": record["id"],
@@ -1170,9 +1182,9 @@ class Neo4jGraphManager:
                 if record:
                     # Parse JSON strings back to objects
                     try:
-                        attributes = json.loads(record["attributes"]) if record["attributes"] else {}
+                        attributes = json.loads(record["attributes"]) if record["attributes"] else []
                     except (json.JSONDecodeError, TypeError):
-                        attributes = {}
+                        attributes = []
                     
                     return {
                         "id": record["id"],
@@ -1387,9 +1399,9 @@ class Neo4jGraphManager:
                         if entity_data.get('attributes'):
                             entity_data['attributes'] = json.loads(entity_data['attributes'])
                         else:
-                            entity_data['attributes'] = {}
+                            entity_data['attributes'] = []
                     except (json.JSONDecodeError, TypeError):
-                        entity_data['attributes'] = {}
+                        entity_data['attributes'] = []
                     
                     entities.append(entity_data)
                 

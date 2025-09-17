@@ -84,20 +84,8 @@ manager = ConnectionManager()
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time communication."""
     try:
-        await websocket.accept()
+        await manager.connect(websocket)
         logging.info("WebSocket connection accepted successfully")
-
-        # Send welcome message
-        await websocket.send_text(
-            json.dumps(
-                {
-                    "type": "connection",
-                    "status": "connected",
-                    "message": "WebSocket connection established",
-                    "timestamp": datetime.now().isoformat(),
-                }
-            )
-        )
 
         # Keep connection alive and handle messages
         while True:
@@ -142,8 +130,10 @@ async def websocket_endpoint(websocket: WebSocket):
 
     except WebSocketDisconnect:
         logging.info("WebSocket client disconnected")
+        manager.disconnect(websocket)
     except Exception as e:
         logging.error(f"WebSocket error: {e}")
+        manager.disconnect(websocket)
 
 
 # Utility function to broadcast task updates

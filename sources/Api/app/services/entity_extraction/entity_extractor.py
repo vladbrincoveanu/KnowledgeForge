@@ -6,18 +6,69 @@ import logging
 import re
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List, Tuple, Optional
+from enum import Enum
 
 import numpy as np
 import pandas as pd
 
 # Import your local models
-from app.domain.models.entities import ColumnProfile, DataType, Entity
+from app.domain.models.entities import ColumnProfile, DataType, Entity, Attribute, infer_entity_name
 
 logger = logging.getLogger(__name__)
 if not logger.handlers:
     logging.basicConfig(level=logging.INFO)
 
+# -----------------------
+# Entity Type Taxonomy
+# -----------------------
+class EntityType(Enum):
+    """Defined taxonomy of entity types with hierarchy."""
+    TABLE = "table"
+    IDENTIFIER = "identifier"
+    MEASUREMENT = "measurement"
+    TEMPORAL = "temporal"
+    GEOGRAPHIC = "geographic"
+    CONTACT = "contact"
+    CATEGORICAL = "categorical"
+    BUSINESS = "business"
+    COMPOSITE = "composite"
+    UNKNOWN = "unknown"
+    
+    # Subtypes
+    UUID = "identifier.uuid"
+    SEQUENTIAL_ID = "identifier.sequential"
+    FOREIGN_KEY = "identifier.foreign_key"
+    PRIMARY_KEY = "identifier.primary"
+    
+    PERCENTAGE = "measurement.percentage"
+    CURRENCY = "measurement.currency"
+    QUANTITY = "measurement.quantity"
+    DIMENSION = "measurement.dimension"
+    
+    DATE = "temporal.date"
+    TIME = "temporal.time"
+    DATETIME = "temporal.datetime"
+    YEAR = "temporal.year"
+    MONTH = "temporal.month"
+    
+    LATITUDE = "geographic.latitude"
+    LONGITUDE = "geographic.longitude"
+    ADDRESS = "geographic.address"
+    POSTAL_CODE = "geographic.postal_code"
+    COUNTRY = "geographic.country"
+    REGION = "geographic.region"
+    CITY = "geographic.city"
+    
+    EMAIL = "contact.email"
+    PHONE = "contact.phone"
+    URL = "contact.url"
+    IP_ADDRESS = "contact.ip_address"
+    
+    STATUS = "categorical.status"
+    TYPE = "categorical.type"
+    CATEGORY = "categorical.category"
+    CLASSIFICATION = "categorical.classification"
 
 # -----------------------
 # Utility: Regex patterns
@@ -38,16 +89,13 @@ _REG_PERCENT = re.compile(r"^-?\d{1,3}(?:\.\d+)?%$")
 _REG_LAT = re.compile(r"^[+-]?(?:90(?:\.0+)?|[0-8]?\d(?:\.\d+)?)$")
 _REG_LON = re.compile(r"^[+-]?(?:180(?:\.0+)?|1[0-7]\d(?:\.\d+)?|\d?\d(?:\.\d+)?)$")
 _REG_YEAR = re.compile(r"^(19\d{2}|20\d{2}|2100)$")
-
+_REG_CURRENCY = re.compile(r"^\$?\d+(?:,\d{3})*(?:\.\d{2})?$")
 
 # -----------------------------------------------------
 # Helpers: deterministic hashing & JSON-safe operations
 # -----------------------------------------------------
-
-
 def _stable_hash_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
 
 def _hash_file(path: str | Path) -> str:
     h = hashlib.sha256()
@@ -56,11 +104,9 @@ def _hash_file(path: str | Path) -> str:
             h.update(chunk)
     return h.hexdigest()
 
-
 # ---------------------------------------
-# Main Extractor with three-gate pipeline
+# Main Extractor with table-level focus
 # ---------------------------------------
-
 def _safe_config_get(config, key, default=None):
     """Safely get configuration value from either dict or Config object."""
     if hasattr(config, 'get'):
@@ -71,7 +117,6 @@ def _safe_config_get(config, key, default=None):
         return getattr(config.extraction, key, default)
     else:
         return default
-
 
 class EntityExtractor:
     def __init__(
@@ -85,11 +130,73 @@ class EntityExtractor:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.llm_manager = llm_manager
         self.embeddings = embeddings_manager
+        
+        # Domain-specific patterns
+        self.domain_patterns = self._load_domain_patterns()
+        
+        # Entity priority for selection
+        self.entity_priority = self._get_entity_priority()
+
+    def _load_domain_patterns(self) -> Dict[str, Dict[str, List[str]]]:
+        """Load domain-specific patterns for better entity recognition."""
+        return {
+            "healthcare": {
+                "business_entities": ["patient", "doctor", "hospital", "treatment", "diagnosis"],
+                "measurement": ["probability", "score", "risk", "rate", "level"],
+                "categorical": ["status", "type", "category", "outcome", "result"],
+                "identifier": ["id", "patient_id", "record_id", "case_id"]
+            },
+            "finance": {
+                "measurement": ["revenue", "profit", "expense", "asset", "liability", "equity"],
+                "categorical": ["account_type", "transaction_type", "sector", "industry"],
+                "temporal": ["fiscal_year", "quarter", "reporting_date"]
+            },
+            # Add more domains as needed
+        }
+
+    def _get_entity_priority(self) -> List[str]:
+        """Define priority order for entity types when selecting the best one."""
+        return [
+            "contact.email",
+            "contact.url",
+            "contact.ip_address",
+            "contact.phone",
+            "identifier.uuid",
+            "identifier.sequential",
+            "geographic.latitude",
+            "geographic.longitude",
+            "geographic.postal_code",
+            "temporal.date",
+            "temporal.time",
+            "temporal.datetime",
+            "measurement.percentage",
+            "measurement.currency",
+            "identifier.primary",
+            "identifier.foreign_key",
+            "identifier.identifier",
+            "measurement.quantity",
+            "measurement.dimension",
+            "geographic.country",
+            "geographic.region",
+            "geographic.city",
+            "geographic.address",
+            "temporal.year",
+            "temporal.month",
+            "categorical.status",
+            "categorical.type",
+            "categorical.category",
+            "categorical.classification",
+            "business.patient",
+            "business.business",
+            "measurement.measurement",
+            "categorical.categorical",
+            "unknown"
+        ]
 
     def _generate_entity_id(self, entity: Entity) -> str:
         """Generate a deterministic ID for an entity based on its content."""
         # Create a stable hash based on entity properties
-        content = f"{entity.name}_{entity.entity_type}_{','.join(sorted(entity.source_columns))}"
+        content = f"{entity.name}_{entity.entity_type}_{entity.source_table}"
         return f"entity_{_stable_hash_text(content)[:12]}"
 
     # ---------- public API ----------
@@ -138,50 +245,37 @@ class EntityExtractor:
         path = self._cache_path(file_hash)
         if not path:
             return
-        payload = [e.__dict__ for e in entities]
+        payload = [e.model_dump() for e in entities]
         path.write_text(json.dumps(payload, ensure_ascii=False))
 
-    # ---------- gate A/B/C orchestrator ----------
+    # ---------- main extraction logic ----------
     def _extract_entities_traditional(
         self,
         file_path: str,
         columns: list[ColumnProfile],
         config: dict[str, Any],
     ) -> list[Entity]:
-        # Store file path for context analysis
+        """Main extraction logic with table-level focus."""
         self.current_file_path = file_path
-        df = self._safe_read_csv(file_path, usecols=[c.name for c in columns])
+        
+        # First, try table-level entity extraction
+        table_entities = self._extract_table_level_entities(columns, config)
+        if table_entities:
+            logger.info(f"Using table-level entity: {table_entities[0].name}")
+            return table_entities
 
-        per_column: list[Entity] = []
-        business_entities: list[Entity] = []  # Initialize business_entities list
+        # Fallback to traditional column-based extraction if table-level fails
+        logger.info("No table-level entity found, falling back to column-level extraction")
+        df = self._safe_read_csv(file_path, usecols=[c.name for c in columns])
         
         # Extract semantic entities based on dataset understanding
         logger.info("Starting semantic entity extraction...")
         semantic_entities = self._extract_semantic_entities(df, columns, config)
-        per_column.extend(semantic_entities)
-        logger.info(f"Extracted {len(semantic_entities)} semantic entities")
         
         # Fallback: Extract entities per column if semantic extraction fails
         if not semantic_entities:
             logger.info("Semantic extraction failed, falling back to column-level extraction")
-            for col in columns[: int(_safe_config_get(config, "max_columns_to_process", 10_000))]:
-                try:
-                    logger.info(f"Extracting entities for column: {col.name}")
-                    col_entities = self._extract_column_entities(df, col, config)
-                    per_column.extend(col_entities)
-                    logger.info(f"Column {col.name}: extracted {len(col_entities)} entities")
-                except Exception as e:
-                    logger.warning(f"Entity extraction failed for column {col.name}: {e}")
-        
-        # Also try business entity extraction (if enabled)
-        if _safe_config_get(config, "extract_business_entities", False):
-            try:
-                logger.info("Attempting LLM-based business entity extraction...")
-                llm_entities = self._extract_business_entities_enhanced(df, columns, config)
-                business_entities.extend(llm_entities)
-                logger.info(f"Business LLM extraction added {len(llm_entities)} entities")
-            except Exception as e:
-                logger.warning(f"Business LLM extraction failed: {e}")
+            semantic_entities = self._extract_column_level_entities(df, columns, config)
 
         # Optional business-level entities; gated & cached inside
         per_dataset: list[Entity] = []
@@ -193,13 +287,13 @@ class EntityExtractor:
             except Exception as e:
                 logger.warning(f"Business LLM extraction skipped: {e}")
 
+        # Combine all entities
+        all_entities = semantic_entities + per_dataset
+        
         # Deduplicate by meaning
         if _safe_config_get(config, "use_intelligent_consolidation", True):
-            business_entities = self._deduplicate_by_embeddings(business_entities, config)
+            all_entities = self._deduplicate_by_embeddings(all_entities, config)
 
-        # Combine per-column and business entities
-        all_entities = per_column + business_entities + per_dataset
-        
         # Drop low-confidence
         thr = float(_safe_config_get(config, "confidence_threshold", 0.70))
         entities = [e for e in all_entities if float(getattr(e, "confidence", 1.0)) >= thr]
@@ -209,174 +303,71 @@ class EntityExtractor:
         if len(entities) > max_entities:
             entities = entities[:max_entities]
         
-        logger.info(f"Total entities extracted: {len(entities)} (per-column: {len(per_column)}, business: {len(business_entities)}, dataset: {len(per_dataset)})")
+        logger.info(f"Total entities extracted: {len(entities)}")
         return entities
 
-    # ---------- Business-focused entity extraction ----------
-    def _extract_business_entities_enhanced(
-        self, df: pd.DataFrame, columns: list[ColumnProfile], config: dict[str, Any]
+    def _extract_table_level_entities(
+        self, 
+        columns: list[ColumnProfile], 
+        config: dict[str, Any]
     ) -> list[Entity]:
-        """Extract meaningful business entities from the dataset."""
-        if not self.llm_manager:
-            return []
-        
+        """Extract a table-level entity with all columns as attributes."""
         try:
-            logger.info(f"Creating dataset summary for LLM analysis...")
-            # Create a focused business analysis prompt
-            dataset_summary = {
-                "total_rows": len(df),
-                "total_columns": len(columns),
-                "column_types": {
-                    col.name: {
-                        "data_type": str(col.data_type),
-                        "unique_count": col.unique_count,
-                        "sample_values": col.sample_values[:3]
-                    }
-                    for col in columns
-                }
-            }
-            logger.info(f"Dataset summary created: {len(df)} rows, {len(columns)} columns")
+            # Infer entity name from file path
+            entity_name = infer_entity_name(self.current_file_path)
+            logger.info(f"Inferred entity name: '{entity_name}' from file path: '{self.current_file_path}'")
             
-            prompt = f"""
-Analyze this dataset and identify core entities based on data structure patterns only:
-
-Dataset Summary: {json.dumps(dataset_summary, indent=2)}
-
-Extract entities from:
-- String/categorical columns (use column names as entity names)
-- Numeric columns (group related numeric data if appropriate)
-
-Rules:
-- Use actual column names as entity names
-- Use only these entity types: "categorical", "numerical", "time_dimension", "identifier"
-- Base decisions purely on data patterns, not domain knowledge
-- Group related columns only when they represent the same concept
- 
-For each entity provide:
-- name: actual column name or grouped name
-- entity_type: one of the allowed types above
-- confidence: 0.0-1.0 based on data pattern clarity
-- reason: data pattern justification (no domain assumptions)
-- source_columns: list of relevant column names
-
-Return JSON array with entities.
-"""
+            # Create attributes from all columns
+            attributes = []
+            for column in columns:
+                attribute = Attribute(
+                    name=column.name,
+                    data_type=column.data_type,
+                    source_column=column.name,
+                    confidence=0.95,  # High confidence for direct column mapping
+                    statistics=column.statistics,
+                    sample_values=column.sample_values
+                )
+                attributes.append(attribute)
             
-            # Use LLM to analyze the dataset
-            logger.info("Sending prompt to LLM for business entity analysis...")
-            response = self.llm_manager.generate_text(prompt, max_tokens=400, temperature=0.1)
+            # Create the main entity
+            entity = Entity(
+                id=str(uuid.uuid4()),
+                name=entity_name,
+                entity_type=EntityType.TABLE.value,
+                attributes=attributes,
+                confidence=1.0,  # High confidence for table-level entity
+                source_table=self.current_file_path
+            )
+            logger.info(f"Created entity: id='{entity.id}', name='{entity.name}', type='{entity.entity_type}'")
             
-            if response:
-                logger.info(f"LLM response received (length: {len(response)})")
-                logger.info(f"LLM response preview: {response[:200]}...")
-                
-                try:
-                    # Extract JSON from response
-                    json_start = response.find('[')
-                    json_end = response.rfind(']') + 1
-                    
-                    if json_start != -1 and json_end != -1:
-                        json_str = response[json_start:json_end]
-                        logger.info(f"Extracted JSON string: {json_str}")
-                        
-                        entities_data = json.loads(json_str)
-                        logger.info(f"Parsed JSON data: {len(entities_data)} entity records")
-                        
-                        entities = []
-                        for i, entity_data in enumerate(entities_data):
-                            try:
-                                logger.info(f"Creating entity {i+1} from LLM data: {entity_data}")
-                                entity = Entity(
-                                    id=str(uuid.uuid4()),
-                                    name=entity_data.get("name", "unknown"),
-                                    entity_type=entity_data.get("entity_type", "unknown"),
-                                    source_columns=entity_data.get("source_columns", []),
-                                    confidence=float(entity_data.get("confidence", 0.8)),
-                                    description=entity_data.get("reason", "Business domain analysis")
-                                )
-                                entities.append(entity)
-                                logger.info(f"✅ Created LLM entity: id={entity.id}, name='{entity.name}', type='{entity.entity_type}'")
-                            except Exception as e:
-                                logger.error(f"❌ Failed to create business entity from data {entity_data}: {e}")
-                        
-                        logger.info(f"LLM entity creation completed: {len(entities)} entities created")
-                        return entities
-                    else:
-                        logger.warning(f"Could not find JSON array in LLM response. json_start={json_start}, json_end={json_end}")
-                        logger.warning(f"Full LLM response: {response}")
-                except Exception as e:
-                    logger.error(f"❌ Failed to parse LLM response: {e}")
-                    logger.error(f"LLM response that failed to parse: {response}")
-            else:
-                logger.warning("LLM returned no response")
-            
-            return []
+            return [entity]
             
         except Exception as e:
-            logger.warning(f"Business entity extraction failed: {e}")
+            logger.warning(f"Table-level entity extraction failed: {e}")
             return []
 
-    def _extract_basic_entities(self, df: pd.DataFrame, columns: list[ColumnProfile], config: dict[str, Any]) -> list[Entity]:
-        """Fallback basic entity extraction if LLM fails."""
-        entities = []
+    def _extract_column_level_entities(
+        self,
+        df: pd.DataFrame,
+        columns: list[ColumnProfile],
+        config: dict[str, Any],
+    ) -> list[Entity]:
+        """Extract entities at the column level as fallback."""
+        entities: list[Entity] = []
         
-        logger.info(f"Starting basic entity extraction for {len(columns)} columns")
-        
-        # Generic entity extraction based on data patterns only
-        for col in columns:
-            col_name = col.name.lower()
-            logger.info(f"Analyzing column: '{col.name}' (type: {col.data_type}, unique: {col.unique_count})")
-            
-            # Generic string/categorical entity
-            if col.data_type == DataType.STRING and col.unique_count > 1:
-                logger.info(f"  Found categorical column: {col.name}")
-                entity = Entity(
-                    id=str(uuid.uuid4()),
-                    name=col.name,
-                    entity_type="categorical",
-                    source_columns=[col.name],
-                    confidence=0.90,
-                    description=f"Categorical data with {col.unique_count} unique values"
-                )
-                entities.append(entity)
-                logger.info(f"  ✅ Created categorical entity: id={entity.id}")
-            
-            # Generic numeric entity
-            elif col.data_type in [DataType.FLOAT, DataType.INTEGER, DataType.NUMERICAL] and col.unique_count > 5:
-                logger.info(f"  Found numeric column: {col.name} (unique values: {col.unique_count})")
-                
-                # Check if column name is a year (time dimension)
-                if col.name.isdigit() and 1900 <= int(col.name) <= 2100:
-                    logger.info(f"    Column name is a year: {col.name}")
-                    entity = Entity(
-                        id=str(uuid.uuid4()),
-                        name=col.name,
-                        entity_type="time_dimension",
-                        source_columns=[col.name],
-                        confidence=0.95,
-                        description=f"Time dimension for year {col.name}"
-                    )
-                    entities.append(entity)
-                    logger.info(f"    ✅ Created time dimension entity for year {col.name}: id={entity.id}")
-                else:
-                    # Generic numeric measurement
-                    entity = Entity(
-                        id=str(uuid.uuid4()),
-                        name=col.name,
-                        entity_type="measurement",
-                        source_columns=[col.name],
-                        confidence=0.85,
-                        description=f"Numeric measurement data from column {col.name}"
-                    )
-                    entities.append(entity)
-                    logger.info(f"    ✅ Created measurement entity: id={entity.id}")
-            else:
-                logger.info(f"  Column '{col.name}' does not match basic entity patterns")
-        
-        logger.info(f"Basic entity extraction completed: {len(entities)} entities created")
+        for col in columns[: int(_safe_config_get(config, "max_columns_to_process", 10_000))]:
+            try:
+                logger.info(f"Extracting entities for column: {col.name}")
+                col_entities = self._extract_column_entities(df, col, config)
+                entities.extend(col_entities)
+                logger.info(f"Column {col.name}: extracted {len(col_entities)} entities")
+            except Exception as e:
+                logger.warning(f"Entity extraction failed for column {col.name}: {e}")
+
         return entities
 
-    # ---------- Gate A + selection ----------
+    # ---------- Column-level entity extraction (fallback) ----------
     def _extract_column_entities(
         self,
         df: pd.DataFrame,
@@ -394,17 +385,14 @@ Return JSON array with entities.
 
         # Hard exit if we got a highly-specific, high-confidence type
         hard_exit_types = {
-            "email",
-            "url",
-            "ip_address",
-            "uuid",
-            "credit_card",
-            "ssn",
-            "date",
-            "time",
-            "postal_code",
-            "address",
-            "phone",
+            EntityType.EMAIL.value,
+            EntityType.URL.value,
+            EntityType.IP_ADDRESS.value,
+            EntityType.UUID.value,
+            EntityType.PHONE.value,
+            EntityType.DATE.value,
+            EntityType.TIME.value,
+            EntityType.POSTAL_CODE.value,
         }
         top_regex = max(regex_entities, key=lambda e: e.confidence, default=None)
         if (
@@ -418,18 +406,18 @@ Return JSON array with entities.
         if column.data_type in [DataType.INTEGER, DataType.STRING]:
             entities.extend(self._extract_id_entities(s, column, config))
 
-        # Strategy 3 (LLM): only if nothing else found with confidence
+        # Strategy 3: pattern-based (percent/latlon/year/etc.)
+        entities.extend(self._extract_pattern_entities(s, column, config))
+
+        # Strategy 4: basic categorical detection (generic)
+        entities.extend(self._extract_categorical_entities(s, column, config))
+
+        # Strategy 5 (LLM): only if nothing else found with confidence
         if _safe_config_get(config, "use_llm", True) and not entities:
             try:
                 entities.extend(self._extract_llm_entities(s, column, config))
             except Exception as e:
                 logger.warning(f"LLM extraction failed for column {name}: {e}")
-
-        # Strategy 4: pattern-based (percent/latlon/year/etc.)
-        entities.extend(self._extract_pattern_entities(s, column, config))
-
-        # Strategy 5: basic categorical detection (generic)
-        entities.extend(self._extract_categorical_entities(s, column, config))
 
         # Final choice: pick exactly one entity per column (default)
         if _safe_config_get(config, "one_entity_per_column", True) and entities:
@@ -455,24 +443,32 @@ Return JSON array with entities.
 
         out: list[Entity] = []
         checks: list[tuple[str, re.Pattern]] = [
-            ("email", _REG_EMAIL),
-            ("ip_address", _REG_IP),
-            ("uuid", _REG_UUID),
-            ("credit_card", _REG_CREDIT_CARD),
-            ("phone", _REG_PHONE),
-            ("postal_code", _REG_POSTAL_5),
-            # URL check moved to end to avoid false positives with years
-            ("url", _REG_URL),
+            (EntityType.EMAIL.value, _REG_EMAIL),
+            (EntityType.IP_ADDRESS.value, _REG_IP),
+            (EntityType.UUID.value, _REG_UUID),
+            (EntityType.PHONE.value, _REG_PHONE),
+            (EntityType.POSTAL_CODE.value, _REG_POSTAL_5),
+            (EntityType.URL.value, _REG_URL),  # URL check moved to end to avoid false positives with years
         ]
         for t, rx in checks:
             r = ratio(rx)
             if r >= 0.70:  # strong validator
+                # Create attribute for this column
+                attribute = Attribute(
+                    name=column.name,
+                    data_type=column.data_type,
+                    source_column=column.name,
+                    confidence=float(r),
+                    statistics=column.statistics,
+                    sample_values=column.sample_values
+                )
+                
                 entity = Entity(
                     name=column.name,
                     entity_type=t,
-                    source_columns=[column.name],
+                    attributes=[attribute],
                     confidence=float(r),
-                    description=f"Validated as {t} by pattern checks",
+                    source_table=self.current_file_path
                 )
                 entity.id = self._generate_entity_id(entity)
                 out.append(entity)
@@ -509,23 +505,33 @@ Return JSON array with entities.
         name_lower = column.name.lower()
         id_prior = ("id" in name_lower) or (name_lower.endswith("_id"))
 
+        # Create attribute for this column
+        attribute = Attribute(
+            name=column.name,
+            data_type=column.data_type,
+            source_column=column.name,
+            confidence=float(min(1.0, 0.7 + 0.3 * ur)),
+            statistics=column.statistics,
+            sample_values=column.sample_values
+        )
+
         if ur >= 0.98 and (monotonic or id_prior):
             entity = Entity(
                 name=column.name,
-                entity_type="sequential_id" if monotonic else "identifier",
-                source_columns=[column.name],
+                entity_type=EntityType.SEQUENTIAL_ID.value if monotonic else EntityType.IDENTIFIER.value,
+                attributes=[attribute],
                 confidence=float(min(1.0, 0.7 + 0.3 * ur)),
-                description="High uniqueness; ID/name prior/sequence detected",
+                source_table=self.current_file_path
             )
             entity.id = self._generate_entity_id(entity)
             out.append(entity)
         elif ur >= 0.95 or loose_ratio >= 0.7:
             entity = Entity(
                 name=column.name,
-                entity_type="identifier",
-                source_columns=[column.name],
+                entity_type=EntityType.IDENTIFIER.value,
+                attributes=[attribute],
                 confidence=float(max(0.70, min(0.95, ur))),
-                description="High uniqueness suggests identifier",
+                source_table=self.current_file_path
             )
             entity.id = self._generate_entity_id(entity)
             out.append(entity)
@@ -555,6 +561,18 @@ Return JSON array with entities.
                         pass
             return hits / n
 
+        def currency_ratio() -> float:
+            hits = 0
+            for v in values:
+                v_str = str(v).strip()
+                if _REG_CURRENCY.match(v_str):
+                    # Additional checks for currency
+                    if any(c in v_str for c in ['$', '€', '£', '¥']):
+                        hits += 1
+                    elif any(word in column.name.lower() for word in ['price', 'cost', 'revenue', 'salary']):
+                        hits += 1
+            return hits / n
+
         def latlon_ratio(which: str) -> float:
             rx = _REG_LAT if which == "lat" else _REG_LON
             hits = 0
@@ -574,41 +592,67 @@ Return JSON array with entities.
                     hits += 1
             return hits / n
 
+        # Create attribute for this column
+        attribute = Attribute(
+            name=column.name,
+            data_type=column.data_type,
+            source_column=column.name,
+            confidence=1.0,
+            statistics=column.statistics,
+            sample_values=column.sample_values
+        )
+
+        # Percentage detection
         pr = pct_ratio()
         if pr >= 0.80:
             entity = Entity(
                 name=column.name,
-                entity_type="measurement",
-                source_columns=[column.name],
+                entity_type=EntityType.PERCENTAGE.value,
+                attributes=[attribute],
                 confidence=float(pr),
-                description="Percentage measurement (0–100%)",
+                source_table=self.current_file_path
             )
             entity.id = self._generate_entity_id(entity)
             out.append(entity)
 
+        # Currency detection
+        cr = currency_ratio()
+        if cr >= 0.80:
+            entity = Entity(
+                name=column.name,
+                entity_type=EntityType.CURRENCY.value,
+                attributes=[attribute],
+                confidence=float(cr),
+                source_table=self.current_file_path
+            )
+            entity.id = _stable_hash_text(f"{column.name}_{EntityType.CURRENCY.value}")[:12]
+            out.append(entity)
+
+        # Latitude/Longitude detection
         latr = latlon_ratio("lat")
         lonr = latlon_ratio("lon")
         if latr >= 0.80:
             entity = Entity(
                 name=column.name,
-                entity_type="location_latitude",
-                source_columns=[column.name],
+                entity_type=EntityType.LATITUDE.value,
+                attributes=[attribute],
                 confidence=float(latr),
-                description="Latitude values",
+                source_table=self.current_file_path
             )
             entity.id = self._generate_entity_id(entity)
             out.append(entity)
         if lonr >= 0.80:
             entity = Entity(
                 name=column.name,
-                entity_type="location_longitude",
-                source_columns=[column.name],
+                entity_type=EntityType.LONGITUDE.value,
+                attributes=[attribute],
                 confidence=float(lonr),
-                description="Longitude values",
+                source_table=self.current_file_path
             )
             entity.id = self._generate_entity_id(entity)
             out.append(entity)
 
+        # Year detection
         yr = year_ratio()
         # Check if column name is a year (4-digit number 1900-2100)
         is_year_column = (len(column.name) == 4 and column.name.isdigit() and 
@@ -617,10 +661,10 @@ Return JSON array with entities.
         if yr >= 0.90 or is_year_column or any(k in column.name.lower() for k in ("year", "yr")):
             entity = Entity(
                 name=column.name,
-                entity_type="time_dimension",
-                source_columns=[column.name],
+                entity_type=EntityType.YEAR.value,
+                attributes=[attribute],
                 confidence=float(max(0.7, yr)) if yr > 0 else 0.9,
-                description="Year-like time dimension",
+                source_table=self.current_file_path
             )
             entity.id = self._generate_entity_id(entity)
             out.append(entity)
@@ -655,12 +699,22 @@ Return JSON array with entities.
                 dataset_context
             )
             
+            # Create attribute for this column
+            attribute = Attribute(
+                name=string_col.name,
+                data_type=string_col.data_type,
+                source_column=string_col.name,
+                confidence=0.95,
+                statistics=string_col.statistics,
+                sample_values=string_col.sample_values
+            )
+            
             entity = Entity(
                 name=entity_name,
                 entity_type=entity_type,
-                source_columns=[string_col.name],
+                attributes=[attribute],
                 confidence=0.95,
-                description=f"{entity_type.replace('_', ' ').title()} with {unique_count} unique values"
+                source_table=self.current_file_path
             )
             entity.id = self._generate_entity_id(entity)
             entities.append(entity)
@@ -689,12 +743,25 @@ Return JSON array with entities.
                 # Infer what kind of measurement based on dataset context
                 measurement_name = self._infer_measurement_type(dataset_context, df, time_cols)
                 
+                # Create attributes for all time columns
+                attributes = []
+                for col in time_cols:
+                    attribute = Attribute(
+                        name=col.name,
+                        data_type=col.data_type,
+                        source_column=col.name,
+                        confidence=0.90,
+                        statistics=col.statistics,
+                        sample_values=col.sample_values
+                    )
+                    attributes.append(attribute)
+                
                 entity = Entity(
                     name=measurement_name,
-                    entity_type="measurement",
-                    source_columns=[col.name for col in time_cols],
+                    entity_type=EntityType.MEASUREMENT.value,
+                    attributes=attributes,
                     confidence=0.90,
-                    description=f"Time series measurements across {len(time_cols)} time periods"
+                    source_table=self.current_file_path
                 )
                 entity.id = self._generate_entity_id(entity)
                 entities.append(entity)
@@ -710,12 +777,22 @@ Return JSON array with entities.
                     dataset_context
                 )
                 
+                # Create attribute for this column
+                attribute = Attribute(
+                    name=col.name,
+                    data_type=col.data_type,
+                    source_column=col.name,
+                    confidence=0.85,
+                    statistics=col.statistics,
+                    sample_values=col.sample_values
+                )
+                
                 entity = Entity(
                     name=entity_name,
                     entity_type=entity_type,
-                    source_columns=[col.name],
+                    attributes=[attribute],
                     confidence=0.85,
-                    description=f"{entity_type.replace('_', ' ').title()} measurement"
+                    source_table=self.current_file_path
                 )
                 entity.id = self._generate_entity_id(entity)
                 entities.append(entity)
@@ -742,6 +819,15 @@ Return JSON array with entities.
             filename_insights = self._extract_filename_insights(file_path)
             context.update(filename_insights)
         
+        # Check for healthcare data
+        healthcare_keywords = ['patient', 'medical', 'health', 'hospital', 'readmission', 
+                              'diagnosis', 'treatment', 'clinical']
+        for col in columns:
+            col_lower = col.name.lower()
+            if any(keyword in col_lower for keyword in healthcare_keywords):
+                context["domain_context"] = "healthcare"
+                break
+        
         # Check for geographic columns
         geo_keywords = ['country', 'region', 'state', 'city', 'location', 'geo', 'area']
         for col in columns:
@@ -763,6 +849,14 @@ Return JSON array with entities.
                     if (sample_vals >= 0).all() and (sample_vals <= 100).all():
                         context["has_percentage_data"] = True
                         break
+        
+        # Check for financial data
+        financial_keywords = ['price', 'cost', 'revenue', 'profit', 'salary', 'expense']
+        for col in columns:
+            col_lower = col.name.lower()
+            if any(keyword in col_lower for keyword in financial_keywords):
+                context["has_financial_data"] = True
+                break
         
         # Infer primary measurement type from data patterns
         if context["has_percentage_data"]:
@@ -786,16 +880,11 @@ Return JSON array with entities.
         
         # Domain/Industry patterns
         domain_patterns = {
-            "agriculture": ["agriculture", "agricultural", "farming", "farm", "crops", "livestock"],
-            "healthcare": ["health", "medical", "patient", "hospital", "disease", "treatment"],
+            "healthcare": ["patient", "medical", "health", "hospital", "readmission", 
+                          "diagnosis", "treatment", "clinical"],
             "finance": ["finance", "financial", "revenue", "profit", "investment", "banking"],
             "education": ["education", "school", "student", "academic", "university", "learning"],
             "retail": ["retail", "sales", "customer", "product", "inventory", "store"],
-            "hr": ["employee", "staff", "workforce", "personnel", "hr", "human_resources"],
-            "manufacturing": ["production", "manufacturing", "factory", "industrial", "assembly"],
-            "logistics": ["shipping", "transport", "logistics", "delivery", "supply_chain"],
-            "energy": ["energy", "power", "electricity", "renewable", "consumption", "utility"],
-            "real_estate": ["property", "real_estate", "housing", "rental", "mortgage"]
         }
         
         # Measurement type patterns
@@ -805,17 +894,6 @@ Return JSON array with entities.
             "financial": ["revenue", "cost", "price", "salary", "wage", "income", "expense"],
             "time_based": ["daily", "monthly", "yearly", "annual", "quarterly", "weekly"],
             "performance": ["performance", "efficiency", "productivity", "score", "rating"],
-            "demographic": ["population", "demographic", "age", "gender", "ethnicity"],
-            "employment": ["employment", "unemployment", "jobs", "workers", "labor", "workforce"]
-        }
-        
-        # Subject matter patterns
-        subject_patterns = {
-            "workers": ["worker", "workers", "employee", "staff", "personnel", "labor"],
-            "customers": ["customer", "client", "consumer", "buyer", "user"],
-            "products": ["product", "item", "goods", "merchandise", "inventory"],
-            "sales": ["sales", "transactions", "orders", "purchases", "deals"],
-            "regions": ["country", "region", "state", "city", "location", "geographic"]
         }
         
         # Analyze filename for patterns
@@ -830,22 +908,6 @@ Return JSON array with entities.
                 insights["measurement_context"] = measurement_type
                 logger.info(f"Detected measurement context from filename: {measurement_type}")
                 break
-        
-        for subject, keywords in subject_patterns.items():
-            if any(keyword in filename for keyword in keywords):
-                insights["subject_matter"] = subject
-                logger.info(f"Detected subject matter from filename: {subject}")
-                break
-        
-        # Special case for the agriculture workers example
-        if "agriculture" in filename and "workers" in filename and "percent" in filename:
-            insights.update({
-                "domain_context": "agriculture",
-                "measurement_context": "employment",
-                "subject_matter": "workers",
-                "metric_type": "employment_rate"
-            })
-            logger.info("Detected agriculture employment dataset from filename")
         
         return insights
     
@@ -870,32 +932,41 @@ Return JSON array with entities.
     ) -> tuple[str, str]:
         """Infer semantic meaning from column characteristics."""
         col_lower = col_name.lower()
+        domain = context.get("domain_context", "generic")
+        
+        # Check domain-specific patterns first
+        if domain in self.domain_patterns:
+            for entity_type, patterns in self.domain_patterns[domain].items():
+                if any(pattern in col_lower for pattern in patterns):
+                    # Create a meaningful name
+                    entity_name = col_name.replace('_', ' ').title()
+                    return entity_name, EntityType[entity_type.upper()].value if hasattr(EntityType, entity_type.upper()) else entity_type
         
         # Geographic entities
         if any(geo in col_lower for geo in ['country', 'nation', 'state', 'region']):
-            return "Geographic Region", "geographic_entity"
+            return "Geographic Region", EntityType.REGION.value
         elif any(geo in col_lower for geo in ['city', 'town', 'location']):
-            return "Location", "geographic_entity"
+            return "Location", EntityType.CITY.value
         
         # Identifier patterns
         if 'id' in col_lower or col_lower.endswith('_id'):
-            return f"{col_name} Identifier", "identifier"
+            return f"{col_name} Identifier", EntityType.IDENTIFIER.value
         
         # Category patterns
         if any(cat in col_lower for cat in ['type', 'category', 'class', 'group']):
-            return f"{col_name} Category", "categorical"
+            return f"{col_name} Category", EntityType.CATEGORY.value
         
         # Status patterns
         if any(status in col_lower for status in ['status', 'state', 'condition']):
-            return f"{col_name} Status", "categorical"
+            return f"{col_name} Status", EntityType.STATUS.value
         
         # Default: Create meaningful name from column
         if data_type == DataType.STRING:
             # Capitalize and clean up column name
             entity_name = col_name.replace('_', ' ').replace('-', ' ').title()
-            return entity_name, "categorical"
+            return entity_name, EntityType.CATEGORICAL.value
         else:
-            return f"{col_name} Measurement", "measurement"
+            return f"{col_name} Measurement", EntityType.MEASUREMENT.value
     
     def _infer_measurement_type(
         self, 
@@ -908,18 +979,6 @@ Return JSON array with entities.
         # Use filename insights for more specific measurement names
         domain = context.get("domain_context", "generic")
         measurement_context = context.get("measurement_context", "generic")
-        subject_matter = context.get("subject_matter")
-        metric_type = context.get("metric_type")
-        
-        # If we have specific metric type from filename, use it
-        if metric_type == "employment_rate":
-            return "Agricultural Employment Rate"
-        
-        # Create domain-specific measurement names
-        if domain == "agriculture" and measurement_context == "employment":
-            return "Agricultural Employment Measurement"
-        elif domain == "agriculture" and subject_matter == "workers":
-            return "Agricultural Worker Statistics"
         
         # Sample some data to understand the measurement
         if time_cols:
@@ -932,12 +991,10 @@ Return JSON array with entities.
                     # Check for decimal values suggesting percentages
                     if (sample_data % 1 != 0).any():
                         # Use domain context for percentage measurements
-                        if domain == "agriculture":
-                            return "Agricultural Employment Percentage"
+                        if domain == "healthcare":
+                            return "Health Metrics Percentage"
                         elif domain == "finance":
                             return "Financial Performance Percentage"
-                        elif domain == "healthcare":
-                            return "Health Metrics Percentage"
                         else:
                             return "Percentage Measurement"
             
@@ -966,6 +1023,16 @@ Return JSON array with entities.
         values = self._det_sample_unique_sorted(s, config)
         n = max(len(values), 1)
 
+        # Create attribute for this column
+        attribute = Attribute(
+            name=column.name,
+            data_type=column.data_type,
+            source_column=column.name,
+            confidence=0.8,
+            statistics=column.statistics,
+            sample_values=column.sample_values
+        )
+
         # Simple categorical detection based on data characteristics only
         if column.data_type == DataType.STRING and len(values) > 0:
             # Check if this looks like a categorical column
@@ -973,19 +1040,17 @@ Return JSON array with entities.
             
             # If we have reasonable number of categories (not too many, not too few)
             if 2 <= len(values) <= 1000 and unique_ratio < 0.8:
-                out.append(
-                    Entity(
-                        name=column.name,
-                        entity_type="categorical",
-                        source_columns=[column.name],
-                        confidence=0.8,
-                        description=f"Categorical data with {len(values)} unique values",
-                    )
+                entity = Entity(
+                    name=column.name,
+                    entity_type=EntityType.CATEGORICAL.value,
+                    attributes=[attribute],
+                    confidence=0.8,
+                    source_table=self.current_file_path
                 )
+                entity.id = self._generate_entity_id(entity)
+                out.append(entity)
 
         return out
-
-
 
     # ---------- Gate C: LLM (last resort, deterministic & cached) ----------
     def _extract_llm_entities(
@@ -1016,33 +1081,30 @@ Return JSON array with entities.
         results = self.llm_manager.extract_entities_for_column(
             prompt=prompt,
             column_name=column.name,
-            allowed_types=[
-                "identifier",
-                "measurement",
-                "time_dimension",
-                "location",
-                "address",
-                "email",
-                "phone",
-                "url",
-                "uuid",
-                "ip_address",
-                "categorical",
-                "unknown",
-            ],
+            allowed_types=[t.value for t in EntityType],
             **kwargs,
         )
 
         entities: list[Entity] = []
         for r in results or []:
             try:
+                # Create attribute for this column
+                attribute = Attribute(
+                    name=column.name,
+                    data_type=column.data_type,
+                    source_column=column.name,
+                    confidence=float(r.get("confidence", 0.6)),
+                    statistics=column.statistics,
+                    sample_values=column.sample_values
+                )
+                
                 entities.append(
                     Entity(
                         name=column.name,
-                        entity_type=str(r.get("entity_type", "unknown")),
-                        source_columns=[column.name],
+                        entity_type=str(r.get("entity_type", EntityType.UNKNOWN.value)),
+                        attributes=[attribute],
                         confidence=float(r.get("confidence", 0.6)),
-                        description=str(r.get("reason", "LLM-inferred")),
+                        source_table=self.current_file_path
                     )
                 )
             except Exception as e:
@@ -1051,7 +1113,7 @@ Return JSON array with entities.
         if cache:
             try:
                 cache.write_text(
-                    json.dumps([e.__dict__ for e in entities], ensure_ascii=False)
+                    json.dumps([e.model_dump() for e in entities], ensure_ascii=False)
                 )
             except Exception:
                 pass
@@ -1098,13 +1160,30 @@ Return JSON array with entities.
         for r in results or []:
             try:
                 name = r.get("name") or r.get("column") or "business_entity"
+                
+                # Create attributes for all source columns
+                attributes = []
+                for col_name in r.get("source_columns", []):
+                    # Find the column profile
+                    col_profile = next((c for c in columns if c.name == col_name), None)
+                    if col_profile:
+                        attribute = Attribute(
+                            name=col_name,
+                            data_type=col_profile.data_type,
+                            source_column=col_name,
+                            confidence=float(r.get("confidence", 0.6)),
+                            statistics=col_profile.statistics,
+                            sample_values=col_profile.sample_values
+                        )
+                        attributes.append(attribute)
+                
                 entities.append(
                     Entity(
                         name=name,
-                        entity_type=str(r.get("entity_type", "unknown")),
-                        source_columns=r.get("source_columns") or [],
+                        entity_type=str(r.get("entity_type", EntityType.UNKNOWN.value)),
+                        attributes=attributes,
                         confidence=float(r.get("confidence", 0.6)),
-                        description=str(r.get("reason", "LLM-inferred")),
+                        source_table=self.current_file_path
                     )
                 )
             except Exception:
@@ -1112,7 +1191,7 @@ Return JSON array with entities.
         if cache:
             try:
                 cache.write_text(
-                    json.dumps([e.__dict__ for e in entities], ensure_ascii=False)
+                    json.dumps([e.model_dump() for e in entities], ensure_ascii=False)
                 )
             except Exception:
                 pass
@@ -1122,32 +1201,6 @@ Return JSON array with entities.
     def _choose_best_entity(
         self, entities: list[Entity], column: ColumnProfile, config: dict[str, Any]
     ) -> Entity:
-        PRIORITY: list[str] = [
-            "email",
-            "url",
-            "ip_address",
-            "uuid",
-            "credit_card",
-            "ssn",
-            "date",
-            "time",
-            "postal_code",
-            "address",
-            "phone",
-            "sequential_id",
-            "uuid_like",
-            "identifier",
-            "composite_key",
-            "measurement",
-            "time_dimension",
-            "location_latitude",
-            "location_longitude",
-            "location",
-            "categorical",
-            "pattern",
-            "unknown",
-        ]
-
         name = column.name.lower()
 
         def name_prior(e: Entity) -> float:
@@ -1183,9 +1236,9 @@ Return JSON array with entities.
 
         def pri_idx(e: Entity) -> int:
             try:
-                return PRIORITY.index(e.entity_type)
+                return self.entity_priority.index(e.entity_type)
             except ValueError:
-                return len(PRIORITY)
+                return len(self.entity_priority)
 
         ranked = sorted(
             entities,
@@ -1208,7 +1261,7 @@ Return JSON array with entities.
             seen = set()
             out: list[Entity] = []
             for e in entities:
-                sig = (e.name, e.entity_type, tuple(sorted(e.source_columns)))
+                sig = (e.name, e.entity_type, e.source_table)
                 if sig in seen:
                     continue
                 seen.add(sig)
@@ -1247,25 +1300,12 @@ Return JSON array with entities.
 
     @staticmethod
     def _entity_signature_text(e: Entity) -> str:
-        return f"{e.name}|{e.entity_type}|{','.join(sorted(e.source_columns or []))}"
+        return f"{e.name}|{e.entity_type}|{e.source_table}"
 
     # ---------- prompts ----------
     @staticmethod
     def _prompt_for_column(column: ColumnProfile, sample_values: list[str]) -> str:
-        allowed = [
-            "identifier",
-            "measurement",
-            "time_dimension",
-            "location",
-            "address",
-            "email",
-            "phone",
-            "url",
-            "uuid",
-            "ip_address",
-            "categorical",
-            "unknown",
-        ]
+        allowed = [t.value for t in EntityType]
         return (
             "You are an ontology-aware extractor.\n"
             "Decide the SINGLE best entity_type for the column below from the allowed set.\n"
@@ -1281,7 +1321,7 @@ Return JSON array with entities.
         return (
             "Identify core entities from the dataset based on data structure patterns only.\n"
             "Return JSON list with objects: {name, entity_type, source_columns, confidence, reason}.\n"
-            "Use actual column names. Entity types: categorical, numerical, time_dimension, identifier.\n"
+            f"Use these entity types: {[t.value for t in EntityType]}.\n"
             "Base decisions on data patterns, not domain knowledge.\n"
             f"Context: {json.dumps(context, ensure_ascii=False)[:4000]}"
         )
@@ -1311,7 +1351,6 @@ Return JSON array with entities.
         if len(vals) > maxn:
             vals = vals[:maxn]
         return vals
-
 
 # -------------
 # End of file.

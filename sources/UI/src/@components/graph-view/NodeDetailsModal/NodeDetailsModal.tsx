@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 import './NodeDetailsModal.scss';
 import { GraphNode } from '../types';
@@ -14,7 +15,13 @@ const NodeDetailsModal: React.FC<NodeDetailsModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  const [expandedAttributes, setExpandedAttributes] = useState<boolean>(false);
+
   if (!isOpen || !node) return null;
+
+  const toggleAttributes = () => {
+    setExpandedAttributes(prev => !prev);
+  };
 
   const formatDataType = (dataType: unknown) => {
     if (typeof dataType === 'string') {
@@ -169,17 +176,37 @@ const NodeDetailsModal: React.FC<NodeDetailsModalProps> = ({
             </div>
           )}
 
-          {node.metadata?.attributes && typeof node.metadata.attributes === 'object' && Object.keys(node.metadata.attributes).length > 0 && (
+          {node.metadata?.attributes && Array.isArray(node.metadata.attributes) && node.metadata.attributes.length > 0 && (
             <div className="attributes-section">
-              <h3>🔧 Entity Attributes</h3>
-              <div className="attributes-grid">
-                {Object.entries(node.metadata.attributes).map(([key, value]) => (
-                  <div key={key} className="attribute-item">
-                    <span className="attribute-key">{key}:</span>
-                    <span className="attribute-value">{safeString(value)}</span>
-                  </div>
-                ))}
+              <div className="attributes-header" onClick={toggleAttributes}>
+                <h3>🔧 Entity Attributes ({node.metadata.attributes.length})</h3>
+                <span className="toggle-icon">
+                  {expandedAttributes ? (
+                    <ChevronDown size={16} />
+                  ) : (
+                    <ChevronRight size={16} />
+                  )}
+                </span>
               </div>
+              {expandedAttributes && (
+                <div className="attributes-grid">
+                  {node.metadata.attributes.map((attr: any, index: number) => (
+                    <div key={index} className="attribute-item">
+                      <span className="attribute-key">{attr.name || `Attribute ${index}`}:</span>
+                      <span className="attribute-value">
+                        <span className="data-type">({attr.data_type || 'unknown'})</span>
+                        {attr.sample_values && attr.sample_values.length > 0 && (
+                          <span className="sample-values">
+                            Sample: {attr.sample_values.slice(0, 3).join(', ')}
+                            {attr.sample_values.length > 3 && '...'}
+                          </span>
+                        )}
+                        <span className="confidence">Confidence: {Math.round((attr.confidence || 0) * 100)}%</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

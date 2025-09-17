@@ -19,6 +19,15 @@ interface ExtractionStatus {
   result?: unknown;
 }
 
+interface Attribute {
+  name: string;
+  data_type: string;
+  source_column: string;
+  confidence: number;
+  statistics?: Record<string, any>;
+  sample_values?: any[];
+}
+
 interface Entity {
   id?: string;
   name: string;
@@ -26,7 +35,7 @@ interface Entity {
   confidence: number;
   source_columns?: string[];
   source_value?: string;
-  attributes?: Record<string, any>;
+  attributes?: Attribute[];
 }
 
 interface Relationship {
@@ -401,6 +410,12 @@ export class WebSocketService {
   private readonly listeners = new Map<string, ((data?: unknown) => void)[]>();
 
   connect(): void {
+    // Don't create multiple connections
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      console.log('WebSocket already connected');
+      return;
+    }
+    
     try {
       // Use direct WebSocket connection to backend since proxy doesn't handle WebSocket
       const wsUrl = API_BASE_URL === '/api' 

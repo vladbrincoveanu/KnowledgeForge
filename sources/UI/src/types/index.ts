@@ -2,6 +2,15 @@
 import React from 'react';
 
 // Base entity interfaces
+export interface Attribute {
+  name: string;
+  data_type: string;
+  source_column: string;
+  confidence: number;
+  statistics?: Record<string, any>;
+  sample_values?: any[];
+}
+
 export interface Entity {
   id?: string;
   name: string;
@@ -9,7 +18,7 @@ export interface Entity {
   confidence: number;
   source_columns?: string[];
   source_value?: string;
-  attributes?: Record<string, any>;
+  attributes?: Attribute[];
 }
 
 export interface Relationship {

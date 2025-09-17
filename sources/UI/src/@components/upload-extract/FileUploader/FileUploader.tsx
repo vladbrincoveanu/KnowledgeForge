@@ -85,16 +85,15 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     [extractionTasks]
   );
 
-  // WebSocket connection for real-time updates
+  // WebSocket message handling (connection managed by App component)
   useEffect(() => {
-    wsService.connect();
-
     wsService.on('message', handleWebSocketMessage);
     wsService.on('connected', () => console.log('WebSocket connected'));
     wsService.on('disconnected', () => console.log('WebSocket disconnected'));
 
     return () => {
-      wsService.disconnect();
+      // Don't disconnect here - let App component manage the connection
+      wsService.off('message', handleWebSocketMessage);
     };
   }, [handleWebSocketMessage]);
 

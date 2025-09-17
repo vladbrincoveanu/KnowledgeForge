@@ -172,8 +172,8 @@ class GraphManager:
                 "name": entity.name,
                 "entity_type": entity.entity_type,
                 "confidence": entity.confidence,
-                "source_columns": json.dumps(entity.source_columns),
-                "source_value": entity.source_value,
+                "source_columns": json.dumps([attr.source_column for attr in entity.attributes if attr.source_column]),
+                "source_value": "N/A",  # Entity model doesn't have source_value
                 "dataset_name": dataset_name,
                 "attributes": json.dumps(entity.attributes),
                 "created_at": datetime.now().isoformat(),

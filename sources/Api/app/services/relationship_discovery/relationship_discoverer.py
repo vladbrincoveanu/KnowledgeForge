@@ -100,7 +100,8 @@ class RelationshipDiscoverer:
             if entity.id is None or entity.id == "":
                 # Create a stable ID based on entity name and index
                 # Generate deterministic ID based on entity content
-                content = f"{entity.name}_{entity.entity_type}_{','.join(sorted(entity.source_columns))}"
+                source_cols = [attr.source_column for attr in entity.attributes if attr.source_column]
+                content = f"{entity.name}_{entity.entity_type}_{','.join(sorted(source_cols))}"
                 entity.id = f"entity_{hashlib.sha256(content.encode('utf-8')).hexdigest()[:12]}"
 
         relationships = []
@@ -428,8 +429,9 @@ class RelationshipDiscoverer:
                             },
                             confidence=float(similarity),
                             source_columns=(
-                                [entity1.source_columns[0], entity2.source_columns[0]]
-                                if entity1.source_columns and entity2.source_columns
+                                [entity1.attributes[0].source_column, entity2.attributes[0].source_column]
+                                if entity1.attributes and entity2.attributes and 
+                                   entity1.attributes[0].source_column and entity2.attributes[0].source_column
                                 else []
                             ),
                         )
@@ -470,8 +472,8 @@ class RelationshipDiscoverer:
             # Group entities by source column
             entities_by_column = defaultdict(list)
             for entity in entities:
-                if entity.source_columns:
-                    entities_by_column[entity.source_columns[0]].append(entity)
+                if entity.attributes and entity.attributes[0].source_column:
+                    entities_by_column[entity.attributes[0].source_column].append(entity)
 
             # Analyze column relationships using LLM
             for col1_name, col1_entities in entities_by_column.items():
@@ -623,7 +625,7 @@ class RelationshipDiscoverer:
                 col_entities = [
                     e
                     for e in entities
-                    if e.source_columns and e.source_columns[0] == column.name
+                    if e.attributes and e.attributes[0].source_column == column.name
                 ]
 
                 if len(col_entities) > 1:
@@ -697,7 +699,7 @@ class RelationshipDiscoverer:
             for e in entities
             if e.entity_type == "temporal"
             or any(
-                col.name in e.attributes.get("source_columns", [])
+                col.name in [attr.source_column for attr in e.attributes if attr.source_column]
                 for col in temporal_columns
             )
         ]
@@ -713,15 +715,17 @@ class RelationshipDiscoverer:
                     attributes={
                         "temporal_relationship": "sequence",
                         "source_columns": (
-                            [entity1.source_columns[0], entity2.source_columns[0]]
-                            if entity1.source_columns and entity2.source_columns[0]
+                            [entity1.attributes[0].source_column, entity2.attributes[0].source_column]
+                            if entity1.attributes and entity2.attributes and 
+                               entity1.attributes[0].source_column and entity2.attributes[0].source_column
                             else []
                         ),
                     },
                     confidence=0.7,
                     source_columns=(
-                        [entity1.source_columns[0], entity2.source_columns[0]]
-                        if entity1.source_columns and entity2.source_columns
+                        [entity1.attributes[0].source_column, entity2.attributes[0].source_column]
+                        if entity1.attributes and entity2.attributes and 
+                           entity1.attributes[0].source_column and entity2.attributes[0].source_column
                         else []
                     ),
                 )
@@ -932,8 +936,8 @@ class RelationshipDiscoverer:
         """Create mapping from column names to entities."""
         mapping = defaultdict(list)
         for entity in entities:
-            if entity.source_columns:
-                mapping[entity.source_columns[0]].append(entity)
+            if entity.attributes and entity.attributes[0].source_column:
+                mapping[entity.attributes[0].source_column].append(entity)
         return dict(mapping)
 
     def _analyze_column_relationship(
@@ -1247,7 +1251,7 @@ class RelationshipDiscoverer:
                 "type": entity.entity_type,
                 "confidence": entity.confidence,
                 "source_column": (
-                    entity.source_columns[0] if entity.source_columns else None
+                    entity.attributes[0].source_column if entity.attributes and entity.attributes[0].source_column else None
                 ),
                 "attributes": entity.attributes,
             }

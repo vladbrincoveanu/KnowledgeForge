@@ -283,7 +283,7 @@ class OntologyMapper:
         # Prepare text for embeddings if enabled
         if self.use_embeddings and self.vectorizer:
             entity_texts = [
-                f"{e.name} {e.entity_type} {' '.join(str(v) for v in e.attributes.values())}"
+                f"{e.name} {e.entity_type} {' '.join(str(attr.name) + ':' + str(attr.sample_values) for attr in e.attributes)}"
                 for e in entities
             ]
             try:
@@ -299,7 +299,8 @@ class OntologyMapper:
             if entity.id is None or entity.id == "":
                 # Create a stable ID based on entity name and index
                 # Generate deterministic ID based on entity content
-                content = f"{entity.name}_{entity.entity_type}_{','.join(sorted(entity.source_columns))}"
+                source_cols = [attr.source_column for attr in entity.attributes if attr.source_column]
+                content = f"{entity.name}_{entity.entity_type}_{','.join(sorted(source_cols))}"
                 entity.id = f"entity_{hashlib.sha256(content.encode('utf-8')).hexdigest()[:12]}"
 
         # Map each entity
@@ -423,7 +424,9 @@ class OntologyMapper:
             attribute_matches = 0
             for attr in class_info["properties"]:
                 if any(
-                    attr.lower() in str(v).lower() for v in entity.attributes.values()
+                    attr.lower() in str(attr_obj.name).lower() or 
+                    any(attr.lower() in str(val).lower() for val in attr_obj.sample_values)
+                    for attr_obj in entity.attributes
                 ):
                     attribute_matches += 1
 
@@ -471,7 +474,8 @@ class OntologyMapper:
             best_match = None
             best_score = 0.0
 
-            for attr_name, _attr_value in entity.attributes.items():
+            for attr_obj in entity.attributes:
+                attr_name = attr_obj.name
                 score = SequenceMatcher(None, attr_name.lower(), prop.lower()).ratio()
                 if score > best_score and score > 0.6:
                     best_score = score
@@ -534,7 +538,7 @@ class OntologyMapper:
             class_name = f"{entity.entity_type}Entity"
             custom_ontology["classes"][class_name] = {
                 "description": f"Custom entity class for {entity.entity_type}",
-                "properties": list(entity.attributes.keys()),
+                "properties": [attr.name for attr in entity.attributes],
                 "superclass": "Thing",
                 "source_entity": entity.id,
             }
@@ -544,7 +548,12 @@ class OntologyMapper:
         for entity in mapped_entities + [
             {"attributes": e.attributes} for e in unmapped_entities
         ]:
-            all_attributes.update(entity.get("attributes", {}).keys())
+            if "attributes" in entity:
+                # Handle both list of Attribute objects and dict formats
+                if isinstance(entity["attributes"], list):
+                    all_attributes.update(attr.name for attr in entity["attributes"])
+                else:
+                    all_attributes.update(entity["attributes"].keys())
 
         for attr in all_attributes:
             if attr not in custom_ontology["properties"]:

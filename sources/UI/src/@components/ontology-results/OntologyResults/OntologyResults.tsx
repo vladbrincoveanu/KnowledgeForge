@@ -9,13 +9,14 @@ import {
   RefreshCw,
   FileText,
   AlertCircle,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import {
   Entity,
   Relationship,
   PaginationState,
   FeedbackForm,
-  PaginatedResponse,
   FeedbackResponse,
 } from '@/types';
 import './OntologyResults.scss';
@@ -49,6 +50,19 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
     confidence_delta: 0,
     user_id: 'current_user',
   });
+  const [expandedAttributes, setExpandedAttributes] = useState<Set<string>>(new Set());
+
+  const toggleAttributes = (entityId: string) => {
+    setExpandedAttributes(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(entityId)) {
+        newSet.delete(entityId);
+      } else {
+        newSet.add(entityId);
+      }
+      return newSet;
+    });
+  };
 
   const loadData = useCallback(
     async (type: 'entities' | 'relationships', reset = false) => {
@@ -291,18 +305,39 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
                       </div>
                     )}
                     {entity.attributes &&
-                      Object.keys(entity.attributes).length > 0 && (
+                      Array.isArray(entity.attributes) && entity.attributes.length > 0 && (
                         <div className="detail-item">
-                          <strong>Attributes:</strong>
-                          <ul className="attributes-list">
-                            {Object.entries(entity.attributes).map(
-                              ([key, value]) => (
-                                <li key={key}>
-                                  <strong>{key}:</strong> {String(value)}
-                                </li>
-                              )
-                            )}
-                          </ul>
+                          <div className="attributes-header" onClick={() => toggleAttributes(entity.id || '')}>
+                            <strong>Attributes ({entity.attributes.length}):</strong>
+                            <span className="toggle-icon">
+                              {expandedAttributes.has(entity.id || '') ? (
+                                <ChevronDown size={16} />
+                              ) : (
+                                <ChevronRight size={16} />
+                              )}
+                            </span>
+                          </div>
+                          {expandedAttributes.has(entity.id || '') && (
+                            <ul className="attributes-list">
+                              {entity.attributes.map(
+                                (attr: any, index: number) => (
+                                  <li key={index}>
+                                    <strong>{attr.name || `Attribute ${index}`}:</strong> 
+                                    <span className="attribute-details">
+                                      <span className="data-type">({attr.data_type || 'unknown'})</span>
+                                      {attr.sample_values && attr.sample_values.length > 0 && (
+                                        <span className="sample-values">
+                                          Sample: {attr.sample_values.slice(0, 3).join(', ')}
+                                          {attr.sample_values.length > 3 && '...'}
+                                        </span>
+                                      )}
+                                      <span className="confidence">Confidence: {Math.round((attr.confidence || 0) * 100)}%</span>
+                                    </span>
+                                  </li>
+                                )
+                              )}
+                            </ul>
+                          )}
                         </div>
                       )}
                   </div>
