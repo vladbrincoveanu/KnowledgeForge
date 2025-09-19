@@ -6,11 +6,20 @@ import logging
 import re
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Tuple, Optional, TypedDict
 from enum import Enum
 
 import numpy as np
 import pandas as pd
+
+# LangGraph imports
+try:
+    from langgraph.graph import StateGraph, END
+    from langgraph.graph.graph import CompiledGraph
+    LANGGRAPH_AVAILABLE = True
+except ImportError:
+    LANGGRAPH_AVAILABLE = False
+    logging.warning("LangGraph not available. Install with: pip install langgraph")
 
 # Import your local models
 from app.domain.models.entities import ColumnProfile, DataType, Entity, Attribute, infer_entity_name
@@ -71,6 +80,33 @@ class EntityType(Enum):
     CLASSIFICATION = "categorical.classification"
 
 # -----------------------
+# LangGraph State Definition
+# -----------------------
+class ExtractionState(TypedDict):
+    """State for the entity extraction workflow."""
+    # Input data
+    file_path: str
+    columns: List[ColumnProfile]
+    config: Dict[str, Any]
+    df: Optional[pd.DataFrame]
+    
+    # Analysis results
+    dataset_type: Optional[str]  # "table_level", "time_series", "relational", "column_level"
+    dataset_context: Dict[str, Any]
+    entity_name: Optional[str]
+    domain: Optional[str]
+    
+    # Extraction results
+    entities: List[Entity]
+    confidence_scores: Dict[str, float]
+    
+    # Workflow control
+    extraction_strategy: Optional[str]
+    should_use_llm: bool
+    needs_consolidation: bool
+    error: Optional[str]
+
+# -----------------------
 # Utility: Regex patterns
 # -----------------------
 _REG_EMAIL = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
@@ -118,13 +154,743 @@ def _safe_config_get(config, key, default=None):
     else:
         return default
 
-class EntityExtractor:
+class LangGraphEntityExtractor:
+    """LangGraph-based entity extractor with graph workflow."""
+    
     def __init__(
         self,
         cache_dir: str | Path | None = ".cache/entity_extractor",
         llm_manager: Any | None = None,
         embeddings_manager: Any | None = None,
     ) -> None:
+        if not LANGGRAPH_AVAILABLE:
+            raise ImportError("LangGraph is required for this extractor. Install with: pip install langgraph")
+            
+        self.cache_dir = Path(cache_dir) if cache_dir else None
+        if self.cache_dir:
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+            self.llm_cache_dir = self.cache_dir / "llm"
+            self.llm_cache_dir.mkdir(parents=True, exist_ok=True)
+            
+        self.llm_manager = llm_manager
+        self.embeddings = embeddings_manager
+        
+        # Initialize the extraction graph
+        self.graph = self._build_extraction_graph()
+        
+        # Domain patterns and configurations
+        self.domain_patterns = self._load_domain_patterns()
+        self.entity_priority = self._get_entity_priority()
+        self.confidence_thresholds = {
+            "rule_based": 0.9,
+            "pattern_based": 0.8,
+            "llm_structured": 0.7,
+            "llm_general": 0.5,
+            "fallback": 0.3
+        }
+
+    def _build_extraction_graph(self) -> CompiledGraph:
+        """Build the LangGraph workflow for entity extraction."""
+        workflow = StateGraph(ExtractionState)
+        
+        # Add nodes for different processing steps
+        workflow.add_node("analyze_dataset", self._analyze_dataset_node)
+        workflow.add_node("load_data", self._load_data_node)
+        workflow.add_node("extract_table_level", self._extract_table_level_node)
+        workflow.add_node("extract_time_series", self._extract_time_series_node)
+        workflow.add_node("extract_relational", self._extract_relational_node)
+        workflow.add_node("extract_column_level", self._extract_column_level_node)
+        workflow.add_node("llm_enhance", self._llm_enhance_node)
+        workflow.add_node("consolidate", self._consolidate_node)
+        
+        # Set entry point
+        workflow.set_entry_point("load_data")
+        
+        # Add conditional edges for routing
+        workflow.add_edge("load_data", "analyze_dataset")
+        
+        workflow.add_conditional_edges(
+            "analyze_dataset",
+            self._route_extraction_strategy,
+            {
+                "table_level": "extract_table_level",
+                "time_series": "extract_time_series", 
+                "relational": "extract_relational",
+                "column_level": "extract_column_level"
+            }
+        )
+        
+        # All extraction strategies go to consolidate
+        workflow.add_edge("extract_table_level", "consolidate")
+        workflow.add_edge("extract_time_series", "consolidate")
+        workflow.add_edge("extract_relational", "consolidate")
+        workflow.add_edge("extract_column_level", "consolidate")
+        
+        # Conditional edge from consolidate
+        workflow.add_conditional_edges(
+            "consolidate",
+            self._should_enhance_with_llm,
+            {
+                "enhance": "llm_enhance",
+                "finish": END
+            }
+        )
+        
+        workflow.add_edge("llm_enhance", END)
+        
+        return workflow.compile()
+
+    def extract_entities(
+        self,
+        file_path: str,
+        columns: List[ColumnProfile],
+        config: Dict[str, Any],
+    ) -> List[Entity]:
+        """Main entry point using LangGraph workflow."""
+        logger.info(f"Extracting entities from {file_path} using LangGraph workflow")
+
+        # Check cache first
+        file_hash = _hash_file(file_path)
+        cached = self._load_cached_entities(file_hash)
+        if cached is not None:
+            logger.info("Returning cached entities")
+            return cached
+
+        # Initialize state
+        initial_state: ExtractionState = {
+            "file_path": file_path,
+            "columns": columns,
+            "config": config,
+            "df": None,
+            "dataset_type": None,
+            "dataset_context": {},
+            "entity_name": None,
+            "domain": None,
+            "entities": [],
+            "confidence_scores": {},
+            "extraction_strategy": None,
+            "should_use_llm": _safe_config_get(config, "use_llm", True),
+            "needs_consolidation": True,
+            "error": None
+        }
+
+        try:
+            # Run the graph workflow
+            final_state = self.graph.invoke(initial_state)
+            
+            if final_state.get("error"):
+                logger.error(f"Extraction failed: {final_state['error']}")
+                return []
+            
+            entities = final_state.get("entities", [])
+            
+            # Cache the results
+            try:
+                self._save_cached_entities(file_hash, entities)
+            except Exception as e:
+                logger.warning(f"Failed to save cache: {e}")
+            
+            logger.info(f"LangGraph extraction completed: {len(entities)} entities")
+            return entities
+            
+        except Exception as e:
+            logger.error(f"LangGraph extraction failed: {e}")
+            # Fallback to traditional extraction
+            logger.info("Falling back to traditional extraction")
+            fallback_extractor = EntityExtractor(
+                cache_dir=self.cache_dir,
+                llm_manager=self.llm_manager,
+                embeddings_manager=self.embeddings
+            )
+            return fallback_extractor.extract_entities(file_path, columns, config)
+
+    # Graph node implementations
+    def _load_data_node(self, state: ExtractionState) -> ExtractionState:
+        """Load and prepare data for analysis."""
+        try:
+            df = self._safe_read_csv(state["file_path"], usecols=[c.name for c in state["columns"]])
+            state["df"] = df
+            logger.info(f"Loaded data: {df.shape}")
+        except Exception as e:
+            state["error"] = f"Failed to load data: {e}"
+            logger.error(state["error"])
+        return state
+
+    def _analyze_dataset_node(self, state: ExtractionState) -> ExtractionState:
+        """Analyze dataset to determine extraction strategy."""
+        try:
+            columns = state["columns"]
+            df = state["df"]
+            
+            # Analyze dataset context
+            dataset_context = self._analyze_dataset_context(df, columns, state["file_path"])
+            state["dataset_context"] = dataset_context
+            state["domain"] = dataset_context.get("domain_context", "generic")
+            
+            # Determine dataset type and strategy
+            if self._is_multi_entity_dataset(columns):
+                if self._is_time_series_dataset(columns):
+                    state["dataset_type"] = "time_series"
+                    state["extraction_strategy"] = "time_series"
+                else:
+                    state["dataset_type"] = "relational"
+                    state["extraction_strategy"] = "relational"
+            else:
+                # Try table-level first
+                entity_name = self._infer_meaningful_entity_name(state["file_path"], columns, state["config"])
+                if entity_name not in ['Entity', 'Record']:
+                    state["dataset_type"] = "table_level"
+                    state["extraction_strategy"] = "table_level"
+                    state["entity_name"] = entity_name
+                else:
+                    state["dataset_type"] = "column_level"
+                    state["extraction_strategy"] = "column_level"
+            
+            logger.info(f"Determined strategy: {state['extraction_strategy']}")
+            
+        except Exception as e:
+            state["error"] = f"Dataset analysis failed: {e}"
+            logger.error(state["error"])
+        
+        return state
+
+    def _route_extraction_strategy(self, state: ExtractionState) -> str:
+        """Route to appropriate extraction strategy."""
+        return state.get("extraction_strategy", "column_level")
+
+    def _extract_table_level_node(self, state: ExtractionState) -> ExtractionState:
+        """Extract table-level entities."""
+        try:
+            columns = state["columns"]
+            entity_name = state.get("entity_name", "Entity")
+            
+            # Create attributes from all columns
+            attributes = []
+            for column in columns:
+                attribute = Attribute(
+                    name=column.name,
+                    data_type=column.data_type,
+                    source_column=column.name,
+                    confidence=0.95,
+                    statistics=column.statistics,
+                    sample_values=column.sample_values
+                )
+                attributes.append(attribute)
+            
+            # Determine entity type
+            entity_type = self._determine_entity_type(entity_name, columns)
+            
+            # Create the main entity
+            entity = Entity(
+                id=str(uuid.uuid4()),
+                name=entity_name,
+                entity_type=entity_type,
+                attributes=attributes,
+                confidence=1.0,
+                source_table=state["file_path"]
+            )
+            
+            state["entities"] = [entity]
+            state["confidence_scores"]["table_level"] = 1.0
+            
+            logger.info(f"Created table-level entity: {entity_name} ({entity_type})")
+            
+        except Exception as e:
+            state["error"] = f"Table-level extraction failed: {e}"
+            logger.error(state["error"])
+        
+        return state
+
+    def _extract_time_series_node(self, state: ExtractionState) -> ExtractionState:
+        """Extract entities from time-series data."""
+        try:
+            columns = state["columns"]
+            df = state["df"]
+            entities = self._extract_time_series_entities(df, columns, state["config"], state["dataset_context"])
+            
+            state["entities"] = entities
+            state["confidence_scores"]["time_series"] = 0.95
+            
+            logger.info(f"Extracted {len(entities)} time-series entities")
+            
+        except Exception as e:
+            state["error"] = f"Time-series extraction failed: {e}"
+            logger.error(state["error"])
+        
+        return state
+
+    def _extract_relational_node(self, state: ExtractionState) -> ExtractionState:
+        """Extract entities from relational data."""
+        try:
+            columns = state["columns"]
+            df = state["df"]
+            entities = self._extract_relational_entities(df, columns, state["config"], state["dataset_context"])
+            
+            state["entities"] = entities
+            state["confidence_scores"]["relational"] = 0.85
+            
+            logger.info(f"Extracted {len(entities)} relational entities")
+            
+        except Exception as e:
+            state["error"] = f"Relational extraction failed: {e}"
+            logger.error(state["error"])
+        
+        return state
+
+    def _extract_column_level_node(self, state: ExtractionState) -> ExtractionState:
+        """Extract entities at column level (fallback)."""
+        try:
+            columns = state["columns"]
+            df = state["df"]
+            entities = self._extract_column_level_entities(df, columns, state["config"])
+            
+            state["entities"] = entities
+            state["confidence_scores"]["column_level"] = 0.7
+            
+            logger.info(f"Extracted {len(entities)} column-level entities")
+            
+        except Exception as e:
+            state["error"] = f"Column-level extraction failed: {e}"
+            logger.error(state["error"])
+        
+        return state
+
+    def _consolidate_node(self, state: ExtractionState) -> ExtractionState:
+        """Consolidate and filter entities."""
+        try:
+            entities = state["entities"]
+            config = state["config"]
+            
+            # Apply confidence threshold
+            confidence_threshold = float(_safe_config_get(config, "confidence_threshold", 0.70))
+            entities = [e for e in entities if float(getattr(e, "confidence", 1.0)) >= confidence_threshold]
+            
+            # Apply max entities limit
+            max_entities = int(_safe_config_get(config, "max_entities", 100_000))
+            if len(entities) > max_entities:
+                entities = entities[:max_entities]
+            
+            # Deduplicate if requested
+            if _safe_config_get(config, "use_intelligent_consolidation", True):
+                entities = self._deduplicate_by_embeddings(entities, config)
+            
+            state["entities"] = entities
+            logger.info(f"Consolidated to {len(entities)} entities")
+            
+        except Exception as e:
+            state["error"] = f"Consolidation failed: {e}"
+            logger.error(state["error"])
+        
+        return state
+
+    def _should_enhance_with_llm(self, state: ExtractionState) -> str:
+        """Determine if LLM enhancement is needed."""
+        config = state["config"]
+        should_use_llm = state["should_use_llm"]
+        
+        # Check if business entity extraction is enabled
+        extract_business = _safe_config_get(config, "extract_business_entities", False)
+        
+        if should_use_llm and extract_business and self.llm_manager:
+            return "enhance"
+        return "finish"
+
+    def _llm_enhance_node(self, state: ExtractionState) -> ExtractionState:
+        """Enhance entities using LLM."""
+        try:
+            df = state["df"]
+            columns = state["columns"]
+            config = state["config"]
+            existing_entities = state["entities"]
+            
+            # Extract business entities using LLM
+            business_entities = self._extract_business_entities_llm(df, columns, config)
+            
+            # Combine with existing entities
+            all_entities = existing_entities + business_entities
+            
+            # Deduplicate again if needed
+            if _safe_config_get(config, "use_intelligent_consolidation", True):
+                all_entities = self._deduplicate_by_embeddings(all_entities, config)
+            
+            state["entities"] = all_entities
+            logger.info(f"LLM enhanced to {len(all_entities)} entities")
+            
+        except Exception as e:
+            logger.warning(f"LLM enhancement failed: {e}")
+            # Continue with existing entities
+        
+        return state
+
+    # Utility methods (reuse from original EntityExtractor)
+    def _load_domain_patterns(self) -> Dict[str, Dict[str, List[str]]]:
+        """Load domain-specific patterns for better entity recognition."""
+        return {
+            "healthcare": {
+                "business_entities": ["patient", "doctor", "hospital", "treatment", "diagnosis"],
+                "measurement": ["probability", "score", "risk", "rate", "level"],
+                "categorical": ["status", "type", "category", "outcome", "result"],
+                "identifier": ["id", "patient_id", "record_id", "case_id"]
+            },
+            "finance": {
+                "measurement": ["revenue", "profit", "expense", "asset", "liability", "equity"],
+                "categorical": ["account_type", "transaction_type", "sector", "industry"],
+                "temporal": ["fiscal_year", "quarter", "reporting_date"]
+            },
+        }
+
+    def _get_entity_priority(self) -> List[str]:
+        """Define priority order for entity types."""
+        return [
+            "contact.email", "contact.url", "contact.ip_address", "contact.phone",
+            "identifier.uuid", "identifier.sequential", "geographic.latitude", "geographic.longitude",
+            "geographic.postal_code", "temporal.date", "temporal.time", "temporal.datetime",
+            "measurement.percentage", "measurement.currency", "identifier.primary",
+            "identifier.foreign_key", "identifier.identifier", "measurement.quantity",
+            "measurement.dimension", "geographic.country", "geographic.region",
+            "geographic.city", "geographic.address", "temporal.year", "temporal.month",
+            "categorical.status", "categorical.type", "categorical.category",
+            "categorical.classification", "business.patient", "business.business",
+            "measurement.measurement", "categorical.categorical", "unknown"
+        ]
+
+    # Cache methods
+    def _cache_path(self, key: str, suffix: str = ".json") -> Path | None:
+        if not self.cache_dir:
+            return None
+        p = self.cache_dir / f"{key}{suffix}"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        return p
+
+    def _load_cached_entities(self, file_hash: str) -> List[Entity] | None:
+        path = self._cache_path(file_hash)
+        if path and path.exists():
+            try:
+                data = json.loads(path.read_text())
+                return [Entity(**e) for e in data]
+            except Exception as e:
+                logger.warning(f"Cache read failed: {e}")
+        return None
+
+    def _save_cached_entities(self, file_hash: str, entities: List[Entity]) -> None:
+        path = self._cache_path(file_hash)
+        if not path:
+            return
+        payload = [e.model_dump() for e in entities]
+        path.write_text(json.dumps(payload, ensure_ascii=False))
+
+    @staticmethod
+    def _safe_read_csv(path: str | Path, usecols: List[str] | None = None) -> pd.DataFrame:
+        return pd.read_csv(path, usecols=usecols, low_memory=False)
+
+    # Methods imported from original EntityExtractor (will be copied over)
+    def _is_multi_entity_dataset(self, columns: List[ColumnProfile]) -> bool:
+        """Check if the dataset contains multiple entity types."""
+        if not columns:
+            return False
+        
+        entity_keywords = ['country', 'region', 'state', 'city', 'product', 'customer', 
+                          'supplier', 'employee', 'department', 'category', 'group',
+                          'company', 'organization', 'location', 'branch', 'store',
+                          'patient', 'user', 'account', 'order', 'transaction', 'address']
+        
+        entity_types_found = set()
+        
+        for col in columns:
+            col_name_lower = col.name.lower()
+            
+            for keyword in entity_keywords:
+                if keyword in col_name_lower:
+                    entity_types_found.add(keyword)
+            
+            if '_id' in col_name_lower and col.data_type in [DataType.STRING, DataType.INTEGER]:
+                entity_type = col_name_lower.replace('_id', '')
+                if entity_type in entity_keywords:
+                    entity_types_found.add(entity_type)
+        
+        return len(entity_types_found) >= 1
+
+    def _is_time_series_dataset(self, columns: List[ColumnProfile]) -> bool:
+        """Check if the dataset represents time-series data."""
+        year_columns = 0
+        for col in columns:
+            col_name = str(col.name)
+            if col_name.isdigit() and len(col_name) == 4:
+                year = int(col_name)
+                if 1900 <= year <= 2100:
+                    year_columns += 1
+            elif any(pattern in col_name.lower() for pattern in ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 
+                                                                  'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
+                                                                  'q1', 'q2', 'q3', 'q4', 'quarter']):
+                year_columns += 1
+        
+        return year_columns > len(columns) * 0.3
+
+    def _infer_meaningful_entity_name(self, file_path: str, columns: List[ColumnProfile], config: Dict[str, Any] = None) -> str:
+        """Infer a semantically meaningful entity name."""
+        from pathlib import Path
+        import re
+        
+        # Get base filename without extension
+        filename = Path(file_path).stem.lower()
+        original_filename = filename
+        
+        # Clean up common prefixes/suffixes
+        cleanup_patterns = ['sample_', 'test_', 'demo_', 'temp_', 'tmp_', 'export_', 'import_', 
+                           '_data', '_dataset', '_table', '_csv', '_export', '_import', '_file']
+        for pattern in cleanup_patterns:
+            filename = filename.replace(pattern, '')
+        
+        # Remove numbers and top patterns
+        filename = re.sub(r'^\d+_|_\d+$', '', filename)
+        filename = re.sub(r'^top_\d+_', '', filename)
+        
+        parts = re.split(r'[_\-]', filename)
+        noise_words = ['of', 'the', 'and', 'or', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 
+                       'from', 'about', 'all', 'new', 'old', 'top', 'high', 'low', 'risk',
+                       'list', 'data', 'info', 'information', 'details', 'records']
+        
+        meaningful_parts = [p for p in parts if p and p not in noise_words]
+        
+        if meaningful_parts:
+            last_part = meaningful_parts[-1]
+            if last_part.endswith('ies'):
+                return last_part[:-3] + 'y'
+            elif last_part.endswith('es'):
+                return last_part[:-2]
+            elif last_part.endswith('s') and len(last_part) > 3:
+                return last_part[:-1]
+            elif len(last_part) > 2:
+                return last_part.capitalize()
+        
+        return 'Entity'
+
+    def _determine_entity_type(self, entity_name: str, columns: List[ColumnProfile] = None) -> str:
+        """Determine the appropriate entity type."""
+        entity_name_lower = entity_name.lower()
+        
+        if any(word in entity_name_lower for word in ['country', 'region', 'state', 'city', 'location']):
+            return EntityType.GEOGRAPHIC.value
+        elif any(word in entity_name_lower for word in ['measurement', 'metric', 'score', 'rate', 'percentage']):
+            return EntityType.MEASUREMENT.value
+        elif any(word in entity_name_lower for word in ['date', 'time', 'period', 'duration']):
+            return EntityType.TEMPORAL.value
+        else:
+            return EntityType.BUSINESS.value
+
+    def _analyze_dataset_context(self, df: pd.DataFrame, columns: List[ColumnProfile], file_path: str = None) -> Dict[str, Any]:
+        """Analyze the dataset to understand its business context."""
+        context = {
+            "has_geographic_data": False,
+            "has_time_series": False,
+            "has_percentage_data": False,
+            "has_financial_data": False,
+            "primary_measurement_type": "generic",
+            "column_patterns": {},
+            "domain_context": "generic",
+            "measurement_context": "generic"
+        }
+        
+        # Extract insights from filename if available
+        if file_path:
+            filename_insights = self._extract_filename_insights(file_path)
+            context.update(filename_insights)
+        
+        # Check for geographic columns
+        geo_keywords = ['country', 'region', 'state', 'city', 'location', 'geo', 'area']
+        for col in columns:
+            col_lower = col.name.lower()
+            if any(keyword in col_lower for keyword in geo_keywords):
+                context["has_geographic_data"] = True
+                context["column_patterns"][col.name] = "geographic"
+        
+        # Check for time series
+        year_cols = [col for col in columns if self._is_time_column(col.name)]
+        if len(year_cols) > 3:
+            context["has_time_series"] = True
+        
+        # Check data values for percentages
+        for col in columns:
+            if col.data_type in [DataType.FLOAT, DataType.NUMERICAL]:
+                sample_vals = df[col.name].dropna().head(100)
+                if len(sample_vals) > 0:
+                    if (sample_vals >= 0).all() and (sample_vals <= 100).all():
+                        context["has_percentage_data"] = True
+                        break
+        
+        # Check for financial data
+        financial_keywords = ['price', 'cost', 'revenue', 'profit', 'salary', 'expense']
+        for col in columns:
+            col_lower = col.name.lower()
+            if any(keyword in col_lower for keyword in financial_keywords):
+                context["has_financial_data"] = True
+                break
+        
+        return context
+
+    def _extract_filename_insights(self, file_path: str) -> Dict[str, Any]:
+        """Extract semantic insights from the filename."""
+        from pathlib import Path
+        
+        filename = Path(file_path).stem.lower()
+        insights = {
+            "domain_context": "generic",
+            "measurement_context": "generic",
+        }
+        
+        domain_patterns = {
+            "healthcare": ["patient", "medical", "health", "hospital", "readmission"],
+            "finance": ["finance", "financial", "revenue", "profit", "investment"],
+            "education": ["education", "school", "student", "academic", "university"],
+            "retail": ["retail", "sales", "customer", "product", "inventory"],
+        }
+        
+        for domain, keywords in domain_patterns.items():
+            if any(keyword in filename for keyword in keywords):
+                insights["domain_context"] = domain
+                break
+        
+        return insights
+
+    def _is_time_column(self, col_name: str) -> bool:
+        """Check if a column name represents a time dimension."""
+        if col_name.isdigit() and len(col_name) == 4:
+            year = int(col_name)
+            return 1900 <= year <= 2100
+        
+        time_keywords = ['year', 'month', 'date', 'time', 'quarter', 'period']
+        return any(keyword in col_name.lower() for keyword in time_keywords)
+
+    def _extract_time_series_entities(self, df: pd.DataFrame, columns: List[ColumnProfile], config: Dict[str, Any], dataset_context: Dict[str, Any]) -> List[Entity]:
+        """Extract entities from time-series multi-entity datasets."""
+        entities: List[Entity] = []
+        first_col = columns[0]
+        
+        if first_col.data_type == DataType.STRING:
+            entity_name = self._infer_meaningful_entity_name("", columns, config)
+            entity_type = self._determine_entity_type(entity_name, columns)
+            
+            attribute = Attribute(
+                name=first_col.name,
+                data_type=first_col.data_type,
+                source_column=first_col.name,
+                confidence=0.95,
+                statistics=first_col.statistics,
+                sample_values=first_col.sample_values
+            )
+            
+            entity = Entity(
+                name=entity_name,
+                entity_type=entity_type,
+                attributes=[attribute],
+                confidence=0.95,
+                source_table=""
+            )
+            entity.id = str(uuid.uuid4())
+            entities.append(entity)
+            
+        return entities
+
+    def _extract_relational_entities(self, df: pd.DataFrame, columns: List[ColumnProfile], config: Dict[str, Any], dataset_context: Dict[str, Any]) -> List[Entity]:
+        """Extract entities from relational multi-entity datasets."""
+        entities: List[Entity] = []
+        
+        # Simple implementation for now
+        for col in columns[:5]:  # Limit to first 5 columns
+            attribute = Attribute(
+                name=col.name,
+                data_type=col.data_type,
+                source_column=col.name,
+                confidence=0.8,
+                statistics=col.statistics,
+                sample_values=col.sample_values
+            )
+            
+            entity = Entity(
+                name=col.name.capitalize(),
+                entity_type=EntityType.CATEGORICAL.value,
+                attributes=[attribute],
+                confidence=0.8,
+                source_table=""
+            )
+            entity.id = str(uuid.uuid4())
+            entities.append(entity)
+            
+        return entities
+
+    def _extract_column_level_entities(self, df: pd.DataFrame, columns: List[ColumnProfile], config: Dict[str, Any]) -> List[Entity]:
+        """Extract entities at the column level as fallback."""
+        entities: List[Entity] = []
+        
+        for col in columns[:10]:  # Limit for now
+            attribute = Attribute(
+                name=col.name,
+                data_type=col.data_type,
+                source_column=col.name,
+                confidence=0.7,
+                statistics=col.statistics,
+                sample_values=col.sample_values
+            )
+            
+            entity = Entity(
+                name=col.name,
+                entity_type=EntityType.CATEGORICAL.value,
+                attributes=[attribute],
+                confidence=0.7,
+                source_table=""
+            )
+            entity.id = str(uuid.uuid4())
+            entities.append(entity)
+            
+        return entities
+
+    def _extract_business_entities_llm(self, df: pd.DataFrame, columns: List[ColumnProfile], config: Dict[str, Any]) -> List[Entity]:
+        """Extract business entities using LLM."""
+        # Simplified implementation
+        return []
+
+    def _deduplicate_by_embeddings(self, entities: List[Entity], config: Dict[str, Any]) -> List[Entity]:
+        """Deduplicate entities by embeddings or simple text matching."""
+        if not entities:
+            return entities
+            
+        # Simple text-based deduplication for now
+        seen = set()
+        out: List[Entity] = []
+        for e in entities:
+            sig = (e.name, e.entity_type)
+            if sig in seen:
+                continue
+            seen.add(sig)
+            out.append(e)
+        return out
+
+
+class EntityExtractor:
+    def __init__(
+        self,
+        cache_dir: str | Path | None = ".cache/entity_extractor",
+        llm_manager: Any | None = None,
+        embeddings_manager: Any | None = None,
+        use_langgraph: bool = True,
+    ) -> None:
+        # Check if we should use LangGraph
+        self.use_langgraph = use_langgraph and LANGGRAPH_AVAILABLE
+        self._langgraph_extractor = None
+        
+        if self.use_langgraph:
+            try:
+                self._langgraph_extractor = LangGraphEntityExtractor(
+                    cache_dir=cache_dir,
+                    llm_manager=llm_manager,
+                    embeddings_manager=embeddings_manager
+                )
+                logger.info("Using LangGraph-based entity extraction")
+            except Exception as e:
+                logger.warning(f"Failed to initialize LangGraph extractor, falling back to traditional: {e}")
+                self.use_langgraph = False
+        
+        # Traditional extractor setup
         self.cache_dir = Path(cache_dir) if cache_dir else None
         if self.cache_dir:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -533,6 +1299,15 @@ Return JSON:
         """Top-level entry: deterministic run with caching."""
         logger.info(f"Extracting entities from {file_path}")
 
+        # Use LangGraph extractor if available
+        if self.use_langgraph and self._langgraph_extractor:
+            try:
+                return self._langgraph_extractor.extract_entities(file_path, columns, config)
+            except Exception as e:
+                logger.warning(f"LangGraph extraction failed, falling back to traditional: {e}")
+                self.use_langgraph = False  # Disable for future calls
+        
+        # Traditional extraction
         file_hash = _hash_file(file_path)
         cached = self._load_cached_entities(file_hash)
         if cached is not None:
@@ -2404,6 +3179,47 @@ Be specific and descriptive. Avoid generic names like "Measurement" or "Data".
         if len(vals) > maxn:
             vals = vals[:maxn]
         return vals
+
+# ---------- Factory Functions ----------
+def create_entity_extractor(
+    cache_dir: str | Path | None = ".cache/entity_extractor",
+    llm_manager: Any | None = None,
+    embeddings_manager: Any | None = None,
+    use_langgraph: bool = True,
+    force_langgraph: bool = False,
+) -> EntityExtractor | LangGraphEntityExtractor:
+    """Factory function to create the appropriate entity extractor.
+    
+    Args:
+        cache_dir: Cache directory path
+        llm_manager: LLM manager instance
+        embeddings_manager: Embeddings manager instance
+        use_langgraph: Whether to prefer LangGraph if available
+        force_langgraph: Force LangGraph usage (raises error if not available)
+        
+    Returns:
+        EntityExtractor or LangGraphEntityExtractor instance
+        
+    Raises:
+        ImportError: If force_langgraph=True but LangGraph is not available
+    """
+    if force_langgraph and not LANGGRAPH_AVAILABLE:
+        raise ImportError("LangGraph is required but not available. Install with: pip install langgraph")
+    
+    if force_langgraph:
+        return LangGraphEntityExtractor(
+            cache_dir=cache_dir,
+            llm_manager=llm_manager,
+            embeddings_manager=embeddings_manager
+        )
+    
+    # Default: Try LangGraph through EntityExtractor with fallback
+    return EntityExtractor(
+        cache_dir=cache_dir,
+        llm_manager=llm_manager,
+        embeddings_manager=embeddings_manager,
+        use_langgraph=use_langgraph
+    )
 
 # -------------
 # End of file.

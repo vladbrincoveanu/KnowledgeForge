@@ -26,6 +26,7 @@ neo4j>=5.15.0
 
 # LLM integration
 lmstudio>=0.1.0
+langgraph>=0.1.0  # Graph-based LLM workflows
 
 # Utilities
 python-dateutil>=2.8.0
