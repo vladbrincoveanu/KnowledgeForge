@@ -3,9 +3,11 @@
 import logging
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+
+from app.endpoint.v1.routes.extraction import extraction_tasks
 
 # Import actual backend services
 from app.infrastructure.graph.neo4j_manager import Neo4jGraphManager
@@ -45,32 +47,62 @@ async def list_entities(
     limit: int = Query(100, ge=1, le=1000, description="Number of entities to return"),
     offset: int = Query(0, ge=0, description="Number of entities to skip"),
     neo4j_manager: Neo4jGraphManager = Depends(get_neo4j_manager),
+    metadata_store: MetadataStore = Depends(get_metadata_store),
 ):
     """List extracted entities with pagination."""
+    fallback_used = False
+    entities: list[dict[str, Any]] = []
+    total_count = 0
+
     try:
-        # Use actual Neo4j manager to retrieve entities
-        entities = neo4j_manager.get_entities(
-            limit=limit, offset=offset, task_id=task_id
+        if neo4j_manager.is_connected():
+            entities = neo4j_manager.get_entities(
+                limit=limit, offset=offset, task_id=task_id
+            )
+            total_count = neo4j_manager.count_entities(task_id=task_id)
+        else:
+            logger.warning("Neo4j not connected. Falling back to in-memory extraction results.")
+    except Exception as neo_error:
+        logger.warning(
+            "Failed to retrieve entities from Neo4j: %s. Falling back to in-memory results.",
+            neo_error,
         )
 
-        # Get total count for pagination
-        total_count = neo4j_manager.count_entities(task_id=task_id)
+    if (not entities) and task_id:
+        task = extraction_tasks.get(task_id)
+        if task:
+            fallback_used = True
+            entities = [
+                entity.dict() if hasattr(entity, "dict") else entity.__dict__
+                for entity in task.entities
+            ]
+            total_count = len(entities)
 
-        return {
-            "entities": [entity if isinstance(entity, dict) else entity.dict() for entity in entities],
-            "total_count": total_count,
-            "extraction_metadata": {
-                "limit": limit,
-                "offset": offset,
-                "has_more": (offset + limit) < total_count,
-            },
-        }
+    if (not entities) and task_id:
+        run_metadata = metadata_store.get_extraction_run(task_id)
+        if run_metadata:
+            payload = run_metadata.get("metadata") or {}
+            stored_entities = payload.get("entities")
+            if not stored_entities:
+                stored_entities = (
+                    payload.get("ontology_results", {}).get("entities")
+                    or payload.get("ontology_results", {}).get("unmapped_entities")
+                )
+            if stored_entities:
+                fallback_used = True
+                entities = stored_entities
+                total_count = len(entities)
 
-    except Exception as e:
-        logger.error(f"Failed to retrieve entities: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve entities: {str(e)}"
-        )
+    return {
+        "entities": entities,
+        "total_count": total_count,
+        "extraction_metadata": {
+            "limit": limit,
+            "offset": offset,
+            "has_more": (offset + limit) < total_count,
+            "source": "memory" if fallback_used else "neo4j",
+        },
+    }
 
 
 @router.get("/relationships")
@@ -81,32 +113,64 @@ async def list_relationships(
     ),
     offset: int = Query(0, ge=0, description="Number of relationships to skip"),
     neo4j_manager: Neo4jGraphManager = Depends(get_neo4j_manager),
+    metadata_store: MetadataStore = Depends(get_metadata_store),
 ):
     """List discovered relationships with pagination."""
+    fallback_used = False
+    relationships: list[dict[str, Any]] = []
+    total_count = 0
+
     try:
-        # Use actual Neo4j manager to retrieve relationships
-        relationships = neo4j_manager.get_relationships(
-            limit=limit, offset=offset, task_id=task_id
+        if neo4j_manager.is_connected():
+            relationships = neo4j_manager.get_relationships(
+                limit=limit, offset=offset, task_id=task_id
+            )
+            total_count = neo4j_manager.count_relationships(task_id=task_id)
+        else:
+            logger.warning("Neo4j not connected. Falling back to in-memory relationship results.")
+    except Exception as neo_error:
+        logger.warning(
+            "Failed to retrieve relationships from Neo4j: %s. Falling back to in-memory results.",
+            neo_error,
         )
 
-        # Get total count for pagination using the proper count_relationships method
-        total_count = neo4j_manager.count_relationships(task_id=task_id)
+    if (not relationships) and task_id:
+        task = extraction_tasks.get(task_id)
+        if task:
+            fallback_used = True
+            relationships = [
+                relationship.dict()
+                if hasattr(relationship, "dict")
+                else relationship.__dict__
+                for relationship in task.relationships
+            ]
+            total_count = len(relationships)
 
-        return {
-            "relationships": relationships,
-            "total_count": total_count,
-            "discovery_metadata": {
-                "limit": limit,
-                "offset": offset,
-                "has_more": (offset + limit) < total_count,
-            },
-        }
+    if (not relationships) and task_id:
+        run_metadata = metadata_store.get_extraction_run(task_id)
+        if run_metadata:
+            payload = run_metadata.get("metadata") or {}
+            stored_relationships = payload.get("relationships")
+            if not stored_relationships:
+                stored_relationships = (
+                    payload.get("ontology_results", {}).get("relationships")
+                    or payload.get("ontology_results", {}).get("suggested_relationships")
+                )
+            if stored_relationships:
+                fallback_used = True
+                relationships = stored_relationships
+                total_count = len(relationships)
 
-    except Exception as e:
-        logger.error(f"Failed to retrieve relationships: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve relationships: {str(e)}"
-        )
+    return {
+        "relationships": relationships,
+        "total_count": total_count,
+        "discovery_metadata": {
+            "limit": limit,
+            "offset": offset,
+            "has_more": (offset + limit) < total_count,
+            "source": "memory" if fallback_used else "neo4j",
+        },
+    }
 
 
 @router.post("/feedback")
@@ -171,35 +235,51 @@ async def get_graph_visualization(
         # Convert entities to the format expected by frontend
         nodes = []
         for entity in graph_data.get("graph_structure", {}).get("entities", []):
+            metadata = {
+                "entityType": entity.get("entity_type"),
+                "confidence": entity.get("confidence"),
+                "sourceColumns": entity.get("source_columns", []),
+                "sourceValue": entity.get("source_value", "N/A"),
+                "attributes": entity.get("attributes", {}),
+                "createdAt": entity.get("created_at"),
+                "updatedAt": entity.get("updated_at"),
+                "sourceFile": entity.get("source_file", "Unknown"),
+                "extractionTimestamp": entity.get("extraction_timestamp"),
+                "lineage": entity.get("lineage"),
+                "version": entity.get("version"),
+            }
+
             node = {
                 "id": entity["id"],
                 "label": entity["name"],
                 "type": "entity",
-                "properties": {
-                    "entityType": entity["entity_type"],
-                    "confidence": entity["confidence"],
-                    "sourceColumns": entity.get("source_columns", []),
-                    "sourceValue": entity.get("source_value", "N/A"),
-                    "attributes": entity.get("attributes", {}),
-                    "createdAt": entity.get("created_at"),
-                    "updatedAt": entity.get("updated_at"),
-                    "sourceFile": entity.get("source_file", "Unknown"),
-                    "extractionTimestamp": entity.get("extraction_timestamp")
-                }
+                "entityType": metadata["entityType"],
+                "confidence": metadata["confidence"],
+                "metadata": metadata,
+                "properties": metadata,
             }
             nodes.append(node)
 
         # Convert relationships to the format expected by frontend
         edges = []
         for relationship in graph_data.get("graph_structure", {}).get("relationships", []):
+            metadata = {
+                "confidence": relationship.get("confidence"),
+                "attributes": relationship.get("attributes", {}),
+                "evidence": relationship.get("evidence", {}),
+                "createdAt": relationship.get("created_at"),
+                "updatedAt": relationship.get("updated_at"),
+            }
+
             edge = {
                 "id": relationship["id"],
                 "source": relationship["source_id"],
                 "target": relationship["target_id"],
-                "type": relationship["type"],
-                "properties": {
-                    "confidence": relationship["confidence"]
-                }
+                "type": relationship.get("type"),
+                "label": relationship.get("type", "connection"),
+                "confidence": relationship.get("confidence"),
+                "metadata": metadata,
+                "properties": metadata,
             }
             edges.append(edge)
 

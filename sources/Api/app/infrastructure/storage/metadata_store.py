@@ -11,6 +11,12 @@ import psycopg2
 from psycopg2.extras import RealDictCursor, Json
 from psycopg2.pool import SimpleConnectionPool
 
+from app.domain.models.recommendations import (
+    EdgeRecommendation,
+    NodeRecommendation,
+    RecommendationSession,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -60,6 +66,53 @@ class PostgreSQLMetadataStore:
         except Exception as e:
             logger.warning(f"PostgreSQL not available, running in mock mode: {e}")
             self.connection_pool = None
+
+        # In-memory storage for mock mode operations
+        self._mock_sessions: dict[str, RecommendationSession] = {}
+        self._mock_node_recommendations: dict[str, list[dict[str, Any]]] = {}
+        self._mock_edge_recommendations: dict[str, list[dict[str, Any]]] = {}
+        self._mock_extraction_runs: dict[str, dict[str, Any]] = {}
+
+    def create_extraction_run(
+        self, task_id: str, status: str = "pending", metadata: Dict[str, Any] | None = None
+    ) -> None:
+        """Create or update an extraction run entry."""
+        payload = metadata or {}
+        try:
+            if self.connection_pool:
+                conn = self.connection_pool.getconn()
+                try:
+                    with conn.cursor() as cursor:
+                        cursor.execute(
+                            """
+                            INSERT INTO extraction_runs (id, status, metadata, created_at)
+                            VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
+                            ON CONFLICT (id) DO UPDATE SET
+                                status = EXCLUDED.status,
+                                metadata = EXCLUDED.metadata,
+                                updated_at = CURRENT_TIMESTAMP
+                            """,
+                            (task_id, status, Json(payload)),
+                        )
+                    conn.commit()
+                    logger.info(
+                        "Registered extraction run %s with status %s in PostgreSQL",
+                        task_id,
+                        status,
+                    )
+                finally:
+                    self.connection_pool.putconn(conn)
+            else:
+                self._mock_extraction_runs[task_id] = {
+                    "id": task_id,
+                    "status": status,
+                    "metadata": payload,
+                    "created_at": datetime.now().isoformat(),
+                }
+                logger.info("Registered extraction run %s (mock mode)", task_id)
+        except Exception as e:
+            logger.error(f"Failed to create extraction run: {e}")
+            raise
 
     def register_file(self, file_path: str, file_name: str, file_size: int, 
                      file_type: str, checksum: str = None) -> str:
@@ -216,10 +269,408 @@ class PostgreSQLMetadataStore:
                 finally:
                     self.connection_pool.putconn(conn)
             else:
+                existing = self._mock_extraction_runs.get(task_id, {})
+                self._mock_extraction_runs[task_id] = {
+                    **existing,
+                    "id": task_id,
+                    "status": status,
+                    "metadata": metadata or existing.get("metadata", {}),
+                    "completed_at": datetime.now().isoformat(),
+                }
                 logger.info(f"Marked extraction run {task_id} as {status} (mock mode)")
         except Exception as e:
             logger.error(f"Failed to complete extraction run: {e}")
             raise
+
+    def get_extraction_run(self, task_id: str) -> Optional[dict[str, Any]]:
+        """Retrieve stored metadata for an extraction run."""
+        try:
+            if self.connection_pool:
+                conn = self.connection_pool.getconn()
+                try:
+                    with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                        cursor.execute(
+                            """
+                            SELECT id, status, metadata, created_at, completed_at
+                            FROM extraction_runs
+                            WHERE id = %s
+                            LIMIT 1
+                            """,
+                            (task_id,),
+                        )
+                        row = cursor.fetchone()
+                        if row:
+                            return dict(row)
+                finally:
+                    self.connection_pool.putconn(conn)
+
+            return self._mock_extraction_runs.get(task_id)
+
+        except Exception as e:
+            logger.error(f"Failed to fetch extraction run {task_id}: {e}")
+            return None
+
+    async def create_recommendation_session(self, session: RecommendationSession):
+        """Create a new recommendation session."""
+        session = session.model_copy(deep=True)
+        session_id = str(session.id)
+
+        for node in session.node_recommendations:
+            node.session_id = session.id
+        for edge in session.edge_recommendations:
+            edge.session_id = session.id
+
+        try:
+            if self.connection_pool:
+                conn = self.connection_pool.getconn()
+                try:
+                    with conn.cursor() as cursor:
+                        cursor.execute(
+                            """
+                            INSERT INTO recommendation_sessions (id, task_id, status, metadata)
+                            VALUES (%s, %s, %s, %s)
+                            ON CONFLICT (id) DO UPDATE SET
+                                status = EXCLUDED.status,
+                                metadata = EXCLUDED.metadata,
+                                generated_at = CURRENT_TIMESTAMP
+                            """,
+                            (
+                                session_id,
+                                session.task_id,
+                                session.status,
+                                Json(session.metadata or {}),
+                            ),
+                        )
+
+                        for node in session.node_recommendations:
+                            cursor.execute(
+                                """
+                                INSERT INTO node_recommendations (
+                                    id, session_id, recommended_name, entity_type,
+                                    confidence_score, reasoning, source_columns,
+                                    llm_metadata, user_feedback
+                                )
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                ON CONFLICT (id) DO UPDATE SET
+                                    recommended_name = EXCLUDED.recommended_name,
+                                    entity_type = EXCLUDED.entity_type,
+                                    confidence_score = EXCLUDED.confidence_score,
+                                    reasoning = EXCLUDED.reasoning,
+                                    source_columns = EXCLUDED.source_columns,
+                                    llm_metadata = EXCLUDED.llm_metadata
+                                """,
+                                (
+                                    str(node.id),
+                                    session_id,
+                                    node.recommended_name,
+                                    node.entity_type,
+                                    round(float(node.confidence_score or 0.0), 4),
+                                    node.reasoning,
+                                    node.source_columns or [],
+                                    Json(node.llm_metadata or {}),
+                                    node.user_feedback,
+                                ),
+                            )
+
+                        for edge in session.edge_recommendations:
+                            cursor.execute(
+                                """
+                                INSERT INTO edge_recommendations (
+                                    id, session_id, source_node_id, target_node_id,
+                                    relationship_type, confidence_score, reasoning,
+                                    connection_evidence, user_feedback
+                                )
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                ON CONFLICT (id) DO UPDATE SET
+                                    relationship_type = EXCLUDED.relationship_type,
+                                    confidence_score = EXCLUDED.confidence_score,
+                                    reasoning = EXCLUDED.reasoning,
+                                    connection_evidence = EXCLUDED.connection_evidence
+                                """,
+                                (
+                                    str(edge.id),
+                                    session_id,
+                                    str(edge.source_node_id),
+                                    str(edge.target_node_id),
+                                    edge.relationship_type,
+                                    round(float(edge.confidence_score or 0.0), 4),
+                                    edge.reasoning,
+                                    Json(edge.connection_evidence or {}),
+                                    edge.user_feedback,
+                                ),
+                            )
+
+                    conn.commit()
+                    logger.info(
+                        "Created recommendation session %s for task %s",
+                        session_id,
+                        session.task_id,
+                    )
+                finally:
+                    self.connection_pool.putconn(conn)
+            else:
+                logger.info(
+                    "Created recommendation session %s for task %s (mock mode)",
+                    session_id,
+                    session.task_id,
+                )
+
+            self._mock_sessions[session.task_id] = session
+            self._mock_node_recommendations[session_id] = [
+                node.model_dump(mode="python") for node in session.node_recommendations
+            ]
+            self._mock_edge_recommendations[session_id] = [
+                edge.model_dump(mode="python") for edge in session.edge_recommendations
+            ]
+
+        except Exception as e:
+            logger.error(f"Failed to create recommendation session: {e}")
+            raise
+
+    async def get_recommendation_session(
+        self, task_id: str
+    ) -> Optional[RecommendationSession]:
+        """Get the latest recommendation session for a task."""
+        try:
+            if self.connection_pool:
+                conn = self.connection_pool.getconn()
+                try:
+                    with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                        cursor.execute(
+                            """
+                            SELECT *
+                            FROM recommendation_sessions
+                            WHERE task_id = %s
+                            ORDER BY generated_at DESC
+                            LIMIT 1
+                            """,
+                            (task_id,),
+                        )
+                        session_row = cursor.fetchone()
+                        if not session_row:
+                            return self._mock_sessions.get(task_id)
+
+                        session = RecommendationSession(**session_row)
+
+                        cursor.execute(
+                            """
+                            SELECT * FROM node_recommendations
+                            WHERE session_id = %s
+                            ORDER BY confidence_score DESC NULLS LAST
+                            """,
+                            (str(session.id),),
+                        )
+                        node_rows = cursor.fetchall()
+                        session.node_recommendations = [
+                            self._build_node_recommendation(dict(row)) for row in node_rows
+                        ]
+
+                        cursor.execute(
+                            """
+                            SELECT * FROM edge_recommendations
+                            WHERE session_id = %s
+                            ORDER BY confidence_score DESC NULLS LAST
+                            """,
+                            (str(session.id),),
+                        )
+                        edge_rows = cursor.fetchall()
+                        session.edge_recommendations = [
+                            self._build_edge_recommendation(dict(row)) for row in edge_rows
+                        ]
+
+                        return session
+                finally:
+                    self.connection_pool.putconn(conn)
+
+            return self._mock_sessions.get(task_id)
+
+        except Exception as e:
+            logger.error(f"Failed to get recommendation session: {e}")
+            raise
+
+    def _build_node_recommendation(self, row: dict[str, Any]) -> NodeRecommendation:
+        metadata = row.get("llm_metadata")
+        if isinstance(metadata, str):
+            try:
+                metadata = json.loads(metadata)
+            except json.JSONDecodeError:
+                metadata = {"raw": metadata}
+
+        source_columns = row.get("source_columns") or []
+        if isinstance(source_columns, str):
+            try:
+                source_columns = json.loads(source_columns)
+            except json.JSONDecodeError:
+                source_columns = [source_columns]
+
+        return NodeRecommendation(
+            id=row["id"],
+            session_id=row["session_id"],
+            recommended_name=row.get("recommended_name", "Suggested Node"),
+            entity_type=row.get("entity_type", "unknown"),
+            confidence_score=float(row.get("confidence_score") or 0.0),
+            reasoning=row.get("reasoning", ""),
+            source_columns=source_columns,
+            llm_metadata=metadata or {},
+            user_feedback=row.get("user_feedback"),
+            created_at=row.get("created_at", datetime.utcnow()),
+        )
+
+    def _build_edge_recommendation(self, row: dict[str, Any]) -> EdgeRecommendation:
+        evidence = row.get("connection_evidence")
+        if isinstance(evidence, str):
+            try:
+                evidence = json.loads(evidence)
+            except json.JSONDecodeError:
+                evidence = {"raw": evidence}
+
+        return EdgeRecommendation(
+            id=row["id"],
+            session_id=row["session_id"],
+            source_node_id=row.get("source_node_id"),
+            target_node_id=row.get("target_node_id"),
+            relationship_type=row.get("relationship_type", "RELATED_TO"),
+            confidence_score=float(row.get("confidence_score") or 0.0),
+            reasoning=row.get("reasoning", ""),
+            connection_evidence=evidence or {},
+            user_feedback=row.get("user_feedback"),
+            created_at=row.get("created_at", datetime.utcnow()),
+        )
+
+    async def update_recommendation_feedback(
+        self,
+        task_id: str,
+        status: str,
+        feedback_payload: dict[str, Any],
+        node_updates: List[dict[str, Any]],
+        edge_updates: List[dict[str, Any]],
+    ) -> None:
+        session = await self.get_recommendation_session(task_id)
+        if not session:
+            logger.warning(
+                "Cannot update recommendation feedback – no session found for task %s",
+                task_id,
+            )
+            return
+
+        metadata_update = {"last_feedback": feedback_payload}
+
+        if self.connection_pool:
+            conn = self.connection_pool.getconn()
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        UPDATE recommendation_sessions
+                        SET status = %s,
+                            approved_at = CURRENT_TIMESTAMP,
+                            metadata = COALESCE(metadata, '{}'::jsonb) || %s::jsonb
+                        WHERE id = %s
+                        """,
+                        (
+                            status,
+                            Json(metadata_update),
+                            str(session.id),
+                        ),
+                    )
+
+                    for update in node_updates:
+                        cursor.execute(
+                            """
+                            UPDATE node_recommendations
+                            SET user_feedback = %s,
+                                recommended_name = COALESCE(%s, recommended_name),
+                                entity_type = COALESCE(%s, entity_type),
+                                confidence_score = COALESCE(%s, confidence_score),
+                                source_columns = COALESCE(%s, source_columns),
+                                llm_metadata = COALESCE(llm_metadata, '{}'::jsonb) || %s::jsonb
+                            WHERE id = %s AND session_id = %s
+                            """,
+                            (
+                                update.get("decision"),
+                                update.get("name"),
+                                update.get("entity_type"),
+                                update.get("confidence"),
+                                update.get("source_columns"),
+                                Json(update.get("metadata") or {}),
+                                update.get("id"),
+                                str(session.id),
+                            ),
+                        )
+
+                    for update in edge_updates:
+                        cursor.execute(
+                            """
+                            UPDATE edge_recommendations
+                            SET user_feedback = %s,
+                                relationship_type = COALESCE(%s, relationship_type),
+                                confidence_score = COALESCE(%s, confidence_score),
+                                connection_evidence = COALESCE(connection_evidence, '{}'::jsonb) || %s::jsonb,
+                                reasoning = COALESCE(%s, reasoning)
+                            WHERE id = %s AND session_id = %s
+                            """,
+                            (
+                                update.get("decision"),
+                                update.get("relationship_type"),
+                                update.get("confidence"),
+                                Json(update.get("metadata") or {}),
+                                update.get("reasoning"),
+                                update.get("id"),
+                                str(session.id),
+                            ),
+                        )
+
+                conn.commit()
+            finally:
+                self.connection_pool.putconn(conn)
+
+        session.status = status
+        session.approved_at = datetime.utcnow()
+        session.metadata = {**(session.metadata or {}), **metadata_update}
+
+        node_map = {str(node.id): node for node in session.node_recommendations}
+        for update in node_updates:
+            node = node_map.get(update.get("id"))
+            if not node:
+                continue
+            if update.get("name"):
+                node.recommended_name = update["name"]
+            if update.get("entity_type"):
+                node.entity_type = update["entity_type"]
+            if update.get("confidence") is not None:
+                node.confidence_score = float(update["confidence"])
+            if update.get("source_columns"):
+                node.source_columns = update["source_columns"]
+            node.user_feedback = update.get("decision", node.user_feedback)
+            node.llm_metadata = node.llm_metadata or {}
+            node.llm_metadata.setdefault("human_feedback", {}).update(
+                update.get("metadata", {}).get("human_feedback", {})
+            )
+
+        edge_map = {str(edge.id): edge for edge in session.edge_recommendations}
+        for update in edge_updates:
+            edge = edge_map.get(update.get("id"))
+            if not edge:
+                continue
+            if update.get("relationship_type"):
+                edge.relationship_type = update["relationship_type"]
+            if update.get("confidence") is not None:
+                edge.confidence_score = float(update["confidence"])
+            if update.get("reasoning"):
+                edge.reasoning = update["reasoning"]
+            edge.user_feedback = update.get("decision", edge.user_feedback)
+            edge.connection_evidence = edge.connection_evidence or {}
+            edge.connection_evidence.setdefault("human_feedback", {}).update(
+                update.get("metadata", {}).get("human_feedback", {})
+            )
+
+        self._mock_sessions[task_id] = session
+        self._mock_node_recommendations[str(session.id)] = [
+            node.model_dump(mode="python") for node in session.node_recommendations
+        ]
+        self._mock_edge_recommendations[str(session.id)] = [
+            edge.model_dump(mode="python") for edge in session.edge_recommendations
+        ]
 
     def _calculate_file_checksum(self, file_path: str) -> str:
         """Calculate SHA-256 checksum of file."""

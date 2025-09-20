@@ -85,6 +85,7 @@ export interface GraphNode {
     uploadDate?: string;
     [key: string]: unknown;
   };
+  llmMetadata?: Record<string, unknown>;
   columns?: Record<string, unknown>;
 }
 
@@ -108,6 +109,7 @@ export interface GraphLink {
   createdAt?: string;
   merged_metadata?: unknown;
   mergedMetadata?: unknown;
+  metadata?: Record<string, unknown>;
   join_strategy?: string;
 }
 

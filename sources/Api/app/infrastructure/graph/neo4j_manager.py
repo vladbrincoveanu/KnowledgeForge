@@ -1412,7 +1412,11 @@ class Neo4jGraphManager:
                     WHERE source.task_id = $task_id AND target.task_id = $task_id
                     RETURN r.id as id, r.type as type,
                            source.id as source_id, target.id as target_id,
-                           r.confidence as confidence
+                           r.confidence as confidence,
+                           r.attributes as attributes,
+                           r.evidence as evidence,
+                           r.created_at as created_at,
+                           r.updated_at as updated_at
                     """
                     relationships_result = session.run(relationships_query, {"task_id": task_id})
                 else:
@@ -1421,10 +1425,38 @@ class Neo4jGraphManager:
                     MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity)
                     RETURN r.id as id, r.type as type,
                            source.id as source_id, target.id as target_id,
-                           r.confidence as confidence
+                           r.confidence as confidence,
+                           r.attributes as attributes,
+                           r.evidence as evidence,
+                           r.created_at as created_at,
+                           r.updated_at as updated_at
                     """
                     relationships_result = session.run(relationships_query)
-                relationships = [dict(record) for record in relationships_result]
+                relationships = []
+                for record in relationships_result:
+                    relationship_data = dict(record)
+
+                    try:
+                        if relationship_data.get("attributes"):
+                            relationship_data["attributes"] = json.loads(
+                                relationship_data["attributes"]
+                            )
+                        else:
+                            relationship_data["attributes"] = {}
+                    except (json.JSONDecodeError, TypeError):
+                        relationship_data["attributes"] = {}
+
+                    try:
+                        if relationship_data.get("evidence"):
+                            relationship_data["evidence"] = json.loads(
+                                relationship_data["evidence"]
+                            )
+                        else:
+                            relationship_data["evidence"] = {}
+                    except (json.JSONDecodeError, TypeError):
+                        relationship_data["evidence"] = {}
+
+                    relationships.append(relationship_data)
                 
                 # Generate basic Cypher queries for visualization
                 if task_id:
