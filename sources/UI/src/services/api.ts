@@ -402,6 +402,14 @@ export class WebSocketService {
 
   connect(): void {
     try {
+      if (
+        this.ws &&
+        (this.ws.readyState === WebSocket.OPEN ||
+          this.ws.readyState === WebSocket.CONNECTING)
+      ) {
+        return;
+      }
+
       // Use direct WebSocket connection to backend since proxy doesn't handle WebSocket
       const wsUrl = API_BASE_URL === '/api' 
         ? 'ws://localhost:8000/ws' 
@@ -425,6 +433,7 @@ export class WebSocketService {
 
       this.ws.onclose = () => {
         console.log('WebSocket disconnected');
+        this.ws = null;
         this.emit('disconnected');
         this.attemptReconnect();
       };

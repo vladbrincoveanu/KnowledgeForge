@@ -378,18 +378,20 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     );
     if (!task) return null;
 
-    const statusColors = {
+    const statusColors: Record<string, string> = {
       pending: '#ffc107',
       processing: '#007bff',
       completed: '#28a745',
       failed: '#dc3545',
+      awaiting_recommendations_approval: '#17a2b8',
     };
 
-    const statusIcons = {
+    const statusIcons: Record<string, JSX.Element> = {
       pending: <Clock size={16} />,
       processing: <Database size={16} />,
       completed: <CheckCircle size={16} />,
       failed: <AlertCircle size={16} />,
+      awaiting_recommendations_approval: <Brain size={16} />,
     };
 
     return (
@@ -398,7 +400,11 @@ const FileUploader: React.FC<FileUploaderProps> = ({
         style={{ color: statusColors[task.status] }}
       >
         {statusIcons[task.status]}
-        <span>{task.message}</span>
+        <span>
+          {task.status === 'awaiting_recommendations_approval'
+            ? 'Recommendations ready for review'
+            : task.message}
+        </span>
         {task.processingTime && <small>({task.processingTime}s)</small>}
       </div>
     );

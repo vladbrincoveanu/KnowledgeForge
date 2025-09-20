@@ -39,7 +39,7 @@ test:
 # Run API locally
 run:
 	@echo "Starting KnowledgeForge API locally..."
-	python main.py
+	source ../venv/bin/activate && python3 app.py
 
 # Build Docker image
 build:
