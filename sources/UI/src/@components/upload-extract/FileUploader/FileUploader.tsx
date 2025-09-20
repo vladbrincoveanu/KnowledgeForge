@@ -10,6 +10,7 @@ import {
   AlertCircle,
   Clock,
 } from 'lucide-react';
+import RecommendationModal from '@/@components/recommendation-modal/RecommendationModal/RecommendationModal';
 import './FileUploader.scss';
 
 interface FileUploaderProps {
@@ -21,7 +22,12 @@ interface FileUploaderProps {
 interface ExtractionTask {
   taskId: string;
   fileName: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
+  status:
+    | 'pending'
+    | 'processing'
+    | 'completed'
+    | 'failed'
+    | 'awaiting_recommendations_approval';
   message: string;
   progress?: number;
   createdAt: string;
@@ -54,6 +60,10 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   const [extractionTasks, setExtractionTasks] = useState<
     Record<string, ExtractionTask>
   >({});
+  const [recommendationModal, setRecommendationModal] = useState<{
+    isOpen: boolean;
+    taskId: string | null;
+  }>({ isOpen: false, taskId: null });
   const [extractionConfig, setExtractionConfig] = useState({
     confidence_threshold: 0.7,
     max_entities_per_column: 100,
@@ -67,34 +77,70 @@ const FileUploader: React.FC<FileUploaderProps> = ({
         task_id?: string;
         status?: string;
         message?: string;
+        progress?: number;
         timestamp?: string;
       };
-      if (wsData.task_id && extractionTasks[wsData.task_id]) {
-        setExtractionTasks(prev => ({
+
+      if (!wsData?.task_id) {
+        return;
+      }
+
+      const shouldOpenModal =
+        wsData.status === 'awaiting_recommendations_approval';
+
+      setExtractionTasks(prev => {
+        const existingTask = prev[wsData.task_id!];
+
+        const baseTask: ExtractionTask =
+          existingTask ||
+          ({
+            taskId: wsData.task_id!,
+            fileName: `Task ${wsData.task_id!.substring(0, 8)}...`,
+            status: 'pending',
+            message: wsData.message || 'Task update received',
+            progress: wsData.progress ?? 0,
+            createdAt: wsData.timestamp || new Date().toISOString(),
+          } as ExtractionTask);
+
+        const updatedTask: ExtractionTask = {
+          ...baseTask,
+          status:
+            (wsData.status as ExtractionTask['status']) || baseTask.status,
+          message: wsData.message || baseTask.message,
+          progress: wsData.progress ?? baseTask.progress,
+        };
+
+        return {
           ...prev,
-          [wsData.task_id!]: {
-            ...prev[wsData.task_id!],
-            status:
-              (wsData.status as ExtractionTask['status']) ||
-              prev[wsData.task_id!].status,
-            message: wsData.message || prev[wsData.task_id!].message,
-          },
-        }));
+          [wsData.task_id!]: updatedTask,
+        };
+      });
+
+      if (shouldOpenModal) {
+        setRecommendationModal({
+          isOpen: true,
+          taskId: wsData.task_id,
+        });
       }
     },
-    [extractionTasks]
+    [setRecommendationModal]
   );
 
   // WebSocket connection for real-time updates
   useEffect(() => {
     wsService.connect();
 
+    const handleConnected = () => console.log('WebSocket connected');
+    const handleDisconnected = () => console.log('WebSocket disconnected');
+
     wsService.on('message', handleWebSocketMessage);
-    wsService.on('connected', () => console.log('WebSocket connected'));
-    wsService.on('disconnected', () => console.log('WebSocket disconnected'));
+    wsService.on('connected', handleConnected);
+    wsService.on('disconnected', handleDisconnected);
 
     return () => {
-      wsService.disconnect();
+      wsService.off('message', handleWebSocketMessage);
+      wsService.off('connected', handleConnected);
+      wsService.off('disconnected', handleDisconnected);
     };
   }, [handleWebSocketMessage]);
 
@@ -267,7 +313,11 @@ const FileUploader: React.FC<FileUploaderProps> = ({
         }));
 
         // Stop polling if task is completed or failed
-        if (status.status === 'completed' || status.status === 'failed') {
+        if (
+          status.status === 'completed' ||
+          status.status === 'failed' ||
+          status.status === 'awaiting_recommendations_approval'
+        ) {
           clearInterval(pollInterval);
         }
       } catch (error) {
@@ -361,8 +411,27 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     }));
   };
 
+  const handleRecommendationApprove = (approvedItems: any) => {
+    console.log('Approved items:', approvedItems);
+    setRecommendationModal({ isOpen: false, taskId: null });
+  };
+
+  const handleRecommendationReject = () => {
+    console.log('Recommendations rejected');
+    setRecommendationModal({ isOpen: false, taskId: null });
+  };
+
   return (
     <div className="file-uploader">
+      <RecommendationModal
+        isOpen={recommendationModal.isOpen}
+        onClose={() =>
+          setRecommendationModal({ isOpen: false, taskId: null })
+        }
+        onApprove={handleRecommendationApprove}
+        onReject={handleRecommendationReject}
+        taskId={recommendationModal.taskId || ''}
+      />
       <h3>
         <Upload size={20} /> Upload Data Files
       </h3>

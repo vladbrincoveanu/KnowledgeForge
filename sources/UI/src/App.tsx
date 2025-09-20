@@ -58,7 +58,13 @@ interface PotentialConnection {
 interface ExtractionTask {
   taskId: string;
   fileName: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status:
+    | 'pending'
+    | 'running'
+    | 'processing'
+    | 'completed'
+    | 'failed'
+    | 'awaiting_recommendations_approval';
   message: string;
   createdAt: string;
   completedAt?: string;
@@ -366,25 +372,39 @@ const MainContent: React.FC = () => {
     []
   );
 
-  const handleWebSocketMessage = useCallback(
-    (data?: unknown) => {
-      const wsData = data as WebSocketMessage;
-      if (wsData?.task_id && extractionTasks[wsData.task_id]) {
-        setExtractionTasks(prev => ({
-          ...prev,
-          [wsData.task_id!]: {
-            ...prev[wsData.task_id!],
-            status:
-              (wsData.status as ExtractionTask['status']) ||
-              prev[wsData.task_id!].status,
-            message: wsData.message || prev[wsData.task_id!].message,
-            timestamp: wsData.timestamp,
-          },
-        }));
-      }
-    },
-    [extractionTasks]
-  );
+  const handleWebSocketMessage = useCallback((data?: unknown) => {
+    const wsData = data as WebSocketMessage & { progress?: number };
+    if (!wsData?.task_id) {
+      return;
+    }
+
+    setExtractionTasks(prev => {
+      const existingTask = prev[wsData.task_id!];
+
+      const baseTask: ExtractionTask =
+        existingTask ||
+        ({
+          taskId: wsData.task_id!,
+          fileName: `Task ${wsData.task_id!.substring(0, 8)}...`,
+          status: 'pending',
+          message: wsData.message || 'Task update received',
+          createdAt: wsData.timestamp || new Date().toISOString(),
+        } as ExtractionTask);
+
+      const updatedTask: ExtractionTask = {
+        ...baseTask,
+        status:
+          (wsData.status as ExtractionTask['status']) || baseTask.status,
+        message: wsData.message || baseTask.message,
+        timestamp: wsData.timestamp || baseTask.timestamp,
+      };
+
+      return {
+        ...prev,
+        [wsData.task_id!]: updatedTask,
+      };
+    });
+  }, []);
 
   const loadAvailableTasks = useCallback(async () => {
     try {
@@ -424,14 +444,20 @@ const MainContent: React.FC = () => {
   useEffect(() => {
     wsService.connect();
 
+    const handleConnected = () => console.log('WebSocket connected');
+    const handleDisconnected = () => console.log('WebSocket disconnected');
+
     wsService.on('message', handleWebSocketMessage);
-    wsService.on('connected', () => console.log('WebSocket connected'));
-    wsService.on('disconnected', () => console.log('WebSocket disconnected'));
+    wsService.on('connected', handleConnected);
+    wsService.on('disconnected', handleDisconnected);
 
     // Load available tasks on component mount
     loadAvailableTasks();
 
     return () => {
+      wsService.off('message', handleWebSocketMessage);
+      wsService.off('connected', handleConnected);
+      wsService.off('disconnected', handleDisconnected);
       wsService.disconnect();
     };
   }, [handleWebSocketMessage, loadAvailableTasks]);
