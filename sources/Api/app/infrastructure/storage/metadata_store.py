@@ -684,6 +684,114 @@ class PostgreSQLMetadataStore:
             logger.error(f"Failed to calculate checksum for {file_path}: {e}")
             return "unknown"
 
+    async def find_similar_datasets(self, column_patterns: List[str], domain: str = None) -> List[Dict[str, Any]]:
+        """Find similar datasets based on column patterns and domain."""
+        try:
+            if not self.connection_pool:
+                logger.debug("No database connection, returning empty similar datasets")
+                return []
+            
+            conn = self.connection_pool.getconn()
+            try:
+                with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                    # Look for extraction runs with similar column patterns
+                    # This is a simplified implementation - in a real system you'd use vector similarity
+                    query = """
+                        SELECT er.id, er.metadata, er.created_at, er.status
+                        FROM extraction_runs er
+                        WHERE er.status = 'completed'
+                        AND er.metadata IS NOT NULL
+                        ORDER BY er.created_at DESC
+                        LIMIT 10
+                    """
+                    
+                    params = []
+                    if domain and domain != "unknown":
+                        query += " AND er.metadata->>'domain' = %s"
+                        params.append(domain)
+                    
+                    cursor.execute(query, params)
+                    rows = cursor.fetchall()
+                    
+                    similar_datasets = []
+                    for row in rows:
+                        metadata = row.get('metadata') or {}
+                        similar_datasets.append({
+                            'task_id': row['id'],
+                            'domain': metadata.get('domain', 'unknown'),
+                            'column_count': metadata.get('column_count', 0),
+                            'entity_count': metadata.get('entity_count', 0),
+                            'created_at': row['created_at'].isoformat() if row['created_at'] else None,
+                            'similarity_score': 0.5  # Placeholder - would calculate actual similarity
+                        })
+                    
+                    logger.debug(f"Found {len(similar_datasets)} similar datasets")
+                    return similar_datasets
+                    
+            finally:
+                self.connection_pool.putconn(conn)
+                
+        except Exception as e:
+            logger.error(f"Failed to find similar datasets: {e}")
+            return []
+
+    async def get_relationship_patterns(self, entity_types: List[str]) -> List[Dict[str, Any]]:
+        """Get relationship patterns for given entity types."""
+        try:
+            if not self.connection_pool:
+                logger.debug("No database connection, returning empty relationship patterns")
+                return []
+            
+            conn = self.connection_pool.getconn()
+            try:
+                with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                    # Look for existing relationship patterns in completed extractions
+                    query = """
+                        SELECT er.metadata
+                        FROM extraction_runs er
+                        WHERE er.status = 'completed'
+                        AND er.metadata IS NOT NULL
+                        AND er.metadata->>'relationship_count' IS NOT NULL
+                        ORDER BY er.created_at DESC
+                        LIMIT 20
+                    """
+                    
+                    cursor.execute(query)
+                    rows = cursor.fetchall()
+                    
+                    patterns = []
+                    for row in rows:
+                        metadata = row.get('metadata') or {}
+                        if 'relationships' in metadata:
+                            patterns.extend(metadata['relationships'])
+                    
+                    # Return some default patterns if none found
+                    if not patterns:
+                        patterns = [
+                            {
+                                'source_type': 'Person',
+                                'target_type': 'Organization', 
+                                'relationship_type': 'WORKS_FOR',
+                                'confidence': 0.8
+                            },
+                            {
+                                'source_type': 'Product',
+                                'target_type': 'Category',
+                                'relationship_type': 'BELONGS_TO',
+                                'confidence': 0.9
+                            }
+                        ]
+                    
+                    logger.debug(f"Found {len(patterns)} relationship patterns")
+                    return patterns
+                    
+            finally:
+                self.connection_pool.putconn(conn)
+                
+        except Exception as e:
+            logger.error(f"Failed to get relationship patterns: {e}")
+            return []
+
     def close(self):
         """Close the connection pool."""
         if hasattr(self, 'connection_pool'):

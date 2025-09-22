@@ -679,6 +679,85 @@ async def extract_ontology(
 
 
 
+async def continue_extraction_pipeline(
+    task_id: str,
+    extraction_config: dict[str, Any],
+    ontology_mapper: OntologyMapper,
+    neo4j_manager: Neo4jGraphManager,
+    metadata_store: MetadataStore,
+    relationship_discoverer: RelationshipDiscoverer,
+):
+    """Continue extraction pipeline after human feedback."""
+    try:
+        task = extraction_tasks.get(task_id)
+        if not task:
+            logger.error(f"Task {task_id} not found for continuation")
+            return
+
+        logger.info(f"Continuing extraction pipeline for task {task_id}")
+        
+        # Update task status
+        task.status = "processing"
+        task.progress = 0.7
+        
+        # Continue with ontology mapping and relationship discovery
+        if task.entities:
+            # Map entities to ontology
+            ontology_result = await ontology_mapper.map_entities_to_ontology(
+                task.entities, task.dataset_profile
+            )
+            if ontology_result:
+                task.ontology_mapping = ontology_result
+                task.progress = 0.8
+                
+                # Discover relationships
+                columns = task.dataset_profile.columns if hasattr(task.dataset_profile, 'columns') else []
+                relationships = relationship_discoverer.discover_relationships(
+                    task.file_path or "",
+                    task.entities,
+                    columns,
+                    task.extraction_config or {}
+                )
+                task.relationships = relationships
+                task.progress = 0.9
+                
+                # Store in Neo4j
+                await store_results_in_neo4j(
+                    task_id, task.entities, task.relationships, neo4j_manager
+                )
+                
+                # Complete the task
+                task.status = "completed"
+                task.progress = 1.0
+                task.completed_at = datetime.utcnow()
+                
+                # Update metadata store
+                metadata_store.complete_extraction_run(
+                    task_id, "completed", {
+                        "entities_count": len(task.entities),
+                        "relationships_count": len(task.relationships),
+                        "ontology_mapping": ontology_result
+                    }
+                )
+                
+                logger.info(f"Successfully completed extraction pipeline for task {task_id}")
+            else:
+                task.status = "failed"
+                task.error_message = "Failed to map entities to ontology"
+                metadata_store.complete_extraction_run(task_id, "failed", {"error": task.error_message})
+        else:
+            task.status = "failed"
+            task.error_message = "No entities found to continue processing"
+            metadata_store.complete_extraction_run(task_id, "failed", {"error": task.error_message})
+            
+    except Exception as e:
+        logger.error(f"Error continuing extraction pipeline for task {task_id}: {e}")
+        task = extraction_tasks.get(task_id)
+        if task:
+            task.status = "failed"
+            task.error_message = str(e)
+            metadata_store.complete_extraction_run(task_id, "failed", {"error": str(e)})
+
 async def run_extraction_pipeline(
     task_id: str,
     file_path: str,
@@ -879,22 +958,26 @@ async def run_extraction_pipeline(
             pass
 
         logger.info(f"Storing results in Neo4j for task {task_id}")
-        for entity in entities:
-<<<<<<< HEAD
-            if not entity.id:
-                # Generate deterministic ID based on entity content
-                source_cols = [attr.source_column for attr in entity.attributes if attr.source_column]
-                content = f"{entity.name}_{entity.entity_type}_{','.join(sorted(source_cols))}"
-                entity.id = f"entity_{hashlib.sha256(content.encode('utf-8')).hexdigest()[:12]}"
-                logger.info(f"Generated deterministic ID for entity: name='{entity.name}' -> id='{entity.id}'")
         
-        # Ensure all relationships have deterministic IDs
-=======
+        entities_stored = 0
+        relationships_stored = 0
+        
+        # Store entities
+        for entity in entities:
             if not getattr(entity, "id", None):
                 content = f"{entity.name}_{entity.entity_type}_{','.join(sorted(entity.source_columns))}"
                 entity.id = f"entity_{hashlib.sha256(content.encode('utf-8')).hexdigest()[:12]}"
-
->>>>>>> 239db38f (Refactor requirements and enhance API functionality. Updated requirements.txt for clarity and removed unnecessary standard library modules. Modified Makefile to activate the virtual environment before running the API. Improved entity and relationship listing in data.py to include fallback mechanisms for data retrieval. Enhanced extraction.py with recommendation session handling and feedback processing. Updated Neo4j manager to include additional relationship attributes. Improved metadata store with recommendation session management. Enhanced UI components for ontology results with loading states and recommendation handling.)
+            
+            success = neo4j_manager.store_entity_with_metadata(
+                entity=entity,
+                source_file=task_id,  # Using task_id as source file identifier
+                extraction_timestamp=datetime.utcnow(),
+                version="1.0"
+            )
+            if success:
+                entities_stored += 1
+        
+        # Store relationships
         for relationship in relationships:
             if not getattr(relationship, "id", None):
                 content = (

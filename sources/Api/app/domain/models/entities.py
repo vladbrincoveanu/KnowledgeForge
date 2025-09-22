@@ -108,6 +108,7 @@ class Entity(BaseModel):
     attributes: List[Attribute] = Field(default_factory=list)
     confidence: float = Field(ge=0.0, le=1.0)
     source_table: str
+    source_columns: List[str] = Field(default_factory=list)
 
     @field_validator("attributes", mode="before")
     @classmethod

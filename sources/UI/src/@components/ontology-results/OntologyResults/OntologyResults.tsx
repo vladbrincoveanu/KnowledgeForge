@@ -59,21 +59,7 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
     confidence_delta: 0,
     user_id: 'current_user',
   });
-<<<<<<< HEAD
   const [expandedAttributes, setExpandedAttributes] = useState<Set<string>>(new Set());
-
-  const toggleAttributes = (entityId: string) => {
-    setExpandedAttributes(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(entityId)) {
-        newSet.delete(entityId);
-      } else {
-        newSet.add(entityId);
-      }
-      return newSet;
-    });
-  };
-=======
   const [recommendationSession, setRecommendationSession] = useState<{
     node_recommendations: EnhancedNodeRecommendation[];
     edge_recommendations: EnhancedEdgeRecommendation[];
@@ -92,7 +78,18 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
   const [reviewNotes, setReviewNotes] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [submittingDecision, setSubmittingDecision] = useState(false);
->>>>>>> 239db38f (Refactor requirements and enhance API functionality. Updated requirements.txt for clarity and removed unnecessary standard library modules. Modified Makefile to activate the virtual environment before running the API. Improved entity and relationship listing in data.py to include fallback mechanisms for data retrieval. Enhanced extraction.py with recommendation session handling and feedback processing. Updated Neo4j manager to include additional relationship attributes. Improved metadata store with recommendation session management. Enhanced UI components for ontology results with loading states and recommendation handling.)
+
+  const toggleAttributes = (entityId: string) => {
+    setExpandedAttributes(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(entityId)) {
+        newSet.delete(entityId);
+      } else {
+        newSet.add(entityId);
+      }
+      return newSet;
+    });
+  };
 
   const loadData = useCallback(
     async (type: 'entities' | 'relationships', reset = false) => {
