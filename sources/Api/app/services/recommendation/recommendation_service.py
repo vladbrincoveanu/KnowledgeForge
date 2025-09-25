@@ -2,6 +2,7 @@ from typing import Any, Dict, List
 
 import difflib
 import logging
+import inspect
 
 from app.infrastructure.llm.llm_manager import LLMManager
 from app.infrastructure.storage.metadata_store import PostgreSQLMetadataStore
@@ -138,12 +139,18 @@ class RecommendationService:
 
         faiss_neighbors: List[Dict[str, Any]] = []
         if self.metadata_store and column_pool:
-            try:
-                faiss_neighbors = await self.metadata_store.find_similar_datasets(
-                    list(column_pool), dataset_summary["domain"]
-                )
-            except Exception as exc:
-                logger.debug("FAISS similarity lookup failed: %s", exc)
+            finder = getattr(self.metadata_store, "find_similar_datasets", None)
+            if finder:
+                try:
+                    maybe_result = finder(
+                        list(column_pool), dataset_summary.get("domain")
+                    )
+                    if inspect.isawaitable(maybe_result):
+                        faiss_neighbors = await maybe_result
+                    else:
+                        faiss_neighbors = list(maybe_result or [])
+                except Exception as exc:
+                    logger.debug("FAISS similarity lookup failed: %s", exc)
 
         def similarity_score(a: str, b: str) -> float:
             if not a or not b:

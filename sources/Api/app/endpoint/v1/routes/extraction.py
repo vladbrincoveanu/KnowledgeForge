@@ -467,7 +467,6 @@ def get_relationship_discoverer():
         logger.warning(f"Failed to initialize metadata store: {e}")
     
     return RelationshipDiscoverer(
-        llm_manager=llm_manager,
         use_sbert=True,  # Enable SBERT for semantic similarity
         cache_dir=None,  # Use default cache directory
         metadata_store=metadata_store,

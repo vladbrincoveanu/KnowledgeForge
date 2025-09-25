@@ -240,6 +240,84 @@ class PostgreSQLMetadataStore:
                 "error": str(e)
             }
 
+    async def find_similar_datasets(
+        self, columns: List[str], domain: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Return datasets with overlapping column names (best effort)."""
+
+        if not columns:
+            return []
+
+        if self.connection_pool:
+            conn = None
+            try:
+                conn = self.connection_pool.getconn()
+                with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                    cursor.execute(
+                        """
+                        SELECT dataset_name, dataset_id, overlap_score
+                        FROM dataset_similarities
+                        WHERE column_name = ANY(%s)
+                        ORDER BY overlap_score DESC
+                        LIMIT 10
+                        """,
+                        (columns,),
+                    )
+                    rows = cursor.fetchall() or []
+                    return [dict(row) for row in rows]
+            except Exception as exc:
+                logger.debug("Similarity lookup failed: %s", exc)
+            finally:
+                if conn:
+                    self.connection_pool.putconn(conn)
+
+        # Mock or fallback path
+        suggestions: List[Dict[str, Any]] = []
+        for column in columns[:5]:
+            suggestions.append(
+                {
+                    "dataset_name": f"Synthetic match for {column}",
+                    "dataset_id": f"mock-{column}",
+                    "overlap_score": 0.2,
+                    "column_name": column,
+                    "domain": domain,
+                }
+            )
+        return suggestions
+
+    async def get_relationship_patterns(
+        self, entity_types: List[str]
+    ) -> List[Dict[str, Any]]:
+        """Return historical relationship patterns for given entity types."""
+
+        if not entity_types:
+            return []
+
+        if self.connection_pool:
+            conn = None
+            try:
+                conn = self.connection_pool.getconn()
+                with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                    cursor.execute(
+                        """
+                        SELECT source_type, target_type, relationship_type, frequency
+                        FROM relationship_patterns
+                        WHERE source_type = ANY(%s) OR target_type = ANY(%s)
+                        ORDER BY frequency DESC
+                        LIMIT 25
+                        """,
+                        (entity_types, entity_types),
+                    )
+                    rows = cursor.fetchall() or []
+                    return [dict(row) for row in rows]
+            except Exception as exc:
+                logger.debug("Relationship pattern lookup failed: %s", exc)
+            finally:
+                if conn:
+                    self.connection_pool.putconn(conn)
+
+        return []
+
     def complete_extraction_run(self, task_id: str, status: str = "completed",
                               metadata: Dict[str, Any] = None):
         """Mark an extraction run as completed."""

@@ -11,7 +11,6 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 from app.domain.models.entities import ColumnProfile, DataType, Entity, Relationship
-from app.infrastructure.llm.llm_manager import LLMManager
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +32,6 @@ class RelationshipDiscoverer:
 
     def __init__(
         self,
-        llm_manager: Optional[LLMManager] = None,
         use_sbert: bool = True,
         cache_dir: Optional[str] = None,
         metadata_store=None,
@@ -41,12 +39,10 @@ class RelationshipDiscoverer:
         """Initialize the relationship discoverer.
 
         Args:
-            llm_manager: Optional LLM manager for semantic analysis
             use_sbert: Whether to use SBERT embeddings for similarity
             cache_dir: Directory for caching embeddings
             metadata_store: PostgreSQL metadata store for data analysis
         """
-        self.llm_manager = llm_manager
         self.metadata_store = metadata_store
         self.use_sbert = use_sbert
         self.cache_dir = cache_dir
@@ -123,11 +119,6 @@ class RelationshipDiscoverer:
         )
         relationships.extend(semantic_rels)
 
-        # Discover LLM-inferred relationships
-        llm_rels = self._discover_llm_relationships(
-            file_path, entities, columns, config
-        )
-        relationships.extend(llm_rels)
 
         # Discover hierarchical relationships
         hierarchical_rels = self._discover_hierarchical_relationships(
@@ -453,160 +444,8 @@ class RelationshipDiscoverer:
         else:
             return "weakly_related_to"
 
-    def _discover_llm_relationships(
-        self,
-        file_path: str,
-        entities: list[Entity],
-        columns: list[ColumnProfile],
-        config: dict[str, Any],
-    ) -> list[Relationship]:
-        """Discover relationships using LLM inference."""
-        relationships = []
 
-        if not self.llm_manager:
-            return relationships
 
-        try:
-            # Group entities by source column
-            entities_by_column = defaultdict(list)
-            for entity in entities:
-                if entity.source_columns:
-                    entities_by_column[entity.source_columns[0]].append(entity)
-
-            # Analyze column relationships using LLM
-            for col1_name, col1_entities in entities_by_column.items():
-                for col2_name, col2_entities in entities_by_column.items():
-                    if col1_name != col2_name:
-                        llm_rels = self._analyze_column_relationship_with_llm(
-                            file_path,
-                            col1_name,
-                            col2_name,
-                            col1_entities,
-                            col2_entities,
-                            config,
-                        )
-                        relationships.extend(llm_rels)
-
-        except Exception as e:
-            logger.warning(f"LLM relationship discovery failed: {e}")
-
-        return relationships
-
-    def _analyze_column_relationship_with_llm(
-        self,
-        file_path: str,
-        col1_name: str,
-        col2_name: str,
-        col1_entities: list[Entity],
-        col2_entities: list[Entity],
-        config: dict[str, Any],
-    ) -> list[Relationship]:
-        """Analyze relationship between two columns using LLM."""
-        relationships = []
-
-        try:
-            # Get sample data for LLM analysis
-            sample_data = self._get_sample_data_for_llm(file_path, col1_name, col2_name)
-
-            if not sample_data:
-                return relationships
-
-            # Use LLM to infer relationship
-            if not self.llm_manager:
-                logger.debug("LLM manager not available, skipping LLM analysis")
-                return relationships
-
-            try:
-                relationship_info = self.llm_manager.infer_column_relationship(
-                    col1_name, col2_name, sample_data
-                )
-                logger.debug(
-                    f"LLM response type: {type(relationship_info)}, content: {relationship_info}"
-                )
-            except Exception as llm_error:
-                logger.warning(f"LLM inference failed: {llm_error}")
-                return relationships
-
-            if relationship_info and isinstance(relationship_info, dict):
-                confidence = relationship_info.get("confidence", 0)
-                relationship_type = relationship_info.get(
-                    "relationship_type", "unknown"
-                )
-                reasoning = relationship_info.get("reasoning", "No reasoning provided")
-
-                logger.debug(
-                    f"Processing LLM result: confidence={confidence}, type={relationship_type}"
-                )
-
-                if confidence >= _safe_config_get(config, "relationship_threshold", 0.6):
-                    # Create relationships for entity pairs
-                    for entity1 in col1_entities[
-                        :5
-                    ]:  # Limit to avoid too many relationships
-                        for entity2 in col2_entities[:5]:
-                            try:
-                                relationship = Relationship(
-                                    id=f"llm_{entity1.id}_{entity2.id}_{hash(relationship_type)}",
-                                    source_entity_id=entity1.id,
-                                    target_entity_id=entity2.id,
-                                    relationship_type=relationship_type,
-                                    attributes={
-                                        "llm_confidence": confidence,
-                                        "llm_reasoning": reasoning,
-                                        "source_column": col1_name,
-                                        "target_column": col2_name,
-                                        "evidence": sample_data,
-                                        "extraction_method": "llm_inference",
-                                    },
-                                    confidence=confidence,
-                                    source_columns=[col1_name, col2_name],
-                                )
-                                relationships.append(relationship)
-                            except Exception as rel_error:
-                                logger.warning(
-                                    f"Failed to create relationship: {rel_error}"
-                                )
-                                continue
-
-        except Exception as e:
-            logger.warning(f"LLM column analysis failed: {e}")
-
-        return relationships
-
-    def _get_sample_data_for_llm(
-        self, file_path: str, col1_name: str, col2_name: str
-    ) -> list[dict[str, Any]]:
-        """Get sample data for LLM relationship analysis."""
-        try:
-            # Load CSV data using pandas
-            df = pd.read_csv(file_path)
-            
-            # Check if the provided column names are valid
-            if col1_name not in df.columns or col2_name not in df.columns:
-                logger.warning(
-                    f"Column names not found in CSV: {col1_name}, {col2_name}"
-                )
-                logger.info(f"Available columns: {list(df.columns)}")
-                return []
-
-            # Get sample data (up to 10 rows)
-            df_clean = df[[col1_name, col2_name]].dropna()
-            df_sample = df_clean.head(10)
-            
-            sample_data = []
-            for _, row in df_sample.iterrows():
-                sample_data.append(
-                    {
-                        "column1_value": str(row[col1_name]),
-                        "column2_value": str(row[col2_name]),
-                    }
-                )
-
-            return sample_data
-
-        except Exception as e:
-            logger.warning(f"Error getting sample data: {e}")
-            return []
 
     def _discover_hierarchical_relationships(
         self,

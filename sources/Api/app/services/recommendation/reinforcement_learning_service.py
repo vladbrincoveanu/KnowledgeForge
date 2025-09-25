@@ -227,7 +227,7 @@ class ReinforcementLearningService:
             Respond only with JSON array.
             """
 
-            response = self.llm_manager.generate_text(
+            response = await self.llm_manager.generate_text(
                 prompt, max_tokens=500, temperature=0.7
             )
 
@@ -278,7 +278,7 @@ class ReinforcementLearningService:
             Respond only with JSON array.
             """
 
-            response = self.llm_manager.generate_text(
+            response = await self.llm_manager.generate_text(
                 prompt, max_tokens=500, temperature=0.7
             )
 

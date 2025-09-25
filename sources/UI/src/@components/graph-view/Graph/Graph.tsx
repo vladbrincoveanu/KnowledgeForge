@@ -43,7 +43,7 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
     console.log('Valid links for graph:', validLinks);
   }
 
-  const handleNodeClick = useCallback((node: GraphNode) => {
+  const handleNodeClick = useCallback((node: GraphNode) => {9
     console.log('Clicked node:', node);
     // Clear edge selection when clicking on a node
     setSelectedEdge(null);
@@ -114,29 +114,15 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
   return (
     <div className="graph-container">
       <div className="graph-header">
-        <h3>AI-Powered Visual Knowledge Discovery</h3>
+        <h3>Knowledge Graph Visualization</h3>
         <div className="graph-stats">
-          <span>{data.nodes.length} Files</span>
-          <span>{data.links.length} AI-Detected Connections</span>
+          <span>{data.nodes.length} Entities</span>
+          <span>{data.links.length} Relationships</span>
           {selectedEdge && (
             <span className="selected-edge">
-              Selected: {selectedEdge.columnA} ↔ {selectedEdge.columnB}
+              Selected: {selectedEdge.label}
             </span>
           )}
-        </div>
-        <div className="discovery-insights">
-          <div className="insight-item">
-            <span className="insight-icon">🔍</span>
-            <span>AI analyzes patterns in your data</span>
-          </div>
-          <div className="insight-item">
-            <span className="insight-icon">💡</span>
-            <span>Discover hidden relationships</span>
-          </div>
-          <div className="insight-item">
-            <span className="insight-icon">✅</span>
-            <span>Validate connections visually</span>
-          </div>
         </div>
         
         <div className="graph-legend">

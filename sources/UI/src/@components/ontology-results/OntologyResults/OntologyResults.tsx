@@ -786,14 +786,16 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
 
                 {recommendationSession && !recommendationsLoading && (
                   <>
-                    <NodeRecommendationList
-                      recommendations={recommendationSession.node_recommendations}
-                      selections={nodeSelections}
-                      onNodeToggle={handleNodeToggle}
-                      onUpdateSelection={handleNodeSelectionUpdate}
-                      onSelectAll={handleSelectAllNodes}
-                      onDeselectAll={handleDeselectAllNodes}
-                    />
+                    <div className="recommendations-body">
+                      <NodeRecommendationList
+                        recommendations={recommendationSession.node_recommendations}
+                        selections={nodeSelections}
+                        onNodeToggle={handleNodeToggle}
+                        onUpdateSelection={handleNodeSelectionUpdate}
+                        onSelectAll={handleSelectAllNodes}
+                        onDeselectAll={handleDeselectAllNodes}
+                      />
+                    </div>
 
                     <div className="review-notes">
                       <label htmlFor="recommendation-notes">
@@ -817,82 +819,37 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
               </div>
             )}
 
-            <div className="section-header">
-              <h3>Extracted Entities</h3>
-              <span className="count">{entities.length} entities found</span>
-            </div>
+            <div className="entities-summary">
+              <h3>Entity Snapshot</h3>
+              <span className="count">{entities.length} tracked</span>
 
-            <div className="entities-list">
-              {entities.map((entity, index) => (
-                <div key={entity.id || index} className="entity-item">
-                  <div className="entity-header">
-                    <h4>{entity.name}</h4>
-                    <div
-                      className="confidence-badge"
-                      style={{
-                        backgroundColor: apiUtils.getConfidenceColor(
-                          entity.confidence
-                        ),
-                      }}
-                    >
-                      {apiUtils.formatConfidence(entity.confidence)}
+              <div className="compact-entity-list">
+                {entities.map((entity, index) => (
+                  <div key={entity.id || index} className="compact-entity-item">
+                    <div className="compact-entity-heading">
+                      <span className="compact-entity-name">{entity.name}</span>
+                      <span
+                        className="compact-confidence"
+                        style={{
+                          backgroundColor: apiUtils.getConfidenceColor(
+                            entity.confidence
+                          ),
+                        }}
+                      >
+                        {apiUtils.formatConfidence(entity.confidence)}
+                      </span>
+                    </div>
+                    <div className="compact-entity-body">
+                      <span className="entity-chip">{entity.entity_type}</span>
+                      {(entity.source_columns || []).slice(0, 3).map(column => (
+                        <span key={column} className="entity-chip light">
+                          {column}
+                        </span>
+                      ))}
                     </div>
                   </div>
-
-                  <div className="entity-details">
-                    <div className="detail-item">
-                      <strong>Type:</strong> {entity.entity_type}
-                    </div>
-                    {entity.source_columns && entity.source_columns.length > 0 && (
-                      <div className="detail-item">
-                        <strong>Source Columns:</strong> {entity.source_columns.join(', ')}
-                      </div>
-                    )}
-                    {entity.attributes &&
-                      Object.keys(entity.attributes).length > 0 && (
-                        <div className="detail-item">
-                          <strong>Attributes:</strong>
-                          <ul className="attributes-list">
-                            {Object.entries(entity.attributes).map(
-                              ([key, value]) => (
-                                <li key={key}>
-                                  <strong>{key}:</strong> {String(value)}
-                                </li>
-                              )
-                            )}
-                          </ul>
-                        </div>
-                      )}
-                  </div>
-
-                  <div className="entity-actions">
-                    <button
-                      className="feedback-button positive"
-                      onClick={() =>
-                        setFeedbackForm(prev => ({
-                          ...prev,
-                          entity_id: entity.id,
-                        }))
-                      }
-                    >
-                      <ThumbsUp size={16} />
-                    </button>
-
-                    <button
-                      className="feedback-button negative"
-                      onClick={() =>
-                        setFeedbackForm(prev => ({
-                          ...prev,
-                          entity_id: entity.id,
-                          feedback_type: 'negative',
-                        }))
-                      }
-                    >
-                      <ThumbsDown size={16} />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -967,14 +924,16 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
 
                 {recommendationSession && !recommendationsLoading && (
                   <>
-                    <EdgeRecommendationList
-                      recommendations={recommendationSession.edge_recommendations}
-                      selections={edgeSelections}
-                      onEdgeToggle={handleEdgeToggle}
-                      onUpdateSelection={handleEdgeSelectionUpdate}
-                      onSelectAll={handleSelectAllEdges}
-                      onDeselectAll={handleDeselectAllEdges}
-                    />
+                    <div className="recommendations-body">
+                      <EdgeRecommendationList
+                        recommendations={recommendationSession.edge_recommendations}
+                        selections={edgeSelections}
+                        onEdgeToggle={handleEdgeToggle}
+                        onUpdateSelection={handleEdgeSelectionUpdate}
+                        onSelectAll={handleSelectAllEdges}
+                        onDeselectAll={handleDeselectAllEdges}
+                      />
+                    </div>
                     <div className="selection-summary">
                       {selectedEdgeCount} of{' '}
                       {recommendationSession.edge_recommendations.length} edge

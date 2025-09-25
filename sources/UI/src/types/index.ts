@@ -90,11 +90,6 @@ export interface GraphLink {
   target_collection?: string;
   source_column?: string;
   target_column?: string;
-  columnA?: string;
-  columnB?: string;
-  confidence_score?: number;
-  llm_analysis?: LLMAnalysis;
-  connection_type?: string;
   type?: string;
   created_at?: string;
   createdAt?: string;
@@ -197,35 +192,6 @@ export interface UploadedFile {
   type: string;
 }
 
-// LLM Analysis interface
-export interface LLMAnalysis {
-  reasoning: string;
-  business_context: string;
-  connection_type?: string;
-  suggested_join_strategy?: string;
-  potential_issues?: string[];
-  recommendations?: string[];
-  confidence_level?: 'High' | 'Medium' | 'Low';
-}
-
-// Connection interface
-export interface Connection {
-  id?: string;
-  fileA: string;
-  fileB: string;
-  columnA: string;
-  columnB: string;
-  confidence: number;
-  confidence_score?: number;
-  ai_score?: number;
-  source_collection?: string;
-  target_collection?: string;
-  source_column?: string;
-  target_column?: string;
-  connection_type?: string;
-  llmAnalysis?: LLMAnalysis;
-  llm_analysis?: LLMAnalysis;
-}
 
 // Chart data interfaces
 export interface ChartData {

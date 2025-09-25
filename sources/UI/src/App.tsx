@@ -10,7 +10,6 @@ import {
 import { wsService, ontologyAPI } from './services/api';
 import FileUploader from './@components/upload-extract/FileUploader/FileUploader';
 import Graph from './@components/graph-view/Graph/Graph';
-import ConnectionPrompt from './@components/upload-extract/ConnectionPrompt/ConnectionPrompt';
 import OntologyResults from './@components/ontology-results/OntologyResults/OntologyResults';
 import SystemMetrics from './@components/system-metrics/SystemMetrics/SystemMetrics';
 import Settings from './@components/settings/Settings/Settings';
@@ -41,19 +40,6 @@ interface UploadedFile {
   type: string;
 }
 
-interface Connection {
-  columnA: string;
-  columnB: string;
-  confidence: number;
-}
-
-interface PotentialConnection {
-  fileA: string;
-  fileB: string;
-  columnA: string;
-  columnB: string;
-  confidence: number;
-}
 
 interface ExtractionTask {
   taskId: string;
@@ -189,9 +175,6 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab }) => {
 const MainContent: React.FC = () => {
   const location = useLocation();
   const [files, setFiles] = useState<UploadedFile[]>([]);
-  const [connections, setConnections] = useState<PotentialConnection[]>([]);
-  const [pendingConnection, setPendingConnection] =
-    useState<PotentialConnection | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [extractionTasks, setExtractionTasks] = useState<
     Record<string, ExtractionTask>
@@ -472,109 +455,11 @@ const MainContent: React.FC = () => {
     });
   }, [extractionTasks, loadGraphData]);
 
-  const calculateSimilarity = useCallback(
-    (str1: string, str2: string): number => {
-      const normalize = (str: string) =>
-        str.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const norm1 = normalize(str1);
-      const norm2 = normalize(str2);
-
-      if (norm1 === norm2) return 1.0;
-      if (norm1.includes(norm2) || norm2.includes(norm1)) return 0.8;
-      if (norm1.includes('id') && norm2.includes('id')) return 0.7;
-      if (norm1.includes('name') && norm2.includes('name')) return 0.7;
-      if (norm1.includes('customer') && norm2.includes('customer')) return 0.9;
-      if (norm1.includes('order') && norm2.includes('order')) return 0.9;
-
-      return 0.0;
-    },
-    []
-  );
-
-  const findPotentialConnections = useCallback(
-    (headersA: string[], headersB: string[]): Connection[] => {
-      const connections: Connection[] = [];
-
-      headersA.forEach(headerA => {
-        headersB.forEach(headerB => {
-          const similarity = calculateSimilarity(headerA, headerB);
-          if (similarity > 0.6) {
-            connections.push({
-              columnA: headerA,
-              columnB: headerB,
-              confidence: similarity,
-            });
-          }
-        });
-      });
-
-      return connections;
-    },
-    [calculateSimilarity]
-  );
-
-  const checkSemanticConnections = useCallback(
-    async (fileHeaders: FileHeader[]): Promise<PotentialConnection[]> => {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      const potentialConnections: PotentialConnection[] = [];
-
-      // Simple mock logic to find potential connections
-      for (let i = 0; i < fileHeaders.length; i++) {
-        for (let j = i + 1; j < fileHeaders.length; j++) {
-          const fileA = fileHeaders[i];
-          const fileB = fileHeaders[j];
-
-          // Check for common patterns in column names
-          const connections = findPotentialConnections(
-            fileA.headers,
-            fileB.headers
-          );
-
-          connections.forEach(connection => {
-            potentialConnections.push({
-              fileA: fileA.name,
-              fileB: fileB.name,
-              columnA: connection.columnA,
-              columnB: connection.columnB,
-              confidence: connection.confidence,
-            });
-          });
-        }
-      }
-
-      return potentialConnections;
-    },
-    [findPotentialConnections]
-  );
-
   const handleFilesUploaded = useCallback(
     async (uploadedFiles: UploadedFile[]) => {
       setFiles(uploadedFiles);
-      setIsProcessing(true);
-
-      try {
-        // Extract headers from each file
-        const fileHeaders: FileHeader[] = uploadedFiles.map(file => ({
-          name: file.name,
-          headers: file.headers,
-        }));
-
-        // Check for semantic connections
-        const potentialConnections =
-          await checkSemanticConnections(fileHeaders);
-
-        if (potentialConnections.length > 0) {
-          setPendingConnection(potentialConnections[0]);
-        }
-      } catch (error) {
-        console.error('Error processing files:', error);
-      } finally {
-        setIsProcessing(false);
-      }
     },
-    [checkSemanticConnections]
+    []
   );
 
   const handleExtractionStarted = useCallback(
@@ -596,21 +481,6 @@ const MainContent: React.FC = () => {
     [activeTaskId]
   );
 
-  const handleConnectionResponse = useCallback(
-    (accepted: boolean, connection: PotentialConnection) => {
-      if (accepted) {
-        setConnections(prev => [...prev, connection]);
-      }
-
-      // Remove the current pending connection
-      setPendingConnection(null);
-
-      // Check if there are more pending connections
-      // This would be handled by the actual implementation
-      // For now, we'll just clear the pending connection
-    },
-    []
-  );
 
   const handleFeedbackSubmitted = useCallback((feedback: unknown) => {
     console.log('Feedback submitted:', feedback);
@@ -712,30 +582,6 @@ const MainContent: React.FC = () => {
                     </div>
                   )}
 
-                  {connections.length > 0 && (
-                    <div className="connections">
-                      <h3>Connections ({connections.length})</h3>
-                      <ul>
-                        {connections.map((connection, index) => (
-                          <li key={index}>
-                            <strong>{connection.fileA}</strong> ↔{' '}
-                            <strong>{connection.fileB}</strong>
-                            <br />
-                            <small>
-                              {connection.columnA} ↔ {connection.columnB}
-                            </small>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {pendingConnection && (
-                    <ConnectionPrompt
-                      connection={pendingConnection}
-                      onResponse={handleConnectionResponse}
-                    />
-                  )}
                 </div>
               }
             />

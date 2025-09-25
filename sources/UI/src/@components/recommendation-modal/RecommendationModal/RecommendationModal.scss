@@ -397,3 +397,20 @@
     border-radius: 12px;
   }
 }
+
+.recommendations-panel {
+  .edge-recommendation-card {
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    border-width: 1px;
+
+    .edge-config {
+      gap: 8px;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    }
+
+    .metadata-section {
+      display: none;
+    }
+  }
+}
