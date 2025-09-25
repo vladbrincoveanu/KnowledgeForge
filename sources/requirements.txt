@@ -1,4 +1,4 @@
-//TODO: clean this sheet
+## Note: keep this list minimal and production-ready
 
 # Core dependencies
 fastapi>=0.104.0
@@ -29,10 +29,7 @@ pymongo>=4.6.0
 # Utilities
 python-dateutil>=2.8.0
 python-multipart>=0.0.6
-hashlib
-re
-json
-datetime
+# stdlib modules like hashlib/re/json/datetime should not be listed
 
 # Testing
 pytest>=7.4.0

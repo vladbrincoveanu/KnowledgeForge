@@ -55,9 +55,15 @@ const NodeDetailsModal: React.FC<NodeDetailsModalProps> = ({
                 <div className="value-with-tooltip">
                   <span className="value">{safeString(node.label)}</span>
                   <div className="tooltip">
-                    <img src="/src/assets/info.svg" alt="info" className="tooltip-icon" />
+                    <img
+                      src="/src/assets/info.svg"
+                      alt="info"
+                      className="tooltip-icon"
+                    />
                     <div className="tooltip-content">
-                      The name of the data concept that AI identified in your dataset. This represents what the data represents (e.g., "product_id", "customer_name").
+                      The name of the data concept that AI identified in your
+                      dataset. This represents what the data represents (e.g.,
+                      "product_id", "customer_name").
                     </div>
                   </div>
                 </div>
@@ -65,11 +71,19 @@ const NodeDetailsModal: React.FC<NodeDetailsModalProps> = ({
               <div className="info-item">
                 <span className="label">Entity Type:</span>
                 <div className="value-with-tooltip">
-                  <span className="value">{safeString(node.entityType || node.type)}</span>
+                  <span className="value">
+                    {safeString(node.entityType || node.type)}
+                  </span>
                   <div className="tooltip">
-                    <img src="/src/assets/info.svg" alt="info" className="tooltip-icon" />
+                    <img
+                      src="/src/assets/info.svg"
+                      alt="info"
+                      className="tooltip-icon"
+                    />
                     <div className="tooltip-content">
-                      The category of data this represents: identifier (unique IDs), measurement (numbers/quantities), categorical (categories/labels), or geographic (locations).
+                      The category of data this represents: identifier (unique
+                      IDs), measurement (numbers/quantities), categorical
+                      (categories/labels), or geographic (locations).
                     </div>
                   </div>
                 </div>
@@ -78,14 +92,27 @@ const NodeDetailsModal: React.FC<NodeDetailsModalProps> = ({
                 <span className="label">Confidence:</span>
                 <div className="value-with-tooltip">
                   <span className="value">
-                    <span className={`confidence-badge confidence-${_getConfidenceLabel(node.confidence || 0).toLowerCase().replace(' ', '-')}`}>
-                      {Math.round((node.confidence || 0) * 100)}% ({_getConfidenceLabel(node.confidence || 0)})
+                    <span
+                      className={`confidence-badge confidence-${_getConfidenceLabel(
+                        node.confidence || 0
+                      )
+                        .toLowerCase()
+                        .replace(' ', '-')}`}
+                    >
+                      {Math.round((node.confidence || 0) * 100)}% (
+                      {_getConfidenceLabel(node.confidence || 0)})
                     </span>
                   </span>
                   <div className="tooltip">
-                    <img src="/src/assets/info.svg" alt="info" className="tooltip-icon" />
+                    <img
+                      src="/src/assets/info.svg"
+                      alt="info"
+                      className="tooltip-icon"
+                    />
                     <div className="tooltip-content">
-                      How certain the AI is about this classification. Higher percentages mean the AI is more confident this is correctly identified.
+                      How certain the AI is about this classification. Higher
+                      percentages mean the AI is more confident this is
+                      correctly identified.
                     </div>
                   </div>
                 </div>
@@ -94,12 +121,21 @@ const NodeDetailsModal: React.FC<NodeDetailsModalProps> = ({
                 <span className="label">Source Columns:</span>
                 <div className="value-with-tooltip">
                   <span className="value">
-                    {Array.isArray(node.metadata?.sourceColumns) ? node.metadata.sourceColumns.length : 0} columns
+                    {Array.isArray(node.metadata?.sourceColumns)
+                      ? node.metadata.sourceColumns.length
+                      : 0}{' '}
+                    columns
                   </span>
                   <div className="tooltip">
-                    <img src="/src/assets/info.svg" alt="info" className="tooltip-icon" />
+                    <img
+                      src="/src/assets/info.svg"
+                      alt="info"
+                      className="tooltip-icon"
+                    />
                     <div className="tooltip-content">
-                      The specific columns in your CSV file where this entity was found. Shows which data columns the AI analyzed to identify this concept.
+                      The specific columns in your CSV file where this entity
+                      was found. Shows which data columns the AI analyzed to
+                      identify this concept.
                     </div>
                   </div>
                 </div>
@@ -108,15 +144,21 @@ const NodeDetailsModal: React.FC<NodeDetailsModalProps> = ({
                 <span className="label">Source Value:</span>
                 <div className="value-with-tooltip">
                   <span className="value">
-                    {node.metadata?.sourceValue && node.metadata.sourceValue !== 'N/A' 
+                    {node.metadata?.sourceValue &&
+                    node.metadata.sourceValue !== 'N/A'
                       ? safeString(node.metadata.sourceValue)
-                      : 'Not available - entity extracted from column structure'
-                    }
+                      : 'Not available - entity extracted from column structure'}
                   </span>
                   <div className="tooltip">
-                    <img src="/src/assets/info.svg" alt="info" className="tooltip-icon" />
+                    <img
+                      src="/src/assets/info.svg"
+                      alt="info"
+                      className="tooltip-icon"
+                    />
                     <div className="tooltip-content">
-                      An example actual value from your data that the AI used to identify this entity. Shows what the data looks like in practice.
+                      An example actual value from your data that the AI used to
+                      identify this entity. Shows what the data looks like in
+                      practice.
                     </div>
                   </div>
                 </div>
@@ -124,11 +166,19 @@ const NodeDetailsModal: React.FC<NodeDetailsModalProps> = ({
               <div className="info-item">
                 <span className="label">Source File:</span>
                 <div className="value-with-tooltip">
-                  <span className="value">{safeString(node.metadata?.sourceFile || 'Unknown')}</span>
+                  <span className="value">
+                    {safeString(node.metadata?.sourceFile || 'Unknown')}
+                  </span>
                   <div className="tooltip">
-                    <img src="/src/assets/info.svg" alt="info" className="tooltip-icon" />
+                    <img
+                      src="/src/assets/info.svg"
+                      alt="info"
+                      className="tooltip-icon"
+                    />
                     <div className="tooltip-content">
-                      The original CSV file where this entity was discovered. Shows which file the AI analyzed to identify this data concept.
+                      The original CSV file where this entity was discovered.
+                      Shows which file the AI analyzed to identify this data
+                      concept.
                     </div>
                   </div>
                 </div>
@@ -138,9 +188,15 @@ const NodeDetailsModal: React.FC<NodeDetailsModalProps> = ({
                 <div className="value-with-tooltip">
                   <span className="value">{safeString(node.id)}</span>
                   <div className="tooltip">
-                    <img src="/src/assets/info.svg" alt="info" className="tooltip-icon" />
+                    <img
+                      src="/src/assets/info.svg"
+                      alt="info"
+                      className="tooltip-icon"
+                    />
                     <div className="tooltip-content">
-                      A unique identifier for this entity in the system. Used internally to track and reference this specific data concept.
+                      A unique identifier for this entity in the system. Used
+                      internally to track and reference this specific data
+                      concept.
                     </div>
                   </div>
                 </div>
@@ -148,40 +204,56 @@ const NodeDetailsModal: React.FC<NodeDetailsModalProps> = ({
             </div>
           </div>
 
-          {Array.isArray(node.metadata?.sourceColumns) && node.metadata.sourceColumns.length > 0 && (
-            <div className="source-columns-section">
-              <div className="section-header-with-tooltip">
-                <h3>📋 Source Columns</h3>
-                <div className="tooltip">
-                  <img src="/src/assets/info.svg" alt="info" className="tooltip-icon" />
-                  <div className="tooltip-content">
-                    These are the actual column names from your CSV file where this entity was found. Click on any column to see more details about the data in that column.
+          {Array.isArray(node.metadata?.sourceColumns) &&
+            node.metadata.sourceColumns.length > 0 && (
+              <div className="source-columns-section">
+                <div className="section-header-with-tooltip">
+                  <h3>📋 Source Columns</h3>
+                  <div className="tooltip">
+                    <img
+                      src="/src/assets/info.svg"
+                      alt="info"
+                      className="tooltip-icon"
+                    />
+                    <div className="tooltip-content">
+                      These are the actual column names from your CSV file where
+                      this entity was found. Click on any column to see more
+                      details about the data in that column.
+                    </div>
                   </div>
                 </div>
+                <div className="source-columns-list">
+                  {Array.isArray(node.metadata.sourceColumns) &&
+                    node.metadata.sourceColumns.map(
+                      (column: string, index: number) => (
+                        <div key={index} className="source-column-item">
+                          <span className="column-name">{column}</span>
+                        </div>
+                      )
+                    )}
+                </div>
               </div>
-              <div className="source-columns-list">
-                {Array.isArray(node.metadata.sourceColumns) && node.metadata.sourceColumns.map((column: string, index: number) => (
-                  <div key={index} className="source-column-item">
-                    <span className="column-name">{column}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+            )}
 
-          {node.metadata?.attributes && typeof node.metadata.attributes === 'object' && Object.keys(node.metadata.attributes).length > 0 && (
-            <div className="attributes-section">
-              <h3>🔧 Entity Attributes</h3>
-              <div className="attributes-grid">
-                {Object.entries(node.metadata.attributes).map(([key, value]) => (
-                  <div key={key} className="attribute-item">
-                    <span className="attribute-key">{key}:</span>
-                    <span className="attribute-value">{safeString(value)}</span>
-                  </div>
-                ))}
+          {node.metadata?.attributes &&
+            typeof node.metadata.attributes === 'object' &&
+            Object.keys(node.metadata.attributes).length > 0 && (
+              <div className="attributes-section">
+                <h3>🔧 Entity Attributes</h3>
+                <div className="attributes-grid">
+                  {Object.entries(node.metadata.attributes).map(
+                    ([key, value]) => (
+                      <div key={key} className="attribute-item">
+                        <span className="attribute-key">{key}:</span>
+                        <span className="attribute-value">
+                          {safeString(value)}
+                        </span>
+                      </div>
+                    )
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {node.columns && Object.keys(node.columns).length > 0 && (
             <div className="columns-section">
@@ -275,14 +347,19 @@ const NodeDetailsModal: React.FC<NodeDetailsModalProps> = ({
             </div>
           )}
 
-          {(!Array.isArray(node.metadata?.sourceColumns) || node.metadata.sourceColumns.length === 0) && 
-           (!node.metadata?.attributes || Object.keys(node.metadata.attributes).length === 0) && 
-           (!node.columns || Object.keys(node.columns).length === 0) && (
-            <div className="no-metadata">
-              <p>⚠️ No detailed metadata available for this entity.</p>
-              <p>This entity was extracted from your data but doesn't have additional metadata stored in PostgreSQL.</p>
-            </div>
-          )}
+          {(!Array.isArray(node.metadata?.sourceColumns) ||
+            node.metadata.sourceColumns.length === 0) &&
+            (!node.metadata?.attributes ||
+              Object.keys(node.metadata.attributes).length === 0) &&
+            (!node.columns || Object.keys(node.columns).length === 0) && (
+              <div className="no-metadata">
+                <p>⚠️ No detailed metadata available for this entity.</p>
+                <p>
+                  This entity was extracted from your data but doesn't have
+                  additional metadata stored in PostgreSQL.
+                </p>
+              </div>
+            )}
         </div>
       </div>
     </div>

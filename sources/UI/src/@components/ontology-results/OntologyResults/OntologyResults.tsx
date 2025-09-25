@@ -1,6 +1,7 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { useState, useEffect } from 'react';
 import { ontologyAPI, apiUtils } from '@/services/api';
+import { recommendationAPI } from '@/services/recommendationService';
 import {
   Database,
   Download,
@@ -15,9 +16,16 @@ import {
   Relationship,
   PaginationState,
   FeedbackForm,
-  PaginatedResponse,
   FeedbackResponse,
 } from '@/types';
+import NodeRecommendationList, {
+  EnhancedNodeRecommendation,
+  NodeSelectionState,
+} from '@/@components/recommendation-modal/NodeRecommendations/NodeRecommendationList';
+import EdgeRecommendationList, {
+  EdgeSelectionState,
+  EnhancedEdgeRecommendation,
+} from '@/@components/recommendation-modal/EdgeRecommendations/EdgeRecommendationList';
 import './OntologyResults.scss';
 
 interface OntologyResultsProps {
@@ -49,6 +57,24 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
     confidence_delta: 0,
     user_id: 'current_user',
   });
+  const [recommendationSession, setRecommendationSession] = useState<{
+    node_recommendations: EnhancedNodeRecommendation[];
+    edge_recommendations: EnhancedEdgeRecommendation[];
+  } | null>(null);
+  const [recommendationsLoading, setRecommendationsLoading] =
+    useState<boolean>(false);
+  const [recommendationsError, setRecommendationsError] = useState<
+    string | null
+  >(null);
+  const [nodeSelections, setNodeSelections] = useState<
+    Record<string, NodeSelectionState>
+  >({});
+  const [edgeSelections, setEdgeSelections] = useState<
+    Record<string, EdgeSelectionState>
+  >({});
+  const [reviewNotes, setReviewNotes] = useState('');
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const [submittingDecision, setSubmittingDecision] = useState(false);
 
   const loadData = useCallback(
     async (type: 'entities' | 'relationships', reset = false) => {
@@ -95,6 +121,687 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
     },
     [taskId]
   );
+
+  const loadRecommendations = useCallback(async () => {
+    if (!taskId) {
+      return;
+    }
+
+    setRecommendationsLoading(true);
+    setRecommendationsError(null);
+    setFeedbackMessage(null);
+
+    try {
+      const session = await recommendationAPI.getRecommendations(taskId);
+      setRecommendationSession(session);
+
+      const nodeState: Record<string, NodeSelectionState> = {};
+      session.node_recommendations.forEach(node => {
+        nodeState[node.id] = {
+          approved: true,
+          finalName: node.name,
+          entityType: node.entityType,
+          confidence: node.confidence ?? 0.75,
+          sourceColumns: node.sourceColumns || [],
+          metadata: node.metadata || node.llmMetadata || {},
+          linkedEntityId: node.linkedEntityId,
+        };
+      });
+      setNodeSelections(nodeState);
+
+      const edgeState: Record<string, EdgeSelectionState> = {};
+      session.edge_recommendations.forEach(edge => {
+        edgeState[edge.id] = {
+          approved: true,
+          relationshipType: edge.relationshipType,
+          confidence: edge.confidence ?? 0.7,
+          metadata: edge.metadata || {},
+          reasoning: edge.reasoning,
+        };
+      });
+      setEdgeSelections(edgeState);
+      setReviewNotes('');
+    } catch (err: unknown) {
+      const maybeError = err as {
+        response?: { status?: number };
+        message?: string;
+      };
+      if (maybeError?.response?.status === 404) {
+        setRecommendationSession(null);
+        setNodeSelections({});
+        setEdgeSelections({});
+        setRecommendationsError(
+          'Recommendations are still being generated. Check back shortly.'
+        );
+      } else {
+        setRecommendationsError(
+          maybeError?.message || 'Failed to load recommendations'
+        );
+      }
+    } finally {
+      setRecommendationsLoading(false);
+    }
+  }, [taskId]);
+
+  const nodeLookup = useMemo(() => {
+    const map: Record<string, EnhancedNodeRecommendation> = {};
+    recommendationSession?.node_recommendations.forEach(node => {
+      map[node.id] = node;
+    });
+    return map;
+  }, [recommendationSession]);
+
+  const edgeLookup = useMemo(() => {
+    const map: Record<string, EnhancedEdgeRecommendation> = {};
+    recommendationSession?.edge_recommendations.forEach(edge => {
+      map[edge.id] = edge;
+    });
+    return map;
+  }, [recommendationSession]);
+
+  const selectedNodeCount = useMemo(
+    () =>
+      Object.values(nodeSelections).filter(selection => selection?.approved)
+        .length,
+    [nodeSelections]
+  );
+
+  const selectedEdgeCount = useMemo(
+    () =>
+      Object.values(edgeSelections).filter(selection => selection?.approved)
+        .length,
+    [edgeSelections]
+  );
+
+  const ensureNodeSelection = useCallback(
+    (nodeId: string): NodeSelectionState => {
+      const existing = nodeSelections[nodeId];
+      if (existing) {
+        return existing;
+      }
+      const node = nodeLookup[nodeId];
+      return {
+        approved: true,
+        finalName: node?.name || 'Suggested Node',
+        entityType: node?.entityType || 'unknown',
+        confidence: node?.confidence ?? 0.75,
+        sourceColumns: node?.sourceColumns || [],
+        metadata: node?.metadata || node?.llmMetadata || {},
+        linkedEntityId: node?.linkedEntityId,
+      };
+    },
+    [nodeSelections, nodeLookup]
+  );
+
+  const ensureEdgeSelection = useCallback(
+    (edgeId: string): EdgeSelectionState => {
+      const existing = edgeSelections[edgeId];
+      if (existing) {
+        return existing;
+      }
+      const edge = edgeLookup[edgeId];
+      return {
+        approved: true,
+        relationshipType: edge?.relationshipType || 'RELATED_TO',
+        confidence: edge?.confidence ?? 0.7,
+        metadata: edge?.metadata || {},
+        reasoning: edge?.reasoning,
+      };
+    },
+    [edgeSelections, edgeLookup]
+  );
+
+  const handleNodeToggle = useCallback(
+    (nodeId: string) => {
+      setNodeSelections(prev => {
+        const next = { ...prev };
+        const selection = ensureNodeSelection(nodeId);
+        next[nodeId] = {
+          ...selection,
+          approved: !selection.approved,
+          decision: undefined,
+        };
+        return next;
+      });
+    },
+    [ensureNodeSelection]
+  );
+
+  const handleNodeSelectionUpdate = useCallback(
+    (nodeId: string, update: Partial<NodeSelectionState>) => {
+      setNodeSelections(prev => ({
+        ...prev,
+        [nodeId]: {
+          ...ensureNodeSelection(nodeId),
+          ...update,
+        },
+      }));
+    },
+    [ensureNodeSelection]
+  );
+
+  const handleSelectAllNodes = useCallback(() => {
+    setNodeSelections(prev => {
+      const updated: Record<string, NodeSelectionState> = { ...prev };
+      Object.keys(nodeLookup).forEach(nodeId => {
+        updated[nodeId] = {
+          ...ensureNodeSelection(nodeId),
+          approved: true,
+          decision: undefined,
+        };
+      });
+      return updated;
+    });
+  }, [ensureNodeSelection, nodeLookup]);
+
+  const handleDeselectAllNodes = useCallback(() => {
+    setNodeSelections(prev => {
+      const updated: Record<string, NodeSelectionState> = { ...prev };
+      Object.keys(nodeLookup).forEach(nodeId => {
+        updated[nodeId] = {
+          ...ensureNodeSelection(nodeId),
+          approved: false,
+          decision: undefined,
+        };
+      });
+      return updated;
+    });
+  }, [ensureNodeSelection, nodeLookup]);
+
+  const handleEdgeToggle = useCallback(
+    (edgeId: string) => {
+      setEdgeSelections(prev => {
+        const next = { ...prev };
+        const selection = ensureEdgeSelection(edgeId);
+        next[edgeId] = {
+          ...selection,
+          approved: !selection.approved,
+          decision: undefined,
+        };
+        return next;
+      });
+    },
+    [ensureEdgeSelection]
+  );
+
+  const handleEdgeSelectionUpdate = useCallback(
+    (edgeId: string, update: Partial<EdgeSelectionState>) => {
+      setEdgeSelections(prev => ({
+        ...prev,
+        [edgeId]: {
+          ...ensureEdgeSelection(edgeId),
+          ...update,
+        },
+      }));
+    },
+    [ensureEdgeSelection]
+  );
+
+  const handleSelectAllEdges = useCallback(() => {
+    setEdgeSelections(prev => {
+      const updated: Record<string, EdgeSelectionState> = { ...prev };
+      Object.keys(edgeLookup).forEach(edgeId => {
+        updated[edgeId] = {
+          ...ensureEdgeSelection(edgeId),
+          approved: true,
+          decision: undefined,
+        };
+      });
+      return updated;
+    });
+  }, [ensureEdgeSelection, edgeLookup]);
+
+  const handleDeselectAllEdges = useCallback(() => {
+    setEdgeSelections(prev => {
+      const updated: Record<string, EdgeSelectionState> = { ...prev };
+      Object.keys(edgeLookup).forEach(edgeId => {
+        updated[edgeId] = {
+          ...ensureEdgeSelection(edgeId),
+          approved: false,
+          decision: undefined,
+        };
+      });
+      return updated;
+    });
+  }, [ensureEdgeSelection, edgeLookup]);
+
+  const applySelectedNodesToEntities = useCallback(() => {
+    if (!recommendationSession) {
+      return;
+    }
+
+    const linkedMap = new Map<string, NodeSelectionState>();
+    const nodeMap = new Map<string, NodeSelectionState>();
+    const nameMap = new Map<string, NodeSelectionState>();
+
+    Object.entries(nodeSelections).forEach(([nodeId, selection]) => {
+      if (!selection?.approved) {
+        return;
+      }
+      if (selection.linkedEntityId) {
+        linkedMap.set(String(selection.linkedEntityId), selection);
+      }
+      nodeMap.set(nodeId, selection);
+      nameMap.set(selection.finalName.toLowerCase(), selection);
+    });
+
+    setEntities(prevEntities =>
+      prevEntities.map(entity => {
+        const entityId = entity.id ? String(entity.id) : undefined;
+        const appliedSelection =
+          (entityId && linkedMap.get(entityId)) ||
+          (entityId && nodeMap.get(entityId)) ||
+          nameMap.get(entity.name.toLowerCase());
+
+        if (!appliedSelection) {
+          return entity;
+        }
+
+        return {
+          ...entity,
+          name: appliedSelection.finalName,
+          entity_type:
+            appliedSelection.entityType || entity.entity_type || 'unknown',
+          confidence:
+            typeof appliedSelection.confidence === 'number'
+              ? appliedSelection.confidence
+              : entity.confidence,
+          source_columns: appliedSelection.sourceColumns?.length
+            ? appliedSelection.sourceColumns
+            : entity.source_columns,
+          attributes: {
+            ...(entity.attributes || {}),
+            ...(appliedSelection.metadata?.attributes || {}),
+          },
+        };
+      })
+    );
+
+    setFeedbackMessage('Applied selected node names to the preview list.');
+  }, [nodeSelections, recommendationSession]);
+
+  const applySelectedEdgesToRelationships = useCallback(() => {
+    if (!recommendationSession) {
+      return;
+    }
+
+    const approvedEdges = Object.entries(edgeSelections).filter(
+      ([, selection]) => selection?.approved
+    );
+
+    if (approvedEdges.length === 0) {
+      return;
+    }
+
+    setRelationships(prevRelationships => {
+      const next = [...prevRelationships];
+
+      approvedEdges.forEach(([edgeId, selection]) => {
+        const edgeInfo = edgeLookup[edgeId];
+        if (!edgeInfo || !selection) {
+          return;
+        }
+
+        const updated: Relationship = {
+          id: edgeInfo.id,
+          relationship_type: selection.relationshipType,
+          confidence:
+            typeof selection.confidence === 'number'
+              ? selection.confidence
+              : (edgeInfo.confidence ?? 0.7),
+          source_entity_id: edgeInfo.sourceNodeId,
+          target_entity_id: edgeInfo.targetNodeId,
+          attributes: {
+            ...(edgeInfo.metadata || {}),
+            ...(selection.metadata || {}),
+          },
+        };
+
+        const existingIndex = next.findIndex(
+          relationship => relationship.id === edgeInfo.id
+        );
+
+        if (existingIndex >= 0) {
+          next[existingIndex] = {
+            ...next[existingIndex],
+            ...updated,
+            attributes: {
+              ...(next[existingIndex].attributes || {}),
+              ...(updated.attributes || {}),
+            },
+          };
+        } else {
+          next.push(updated);
+        }
+      });
+
+      return next;
+    });
+
+    setFeedbackMessage(
+      'Applied selected edge recommendations to the preview list.'
+    );
+  }, [edgeLookup, edgeSelections, recommendationSession]);
+
+  const buildNodeFeedbackPayload = useCallback(
+    (
+      entries: Array<[string, NodeSelectionState]>,
+      decision: 'approved' | 'rejected'
+    ) => {
+      const results = entries
+        .map(([nodeId, selection]) => {
+          if (!selection) {
+            return null;
+          }
+          const detail = nodeLookup[nodeId];
+          const selectionMetadata = (selection.metadata || {}) as Record<
+            string,
+            any
+          >;
+          const llmMetadata = (detail?.llmMetadata || detail?.metadata || {}) as Record<
+            string,
+            any
+          >;
+          const linkedEntityId =
+            selection.linkedEntityId ||
+            llmMetadata?.human_feedback?.entity_id ||
+            selectionMetadata?.human_feedback?.entity_id ||
+            detail?.linkedEntityId;
+          const attributes =
+            selectionMetadata?.attributes || llmMetadata?.attributes || {};
+
+          return {
+            id: nodeId,
+            finalName: selection.finalName,
+            name: selection.finalName,
+            entityType: selection.entityType,
+            confidence: selection.confidence,
+            sourceColumns: selection.sourceColumns,
+            linkedEntityId,
+            approved: decision === 'approved',
+            decision,
+            metadata: {
+              ...llmMetadata,
+              ...selectionMetadata,
+              original_entity_name: detail?.name,
+              human_feedback: {
+                entity_id: linkedEntityId,
+                attributes,
+                notes: reviewNotes || undefined,
+              },
+              llm_metadata: llmMetadata,
+            },
+          };
+        })
+        .filter(Boolean) as Array<Record<string, unknown>>;
+
+      return results;
+    },
+    [nodeLookup, reviewNotes]
+  );
+
+  const buildEdgeFeedbackPayload = useCallback(
+    (
+      entries: Array<[string, EdgeSelectionState]>,
+      decision: 'approved' | 'rejected'
+    ) => {
+      const results = entries
+        .map(([edgeId, selection]) => {
+          if (!selection) {
+            return null;
+          }
+          const detail = edgeLookup[edgeId];
+          return {
+            id: edgeId,
+            relationshipType: selection.relationshipType,
+            confidence: selection.confidence,
+            approved: decision === 'approved',
+            decision,
+            metadata: {
+              ...(selection.metadata || {}),
+              reasoning: selection.reasoning || detail?.reasoning,
+            },
+            sourceNodeId: detail?.sourceNodeId,
+            targetNodeId: detail?.targetNodeId,
+            sourceEntityId:
+              (selection.metadata || {}).sourceEntityId || detail?.sourceNodeId,
+            targetEntityId:
+              (selection.metadata || {}).targetEntityId || detail?.targetNodeId,
+          };
+        })
+        .filter(Boolean) as Array<Record<string, unknown>>;
+
+      return results;
+    },
+    [edgeLookup]
+  );
+
+  const submitRecommendationDecision = useCallback(
+    async (
+      approved: boolean,
+      overrides?: {
+        nodes?: Array<[string, NodeSelectionState]>;
+        edges?: Array<[string, EdgeSelectionState]>;
+        decision?: 'approved' | 'rejected';
+        successMessage?: string;
+      }
+    ) => {
+      if (!recommendationSession) {
+        return;
+      }
+
+      const decision = overrides?.decision ?? (approved ? 'approved' : 'rejected');
+      const nodeEntries =
+        overrides?.nodes ||
+        (decision === 'approved'
+          ? Object.entries(nodeSelections).filter(
+              ([, selection]) => selection?.approved
+            )
+          : Object.entries(nodeSelections));
+      const edgeEntries =
+        overrides?.edges ||
+        (decision === 'approved'
+          ? Object.entries(edgeSelections).filter(
+              ([, selection]) => selection?.approved
+            )
+          : Object.entries(edgeSelections));
+
+      if (decision === 'approved' && nodeEntries.length === 0 && edgeEntries.length === 0) {
+        setFeedbackMessage('Select at least one recommendation to approve.');
+        return;
+      }
+
+      setSubmittingDecision(true);
+      setFeedbackMessage(null);
+
+      const payload = {
+        approved: decision === 'approved',
+        notes: reviewNotes || undefined,
+        items: {
+          nodes: buildNodeFeedbackPayload(nodeEntries, decision),
+          edges: buildEdgeFeedbackPayload(edgeEntries, decision),
+        },
+      };
+
+      try {
+        await recommendationAPI.submitRecommendationFeedback(taskId, payload);
+
+        if (nodeEntries.length > 0) {
+          setNodeSelections(prev => {
+            const next = { ...prev };
+            nodeEntries.forEach(([nodeId]) => {
+              const current = next[nodeId] || ensureNodeSelection(nodeId);
+              next[nodeId] = {
+                ...current,
+                approved: decision === 'approved',
+                decision,
+              };
+            });
+            return next;
+          });
+        }
+
+        if (edgeEntries.length > 0) {
+          setEdgeSelections(prev => {
+            const next = { ...prev };
+            edgeEntries.forEach(([edgeId]) => {
+              const current = next[edgeId] || ensureEdgeSelection(edgeId);
+              next[edgeId] = {
+                ...current,
+                approved: decision === 'approved',
+                decision,
+              };
+            });
+            return next;
+          });
+        }
+
+        setFeedbackMessage(
+          overrides?.successMessage ||
+            (decision === 'approved'
+              ? 'Submitted approved recommendations and pushed them to the graph.'
+              : 'Rejected the selected recommendations.')
+        );
+
+        onFeedbackSubmitted({
+          success: true,
+          message:
+            decision === 'approved'
+              ? 'recommendations-approved'
+              : 'recommendations-rejected',
+        });
+      } catch (err: unknown) {
+        const maybeError = err as { message?: string };
+        setFeedbackMessage(
+          maybeError?.message || 'Failed to submit recommendation feedback.'
+        );
+      } finally {
+        setSubmittingDecision(false);
+      }
+    },
+    [
+      recommendationSession,
+      nodeSelections,
+      edgeSelections,
+      buildNodeFeedbackPayload,
+      buildEdgeFeedbackPayload,
+      reviewNotes,
+      taskId,
+      onFeedbackSubmitted,
+      ensureNodeSelection,
+      ensureEdgeSelection,
+    ]
+  );
+
+  const handleApproveSelectedNodes = useCallback(async () => {
+    const selectedEntries = Object.entries(nodeSelections).filter(
+      ([, selection]) => selection?.approved
+    );
+
+    if (selectedEntries.length === 0) {
+      setFeedbackMessage('Select at least one node recommendation to approve.');
+      return;
+    }
+
+    await submitRecommendationDecision(true, {
+      nodes: selectedEntries,
+      decision: 'approved',
+      successMessage:
+        'Submitted node approvals and saved them to the knowledge graph.',
+    });
+  }, [nodeSelections, submitRecommendationDecision]);
+
+  const handleRejectAllNodes = useCallback(async () => {
+    if (Object.keys(nodeSelections).length === 0) {
+      setFeedbackMessage('No node recommendations to reject.');
+      return;
+    }
+
+    const updatedEntries = Object.entries(nodeSelections).map(
+      ([nodeId, selection]) =>
+        [
+          nodeId,
+          {
+            ...ensureNodeSelection(nodeId),
+            ...selection,
+            approved: false,
+            decision: 'rejected' as const,
+          },
+        ] as [string, NodeSelectionState]
+    );
+
+    const updatedMap: Record<string, NodeSelectionState> = {};
+    updatedEntries.forEach(([nodeId, selection]) => {
+      updatedMap[nodeId] = selection;
+    });
+    setNodeSelections(updatedMap);
+
+    await submitRecommendationDecision(false, {
+      nodes: updatedEntries,
+      decision: 'rejected',
+      successMessage: 'Rejected all node recommendations.',
+    });
+  }, [
+    nodeSelections,
+    ensureNodeSelection,
+    submitRecommendationDecision,
+  ]);
+
+  const handleApproveSelectedEdges = useCallback(async () => {
+    const selectedEntries = Object.entries(edgeSelections).filter(
+      ([, selection]) => selection?.approved
+    );
+
+    if (selectedEntries.length === 0) {
+      setFeedbackMessage(
+        'Select at least one relationship recommendation to approve.'
+      );
+      return;
+    }
+
+    await submitRecommendationDecision(true, {
+      edges: selectedEntries,
+      decision: 'approved',
+      successMessage:
+        'Submitted relationship approvals and saved them to the knowledge graph.',
+    });
+  }, [edgeSelections, submitRecommendationDecision]);
+
+  const handleRejectAllEdges = useCallback(async () => {
+    if (Object.keys(edgeSelections).length === 0) {
+      setFeedbackMessage('No relationship recommendations to reject.');
+      return;
+    }
+
+    const updatedEntries = Object.entries(edgeSelections).map(
+      ([edgeId, selection]) =>
+        [
+          edgeId,
+          {
+            ...ensureEdgeSelection(edgeId),
+            ...selection,
+            approved: false,
+            decision: 'rejected' as const,
+          },
+        ] as [string, EdgeSelectionState]
+    );
+
+    const updatedMap: Record<string, EdgeSelectionState> = {};
+    updatedEntries.forEach(([edgeId, selection]) => {
+      updatedMap[edgeId] = selection;
+    });
+    setEdgeSelections(updatedMap);
+
+    await submitRecommendationDecision(false, {
+      edges: updatedEntries,
+      decision: 'rejected',
+      successMessage: 'Rejected all relationship recommendations.',
+    });
+  }, [
+    edgeSelections,
+    ensureEdgeSelection,
+    submitRecommendationDecision,
+  ]);
 
   const handleFeedbackSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,6 +871,19 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
   };
 
   useEffect(() => {
+    if (
+      recommendationsError &&
+      recommendationsError.toLowerCase().includes('still being generated')
+    ) {
+      const timer = setTimeout(() => {
+        loadRecommendations();
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [recommendationsError, loadRecommendations]);
+
+  useEffect(() => {
     if (!taskId) return;
 
     const loadInitialData = async () => {
@@ -192,6 +912,8 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
             total: relationshipsData.total || 0,
           },
         });
+
+        await loadRecommendations();
       } catch (error: unknown) {
         const errorMessage =
           error instanceof Error ? error.message : 'An unknown error occurred';
@@ -202,7 +924,7 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
     };
 
     loadInitialData();
-  }, [taskId]);
+  }, [taskId, loadRecommendations]);
 
   return (
     <div className="ontology-results">
@@ -220,7 +942,10 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
           </button>
 
           <button
-            onClick={() => loadData(activeTab, true)}
+            onClick={() => {
+              loadData(activeTab, true);
+              loadRecommendations();
+            }}
             className="refresh-button"
           >
             <RefreshCw size={16} />
@@ -259,88 +984,262 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
 
         {activeTab === 'entities' && (
           <div className="entities-section">
-            <div className="section-header">
-              <h3>Extracted Entities</h3>
-              <span className="count">{entities.length} entities found</span>
-            </div>
-
-            <div className="entities-list">
-              {entities.map((entity, index) => (
-                <div key={entity.id || index} className="entity-item">
-                  <div className="entity-header">
-                    <h4>{entity.name}</h4>
-                    <div
-                      className="confidence-badge"
-                      style={{
-                        backgroundColor: apiUtils.getConfidenceColor(
-                          entity.confidence
-                        ),
-                      }}
-                    >
-                      {apiUtils.formatConfidence(entity.confidence)}
-                    </div>
+            {(recommendationsLoading ||
+              recommendationSession ||
+              recommendationsError) && (
+              <div className="recommendations-panel">
+                <div className="recommendations-header">
+                  <div>
+                    <h3>LLM Node Recommendations</h3>
+                    <p className="recommendations-subtitle">
+                      Curate suggested node names and apply them directly to the
+                      extracted entities.
+                    </p>
                   </div>
-
-                  <div className="entity-details">
-                    <div className="detail-item">
-                      <strong>Type:</strong> {entity.entity_type}
-                    </div>
-                    {entity.source_columns && entity.source_columns.length > 0 && (
-                      <div className="detail-item">
-                        <strong>Source Columns:</strong> {entity.source_columns.join(', ')}
-                      </div>
-                    )}
-                    {entity.attributes &&
-                      Object.keys(entity.attributes).length > 0 && (
-                        <div className="detail-item">
-                          <strong>Attributes:</strong>
-                          <ul className="attributes-list">
-                            {Object.entries(entity.attributes).map(
-                              ([key, value]) => (
-                                <li key={key}>
-                                  <strong>{key}:</strong> {String(value)}
-                                </li>
-                              )
-                            )}
-                          </ul>
-                        </div>
-                      )}
-                  </div>
-
-                  <div className="entity-actions">
+                  <div className="recommendations-actions">
                     <button
-                      className="feedback-button positive"
-                      onClick={() =>
-                        setFeedbackForm(prev => ({
-                          ...prev,
-                          entity_id: entity.id,
-                        }))
+                      className="button-secondary"
+                      onClick={handleSelectAllNodes}
+                      disabled={
+                        !recommendationSession || recommendationsLoading
                       }
                     >
-                      <ThumbsUp size={16} />
+                      Select All
                     </button>
-
                     <button
-                      className="feedback-button negative"
-                      onClick={() =>
-                        setFeedbackForm(prev => ({
-                          ...prev,
-                          entity_id: entity.id,
-                          feedback_type: 'negative',
-                        }))
+                      className="button-secondary"
+                      onClick={handleDeselectAllNodes}
+                      disabled={
+                        !recommendationSession || recommendationsLoading
                       }
                     >
-                      <ThumbsDown size={16} />
+                      Clear
+                    </button>
+                    <button
+                      className="button-muted"
+                      onClick={applySelectedNodesToEntities}
+                      disabled={
+                        !recommendationSession || selectedNodeCount === 0
+                      }
+                    >
+                      Apply Selected Names
+                    </button>
+                    <button
+                      className="button-primary"
+                      onClick={handleApproveSelectedNodes}
+                      disabled={
+                        submittingDecision ||
+                        !recommendationSession ||
+                        selectedNodeCount === 0
+                      }
+                    >
+                      <ThumbsUp size={16} /> Approve Selected
+                    </button>
+                    <button
+                      className="button-danger"
+                      onClick={handleRejectAllNodes}
+                      disabled={submittingDecision || !recommendationSession}
+                    >
+                      <ThumbsDown size={16} /> Reject All
                     </button>
                   </div>
                 </div>
-              ))}
+
+                {recommendationsLoading && (
+                  <div className="recommendations-status">
+                    Loading recommendations...
+                  </div>
+                )}
+
+                {recommendationsError && (
+                  <div className="recommendations-status error">
+                    {recommendationsError}
+                  </div>
+                )}
+
+                {feedbackMessage && (
+                  <div className="recommendations-status notice">
+                    {feedbackMessage}
+                  </div>
+                )}
+
+                {recommendationSession && !recommendationsLoading && (
+                  <>
+                    <div className="recommendations-body">
+                      <NodeRecommendationList
+                        recommendations={
+                          recommendationSession.node_recommendations
+                        }
+                        selections={nodeSelections}
+                        onNodeToggle={handleNodeToggle}
+                        onUpdateSelection={handleNodeSelectionUpdate}
+                        onSelectAll={handleSelectAllNodes}
+                        onDeselectAll={handleDeselectAllNodes}
+                      />
+                    </div>
+
+                    <div className="review-notes">
+                      <label htmlFor="recommendation-notes">
+                        Decision notes (optional)
+                      </label>
+                      <textarea
+                        id="recommendation-notes"
+                        rows={3}
+                        value={reviewNotes}
+                        onChange={event => setReviewNotes(event.target.value)}
+                        placeholder="Document why you approved or adjusted these recommendations..."
+                      />
+                    </div>
+                    <div className="selection-summary">
+                      {selectedNodeCount} of{' '}
+                      {recommendationSession.node_recommendations.length} node
+                      suggestions selected
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            <div className="entities-summary">
+              <h3>Entity Snapshot</h3>
+              <span className="count">{entities.length} tracked</span>
+
+              <div className="compact-entity-list">
+                {entities.map((entity, index) => (
+                  <div key={entity.id || index} className="compact-entity-item">
+                    <div className="compact-entity-heading">
+                      <span className="compact-entity-name">{entity.name}</span>
+                      <span
+                        className="compact-confidence"
+                        style={{
+                          backgroundColor: apiUtils.getConfidenceColor(
+                            entity.confidence
+                          ),
+                        }}
+                      >
+                        {apiUtils.formatConfidence(entity.confidence)}
+                      </span>
+                    </div>
+                    <div className="compact-entity-body">
+                      <span className="entity-chip">{entity.entity_type}</span>
+                      {(entity.source_columns || []).slice(0, 3).map(column => (
+                        <span key={column} className="entity-chip light">
+                          {column}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
 
         {activeTab === 'relationships' && (
           <div className="relationships-section">
+            {(recommendationsLoading ||
+              (recommendationSession?.edge_recommendations?.length ?? 0) > 0 ||
+              recommendationsError) && (
+              <div className="recommendations-panel">
+                <div className="recommendations-header">
+                  <div>
+                    <h3>LLM Relationship Recommendations</h3>
+                    <p className="recommendations-subtitle">
+                      Review suggested edges between the proposed nodes and
+                      incorporate them into the graph.
+                    </p>
+                  </div>
+                  <div className="recommendations-actions">
+                    <button
+                      className="button-secondary"
+                      onClick={handleSelectAllEdges}
+                      disabled={
+                        !recommendationSession || recommendationsLoading
+                      }
+                    >
+                      Select All
+                    </button>
+                    <button
+                      className="button-secondary"
+                      onClick={handleDeselectAllEdges}
+                      disabled={
+                        !recommendationSession || recommendationsLoading
+                      }
+                    >
+                      Clear
+                    </button>
+                    <button
+                      className="button-muted"
+                      onClick={applySelectedEdgesToRelationships}
+                      disabled={
+                        !recommendationSession || selectedEdgeCount === 0
+                      }
+                    >
+                      Apply Selected Edges
+                    </button>
+                    <button
+                      className="button-primary"
+                      onClick={handleApproveSelectedEdges}
+                      disabled={
+                        submittingDecision ||
+                        !recommendationSession ||
+                        selectedEdgeCount === 0
+                      }
+                    >
+                      <ThumbsUp size={16} /> Approve Selected
+                    </button>
+                    <button
+                      className="button-danger"
+                      onClick={handleRejectAllEdges}
+                      disabled={submittingDecision || !recommendationSession}
+                    >
+                      <ThumbsDown size={16} /> Reject All
+                    </button>
+                  </div>
+                </div>
+
+                {recommendationsLoading && (
+                  <div className="recommendations-status">
+                    Loading recommendations...
+                  </div>
+                )}
+
+                {recommendationsError && (
+                  <div className="recommendations-status error">
+                    {recommendationsError}
+                  </div>
+                )}
+
+                {feedbackMessage && (
+                  <div className="recommendations-status notice">
+                    {feedbackMessage}
+                  </div>
+                )}
+
+                {recommendationSession && !recommendationsLoading && (
+                  <>
+                    <div className="recommendations-body">
+                      <EdgeRecommendationList
+                        recommendations={
+                          recommendationSession.edge_recommendations
+                        }
+                        selections={edgeSelections}
+                        onEdgeToggle={handleEdgeToggle}
+                        onUpdateSelection={handleEdgeSelectionUpdate}
+                        onSelectAll={handleSelectAllEdges}
+                        onDeselectAll={handleDeselectAllEdges}
+                      />
+                    </div>
+                    <div className="selection-summary">
+                      {selectedEdgeCount} of{' '}
+                      {recommendationSession.edge_recommendations.length} edge
+                      suggestions selected
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
             <div className="section-header">
               <h3>Discovered Relationships</h3>
               <span className="count">

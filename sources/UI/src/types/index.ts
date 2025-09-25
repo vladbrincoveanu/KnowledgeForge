@@ -16,8 +16,8 @@ export interface Relationship {
   id?: string;
   source_entity_id?: string;
   target_entity_id?: string;
-  source_entity?: string;  // Entity name
-  target_entity?: string;  // Entity name
+  source_entity?: string; // Entity name
+  target_entity?: string; // Entity name
   relationship_type: string;
   confidence: number;
   source_columns?: string[];
@@ -76,6 +76,7 @@ export interface GraphNode {
     uploadDate?: string;
     [key: string]: unknown;
   };
+  llmMetadata?: Record<string, unknown>;
   columns?: Record<string, unknown>;
 }
 
@@ -89,16 +90,12 @@ export interface GraphLink {
   target_collection?: string;
   source_column?: string;
   target_column?: string;
-  columnA?: string;
-  columnB?: string;
-  confidence_score?: number;
-  llm_analysis?: LLMAnalysis;
-  connection_type?: string;
   type?: string;
   created_at?: string;
   createdAt?: string;
   merged_metadata?: unknown;
   mergedMetadata?: unknown;
+  metadata?: Record<string, unknown>;
   join_strategy?: string;
 }
 
@@ -193,36 +190,6 @@ export interface UploadedFile {
   size: number;
   rowCount: number;
   type: string;
-}
-
-// LLM Analysis interface
-export interface LLMAnalysis {
-  reasoning: string;
-  business_context: string;
-  connection_type?: string;
-  suggested_join_strategy?: string;
-  potential_issues?: string[];
-  recommendations?: string[];
-  confidence_level?: 'High' | 'Medium' | 'Low';
-}
-
-// Connection interface
-export interface Connection {
-  id?: string;
-  fileA: string;
-  fileB: string;
-  columnA: string;
-  columnB: string;
-  confidence: number;
-  confidence_score?: number;
-  ai_score?: number;
-  source_collection?: string;
-  target_collection?: string;
-  source_column?: string;
-  target_column?: string;
-  connection_type?: string;
-  llmAnalysis?: LLMAnalysis;
-  llm_analysis?: LLMAnalysis;
 }
 
 // Chart data interfaces
