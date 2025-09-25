@@ -44,7 +44,8 @@ export const recommendationAPI = {
 
     const normalizeNode = (node: any): NodeRecommendation => {
       const llmMetadata = node.llm_metadata || node.metadata || {};
-      const sourceColumns = node.source_columns || llmMetadata.source_columns || [];
+      const sourceColumns =
+        node.source_columns || llmMetadata.source_columns || [];
       const candidateEntities = llmMetadata.candidate_entities || [];
       const linkedEntityId =
         node.linked_entity_id ||

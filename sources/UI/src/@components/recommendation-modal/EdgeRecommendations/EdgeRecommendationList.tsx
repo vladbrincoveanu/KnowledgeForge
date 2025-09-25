@@ -17,13 +17,17 @@ export interface EdgeSelectionState {
   confidence: number;
   metadata: Record<string, any>;
   reasoning?: string;
+  decision?: 'approved' | 'rejected' | 'pending';
 }
 
 interface EdgeRecommendationListProps {
   recommendations: EnhancedEdgeRecommendation[];
   selections: Record<string, EdgeSelectionState>;
   onEdgeToggle: (edgeId: string) => void;
-  onUpdateSelection: (edgeId: string, update: Partial<EdgeSelectionState>) => void;
+  onUpdateSelection: (
+    edgeId: string,
+    update: Partial<EdgeSelectionState>
+  ) => void;
   onSelectAll: () => void;
   onDeselectAll: () => void;
 }
@@ -36,7 +40,9 @@ const EdgeRecommendationList: React.FC<EdgeRecommendationListProps> = ({
   onSelectAll,
   onDeselectAll,
 }) => {
-  const selectedCount = Object.values(selections).filter(sel => sel?.approved).length;
+  const selectedCount = Object.values(selections).filter(
+    sel => sel?.approved
+  ).length;
 
   return (
     <div className="edge-recommendation-list">

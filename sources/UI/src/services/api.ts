@@ -33,8 +33,8 @@ interface Relationship {
   id?: string;
   source_entity_id?: string;
   target_entity_id?: string;
-  source_entity?: string;  // Entity name
-  target_entity?: string;  // Entity name
+  source_entity?: string; // Entity name
+  target_entity?: string; // Entity name
   relationship_type: string;
   confidence: number;
   source_columns?: string[];
@@ -283,24 +283,21 @@ export const ontologyAPI = {
 
   // Get system metrics
   getMetrics: async (): Promise<SystemMetrics> => {
-    const response: AxiosResponse<SystemMetrics> = await api.get(
-      '/v1/health/metrics'
-    );
+    const response: AxiosResponse<SystemMetrics> =
+      await api.get('/v1/health/metrics');
     return response.data;
   },
 
   // Health check
   healthCheck: async (): Promise<HealthStatus> => {
-    const response: AxiosResponse<HealthStatus> =
-      await api.get('/v1/health/');
+    const response: AxiosResponse<HealthStatus> = await api.get('/v1/health/');
     return response.data;
   },
 
   // Readiness check
   readinessCheck: async (): Promise<HealthStatus> => {
-    const response: AxiosResponse<HealthStatus> = await api.get(
-      '/v1/health/ready'
-    );
+    const response: AxiosResponse<HealthStatus> =
+      await api.get('/v1/health/ready');
     return response.data;
   },
 };
@@ -411,9 +408,10 @@ export class WebSocketService {
       }
 
       // Use direct WebSocket connection to backend since proxy doesn't handle WebSocket
-      const wsUrl = API_BASE_URL === '/api' 
-        ? 'ws://localhost:8000/ws' 
-        : API_BASE_URL.replace('http', 'ws') + '/ws';
+      const wsUrl =
+        API_BASE_URL === '/api'
+          ? 'ws://localhost:8000/ws'
+          : API_BASE_URL.replace('http', 'ws') + '/ws';
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {

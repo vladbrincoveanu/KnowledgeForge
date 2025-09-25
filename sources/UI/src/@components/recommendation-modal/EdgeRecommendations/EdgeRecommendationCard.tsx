@@ -8,7 +8,10 @@ interface EdgeRecommendationCardProps {
   recommendation: EnhancedEdgeRecommendation;
   selection: EdgeSelectionState | undefined;
   onToggle: (edgeId: string) => void;
-  onUpdateSelection: (edgeId: string, update: Partial<EdgeSelectionState>) => void;
+  onUpdateSelection: (
+    edgeId: string,
+    update: Partial<EdgeSelectionState>
+  ) => void;
 }
 
 const EdgeRecommendationCard: React.FC<EdgeRecommendationCardProps> = ({
@@ -122,7 +125,9 @@ const EdgeRecommendationCard: React.FC<EdgeRecommendationCardProps> = ({
             {Object.entries(connectionEvidence).map(([key, value]) => (
               <li key={key}>
                 <strong>{key.replace(/_/g, ' ')}:</strong>{' '}
-                {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                {typeof value === 'object'
+                  ? JSON.stringify(value)
+                  : String(value)}
               </li>
             ))}
             {Object.keys(connectionEvidence).length === 0 && (

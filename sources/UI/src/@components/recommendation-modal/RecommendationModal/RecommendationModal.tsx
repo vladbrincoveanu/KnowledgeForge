@@ -61,8 +61,7 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
                 entityType: node.entityType,
                 confidence: node.confidence ?? 0.75,
                 sourceColumns: node.sourceColumns || [],
-                metadata:
-                  node.metadata || node.llmMetadata || {},
+                metadata: node.metadata || node.llmMetadata || {},
                 linkedEntityId: node.linkedEntityId,
               };
             });
@@ -301,7 +300,8 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
                       [nodeId]: {
                         ...(prev[nodeId] ?? {
                           approved: true,
-                          finalName: nodeLookup[nodeId]?.name || 'Untitled node',
+                          finalName:
+                            nodeLookup[nodeId]?.name || 'Untitled node',
                           entityType:
                             nodeLookup[nodeId]?.entityType || 'unknown',
                           confidence: nodeLookup[nodeId]?.confidence || 0.75,
@@ -345,7 +345,9 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
                   onDeselectAll={handleDeselectAllEdges}
                 />
                 <div className="review-notes">
-                  <label htmlFor="review-notes">Decision notes (optional)</label>
+                  <label htmlFor="review-notes">
+                    Decision notes (optional)
+                  </label>
                   <textarea
                     id="review-notes"
                     rows={3}

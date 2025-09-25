@@ -23,13 +23,17 @@ export interface NodeSelectionState {
   sourceColumns: string[];
   metadata: Record<string, any>;
   linkedEntityId?: string;
+  decision?: 'approved' | 'rejected' | 'pending';
 }
 
 interface NodeRecommendationListProps {
   recommendations: EnhancedNodeRecommendation[];
   selections: Record<string, NodeSelectionState>;
   onNodeToggle: (nodeId: string) => void;
-  onUpdateSelection: (nodeId: string, update: Partial<NodeSelectionState>) => void;
+  onUpdateSelection: (
+    nodeId: string,
+    update: Partial<NodeSelectionState>
+  ) => void;
   onSelectAll: () => void;
   onDeselectAll: () => void;
 }
@@ -50,23 +54,23 @@ const NodeRecommendationList: React.FC<NodeRecommendationListProps> = ({
   const handleAddCustomNode = () => {
     if (customNodeName.trim()) {
       const customNodeId = `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
+
       const customSelection: NodeSelectionState = {
         approved: true,
         finalName: customNodeName.trim(),
         entityType: customNodeType,
         confidence: 1.0,
         sourceColumns: [],
-        metadata: { 
+        metadata: {
           custom: true,
           created_at: new Date().toISOString(),
-          user_created: true
+          user_created: true,
         },
       };
 
       // Add the custom selection
       onUpdateSelection(customNodeId, customSelection);
-      
+
       // Reset form
       setCustomNodeName('');
       setCustomNodeType('categorical');
@@ -84,10 +88,12 @@ const NodeRecommendationList: React.FC<NodeRecommendationListProps> = ({
     setEditingNodes(newEditingNodes);
   };
 
-  const approvedCount = Object.values(selections).filter(sel => sel?.approved).length;
+  const approvedCount = Object.values(selections).filter(
+    sel => sel?.approved
+  ).length;
   const totalCount = recommendations.length;
-  const customNodesCount = Object.entries(selections).filter(([id, sel]) => 
-    sel?.metadata?.custom && sel?.approved
+  const customNodesCount = Object.entries(selections).filter(
+    ([, sel]) => sel?.metadata?.custom && sel?.approved
   ).length;
 
   const handleCancelCustom = () => {
@@ -106,15 +112,17 @@ const NodeRecommendationList: React.FC<NodeRecommendationListProps> = ({
             <span className="stat-badge primary">{totalCount} Generated</span>
             <span className="stat-badge success">{approvedCount} Approved</span>
             {customNodesCount > 0 && (
-              <span className="stat-badge custom">{customNodesCount} Custom</span>
+              <span className="stat-badge custom">
+                {customNodesCount} Custom
+              </span>
             )}
           </div>
         </div>
 
         <div className="list-controls">
           <div className="bulk-actions">
-            <button 
-              onClick={onSelectAll} 
+            <button
+              onClick={onSelectAll}
               className="control-btn success"
               title="Approve all recommendations"
               disabled={totalCount === 0}
@@ -122,8 +130,8 @@ const NodeRecommendationList: React.FC<NodeRecommendationListProps> = ({
               <Check size={14} />
               All
             </button>
-            <button 
-              onClick={onDeselectAll} 
+            <button
+              onClick={onDeselectAll}
               className="control-btn danger"
               title="Decline all recommendations"
               disabled={totalCount === 0}
@@ -133,7 +141,7 @@ const NodeRecommendationList: React.FC<NodeRecommendationListProps> = ({
             </button>
           </div>
 
-          <button 
+          <button
             className="add-custom-btn primary"
             onClick={() => setShowAddCustom(!showAddCustom)}
             title="Add custom node recommendation"
@@ -152,10 +160,12 @@ const NodeRecommendationList: React.FC<NodeRecommendationListProps> = ({
             </div>
             <div className="custom-title">
               <h4>Add Custom Node</h4>
-              <p>Create a manual entity recommendation with your preferred naming</p>
+              <p>
+                Create a manual entity recommendation with your preferred naming
+              </p>
             </div>
           </div>
-          
+
           <div className="add-custom-form">
             <div className="form-grid">
               <div className="form-group">
@@ -164,23 +174,23 @@ const NodeRecommendationList: React.FC<NodeRecommendationListProps> = ({
                   id="customNodeName"
                   type="text"
                   value={customNodeName}
-                  onChange={(e) => setCustomNodeName(e.target.value)}
+                  onChange={e => setCustomNodeName(e.target.value)}
                   placeholder="e.g., Customer ID, Product Name..."
                   className="custom-name-input"
-                  onKeyDown={(e) => {
+                  onKeyDown={e => {
                     if (e.key === 'Enter') handleAddCustomNode();
                     if (e.key === 'Escape') handleCancelCustom();
                   }}
                   autoFocus
                 />
               </div>
-              
+
               <div className="form-group">
                 <label htmlFor="customNodeType">Entity Type</label>
                 <select
                   id="customNodeType"
                   value={customNodeType}
-                  onChange={(e) => setCustomNodeType(e.target.value)}
+                  onChange={e => setCustomNodeType(e.target.value)}
                   className="custom-type-select"
                 >
                   <option value="categorical">📊 Categorical</option>
@@ -192,12 +202,9 @@ const NodeRecommendationList: React.FC<NodeRecommendationListProps> = ({
                 </select>
               </div>
             </div>
-            
+
             <div className="form-actions">
-              <button
-                className="cancel-btn"
-                onClick={handleCancelCustom}
-              >
+              <button className="cancel-btn" onClick={handleCancelCustom}>
                 Cancel
               </button>
               <button
@@ -219,10 +226,11 @@ const NodeRecommendationList: React.FC<NodeRecommendationListProps> = ({
             <Sparkles size={48} className="empty-icon" />
             <h3>No Automatic Recommendations</h3>
             <p>
-              The system didn't generate any automatic node recommendations for this dataset. 
-              You can manually create custom nodes using the button above.
+              The system didn't generate any automatic node recommendations for
+              this dataset. You can manually create custom nodes using the
+              button above.
             </p>
-            <button 
+            <button
               className="empty-action-btn"
               onClick={() => setShowAddCustom(true)}
             >
@@ -233,7 +241,7 @@ const NodeRecommendationList: React.FC<NodeRecommendationListProps> = ({
         </div>
       ) : (
         <div className="recommendations-container">
-          {recommendations.map((recommendation) => {
+          {recommendations.map(recommendation => {
             const selection = selections[recommendation.id];
             if (!selection) return null;
 
@@ -249,10 +257,13 @@ const NodeRecommendationList: React.FC<NodeRecommendationListProps> = ({
               />
             );
           })}
-          
+
           {/* Show custom nodes that aren't in recommendations */}
           {Object.entries(selections)
-            .filter(([id, sel]) => sel?.metadata?.custom && !recommendations.find(r => r.id === id))
+            .filter(
+              ([id, sel]) =>
+                sel?.metadata?.custom && !recommendations.find(r => r.id === id)
+            )
             .map(([customId, selection]) => {
               // Create a fake recommendation for custom nodes
               const customRecommendation: EnhancedNodeRecommendation = {
@@ -262,7 +273,7 @@ const NodeRecommendationList: React.FC<NodeRecommendationListProps> = ({
                 confidence: selection.confidence,
                 reasoning: 'Custom node created by user',
                 sourceColumns: selection.sourceColumns,
-                metadata: { ...selection.metadata, custom: true }
+                metadata: { ...selection.metadata, custom: true },
               };
 
               return (
@@ -280,12 +291,17 @@ const NodeRecommendationList: React.FC<NodeRecommendationListProps> = ({
         </div>
       )}
 
-      {(totalCount > 0 || Object.keys(selections).some(id => selections[id]?.metadata?.custom)) && (
+      {(totalCount > 0 ||
+        Object.keys(selections).some(
+          id => selections[id]?.metadata?.custom
+        )) && (
         <div className="list-summary">
           <div className="summary-stats">
             <div className="summary-item">
               <span className="summary-label">Total Nodes:</span>
-              <span className="summary-value">{totalCount + customNodesCount}</span>
+              <span className="summary-value">
+                {totalCount + customNodesCount}
+              </span>
             </div>
             <div className="summary-item">
               <span className="summary-label">Approved:</span>

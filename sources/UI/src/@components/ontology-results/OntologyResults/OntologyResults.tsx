@@ -63,9 +63,9 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
   } | null>(null);
   const [recommendationsLoading, setRecommendationsLoading] =
     useState<boolean>(false);
-  const [recommendationsError, setRecommendationsError] = useState<string | null>(
-    null
-  );
+  const [recommendationsError, setRecommendationsError] = useState<
+    string | null
+  >(null);
   const [nodeSelections, setNodeSelections] = useState<
     Record<string, NodeSelectionState>
   >({});
@@ -162,12 +162,17 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
       setEdgeSelections(edgeState);
       setReviewNotes('');
     } catch (err: unknown) {
-      const maybeError = err as { response?: { status?: number }; message?: string };
+      const maybeError = err as {
+        response?: { status?: number };
+        message?: string;
+      };
       if (maybeError?.response?.status === 404) {
         setRecommendationSession(null);
         setNodeSelections({});
         setEdgeSelections({});
-        setRecommendationsError('Recommendations are still being generated. Check back shortly.');
+        setRecommendationsError(
+          'Recommendations are still being generated. Check back shortly.'
+        );
       } else {
         setRecommendationsError(
           maybeError?.message || 'Failed to load recommendations'
@@ -196,13 +201,15 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
 
   const selectedNodeCount = useMemo(
     () =>
-      Object.values(nodeSelections).filter(selection => selection?.approved).length,
+      Object.values(nodeSelections).filter(selection => selection?.approved)
+        .length,
     [nodeSelections]
   );
 
   const selectedEdgeCount = useMemo(
     () =>
-      Object.values(edgeSelections).filter(selection => selection?.approved).length,
+      Object.values(edgeSelections).filter(selection => selection?.approved)
+        .length,
     [edgeSelections]
   );
 
@@ -249,7 +256,11 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
       setNodeSelections(prev => {
         const next = { ...prev };
         const selection = ensureNodeSelection(nodeId);
-        next[nodeId] = { ...selection, approved: !selection.approved };
+        next[nodeId] = {
+          ...selection,
+          approved: !selection.approved,
+          decision: undefined,
+        };
         return next;
       });
     },
@@ -273,7 +284,11 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
     setNodeSelections(prev => {
       const updated: Record<string, NodeSelectionState> = { ...prev };
       Object.keys(nodeLookup).forEach(nodeId => {
-        updated[nodeId] = { ...ensureNodeSelection(nodeId), approved: true };
+        updated[nodeId] = {
+          ...ensureNodeSelection(nodeId),
+          approved: true,
+          decision: undefined,
+        };
       });
       return updated;
     });
@@ -283,7 +298,11 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
     setNodeSelections(prev => {
       const updated: Record<string, NodeSelectionState> = { ...prev };
       Object.keys(nodeLookup).forEach(nodeId => {
-        updated[nodeId] = { ...ensureNodeSelection(nodeId), approved: false };
+        updated[nodeId] = {
+          ...ensureNodeSelection(nodeId),
+          approved: false,
+          decision: undefined,
+        };
       });
       return updated;
     });
@@ -294,7 +313,11 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
       setEdgeSelections(prev => {
         const next = { ...prev };
         const selection = ensureEdgeSelection(edgeId);
-        next[edgeId] = { ...selection, approved: !selection.approved };
+        next[edgeId] = {
+          ...selection,
+          approved: !selection.approved,
+          decision: undefined,
+        };
         return next;
       });
     },
@@ -318,7 +341,11 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
     setEdgeSelections(prev => {
       const updated: Record<string, EdgeSelectionState> = { ...prev };
       Object.keys(edgeLookup).forEach(edgeId => {
-        updated[edgeId] = { ...ensureEdgeSelection(edgeId), approved: true };
+        updated[edgeId] = {
+          ...ensureEdgeSelection(edgeId),
+          approved: true,
+          decision: undefined,
+        };
       });
       return updated;
     });
@@ -328,7 +355,11 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
     setEdgeSelections(prev => {
       const updated: Record<string, EdgeSelectionState> = { ...prev };
       Object.keys(edgeLookup).forEach(edgeId => {
-        updated[edgeId] = { ...ensureEdgeSelection(edgeId), approved: false };
+        updated[edgeId] = {
+          ...ensureEdgeSelection(edgeId),
+          approved: false,
+          decision: undefined,
+        };
       });
       return updated;
     });
@@ -375,10 +406,9 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
             typeof appliedSelection.confidence === 'number'
               ? appliedSelection.confidence
               : entity.confidence,
-          source_columns:
-            appliedSelection.sourceColumns?.length
-              ? appliedSelection.sourceColumns
-              : entity.source_columns,
+          source_columns: appliedSelection.sourceColumns?.length
+            ? appliedSelection.sourceColumns
+            : entity.source_columns,
           attributes: {
             ...(entity.attributes || {}),
             ...(appliedSelection.metadata?.attributes || {}),
@@ -418,7 +448,7 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
           confidence:
             typeof selection.confidence === 'number'
               ? selection.confidence
-              : edgeInfo.confidence ?? 0.7,
+              : (edgeInfo.confidence ?? 0.7),
           source_entity_id: edgeInfo.sourceNodeId,
           target_entity_id: edgeInfo.targetNodeId,
           attributes: {
@@ -448,78 +478,198 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
       return next;
     });
 
-    setFeedbackMessage('Applied selected edge recommendations to the preview list.');
+    setFeedbackMessage(
+      'Applied selected edge recommendations to the preview list.'
+    );
   }, [edgeLookup, edgeSelections, recommendationSession]);
 
-  const buildApprovedNodesPayload = useCallback(() => {
-    return Object.entries(nodeSelections)
-      .filter(([, selection]) => selection?.approved)
-      .map(([nodeId, selection]) => {
-        const detail = nodeLookup[nodeId];
-        return {
-          id: nodeId,
-          name: selection.finalName,
-          entityType: selection.entityType,
-          confidence: selection.confidence,
-          sourceColumns: selection.sourceColumns,
-          linkedEntityId: selection.linkedEntityId,
-          metadata: {
-            ...(selection.metadata || {}),
-            llm_metadata: detail?.llmMetadata ?? detail?.metadata ?? {},
-            reasoning: detail?.reasoning,
-          },
-        };
-      });
-  }, [nodeSelections, nodeLookup]);
+  const buildNodeFeedbackPayload = useCallback(
+    (
+      entries: Array<[string, NodeSelectionState]>,
+      decision: 'approved' | 'rejected'
+    ) => {
+      const results = entries
+        .map(([nodeId, selection]) => {
+          if (!selection) {
+            return null;
+          }
+          const detail = nodeLookup[nodeId];
+          const selectionMetadata = (selection.metadata || {}) as Record<
+            string,
+            any
+          >;
+          const llmMetadata = (detail?.llmMetadata || detail?.metadata || {}) as Record<
+            string,
+            any
+          >;
+          const linkedEntityId =
+            selection.linkedEntityId ||
+            llmMetadata?.human_feedback?.entity_id ||
+            selectionMetadata?.human_feedback?.entity_id ||
+            detail?.linkedEntityId;
+          const attributes =
+            selectionMetadata?.attributes || llmMetadata?.attributes || {};
 
-  const buildApprovedEdgesPayload = useCallback(() => {
-    return Object.entries(edgeSelections)
-      .filter(([, selection]) => selection?.approved)
-      .map(([edgeId, selection]) => {
-        const detail = edgeLookup[edgeId];
-        return {
-          id: edgeId,
-          relationshipType: selection.relationshipType,
-          confidence: selection.confidence,
-          metadata: {
-            ...(selection.metadata || {}),
-            reasoning: selection.reasoning || detail?.reasoning,
-          },
-          sourceNodeId: detail?.sourceNodeId,
-          targetNodeId: detail?.targetNodeId,
-        };
-      });
-  }, [edgeSelections, edgeLookup]);
+          return {
+            id: nodeId,
+            finalName: selection.finalName,
+            name: selection.finalName,
+            entityType: selection.entityType,
+            confidence: selection.confidence,
+            sourceColumns: selection.sourceColumns,
+            linkedEntityId,
+            approved: decision === 'approved',
+            decision,
+            metadata: {
+              ...llmMetadata,
+              ...selectionMetadata,
+              original_entity_name: detail?.name,
+              human_feedback: {
+                entity_id: linkedEntityId,
+                attributes,
+                notes: reviewNotes || undefined,
+              },
+              llm_metadata: llmMetadata,
+            },
+          };
+        })
+        .filter(Boolean) as Array<Record<string, unknown>>;
+
+      return results;
+    },
+    [nodeLookup, reviewNotes]
+  );
+
+  const buildEdgeFeedbackPayload = useCallback(
+    (
+      entries: Array<[string, EdgeSelectionState]>,
+      decision: 'approved' | 'rejected'
+    ) => {
+      const results = entries
+        .map(([edgeId, selection]) => {
+          if (!selection) {
+            return null;
+          }
+          const detail = edgeLookup[edgeId];
+          return {
+            id: edgeId,
+            relationshipType: selection.relationshipType,
+            confidence: selection.confidence,
+            approved: decision === 'approved',
+            decision,
+            metadata: {
+              ...(selection.metadata || {}),
+              reasoning: selection.reasoning || detail?.reasoning,
+            },
+            sourceNodeId: detail?.sourceNodeId,
+            targetNodeId: detail?.targetNodeId,
+            sourceEntityId:
+              (selection.metadata || {}).sourceEntityId || detail?.sourceNodeId,
+            targetEntityId:
+              (selection.metadata || {}).targetEntityId || detail?.targetNodeId,
+          };
+        })
+        .filter(Boolean) as Array<Record<string, unknown>>;
+
+      return results;
+    },
+    [edgeLookup]
+  );
 
   const submitRecommendationDecision = useCallback(
-    async (approved: boolean) => {
+    async (
+      approved: boolean,
+      overrides?: {
+        nodes?: Array<[string, NodeSelectionState]>;
+        edges?: Array<[string, EdgeSelectionState]>;
+        decision?: 'approved' | 'rejected';
+        successMessage?: string;
+      }
+    ) => {
       if (!recommendationSession) {
+        return;
+      }
+
+      const decision = overrides?.decision ?? (approved ? 'approved' : 'rejected');
+      const nodeEntries =
+        overrides?.nodes ||
+        (decision === 'approved'
+          ? Object.entries(nodeSelections).filter(
+              ([, selection]) => selection?.approved
+            )
+          : Object.entries(nodeSelections));
+      const edgeEntries =
+        overrides?.edges ||
+        (decision === 'approved'
+          ? Object.entries(edgeSelections).filter(
+              ([, selection]) => selection?.approved
+            )
+          : Object.entries(edgeSelections));
+
+      if (decision === 'approved' && nodeEntries.length === 0 && edgeEntries.length === 0) {
+        setFeedbackMessage('Select at least one recommendation to approve.');
         return;
       }
 
       setSubmittingDecision(true);
       setFeedbackMessage(null);
 
-      const payload: Record<string, unknown> = {
-        approved,
+      const payload = {
+        approved: decision === 'approved',
         notes: reviewNotes || undefined,
+        items: {
+          nodes: buildNodeFeedbackPayload(nodeEntries, decision),
+          edges: buildEdgeFeedbackPayload(edgeEntries, decision),
+        },
       };
-
-      if (approved) {
-        payload.items = {
-          nodes: buildApprovedNodesPayload(),
-          edges: buildApprovedEdgesPayload(),
-        };
-      }
 
       try {
         await recommendationAPI.submitRecommendationFeedback(taskId, payload);
+
+        if (nodeEntries.length > 0) {
+          setNodeSelections(prev => {
+            const next = { ...prev };
+            nodeEntries.forEach(([nodeId]) => {
+              const current = next[nodeId] || ensureNodeSelection(nodeId);
+              next[nodeId] = {
+                ...current,
+                approved: decision === 'approved',
+                decision,
+              };
+            });
+            return next;
+          });
+        }
+
+        if (edgeEntries.length > 0) {
+          setEdgeSelections(prev => {
+            const next = { ...prev };
+            edgeEntries.forEach(([edgeId]) => {
+              const current = next[edgeId] || ensureEdgeSelection(edgeId);
+              next[edgeId] = {
+                ...current,
+                approved: decision === 'approved',
+                decision,
+              };
+            });
+            return next;
+          });
+        }
+
         setFeedbackMessage(
-          approved
-            ? 'Submitted approved recommendations to the pipeline.'
-            : 'Rejected recommendations. The pipeline will continue without them.'
+          overrides?.successMessage ||
+            (decision === 'approved'
+              ? 'Submitted approved recommendations and pushed them to the graph.'
+              : 'Rejected the selected recommendations.')
         );
-        onFeedbackSubmitted({ success: true, message: 'recommendations-submitted' });
+
+        onFeedbackSubmitted({
+          success: true,
+          message:
+            decision === 'approved'
+              ? 'recommendations-approved'
+              : 'recommendations-rejected',
+        });
       } catch (err: unknown) {
         const maybeError = err as { message?: string };
         setFeedbackMessage(
@@ -531,13 +681,127 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
     },
     [
       recommendationSession,
+      nodeSelections,
+      edgeSelections,
+      buildNodeFeedbackPayload,
+      buildEdgeFeedbackPayload,
       reviewNotes,
-      buildApprovedNodesPayload,
-      buildApprovedEdgesPayload,
       taskId,
       onFeedbackSubmitted,
+      ensureNodeSelection,
+      ensureEdgeSelection,
     ]
   );
+
+  const handleApproveSelectedNodes = useCallback(async () => {
+    const selectedEntries = Object.entries(nodeSelections).filter(
+      ([, selection]) => selection?.approved
+    );
+
+    if (selectedEntries.length === 0) {
+      setFeedbackMessage('Select at least one node recommendation to approve.');
+      return;
+    }
+
+    await submitRecommendationDecision(true, {
+      nodes: selectedEntries,
+      decision: 'approved',
+      successMessage:
+        'Submitted node approvals and saved them to the knowledge graph.',
+    });
+  }, [nodeSelections, submitRecommendationDecision]);
+
+  const handleRejectAllNodes = useCallback(async () => {
+    if (Object.keys(nodeSelections).length === 0) {
+      setFeedbackMessage('No node recommendations to reject.');
+      return;
+    }
+
+    const updatedEntries = Object.entries(nodeSelections).map(
+      ([nodeId, selection]) =>
+        [
+          nodeId,
+          {
+            ...ensureNodeSelection(nodeId),
+            ...selection,
+            approved: false,
+            decision: 'rejected' as const,
+          },
+        ] as [string, NodeSelectionState]
+    );
+
+    const updatedMap: Record<string, NodeSelectionState> = {};
+    updatedEntries.forEach(([nodeId, selection]) => {
+      updatedMap[nodeId] = selection;
+    });
+    setNodeSelections(updatedMap);
+
+    await submitRecommendationDecision(false, {
+      nodes: updatedEntries,
+      decision: 'rejected',
+      successMessage: 'Rejected all node recommendations.',
+    });
+  }, [
+    nodeSelections,
+    ensureNodeSelection,
+    submitRecommendationDecision,
+  ]);
+
+  const handleApproveSelectedEdges = useCallback(async () => {
+    const selectedEntries = Object.entries(edgeSelections).filter(
+      ([, selection]) => selection?.approved
+    );
+
+    if (selectedEntries.length === 0) {
+      setFeedbackMessage(
+        'Select at least one relationship recommendation to approve.'
+      );
+      return;
+    }
+
+    await submitRecommendationDecision(true, {
+      edges: selectedEntries,
+      decision: 'approved',
+      successMessage:
+        'Submitted relationship approvals and saved them to the knowledge graph.',
+    });
+  }, [edgeSelections, submitRecommendationDecision]);
+
+  const handleRejectAllEdges = useCallback(async () => {
+    if (Object.keys(edgeSelections).length === 0) {
+      setFeedbackMessage('No relationship recommendations to reject.');
+      return;
+    }
+
+    const updatedEntries = Object.entries(edgeSelections).map(
+      ([edgeId, selection]) =>
+        [
+          edgeId,
+          {
+            ...ensureEdgeSelection(edgeId),
+            ...selection,
+            approved: false,
+            decision: 'rejected' as const,
+          },
+        ] as [string, EdgeSelectionState]
+    );
+
+    const updatedMap: Record<string, EdgeSelectionState> = {};
+    updatedEntries.forEach(([edgeId, selection]) => {
+      updatedMap[edgeId] = selection;
+    });
+    setEdgeSelections(updatedMap);
+
+    await submitRecommendationDecision(false, {
+      edges: updatedEntries,
+      decision: 'rejected',
+      successMessage: 'Rejected all relationship recommendations.',
+    });
+  }, [
+    edgeSelections,
+    ensureEdgeSelection,
+    submitRecommendationDecision,
+  ]);
 
   const handleFeedbackSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -720,49 +984,60 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
 
         {activeTab === 'entities' && (
           <div className="entities-section">
-            {(recommendationsLoading || recommendationSession || recommendationsError) && (
+            {(recommendationsLoading ||
+              recommendationSession ||
+              recommendationsError) && (
               <div className="recommendations-panel">
                 <div className="recommendations-header">
                   <div>
                     <h3>LLM Node Recommendations</h3>
                     <p className="recommendations-subtitle">
-                      Curate suggested node names and apply them directly to the extracted entities.
+                      Curate suggested node names and apply them directly to the
+                      extracted entities.
                     </p>
                   </div>
                   <div className="recommendations-actions">
                     <button
                       className="button-secondary"
                       onClick={handleSelectAllNodes}
-                      disabled={!recommendationSession || recommendationsLoading}
+                      disabled={
+                        !recommendationSession || recommendationsLoading
+                      }
                     >
                       Select All
                     </button>
                     <button
                       className="button-secondary"
                       onClick={handleDeselectAllNodes}
-                      disabled={!recommendationSession || recommendationsLoading}
+                      disabled={
+                        !recommendationSession || recommendationsLoading
+                      }
                     >
                       Clear
                     </button>
                     <button
                       className="button-muted"
                       onClick={applySelectedNodesToEntities}
-                      disabled={!recommendationSession || selectedNodeCount === 0}
+                      disabled={
+                        !recommendationSession || selectedNodeCount === 0
+                      }
                     >
                       Apply Selected Names
                     </button>
                     <button
                       className="button-primary"
-                      onClick={() => submitRecommendationDecision(true)}
+                      onClick={handleApproveSelectedNodes}
                       disabled={
-                        submittingDecision || !recommendationSession || selectedNodeCount === 0
+                        submittingDecision ||
+                        !recommendationSession ||
+                        selectedNodeCount === 0
                       }
                     >
                       <ThumbsUp size={16} /> Approve Selected
                     </button>
                     <button
                       className="button-danger"
-                      onClick={() => submitRecommendationDecision(false)}
+                      onClick={handleRejectAllNodes}
                       disabled={submittingDecision || !recommendationSession}
                     >
                       <ThumbsDown size={16} /> Reject All
@@ -771,7 +1046,9 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
                 </div>
 
                 {recommendationsLoading && (
-                  <div className="recommendations-status">Loading recommendations...</div>
+                  <div className="recommendations-status">
+                    Loading recommendations...
+                  </div>
                 )}
 
                 {recommendationsError && (
@@ -781,14 +1058,18 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
                 )}
 
                 {feedbackMessage && (
-                  <div className="recommendations-status notice">{feedbackMessage}</div>
+                  <div className="recommendations-status notice">
+                    {feedbackMessage}
+                  </div>
                 )}
 
                 {recommendationSession && !recommendationsLoading && (
                   <>
                     <div className="recommendations-body">
                       <NodeRecommendationList
-                        recommendations={recommendationSession.node_recommendations}
+                        recommendations={
+                          recommendationSession.node_recommendations
+                        }
                         selections={nodeSelections}
                         onNodeToggle={handleNodeToggle}
                         onUpdateSelection={handleNodeSelectionUpdate}
@@ -864,43 +1145,52 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
                   <div>
                     <h3>LLM Relationship Recommendations</h3>
                     <p className="recommendations-subtitle">
-                      Review suggested edges between the proposed nodes and incorporate them into the graph.
+                      Review suggested edges between the proposed nodes and
+                      incorporate them into the graph.
                     </p>
                   </div>
                   <div className="recommendations-actions">
                     <button
                       className="button-secondary"
                       onClick={handleSelectAllEdges}
-                      disabled={!recommendationSession || recommendationsLoading}
+                      disabled={
+                        !recommendationSession || recommendationsLoading
+                      }
                     >
                       Select All
                     </button>
                     <button
                       className="button-secondary"
                       onClick={handleDeselectAllEdges}
-                      disabled={!recommendationSession || recommendationsLoading}
+                      disabled={
+                        !recommendationSession || recommendationsLoading
+                      }
                     >
                       Clear
                     </button>
                     <button
                       className="button-muted"
                       onClick={applySelectedEdgesToRelationships}
-                      disabled={!recommendationSession || selectedEdgeCount === 0}
+                      disabled={
+                        !recommendationSession || selectedEdgeCount === 0
+                      }
                     >
                       Apply Selected Edges
                     </button>
                     <button
                       className="button-primary"
-                      onClick={() => submitRecommendationDecision(true)}
+                      onClick={handleApproveSelectedEdges}
                       disabled={
-                        submittingDecision || !recommendationSession || selectedEdgeCount === 0
+                        submittingDecision ||
+                        !recommendationSession ||
+                        selectedEdgeCount === 0
                       }
                     >
                       <ThumbsUp size={16} /> Approve Selected
                     </button>
                     <button
                       className="button-danger"
-                      onClick={() => submitRecommendationDecision(false)}
+                      onClick={handleRejectAllEdges}
                       disabled={submittingDecision || !recommendationSession}
                     >
                       <ThumbsDown size={16} /> Reject All
@@ -909,7 +1199,9 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
                 </div>
 
                 {recommendationsLoading && (
-                  <div className="recommendations-status">Loading recommendations...</div>
+                  <div className="recommendations-status">
+                    Loading recommendations...
+                  </div>
                 )}
 
                 {recommendationsError && (
@@ -919,14 +1211,18 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
                 )}
 
                 {feedbackMessage && (
-                  <div className="recommendations-status notice">{feedbackMessage}</div>
+                  <div className="recommendations-status notice">
+                    {feedbackMessage}
+                  </div>
                 )}
 
                 {recommendationSession && !recommendationsLoading && (
                   <>
                     <div className="recommendations-body">
                       <EdgeRecommendationList
-                        recommendations={recommendationSession.edge_recommendations}
+                        recommendations={
+                          recommendationSession.edge_recommendations
+                        }
                         selections={edgeSelections}
                         onEdgeToggle={handleEdgeToggle}
                         onUpdateSelection={handleEdgeSelectionUpdate}

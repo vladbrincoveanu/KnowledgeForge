@@ -23,27 +23,29 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
   console.log('Graph links count:', data.links.length);
 
   // Validate data structure
-  const isValidData = data && Array.isArray(data.nodes) && Array.isArray(data.links);
+  const isValidData =
+    data && Array.isArray(data.nodes) && Array.isArray(data.links);
   console.log('Graph data is valid:', isValidData);
 
   // Debug: Check for orphaned links
   if (data.links && data.links.length > 0) {
     const nodeIds = new Set(data.nodes.map(n => n.id));
-    const orphanedLinks = data.links.filter(link => 
-      !nodeIds.has(link.source) || !nodeIds.has(link.target)
+    const orphanedLinks = data.links.filter(
+      link => !nodeIds.has(link.source) || !nodeIds.has(link.target)
     );
     if (orphanedLinks.length > 0) {
       console.warn('Found orphaned links:', orphanedLinks);
     }
-    
+
     // Log valid links
-    const validLinks = data.links.filter(link => 
-      nodeIds.has(link.source) && nodeIds.has(link.target)
+    const validLinks = data.links.filter(
+      link => nodeIds.has(link.source) && nodeIds.has(link.target)
     );
     console.log('Valid links for graph:', validLinks);
   }
 
-  const handleNodeClick = useCallback((node: GraphNode) => {9
+  const handleNodeClick = useCallback((node: GraphNode) => {
+    9;
     console.log('Clicked node:', node);
     // Clear edge selection when clicking on a node
     setSelectedEdge(null);
@@ -124,25 +126,37 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
             </span>
           )}
         </div>
-        
+
         <div className="graph-legend">
           <div className="legend-section">
             <h4>Link Confidence:</h4>
             <div className="legend-items">
               <div className="legend-item">
-                <span className="legend-color" style={{ backgroundColor: '#28a745' }}></span>
+                <span
+                  className="legend-color"
+                  style={{ backgroundColor: '#28a745' }}
+                ></span>
                 <span>High (&gt;=90%)</span>
               </div>
               <div className="legend-item">
-                <span className="legend-color" style={{ backgroundColor: '#fd7e14' }}></span>
+                <span
+                  className="legend-color"
+                  style={{ backgroundColor: '#fd7e14' }}
+                ></span>
                 <span>Medium (&gt;=70%)</span>
               </div>
               <div className="legend-item">
-                <span className="legend-color" style={{ backgroundColor: '#ffc107' }}></span>
+                <span
+                  className="legend-color"
+                  style={{ backgroundColor: '#ffc107' }}
+                ></span>
                 <span>Lower (&gt;=50%)</span>
               </div>
               <div className="legend-item">
-                <span className="legend-color" style={{ backgroundColor: '#dc3545' }}></span>
+                <span
+                  className="legend-color"
+                  style={{ backgroundColor: '#dc3545' }}
+                ></span>
                 <span>Low (&lt;50%)</span>
               </div>
             </div>
@@ -155,9 +169,12 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
           <div className="empty-graph">
             <div className="empty-icon">⚠️</div>
             <h4>Invalid Graph Data</h4>
-            <p>The graph data structure is invalid. Please check the console for details.</p>
+            <p>
+              The graph data structure is invalid. Please check the console for
+              details.
+            </p>
           </div>
-                ) : data.nodes.length > 0 ? (
+        ) : data.nodes.length > 0 ? (
           <ForceGraph2D
             ref={graphRef}
             graphData={{
@@ -165,45 +182,79 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
               links: data.links.filter(link => {
                 // ForceGraph2D might be converting string IDs to objects
                 // Let's ensure we're working with string IDs
-                const sourceId = typeof link.source === 'object' && link.source !== null ? (link.source as any).id : String(link.source);
-                const targetId = typeof link.target === 'object' && link.target !== null ? (link.target as any).id : String(link.target);
-                
+                const sourceId =
+                  typeof link.source === 'object' && link.source !== null
+                    ? (link.source as any).id
+                    : String(link.source);
+                const targetId =
+                  typeof link.target === 'object' && link.target !== null
+                    ? (link.target as any).id
+                    : String(link.target);
+
                 console.log('Checking link:', link);
-                console.log('Original source:', link.source, 'type:', typeof link.source);
-                console.log('Original target:', link.target, 'type:', typeof link.target);
+                console.log(
+                  'Original source:',
+                  link.source,
+                  'type:',
+                  typeof link.source
+                );
+                console.log(
+                  'Original target:',
+                  link.target,
+                  'type:',
+                  typeof link.target
+                );
                 console.log('Processed sourceId:', sourceId);
                 console.log('Processed targetId:', targetId);
-                
+
                 const sourceExists = data.nodes.some(node => {
                   const nodeId = String(node.id);
                   const matches = nodeId === sourceId;
-                  console.log('Comparing node ID:', nodeId, 'with sourceId:', sourceId, 'matches:', matches);
+                  console.log(
+                    'Comparing node ID:',
+                    nodeId,
+                    'with sourceId:',
+                    sourceId,
+                    'matches:',
+                    matches
+                  );
                   return matches;
                 });
                 const targetExists = data.nodes.some(node => {
                   const nodeId = String(node.id);
                   const matches = nodeId === targetId;
-                  console.log('Comparing node ID:', nodeId, 'with targetId:', targetId, 'matches:', matches);
+                  console.log(
+                    'Comparing node ID:',
+                    nodeId,
+                    'with targetId:',
+                    targetId,
+                    'matches:',
+                    matches
+                  );
                   return matches;
                 });
-                
+
                 const isValid = sourceExists && targetExists;
                 if (!isValid) {
                   console.warn(`Invalid link: ${sourceId} -> ${targetId}`);
-                  console.warn('Source exists:', sourceExists, 'Target exists:', targetExists);
+                  console.warn(
+                    'Source exists:',
+                    sourceExists,
+                    'Target exists:',
+                    targetExists
+                  );
                 } else {
                   console.log(`Valid link: ${sourceId} -> ${targetId}`);
                 }
                 return isValid;
-              })
+              }),
             }}
-            onLinkHover={(link) => {
+            onLinkHover={link => {
               console.log('Link hovered:', link);
             }}
-            onNodeHover={(node) => {
+            onNodeHover={node => {
               console.log('Node hovered:', node);
             }}
-
             nodeLabel={nodeLabel}
             linkLabel={linkLabel}
             nodeColor={nodeColor}
@@ -233,9 +284,17 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
           <div className="empty-graph">
             <div className="empty-icon">📊</div>
             <h4>No Graph Data Available</h4>
-            <p>Complete an ontology extraction to see the network graph visualization</p>
-            <p>This graph shows the same entities and relationships as the Ontology Results section</p>
-            <p>Current data: {data.nodes.length} nodes, {data.links.length} links</p>
+            <p>
+              Complete an ontology extraction to see the network graph
+              visualization
+            </p>
+            <p>
+              This graph shows the same entities and relationships as the
+              Ontology Results section
+            </p>
+            <p>
+              Current data: {data.nodes.length} nodes, {data.links.length} links
+            </p>
             <div className="empty-state-actions">
               <p>To get started:</p>
               <ol>
@@ -244,9 +303,16 @@ const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
                 <li>Wait for the extraction to complete</li>
                 <li>Return to this Graph View to see the results</li>
               </ol>
-              <p style={{ marginTop: '16px', fontSize: '12px', color: '#6c757d' }}>
-                <strong>Note:</strong> This view only shows data from your current session. 
-                If you want to see all data from previous extractions, use the "Load All Data from Database" button above.
+              <p
+                style={{
+                  marginTop: '16px',
+                  fontSize: '12px',
+                  color: '#6c757d',
+                }}
+              >
+                <strong>Note:</strong> This view only shows data from your
+                current session. If you want to see all data from previous
+                extractions, use the "Load All Data from Database" button above.
               </p>
             </div>
           </div>

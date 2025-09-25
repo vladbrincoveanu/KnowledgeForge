@@ -1,92 +1,45 @@
 .node-recommendation-card {
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 16px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 4px;
+  transition: all 0.2s ease;
   position: relative;
-  overflow: hidden;
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: linear-gradient(90deg, #6366f1, #8b5cf6, #ec4899);
-    opacity: 0;
-    transition: opacity 0.3s ease;
-  }
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
 
   &:hover {
-    border-color: #c7d2fe;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    transform: translateY(-2px);
-
-    &::before {
-      opacity: 1;
-    }
+    border-color: #cbd5e1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
 
-  &.approved {
-    border-color: #10b981;
-    background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%);
-
-    &::before {
-      background: linear-gradient(90deg, #10b981, #059669);
-      opacity: 1;
-    }
-  }
-
-  &.declined {
-    border-color: #ef4444;
-    background: linear-gradient(135deg, #fef2f2 0%, #fef2f2 100%);
-    opacity: 0.7;
-
-    &::before {
-      background: linear-gradient(90deg, #ef4444, #dc2626);
-      opacity: 1;
-    }
-  }
-
-  &.editing {
+  &.selected {
     border-color: #3b82f6;
-    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
-
-    &::before {
-      background: linear-gradient(90deg, #3b82f6, #2563eb);
-      opacity: 1;
-    }
-  }
-
-  .card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
   }
 
   .approval-toggle {
     display: flex;
-    gap: 8px;
+    gap: 4px;
+    flex-shrink: 0;
 
     .toggle-btn {
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 36px;
-      height: 36px;
-      border: 2px solid #e2e8f0;
-      border-radius: 8px;
+      width: 24px;
+      height: 24px;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
       background: white;
       cursor: pointer;
       transition: all 0.2s ease;
       color: #64748b;
 
       &:hover {
-        transform: scale(1.05);
         border-color: #cbd5e1;
       }
 
@@ -95,7 +48,6 @@
           background: #10b981;
           border-color: #10b981;
           color: white;
-          box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
         }
 
         &:hover:not(.active) {
@@ -104,12 +56,11 @@
         }
       }
 
-      &.decline {
+      &.reject {
         &.active {
           background: #ef4444;
           border-color: #ef4444;
           color: white;
-          box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
         }
 
         &:hover:not(.active) {
@@ -117,338 +68,289 @@
           color: #ef4444;
         }
       }
+
+      .icon {
+        font-size: 12px;
+      }
+    }
+  }
+
+  .entity-icon {
+    font-size: 16px;
+    color: #6366f1;
+    flex-shrink: 0;
+  }
+
+  .entity-info {
+    flex: 1;
+    min-width: 0;
+
+    .entity-name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 2px;
+
+      .entity-name-text {
+        font-size: 14px;
+        font-weight: 600;
+        color: #1f2937;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .entity-type-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 6px;
+        background: #f3f4f6;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 500;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        flex-shrink: 0;
+
+        .entity-icon {
+          font-size: 12px;
+        }
+      }
+    }
+
+    .entity-description {
+      font-size: 12px;
+      color: #6b7280;
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .source-columns {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+
+      strong {
+        color: #374151;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .column-chips {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+
+        .column-chip {
+          padding: 2px 6px;
+          background: #8b5cf6;
+          color: white;
+          border-radius: 8px;
+          font-size: 10px;
+          font-weight: 500;
+          white-space: nowrap;
+        }
+      }
     }
   }
 
   .confidence-indicator {
+    flex-shrink: 0;
+
     .confidence-bar {
-      padding: 6px 12px;
-      border-radius: 16px;
+      padding: 4px 8px;
+      border-radius: 12px;
       color: white;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
   }
 
-  .card-content {
-    .entity-info {
-      margin-bottom: 16px;
+  .card-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
 
-      .entity-type-badge {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 12px;
+    .action-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      background: white;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: #64748b;
 
-        .entity-icon {
-          font-size: 20px;
-        }
-
-        .entity-type-edit {
-          background: white;
-          border: 2px solid #e2e8f0;
-          border-radius: 6px;
-          padding: 4px 8px;
-          font-size: 12px;
-          color: #475569;
-          cursor: pointer;
-
-          &:focus {
-            outline: none;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-          }
-        }
-
-        .entity-type-text {
-          background: #f1f5f9;
-          color: #475569;
-          padding: 4px 8px;
-          border-radius: 6px;
-          font-size: 12px;
-          font-weight: 500;
-          text-transform: capitalize;
-        }
+      &:hover {
+        border-color: #cbd5e1;
+        color: #374151;
       }
 
-      .entity-name {
-        .name-edit-container {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-
-          .name-edit-input {
-            flex: 1;
-            font-size: 18px;
-            font-weight: 600;
-            background: white;
-            border: 2px solid #3b82f6;
-            border-radius: 8px;
-            padding: 8px 12px;
-            color: #1e293b;
-
-            &:focus {
-              outline: none;
-              box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-            }
-
-            &::placeholder {
-              color: #94a3b8;
-            }
-          }
-
-          .edit-actions {
-            display: flex;
-            gap: 4px;
-
-            .save-btn, .cancel-btn {
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              width: 28px;
-              height: 28px;
-              border: none;
-              border-radius: 6px;
-              cursor: pointer;
-              transition: all 0.2s ease;
-
-              &:disabled {
-                opacity: 0.5;
-                cursor: not-allowed;
-              }
-            }
-
-            .save-btn {
-              background: #10b981;
-              color: white;
-
-              &:hover:not(:disabled) {
-                background: #059669;
-                transform: scale(1.05);
-              }
-            }
-
-            .cancel-btn {
-              background: #ef4444;
-              color: white;
-
-              &:hover {
-                background: #dc2626;
-                transform: scale(1.05);
-              }
-            }
-          }
-        }
-
-        .name-display {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-
-          .entity-name-text {
-            font-size: 18px;
-            font-weight: 600;
-            color: #1e293b;
-            margin: 0;
-            flex: 1;
-          }
-
-          .edit-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 28px;
-            height: 28px;
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            cursor: pointer;
-            color: #64748b;
-            transition: all 0.2s ease;
-
-            &:hover {
-              background: #3b82f6;
-              border-color: #3b82f6;
-              color: white;
-              transform: scale(1.05);
-            }
-          }
-        }
+      .icon {
+        font-size: 14px;
       }
     }
+  }
+}
 
-    .recommendation-details {
-      .reasoning {
-        margin-bottom: 12px;
+// Panel-specific compact styles
+.recommendations-panel .node-recommendation-card {
+  padding: 6px 10px;
+  margin-bottom: 3px;
+  min-height: 40px;
+  gap: 8px;
 
-        p {
-          color: #64748b;
-          font-size: 14px;
-          line-height: 1.5;
-          margin: 0;
-          font-style: italic;
-        }
+  .approval-toggle .toggle-btn {
+    width: 20px;
+    height: 20px;
+
+    .icon {
+      font-size: 10px;
+    }
+  }
+
+  .entity-icon {
+    font-size: 14px;
+  }
+
+  .entity-info {
+    .entity-name .entity-name-text {
+      font-size: 13px;
+    }
+
+    .entity-description {
+      font-size: 11px;
+    }
+
+    .source-columns {
+      font-size: 10px;
+
+      .column-chips .column-chip {
+        font-size: 9px;
+        padding: 1px 4px;
       }
+    }
+  }
 
-      .source-columns {
-        margin-bottom: 12px;
+  .confidence-indicator .confidence-bar {
+    padding: 3px 6px;
+    font-size: 10px;
+  }
+
+  .card-actions .action-btn {
+    width: 24px;
+    height: 24px;
+
+    .icon {
+      font-size: 12px;
+    }
+  }
+}
+
+// Edit mode styles
+.node-recommendation-card.editing {
+  .entity-name-text {
+    background: #f9fafb;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 14px;
+    width: 100%;
+  }
+
+  .entity-type-select {
+    background: #f9fafb;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 11px;
+    color: #6b7280;
+  }
+}
+
+// Advanced details
+.advanced-details {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+
+  .metadata-section,
+  .selection-metadata {
+    margin-bottom: 12px;
+
+    h4 {
+      font-size: 12px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 6px;
+    }
+
+    .metadata-content {
+      background: #f9fafb;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      padding: 8px;
+      font-size: 10px;
+      color: #6b7280;
+      overflow-x: auto;
+      max-height: 120px;
+    }
+
+    .selection-info {
+      p {
+        font-size: 11px;
+        color: #6b7280;
+        margin: 2px 0;
 
         strong {
           color: #374151;
-          font-size: 12px;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          display: block;
-          margin-bottom: 6px;
-        }
-
-        .columns-tags {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 4px;
-
-          .column-tag {
-            background: #e0e7ff;
-            color: #3730a3;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 500;
-          }
-        }
-      }
-
-      .advanced-toggle {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        background: none;
-        border: none;
-        color: #6366f1;
-        font-size: 12px;
-        cursor: pointer;
-        padding: 4px 0;
-        margin: 8px 0;
-        transition: all 0.2s ease;
-
-        &:hover {
-          color: #4f46e5;
-        }
-
-        .rotated {
-          transform: rotate(180deg);
-        }
-      }
-
-      .advanced-details {
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 12px;
-        margin-top: 8px;
-
-        .metadata-section, .selection-metadata {
-          margin-bottom: 12px;
-
-          &:last-child {
-            margin-bottom: 0;
-          }
-
-          h4 {
-            color: #374151;
-            font-size: 12px;
-            font-weight: 600;
-            margin: 0 0 6px 0;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-          }
-
-          .metadata-content {
-            background: #1e293b;
-            color: #e2e8f0;
-            padding: 8px;
-            border-radius: 4px;
-            font-size: 10px;
-            overflow-x: auto;
-            margin: 0;
-          }
-
-          .selection-info {
-            p {
-              margin: 2px 0;
-              font-size: 11px;
-              color: #64748b;
-
-              strong {
-                color: #374151;
-              }
-            }
-          }
         }
       }
     }
   }
 }
 
-.recommendations-panel .node-recommendation-card {
-  padding: 14px 16px;
-  margin-bottom: 10px;
-  border-width: 1px;
-
-  .entity-name .name-edit-container .name-edit-input {
-    font-size: 16px;
-  }
-
-  .entity-type-badge {
-    margin-bottom: 8px;
-  }
-
-  .node-config {
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 8px;
-
-    .form-field label {
-      font-size: 0.7rem;
-    }
-  }
+// Rotated icon animation
+.rotated {
+  transform: rotate(180deg);
+  transition: transform 0.2s ease;
 }
 
-/* Animations */
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.node-recommendation-card {
-  animation: slideIn 0.3s ease-out;
-}
-
-/* Responsive Design */
+// Responsive adjustments
 @media (max-width: 768px) {
   .node-recommendation-card {
-    padding: 16px;
-    
-    .card-header {
-      flex-direction: column;
-      gap: 12px;
-      align-items: stretch;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    min-height: auto;
+    padding: 8px;
+
+    .entity-info {
+      width: 100%;
     }
-    
-    .approval-toggle {
-      justify-content: center;
-    }
-    
-    .entity-name .name-edit-container {
-      flex-direction: column;
-      gap: 8px;
+
+    .card-actions {
+      align-self: flex-end;
     }
   }
 }

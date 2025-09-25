@@ -72,7 +72,9 @@
     border-radius: 14px;
     padding: 1.25rem;
     margin-bottom: 1rem;
-    transition: border-color 0.25s ease, transform 0.2s ease;
+    transition:
+      border-color 0.25s ease,
+      transform 0.2s ease;
 
     &.selected {
       border-color: rgba(80, 190, 255, 0.65);

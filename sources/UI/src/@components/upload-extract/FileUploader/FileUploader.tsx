@@ -431,9 +431,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     <div className="file-uploader">
       <RecommendationModal
         isOpen={recommendationModal.isOpen}
-        onClose={() =>
-          setRecommendationModal({ isOpen: false, taskId: null })
-        }
+        onClose={() => setRecommendationModal({ isOpen: false, taskId: null })}
         onApprove={handleRecommendationApprove}
         onReject={handleRecommendationReject}
         taskId={recommendationModal.taskId || ''}
