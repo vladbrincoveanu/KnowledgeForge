@@ -1,0 +1,113 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36" version="26.1.1">
+  <diagram name="Page-1" id="VYCH7q5QvsUfqNMjW084">
+    <mxGraphModel dx="4104" dy="2736" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="12050" pageHeight="16050" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-41" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="209" y="375.5" width="759" height="297" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-3" value="Data sources" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="33" y="132" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-4" value="Schema building" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="247.5" y="132" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-5" value="Extraction" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="489.75" y="132" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-6" value="Human in the loop" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="758.25" y="132" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-7" value="Reinforcement Learning" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="1562" y="121" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-8" value="Evaluation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="2140" y="132" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-9" value="DBs: RDBMS" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;" vertex="1" parent="1">
+          <mxGeometry x="38.5" y="572" width="82.5" height="77" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-19" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.001;entryY=0.643;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="6irXq0x4EQZJR6hfVGo6-10" target="6irXq0x4EQZJR6hfVGo6-41">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-10" value="CSV" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="44" y="374" width="66" height="77" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-11" value="Text, pdf, etc." style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;" vertex="1" parent="1">
+          <mxGeometry x="44" y="473" width="66" height="77" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-12" value="Cloud" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="19.75" y="660" width="120" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-14" value="API" style="shape=xor;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="47" y="748" width="60" height="88" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="6irXq0x4EQZJR6hfVGo6-16" target="6irXq0x4EQZJR6hfVGo6-22">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="328" y="770" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-16" value="Register in&amp;nbsp;&lt;span style=&quot;color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255)); background-color: transparent;&quot;&gt;files table&lt;/span&gt;&lt;div&gt;&lt;ul&gt;&lt;li&gt;&lt;span style=&quot;color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255)); background-color: transparent;&quot;&gt;id (PK)&lt;/span&gt;&lt;/li&gt;&lt;li&gt;&lt;span style=&quot;color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255)); background-color: transparent;&quot;&gt;file_path&lt;/span&gt;&lt;/li&gt;&lt;li&gt;file_ name&lt;/li&gt;&lt;li&gt;file_size&lt;/li&gt;&lt;li&gt;file_type&lt;/li&gt;&lt;li&gt;checksum&lt;/li&gt;&lt;li&gt;upload_timestamp&lt;/li&gt;&lt;li&gt;processing_status&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255)); background-color: transparent;&quot;&gt;&lt;br&gt;&lt;/span&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="242" y="430.5" width="176" height="185.5" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-22" value="&lt;div&gt;&lt;br&gt;&lt;/div&gt;Extraction task tracking&lt;div&gt;&lt;ul&gt;&lt;li&gt;id&lt;/li&gt;&lt;li&gt;file_id&lt;/li&gt;&lt;li&gt;status&lt;/li&gt;&lt;li&gt;entities_count&lt;/li&gt;&lt;li&gt;relationships_count&lt;/li&gt;&lt;li&gt;started_at&lt;/li&gt;&lt;li&gt;error_message&lt;/li&gt;&lt;li&gt;metadata&lt;/li&gt;&lt;/ul&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;&lt;/div&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="484" y="430.5" width="187" height="187" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-23" value="Allign entities with metadata_store" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="2590" y="300" width="209" height="33" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-26" value="&lt;div&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;Human-in-the-loop feedback&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;ul&gt;&lt;li&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;id&lt;/span&gt;&lt;/li&gt;&lt;li&gt;entity_id&lt;/li&gt;&lt;li&gt;relationship_id&lt;/li&gt;&lt;li&gt;feedback_type&lt;/li&gt;&lt;li&gt;feedback_value&lt;/li&gt;&lt;li&gt;confidence_adjustment&lt;/li&gt;&lt;li&gt;user_id&lt;/li&gt;&lt;li&gt;feedback_source&lt;/li&gt;&lt;/ul&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;&lt;/div&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="723.5" y="429.75" width="189.5" height="187" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-27" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=default;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/Postgresql_elephant.svg/1163px-Postgresql_elephant.svg.png;" vertex="1" parent="1">
+          <mxGeometry x="902" y="384.15" width="55" height="56.7" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-30" value="&lt;div&gt;Data Profiling&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;Entity Extraction&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;Relationship&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;Discovery&amp;nbsp;&lt;/span&gt;&lt;/div&gt;" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="485" y="192" width="129.5" height="97" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-34" value="llm" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="485" y="707" width="44" height="33" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-37" value="&lt;br&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="209" y="759" width="1188" height="572" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-38" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=default;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://upload.wikimedia.org/wikipedia/commons/a/a5/Neo4j-logo2024color.png;" vertex="1" parent="1">
+          <mxGeometry x="231" y="1232" width="198" height="70.28" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-43" value="&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Entity node&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;ul&gt;&lt;li&gt;id&lt;/li&gt;&lt;li&gt;name&lt;/li&gt;&lt;li&gt;entity_type&lt;/li&gt;&lt;li&gt;confidence&lt;/li&gt;&lt;li&gt;source_columns&lt;/li&gt;&lt;li&gt;attributes&lt;/li&gt;&lt;li&gt;source_file&lt;/li&gt;&lt;li&gt;dataset&lt;/li&gt;&lt;li&gt;ontology_class&lt;/li&gt;&lt;li&gt;task_id&lt;/li&gt;&lt;li&gt;created_at&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="264" y="825" width="159.5" height="236" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-44" value="&lt;div&gt;Dataset node&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;ul&gt;&lt;li&gt;id&lt;/li&gt;&lt;li&gt;name&lt;/li&gt;&lt;li&gt;file_path&lt;/li&gt;&lt;li&gt;row_count&lt;/li&gt;&lt;li&gt;column_count&lt;/li&gt;&lt;li&gt;metadata&lt;/li&gt;&lt;li&gt;created_at&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="468.63" y="825" width="162.25" height="225" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-45" value="&lt;div&gt;Ontology node&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;ul&gt;&lt;li&gt;id&lt;/li&gt;&lt;li&gt;name&lt;/li&gt;&lt;li&gt;version&lt;/li&gt;&lt;li&gt;namespace&lt;/li&gt;&lt;li&gt;created_at&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="690.5" y="825" width="156.5" height="165" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-46" value="&lt;span style=&quot;background-color: transparent;&quot;&gt;RELATES_TO edge (entity → entity)&lt;/span&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;ul&gt;&lt;li&gt;id&lt;/li&gt;&lt;li&gt;type&lt;/li&gt;&lt;li&gt;confidence&lt;/li&gt;&lt;li&gt;evidence&lt;/li&gt;&lt;li&gt;discovery_method&lt;/li&gt;&lt;li&gt;created_at&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;BELONGS_TO edge (entity → dataset)&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;ul&gt;&lt;li&gt;created_at&lt;/li&gt;&lt;li&gt;extraction_method&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;CONFORMS_TO edge (entity → ontology)&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;ul&gt;&lt;li&gt;confidence&lt;/li&gt;&lt;li&gt;mapping_method&lt;/li&gt;&lt;li&gt;mapped_at&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;" style="whiteSpace=wrap;html=1;aspect=fixed;" vertex="1" parent="1">
+          <mxGeometry x="913" y="805.67" width="437.33" height="437.33" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-29" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="1" source="6irXq0x4EQZJR6hfVGo6-41" target="6irXq0x4EQZJR6hfVGo6-43">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="192.43" y="671" as="sourcePoint" />
+            <mxPoint x="165" y="803" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="561" y="671" />
+              <mxPoint x="561" y="781" />
+              <mxPoint x="344" y="781" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-47" value="Remove onotlogy node from neo4j" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="2590" y="322" width="209" height="33" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-50" value="TODOs" style="swimlane;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="2560" y="260" width="470" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="6irXq0x4EQZJR6hfVGo6-53" value="Research enterprise big data - dataset and create validation/benchmarking&amp;nbsp;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="6irXq0x4EQZJR6hfVGo6-50">
+          <mxGeometry x="30" y="94.15" width="420" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
