@@ -1,21 +1,43 @@
-import React, { useRef, useCallback, useState } from 'react';
+import React, { useRef, useCallback, useState, useEffect } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import EdgeDetailsModal from '../EdgeDetailsModal/EdgeDetailsModal';
 import NodeDetailsModal from '../NodeDetailsModal/NodeDetailsModal';
 import './Graph.scss';
 import { GraphData, GraphLink, GraphNode } from '../../../types';
+import { ontologyAPI } from '../../../services/api';
 
 interface GraphProps {
   data: GraphData;
   onEdgeClick?: (edge: GraphLink) => void;
+  activeTaskId: string | null;
+  onGraphUpdate: () => void;
 }
 
-const Graph: React.FC<GraphProps> = ({ data, onEdgeClick }) => {
+const Graph: React.FC<GraphProps> = ({ data, onEdgeClick, activeTaskId, onGraphUpdate }) => {
   const graphRef = useRef<any>();
   const [selectedEdge, setSelectedEdge] = useState<GraphLink | null>(null);
   const [showEdgeModal, setShowEdgeModal] = useState(false);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [showNodeModal, setShowNodeModal] = useState(false);
+
+  useEffect(() => {
+    if (activeTaskId) {
+      const interval = setInterval(async () => {
+        try {
+          const taskStatus = await ontologyAPI.getTaskStatus(activeTaskId);
+          if (taskStatus.status === 'completed') {
+            onGraphUpdate();
+            clearInterval(interval);
+          }
+        } catch (error) {
+          console.error('Polling for task status failed:', error);
+          clearInterval(interval);
+        }
+      }, 5000); // Poll every 5 seconds
+
+      return () => clearInterval(interval);
+    }
+  }, [activeTaskId, onGraphUpdate]);
 
   // Debug logging
   console.log('Graph component received data:', data);

@@ -38,6 +38,27 @@ from app.endpoint.v1.routes.websocket import (
 logger = logging.getLogger(__name__)
 
 
+def get_recommendation_service():
+    """Get recommendation service instance."""
+    try:
+        config = get_config()
+        # Create LLM manager directly to avoid circular imports
+        from app.infrastructure.llm.llm_manager import LLMManager
+        llm_manager = LLMManager(
+            lmstudio_url=config.lmstudio.base_url if hasattr(config, 'lmstudio') else "http://localhost:1234",
+            max_retries=config.lmstudio.max_retries if hasattr(config, 'lmstudio') else 3,
+        )
+        metadata_store = get_metadata_store()
+        return RecommendationService(
+            llm_manager=llm_manager,
+            metadata_store=metadata_store,
+            confidence=0.5,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to initialize recommendation service: {e}")
+        return None
+
+
 class ExtractionRequest(BaseModel):
     """Request model for extraction operations."""
 
@@ -141,6 +162,24 @@ def get_metadata_store():
     """Get metadata store instance."""
     config = get_config()
     return MetadataStore(config=config)
+
+
+
+
+def get_recommendation_service():
+    """Get recommendation service instance."""
+    try:
+        config = get_config()
+        llm_manager = get_llm_manager()
+        metadata_store = get_metadata_store()
+        return RecommendationService(
+            llm_manager=llm_manager,
+            metadata_store=metadata_store,
+            confidence=0.5,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to initialize recommendation service: {e}")
+        return None
 
 
 def _safe_uuid(value: Any) -> uuid.UUID:
@@ -258,6 +297,22 @@ def get_relationship_discoverer():
     )
 
 
+def get_recommendation_service():
+    """Get recommendation service instance."""
+    try:
+        config = get_config()
+        llm_manager = get_llm_manager()
+        metadata_store = get_metadata_store()
+        return RecommendationService(
+            llm_manager=llm_manager,
+            metadata_store=metadata_store,
+            use_reinforcement_learning=True,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to initialize recommendation service: {e}")
+        return None
+
+
 @router.post("/upload", response_model=dict[str, Any])
 async def upload_csv_file(
     file: UploadFile = File(...),
@@ -356,6 +411,22 @@ async def list_extraction_tasks():
         )
 
 
+def get_recommendation_service():
+    """Get recommendation service instance."""
+    try:
+        config = get_config()
+        llm_manager = get_llm_manager()
+        metadata_store = get_metadata_store()
+        return RecommendationService(
+            llm_manager=llm_manager,
+            metadata_store=metadata_store,
+            use_reinforcement_learning=True,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to initialize recommendation service: {e}")
+        return None
+
+
 @router.post("/", response_model=ExtractionResponse)
 async def extract_ontology(
     request: ExtractionRequest,
@@ -365,7 +436,7 @@ async def extract_ontology(
     neo4j_manager: Neo4jGraphManager = Depends(get_neo4j_manager),
     metadata_store: MetadataStore = Depends(get_metadata_store),
     relationship_discoverer: RelationshipDiscoverer = Depends(get_relationship_discoverer),
-    recommendation_service: Optional[RecommendationService] = Depends(get_recommendation_service),
+    recommendation_service: Optional[Any] = None,
 ):
     """
     Process CSV file and extract ontology.
@@ -427,7 +498,7 @@ async def run_extraction_pipeline(
     neo4j_manager: Neo4jGraphManager,
     metadata_store: MetadataStore,
     relationship_discoverer: RelationshipDiscoverer,
-    recommendation_service: Optional[RecommendationService] = None,
+    recommendation_service: Optional[Any] = None,
 ):
     """Run the complete extraction pipeline in the background."""
     task = extraction_tasks.get(task_id)
@@ -548,32 +619,37 @@ async def run_extraction_pipeline(
             try:
                 # Build enhanced node recommendations from extracted entities
                 basic_node_candidates: list[dict[str, Any]] = []
+                seen_entities = set()  # Track unique entity names to avoid duplicates
+                
                 for entity in entities[: min(15, len(entities))]:
                     entity_name = getattr(entity, "name", None) or getattr(entity, "entity_type", "Entity")
-                    # Generate multiple naming suggestions
-                    suggestions = [
-                        entity_name,
-                        entity_name.title().replace('_', ' '),
-                        f"{entity_name}_entity",
-                        f"Enhanced_{entity_name}",
-                    ]
+                    entity_type = getattr(entity, "entity_type", "unknown")
+                    source_columns = getattr(entity, "source_columns", []) or []
                     
-                    for i, suggestion in enumerate(suggestions[:3]):  # Limit to 3 suggestions per entity
-                        basic_node_candidates.append(
-                            {
-                                "id": str(uuid.uuid4()),
-                                "name": suggestion,
-                                "entity_type": getattr(entity, "entity_type", "unknown"),
-                                "confidence": 0.8 - (i * 0.1),  # Decreasing confidence
-                                "reasoning": f"Suggestion #{i+1}: Derived from extracted entity '{entity_name}'",
-                                "source_columns": getattr(entity, "source_columns", []) or [],
-                                "metadata": {
-                                    "original_entity_name": entity_name,
-                                    "suggestion_rank": i + 1,
-                                    "manual_editable": True
-                                }
+                    # Create a unique key for deduplication (name + type)
+                    entity_key = f"{entity_name.lower()}:{entity_type.lower()}"
+                    
+                    # Skip if we've already seen this entity
+                    if entity_key in seen_entities:
+                        continue
+                    
+                    seen_entities.add(entity_key)
+                    
+                    # Create a single recommendation per unique entity
+                    basic_node_candidates.append(
+                        {
+                            "id": str(uuid.uuid4()),
+                            "name": entity_name,
+                            "entity_type": entity_type,
+                            "confidence": 0.8,
+                            "reasoning": f"Derived from extracted entity with high confidence",
+                            "source_columns": source_columns,
+                            "metadata": {
+                                "original_entity_name": entity_name,
+                                "manual_editable": True
                             }
-                        )
+                        }
+                    )
 
                 recommendations = {
                     "node_recommendations": basic_node_candidates,
@@ -715,7 +791,99 @@ async def run_extraction_pipeline(
         except Exception:
             pass
 
+        # Automatically trigger recommendations generation after extraction is complete
+        try:
+            logger.info(f"Automatically triggering recommendations generation for completed task {task_id}")
+            # Trigger recommendations generation in the background
+            background_tasks.add_task(_generate_recommendations_background, task_id)
+        except Exception as e:
+            logger.error(f"Failed to trigger automatic recommendations generation for task {task_id}: {e}")
+
         logger.info(f"Extraction pipeline completed for task {task_id}")
+
+    except Exception as e:
+        logger.error(f"Extraction pipeline failed for task {task_id}: {e}")
+        task.status = "failed"
+        task.errors.append(str(e))
+
+        try:
+            await broadcast_task_update(
+                task_id,
+                "failed",
+                message="Extraction pipeline failed",
+                progress=0,
+            )
+        except Exception:
+            pass
+
+
+async def _generate_recommendations_background(task_id: str):
+    """Generate recommendations for a task in the background."""
+    try:
+        logger.info(f"Starting background recommendations generation for task {task_id}")
+
+        # Get the task
+        task = extraction_tasks.get(task_id)
+        if not task:
+            logger.error(f"Task {task_id} not found for background recommendations generation")
+            return
+
+        # Get dependencies
+        config = get_config()
+        metadata_store = MetadataStore(config=config)
+
+        # Get dataset profile
+        dataset_profile = task.dataset_profile or await profile_dataset(
+            task.file_path, metadata_store
+        )
+
+        # Convert entities to dict format
+        entities_dict = [
+            entity.dict() if hasattr(entity, "dict") else entity for entity in task.entities
+        ]
+
+        # Generate recommendations using the service
+        try:
+            recommendation_service = get_recommendation_service()
+            if recommendation_service:
+                recommendations = await recommendation_service.generate_recommendations(
+                    task_id, entities_dict, dataset_profile.dict()
+                )
+            else:
+                # Fallback to basic recommendations
+                recommendations = {"node_recommendations": [], "edge_recommendations": []}
+        except Exception as e:
+            logger.error(f"Failed to generate recommendations with service for task {task_id}: {e}")
+            recommendations = {"node_recommendations": [], "edge_recommendations": []}
+
+        # Create recommendation session
+        session = RecommendationSession(
+            task_id=task_id,
+            metadata=recommendations.get("rl_metadata", {}),
+        )
+
+        # Convert recommendations to proper format
+        session.node_recommendations = [
+            _to_node_recommendation(candidate, session.id)
+            for candidate in recommendations.get("node_recommendations", [])
+        ]
+        session.edge_recommendations = [
+            _to_edge_recommendation(candidate, session.id)
+            for candidate in recommendations.get("edge_recommendations", [])
+        ]
+
+        # Store the recommendation session
+        await metadata_store.create_recommendation_session(session)
+
+        # Update task status
+        task.recommendation_session = session
+        task.status = "awaiting_recommendations_approval"
+
+        logger.info(f"Background recommendations generation completed for task {task_id}")
+
+    except Exception as e:
+        logger.error(f"Background recommendations generation failed for task {task_id}: {e}")
+
 
     except Exception as e:
         logger.error(f"Extraction pipeline failed for task {task_id}: {e}")
@@ -736,6 +904,192 @@ async def run_extraction_pipeline(
                 f"Failed to update metadata store with failure status: {store_error}"
             )
 
+
+async def continue_extraction_pipeline(
+    task_id: str,
+    extraction_config: dict[str, Any],
+    ontology_mapper: OntologyMapper,
+    neo4j_manager: Neo4jGraphManager,
+    metadata_store: MetadataStore,
+    relationship_discoverer: RelationshipDiscoverer,
+) -> None:
+    """
+    Resume the extraction pipeline after human feedback has been submitted.
+
+    This picks up after recommendations have been approved, discovers relationships,
+    maps entities to ontologies, persists results, and marks the task completed.
+    """
+    task = extraction_tasks.get(task_id)
+    if not task:
+        logger.warning("Cannot continue pipeline – task %s not found", task_id)
+        return
+
+    try:
+        logger.info("Continuing extraction pipeline for task %s", task_id)
+
+        # Ensure we have a dataset profile to drive downstream steps.
+        if not task.dataset_profile:
+            logger.info(
+                "Dataset profile missing for task %s; regenerating from %s",
+                task_id,
+                task.file_path,
+            )
+            task.dataset_profile = await profile_dataset(task.file_path, metadata_store)
+
+        dataset_profile = task.dataset_profile
+        entities = task.entities or []
+
+        if not entities:
+            logger.warning(
+                "Task %s has no entities after feedback; skipping continuation",
+                task_id,
+            )
+            return
+
+        task.status = "processing"
+        task.progress = max(task.progress or 0.6, 0.6)
+
+        try:
+            await broadcast_task_update(
+                task_id,
+                task.status,
+                message="Resuming pipeline: discovering relationships.",
+                progress=int(task.progress * 100),
+            )
+        except Exception:
+            pass
+
+        relationships = await discover_relationships(
+            entities,
+            extraction_config or task.extraction_config or {},
+            neo4j_manager,
+            relationship_discoverer,
+            task.file_path,
+            dataset_profile.columns,
+        )
+        task.relationships = relationships
+        task.progress = 0.8
+
+        try:
+            await broadcast_task_update(
+                task_id,
+                task.status,
+                message="Relationships discovered after human feedback.",
+                progress=int(task.progress * 100),
+            )
+        except Exception:
+            pass
+
+        ontology_results = await map_to_ontologies(
+            entities,
+            relationships,
+            ontology_mapper,
+        )
+        task.progress = 0.9
+
+        try:
+            await broadcast_task_update(
+                task_id,
+                task.status,
+                message="Entities mapped to ontologies.",
+                progress=int(task.progress * 100),
+            )
+        except Exception:
+            pass
+
+        # Ensure identifiers exist before persisting.
+        for entity in entities:
+            if not getattr(entity, "id", None):
+                content = f"{entity.name}_{entity.entity_type}_{','.join(sorted(entity.source_columns))}"
+                entity.id = f"entity_{hashlib.sha256(content.encode('utf-8')).hexdigest()[:12]}"
+
+        for relationship in relationships:
+            if not getattr(relationship, "id", None):
+                content = (
+                    f"{relationship.source_entity_id}_{relationship.target_entity_id}_"
+                    f"{relationship.relationship_type}"
+                )
+                relationship.id = f"rel_{hashlib.sha256(content.encode('utf-8')).hexdigest()[:12]}"
+
+        await store_in_neo4j(
+            entities,
+            relationships,
+            neo4j_manager,
+            task_id,
+            task.file_path,
+        )
+
+        task.progress = 1.0
+
+        metadata_store.complete_extraction_run(
+            task_id,
+            "completed",
+            {
+                "entities_count": len(entities),
+                "relationships_count": len(relationships),
+                "ontology_results": (
+                    ontology_results.model_dump()
+                    if hasattr(ontology_results, "model_dump")
+                    else ontology_results
+                ),
+                "completed_at": datetime.now().isoformat(),
+            },
+        )
+
+        task.status = "completed"
+        task.completed_at = datetime.now()
+
+        try:
+            await broadcast_extraction_complete(
+                task_id,
+                {
+                    "entities_count": len(entities),
+                    "relationships_count": len(relationships),
+                },
+            )
+            await broadcast_task_update(
+                task_id,
+                "completed",
+                message="Extraction pipeline completed after human feedback.",
+                progress=100,
+            )
+        except Exception:
+            pass
+
+        logger.info("Extraction pipeline continuation completed for task %s", task_id)
+
+    except Exception as exc:
+        logger.error(
+            "Failed to continue extraction pipeline for task %s: %s",
+            task_id,
+            exc,
+        )
+        task.status = "failed"
+        task.errors.append(str(exc))
+        try:
+            metadata_store.complete_extraction_run(
+                task_id,
+                "failed",
+                {
+                    "error": str(exc),
+                    "failed_at": datetime.now().isoformat(),
+                },
+            )
+        except Exception as store_error:
+            logger.error(
+                "Failed to mark task %s as failed in metadata store: %s",
+                task_id,
+                store_error,
+            )
+        try:
+            await broadcast_task_update(
+                task_id,
+                "failed",
+                message="Extraction pipeline failed while resuming after feedback.",
+                progress=int((task.progress or 0) * 100),
+            )
+        except Exception:
+            pass
 
 
 async def profile_dataset(
@@ -1018,6 +1372,109 @@ async def generate_recommendations(
     return session
 
 
+@router.post("/{task_id}/generate-edge-recommendations", response_model=RecommendationSession)
+async def generate_edge_recommendations(
+    task_id: str,
+    neo4j_manager: Neo4jGraphManager = Depends(get_neo4j_manager),
+    metadata_store: MetadataStore = Depends(get_metadata_store),
+):
+    """Generate edge recommendations based on approved nodes in Neo4j."""
+    try:
+        # 1. Verify task exists
+        task = extraction_tasks.get(task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        
+        # 2. Get the recommendation session
+        session = await metadata_store.get_recommendation_session(task_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Recommendation session not found")
+        
+        # 3. Verify nodes were approved
+        if session.phase not in ["nodes_completed", "edges"]:
+            raise HTTPException(
+                status_code=400, 
+                detail="Nodes must be approved before generating edge recommendations"
+            )
+        
+        # 4. Fetch approved nodes from Neo4j for this task
+        try:
+            if not neo4j_manager.is_connected():
+                neo4j_manager.connect()
+            
+            nodes = neo4j_manager.get_entities(task_id=task_id, limit=1000)
+            logger.info(f"Found {len(nodes)} nodes in Neo4j for task {task_id}")
+            
+            if len(nodes) < 2:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"At least 2 nodes are required to generate relationships. Found {len(nodes)} nodes."
+                )
+            
+        except Exception as neo_error:
+            logger.error(f"Failed to fetch nodes from Neo4j: {neo_error}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to fetch nodes from Neo4j: {str(neo_error)}"
+            )
+        
+        # 5. Generate edge recommendations based on existing nodes
+        # Create a mapping of node IDs
+        node_id_map = {str(node.get("id")): node for node in nodes}
+        node_ids = list(node_id_map.keys())
+        
+        # For now, generate simple recommendations based on column relationships
+        # In a real implementation, you'd use LLM here
+        edge_recommendations = []
+        
+        # Simple heuristic: look for potential FK relationships
+        for i, node1 in enumerate(nodes):
+            for node2 in nodes[i+1:]:
+                node1_name = node1.get("name", "")
+                node2_name = node2.get("name", "")
+                
+                # Check if names suggest a relationship
+                if "_id" in node1_name.lower() and node2_name.lower() in node1_name.lower():
+                    edge_recommendations.append(
+                        _to_edge_recommendation({
+                            "source_node_id": str(node1.get("id")),
+                            "target_node_id": str(node2.get("id")),
+                            "relationship_type": "REFERENCES",
+                            "confidence_score": 0.7,
+                            "reasoning": f"'{node1_name}' appears to reference '{node2_name}' based on naming convention",
+                            "connection_evidence": {
+                                "source_name": node1_name,
+                                "target_name": node2_name,
+                                "detection_method": "naming_heuristic"
+                            }
+                        }, session.id)
+                    )
+        
+        logger.info(f"Generated {len(edge_recommendations)} edge recommendations")
+        
+        # 6. Update session with edge recommendations and phase
+        session.edge_recommendations = edge_recommendations
+        session.phase = "edges"
+        session.metadata = session.metadata or {}
+        session.metadata["edge_generation_timestamp"] = datetime.now().isoformat()
+        session.metadata["node_count"] = len(nodes)
+        
+        # 7. Save updated session
+        await metadata_store.create_recommendation_session(session)
+        task.recommendation_session = session
+        
+        return session
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to generate edge recommendations: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate edge recommendations: {str(e)}"
+        )
+
+
 @router.get("/{task_id}/recommendations", response_model=RecommendationSession)
 async def get_recommendations(
     task_id: str,
@@ -1048,6 +1505,11 @@ async def get_recommendations(
 
     if not session:
         raise HTTPException(status_code=404, detail="Recommendations not found")
+    
+    # Filter edge recommendations based on phase
+    # Only show edges if we're in the edges phase
+    if session.phase == "nodes":
+        session.edge_recommendations = []
 
     return session
 
@@ -1062,6 +1524,9 @@ async def submit_recommendation_feedback(
     metadata_store: MetadataStore = Depends(get_metadata_store),
     relationship_discoverer: RelationshipDiscoverer = Depends(
         get_relationship_discoverer
+    ),
+    recommendation_service: Optional[RecommendationService] = Depends(
+        get_recommendation_service
     ),
 ):
     """Submit feedback for recommendations and continue extraction pipeline."""
@@ -1086,6 +1551,44 @@ async def submit_recommendation_feedback(
         edge_updates_for_store: list[dict[str, Any]] = []
         persisted_entities = 0
         persisted_relationships = 0
+
+        async def update_metadata_store_with_compat(
+            *,
+            task_id: str,
+            status: str,
+            feedback_payload: dict[str, Any],
+            node_updates: list[dict[str, Any]],
+            edge_updates: list[dict[str, Any]],
+            phase: Optional[str] = None,
+            nodes_approved_at: Optional[datetime] = None,
+        ) -> None:
+            """Update metadata store while tolerating legacy signatures."""
+            try:
+                await metadata_store.update_recommendation_feedback(
+                    task_id=task_id,
+                    status=status,
+                    feedback_payload=feedback_payload,
+                    node_updates=node_updates,
+                    edge_updates=edge_updates,
+                    phase=phase,
+                    nodes_approved_at=nodes_approved_at,
+                )
+            except TypeError as type_error:
+                error_text = str(type_error)
+                if "unexpected keyword argument" not in error_text:
+                    raise
+                logger.warning(
+                    "Metadata store update_recommendation_feedback signature mismatch; "
+                    "retrying without phase metadata: %s",
+                    error_text,
+                )
+                await metadata_store.update_recommendation_feedback(
+                    task_id=task_id,
+                    status=status,
+                    feedback_payload=feedback_payload,
+                    node_updates=node_updates,
+                    edge_updates=edge_updates,
+                )
 
         entity_map = {entity.id: entity for entity in task.entities if entity.id}
 
@@ -1315,7 +1818,6 @@ async def submit_recommendation_feedback(
                     )
 
         # Process LLM feedback for continuous learning and retraining
-        recommendation_service = get_recommendation_service()
         if recommendation_service:
             try:
                 # Enhanced feedback data structure for LLM learning
@@ -1372,18 +1874,38 @@ async def submit_recommendation_feedback(
 
         status_label = "approved" if approved_overall else "rejected"
 
-        await metadata_store.update_recommendation_feedback(
-            task_id,
-            status_label,
-            feedback,
-            node_updates_for_store,
-            edge_updates_for_store,
+        await update_metadata_store_with_compat(
+            task_id=task_id,
+            status=status_label,
+            feedback_payload=feedback,
+            node_updates=node_updates_for_store,
+            edge_updates=edge_updates_for_store,
+            phase=session.phase if session else None,
+            nodes_approved_at=session.nodes_approved_at if session else None,
         )
 
         if session:
             session.status = status_label
-            session.approved_at = datetime.now()
-            session.metadata = {**(session.metadata or {}), "last_feedback": feedback}
+            
+            # Phase transition logic
+            if session.phase == "nodes":
+                session.phase = "nodes_completed"
+                session.nodes_approved_at = datetime.now()
+            elif session.phase == "edges":
+                session.phase = "completed"
+                session.approved_at = datetime.now()
+
+            await update_metadata_store_with_compat(
+                task_id=task_id,
+                status=session.status,
+                feedback_payload=feedback,
+                node_updates=node_updates_for_store,
+                edge_updates=edge_updates_for_store,
+                phase=session.phase,
+                nodes_approved_at=session.nodes_approved_at,
+            )
+
+            # Update in-memory session object
             node_map = {str(node.id): node for node in session.node_recommendations}
             for update in node_updates_for_store:
                 node_obj = node_map.get(update.get("id"))
@@ -1448,6 +1970,7 @@ async def submit_recommendation_feedback(
             "edges_processed": len(edge_updates_for_store),
             "nodes_persisted": persisted_entities,
             "relationships_persisted": persisted_relationships,
+            "ready_for_edges": session.phase == "nodes_completed" if session else False
         }
 
     except Exception as e:

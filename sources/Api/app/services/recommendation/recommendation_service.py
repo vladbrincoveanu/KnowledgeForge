@@ -227,6 +227,7 @@ class RecommendationService:
         self, entities: List[Dict[str, Any]], dataset_profile: Dict[str, Any]
     ) -> List[NodeRecommendation]:
         if not self.llm_manager:
+            logger.warning("No LLM manager available for node recommendations")
             return []
 
         prompt = f"""
@@ -244,17 +245,26 @@ class RecommendationService:
         """
 
         try:
-            response = await self.llm_manager.generate_text(prompt)
-            recommendations = self.llm_manager.parse_json_response(response)
-            return [NodeRecommendation(**rec) for rec in recommendations]
+            logger.info("Calling LLM to generate basic node recommendations")
+            response = self.llm_manager.generate_text(prompt, max_tokens=500, temperature=0.7)
+            if response:
+                logger.info(f"LLM response received (length: {len(response)})")
+                recommendations = self.llm_manager._extract_json_from_response(response)
+                if recommendations and isinstance(recommendations, list):
+                    logger.info(f"Successfully parsed {len(recommendations)} node recommendations")
+                    return [NodeRecommendation(**rec) for rec in recommendations]
+                else:
+                    logger.warning("LLM response did not contain valid JSON array")
+            return []
         except Exception as e:
-            logger.error(f"Failed to generate node recommendations: {e}")
+            logger.error(f"Failed to generate node recommendations: {e}", exc_info=True)
             return []
 
     async def _generate_edge_recommendations(
         self, entities: List[Dict[str, Any]], dataset_profile: Dict[str, Any]
     ) -> List[EdgeRecommendation]:
         if not self.llm_manager:
+            logger.warning("No LLM manager available for edge recommendations")
             return []
 
         prompt = f"""
@@ -273,9 +283,17 @@ class RecommendationService:
         """
 
         try:
-            response = await self.llm_manager.generate_text(prompt)
-            recommendations = self.llm_manager.parse_json_response(response)
-            return [EdgeRecommendation(**rec) for rec in recommendations]
+            logger.info("Calling LLM to generate basic edge recommendations")
+            response = self.llm_manager.generate_text(prompt, max_tokens=500, temperature=0.7)
+            if response:
+                logger.info(f"LLM response received (length: {len(response)})")
+                recommendations = self.llm_manager._extract_json_from_response(response)
+                if recommendations and isinstance(recommendations, list):
+                    logger.info(f"Successfully parsed {len(recommendations)} edge recommendations")
+                    return [EdgeRecommendation(**rec) for rec in recommendations]
+                else:
+                    logger.warning("LLM response did not contain valid JSON array")
+            return []
         except Exception as e:
-            logger.error(f"Failed to generate edge recommendations: {e}")
+            logger.error(f"Failed to generate edge recommendations: {e}", exc_info=True)
             return []

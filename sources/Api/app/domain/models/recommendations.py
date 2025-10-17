@@ -37,8 +37,10 @@ class RecommendationSession(BaseModel):
     id: uuid.UUID = Field(default_factory=uuid.uuid4)
     task_id: str
     status: str = "pending"
+    phase: str = "nodes"  # "nodes", "nodes_completed", "edges", or "completed"
     generated_at: datetime = Field(default_factory=datetime.utcnow)
     approved_at: Optional[datetime] = None
+    nodes_approved_at: Optional[datetime] = None
     metadata: Optional[dict[str, Any]] = None
     node_recommendations: List[NodeRecommendation] = Field(default_factory=list)
     edge_recommendations: List[EdgeRecommendation] = Field(default_factory=list)

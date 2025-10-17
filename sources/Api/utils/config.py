@@ -10,6 +10,30 @@ from pydantic import BaseModel, Field, validator
 from pydantic_settings import BaseSettings
 
 
+class DatabaseConfig(BaseModel):
+    """PostgreSQL database connection configuration."""
+
+    type: str = Field(default="postgresql", description="Database type")
+    host: str = Field(default="localhost", description="Database host")
+    port: int = Field(default=5432, description="Database port")
+    name: str = Field(default="knowledgeforge", description="Database name")
+    username: str = Field(default="knowledgeforge", description="Database username")
+    password: str = Field(default="knowledgeforge123", description="Database password")
+    connection_pool: dict = Field(
+        default_factory=lambda: {
+            "min_connections": 1,
+            "max_connections": 20,
+            "connection_timeout": 30,
+            "idle_timeout": 300,
+        },
+        description="Connection pool settings"
+    )
+    ssl_mode: str = Field(default="prefer", description="SSL mode")
+    application_name: str = Field(
+        default="KnowledgeForge-API", description="Application name"
+    )
+
+
 class Neo4jConfig(BaseModel):
     """Neo4j database connection configuration."""
 
@@ -195,6 +219,7 @@ class Config(BaseSettings):
     debug: bool = Field(default=True, description="Enable debug mode")
 
     # Nested configurations
+    database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     neo4j: Neo4jConfig = Field(default_factory=Neo4jConfig)
     lmstudio: LMStudioConfig = Field(default_factory=LMStudioConfig)
     extraction: ExtractionConfig = Field(default_factory=ExtractionConfig)

@@ -722,7 +722,76 @@ Return JSON array with entities.
                 logger.info(f"Created {entity_type} entity '{entity_name}' from column '{col.name}'")
         
         logger.info(f"Final result: {len(entities)} semantically meaningful entities extracted")
+        
+        # Enrich all extracted entities with detailed attributes
+        for entity in entities:
+            self._enrich_entity_attributes(entity, df, dataset_context)
+
         return entities
+
+    def _enrich_entity_attributes(
+        self, entity: Entity, df: pd.DataFrame, context: dict[str, Any]
+    ) -> None:
+        """Enrich entity with detailed metadata for knowledge graph."""
+        # Ensure attributes is a dict
+        if not isinstance(entity.attributes, dict):
+            entity.attributes = {}
+
+        # 1. Description
+        entity.attributes["description"] = (
+            f"Represents a '{entity.entity_type.replace('_', ' ')}' named '{entity.name}', "
+            f"derived from column(s): {', '.join(entity.source_columns)}"
+        )
+
+        # 2. Semantic Type (already part of entity_type, but can be more specific)
+        entity.attributes["semantic_type"] = entity.entity_type
+
+        # 3. Domain Context
+        entity.attributes["domain_context"] = context.get("domain_context", "generic")
+
+        # 4. Cardinality for categorical entities
+        if entity.entity_type == "categorical" and entity.source_columns:
+            try:
+                col_name = entity.source_columns[0]
+                cardinality = df[col_name].nunique()
+                entity.attributes["cardinality"] = int(cardinality)
+            except Exception as e:
+                logger.warning(
+                    f"Could not calculate cardinality for {entity.name}: {e}"
+                )
+                entity.attributes["cardinality"] = None
+        else:
+            entity.attributes["cardinality"] = None
+
+        # 5. Data Quality Score
+        completeness = 0.0
+        if entity.source_columns:
+            try:
+                col_name = entity.source_columns[0]
+                completeness = 1.0 - (
+                    df[col_name].isnull().sum() / len(df) if len(df) > 0 else 0
+                )
+            except Exception:
+                pass  # Ignore if column not found or other errors
+
+        # This is a simple quality score; can be enhanced with validity, consistency checks
+        entity.attributes["data_quality_score"] = round(completeness, 2)
+
+        # 6. Sample Representative Values
+        if entity.source_columns:
+            try:
+                col_name = entity.source_columns[0]
+                sample_values = (
+                    df[col_name].dropna().unique().tolist()[:5]
+                )  # Get up to 5 unique non-null values
+                entity.attributes["sample_representative_values"] = [
+                    str(v) for v in sample_values
+                ]
+            except Exception:
+                entity.attributes["sample_representative_values"] = []
+        else:
+            entity.attributes["sample_representative_values"] = []
+
 
     def _analyze_dataset_context(self, df: pd.DataFrame, columns: list[ColumnProfile], file_path: str = None) -> dict[str, Any]:
         """Analyze the dataset to understand its business context."""

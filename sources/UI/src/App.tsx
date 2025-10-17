@@ -22,6 +22,7 @@ import {
   Brain,
 } from 'lucide-react';
 import './App.scss';
+import Notification from './@components/notification/Notification';
 
 // TypeScript interfaces
 interface NavItem {
@@ -183,6 +184,12 @@ const MainContent: React.FC = () => {
     nodes: [],
     links: [],
   });
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showNotification = (message: string, type: 'success' | 'error' | 'info') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 5000);
+  };
 
   const loadGraphData = useCallback(async (taskId: string) => {
     try {
@@ -608,6 +615,13 @@ const MainContent: React.FC = () => {
 
   return (
     <div className="app">
+      {notification && (
+        <Notification
+          message={notification.message}
+          type={notification.type}
+          onClose={() => setNotification(null)}
+        />
+      )}
       <div className="app-container">
         <Navigation activeTab={activeTab} />
 
@@ -631,6 +645,7 @@ const MainContent: React.FC = () => {
                     onFilesUploaded={handleFilesUploaded}
                     isProcessing={isProcessing}
                     onExtractionStarted={handleExtractionStarted}
+                    showNotification={showNotification}
                   />
 
                   {files.length > 0 && (
@@ -864,6 +879,13 @@ const MainContent: React.FC = () => {
                   <Graph
                     data={graphData}
                     onEdgeClick={edge => console.log('Edge clicked:', edge)}
+                    activeTaskId={activeTaskId}
+                    onGraphUpdate={() => {
+                      if (activeTaskId) {
+                        loadGraphData(activeTaskId);
+                        showNotification('Graph updated with the latest data!', 'info');
+                      }
+                    }}
                   />
                 </div>
               }

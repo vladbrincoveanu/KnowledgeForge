@@ -71,12 +71,12 @@ services:
       - "8000:8000"
     environment:
       # PostgreSQL Configuration
-      - DATABASE_TYPE=postgresql
-      - DATABASE_HOST=postgres
-      - DATABASE_PORT=5432
-      - DATABASE_NAME=knowledgeforge
-      - DATABASE_USERNAME=knowledgeforge
-      - DATABASE_PASSWORD=knowledgeforge123
+      - KF_DATABASE__TYPE=postgresql
+      - KF_DATABASE__HOST=postgres
+      - KF_DATABASE__PORT=5432
+      - KF_DATABASE__NAME=knowledgeforge
+      - KF_DATABASE__USERNAME=knowledgeforge
+      - KF_DATABASE__PASSWORD=knowledgeforge123
       - DATABASE_URL=postgresql://knowledgeforge:knowledgeforge123@postgres:5432/knowledgeforge
       # Neo4j Configuration
       - KF_NEO4J__URI=bolt://neo4j:7687
@@ -123,8 +123,8 @@ services:
       - /app/node_modules
     environment:
       - CHOKIDAR_USEPOLLING=true
-      - VITE_API_URL=http://localhost:8000
-      - VITE_APP_API_URL=http://localhost:8000
+      - VITE_API_URL=http://api:8000
+      - VITE_APP_API_URL=http://api:8000
     networks:
       - knowledgeforge-network
     stdin_open: true

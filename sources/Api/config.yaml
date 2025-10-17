@@ -7,7 +7,7 @@ debug: true
 # Database configuration
 database:
   type: "postgresql"
-  host: "localhost"
+  host: "knowledgeforge-postgres"
   port: 5432
   name: "knowledgeforge"
   username: "knowledgeforge"
@@ -22,7 +22,7 @@ database:
 
 # Neo4j database configuration
 neo4j:
-  uri: "bolt://localhost:7687"  # Use localhost when running locally, neo4j:7687 when in Docker
+  uri: "bolt://knowledgeforge-neo4j:7687"  # Use service name when running in Docker
   username: "neo4j"
   password: "password"
   database: "neo4j"

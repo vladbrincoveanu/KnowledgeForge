@@ -81,7 +81,7 @@ async def list_entities(
     if (not entities) and task_id:
         run_metadata = metadata_store.get_extraction_run(task_id)
         if run_metadata:
-            payload = run_metadata.get("metadata") or {}
+            payload = run_metadata.metadata or {}
             stored_entities = payload.get("entities")
             if not stored_entities:
                 stored_entities = (
@@ -149,7 +149,7 @@ async def list_relationships(
     if (not relationships) and task_id:
         run_metadata = metadata_store.get_extraction_run(task_id)
         if run_metadata:
-            payload = run_metadata.get("metadata") or {}
+            payload = run_metadata.metadata or {}
             stored_relationships = payload.get("relationships")
             if not stored_relationships:
                 stored_relationships = (
@@ -200,7 +200,7 @@ async def submit_feedback(
         }
 
         # Extract individual fields for the add_user_feedback method
-        feedback_id = metadata_store.add_user_feedback(
+        feedback = metadata_store.add_user_feedback(
             entity_id=feedback_data.get("entity_id"),
             relationship_id=feedback_data.get("relationship_id"),
             feedback_type=feedback_data.get("feedback_type"),
@@ -211,7 +211,7 @@ async def submit_feedback(
         )
 
         return {
-            "feedback_id": feedback_id,
+            "feedback_id": feedback.id,
             "status": "received",
             "message": "Feedback submitted successfully",
         }

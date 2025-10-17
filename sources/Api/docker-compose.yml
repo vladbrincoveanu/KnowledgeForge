@@ -73,12 +73,12 @@ services:
       - "8000:8000"
     environment:
       # Database configuration
-      - DATABASE_TYPE=postgresql
-      - DATABASE_HOST=postgres
-      - DATABASE_PORT=5432
-      - DATABASE_NAME=knowledgeforge
-      - DATABASE_USERNAME=knowledgeforge
-      - DATABASE_PASSWORD=knowledgeforge123
+      - KF_DATABASE__TYPE=postgresql
+      - KF_DATABASE__HOST=postgres
+      - KF_DATABASE__PORT=5432
+      - KF_DATABASE__NAME=knowledgeforge
+      - KF_DATABASE__USERNAME=knowledgeforge
+      - KF_DATABASE__PASSWORD=knowledgeforge123
       - DATABASE_URL=postgresql://knowledgeforge:knowledgeforge123@postgres:5432/knowledgeforge
       
       # Neo4j configuration - updated to use the neo4j service
@@ -102,6 +102,10 @@ services:
       - ./uploads:/app/uploads
       - ./cache:/app/cache
       - ./config.yaml:/app/config.yaml:ro
+      # Mount source code for live development
+      - ./app:/app/app
+      - ./utils:/app/utils
+      - ./requirements.txt:/app/requirements.txt
     depends_on:
       postgres:
         condition: service_healthy

@@ -622,6 +622,8 @@ class PostgreSQLMetadataStore:
         feedback_payload: dict[str, Any],
         node_updates: List[dict[str, Any]],
         edge_updates: List[dict[str, Any]],
+        phase: Optional[str] = None,
+        nodes_approved_at: Optional[datetime] = None,
     ) -> None:
         session = await self.get_recommendation_session(task_id)
         if not session:
@@ -632,6 +634,15 @@ class PostgreSQLMetadataStore:
             return
 
         metadata_update = {"last_feedback": feedback_payload}
+        phase_to_store = phase if phase is not None else session.phase
+        nodes_approved_at_to_store = (
+            nodes_approved_at if nodes_approved_at is not None else session.nodes_approved_at
+        )
+
+        if phase_to_store is not None:
+            session.phase = phase_to_store
+        if nodes_approved_at_to_store is not None:
+            session.nodes_approved_at = nodes_approved_at_to_store
 
         if self.connection_pool:
             conn = self.connection_pool.getconn()
@@ -642,11 +653,15 @@ class PostgreSQLMetadataStore:
                         UPDATE recommendation_sessions
                         SET status = %s,
                             approved_at = CURRENT_TIMESTAMP,
+                            phase = COALESCE(%s, phase),
+                            nodes_approved_at = COALESCE(%s, nodes_approved_at),
                             metadata = COALESCE(metadata, '{}'::jsonb) || %s::jsonb
                         WHERE id = %s
                         """,
                         (
                             status,
+                            phase_to_store,
+                            nodes_approved_at_to_store,
                             Json(metadata_update),
                             str(session.id),
                         ),

@@ -17,6 +17,7 @@ interface FileUploaderProps {
   onFilesUploaded: (files: UploadedFile[]) => void;
   isProcessing: boolean;
   onExtractionStarted: (taskId: string, file: UploadedFile) => void;
+  showNotification: (message: string, type: 'success' | 'error' | 'info') => void;
 }
 
 interface ExtractionTask {
@@ -50,6 +51,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   onFilesUploaded,
   isProcessing,
   onExtractionStarted,
+  showNotification,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -435,6 +437,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
         onApprove={handleRecommendationApprove}
         onReject={handleRecommendationReject}
         taskId={recommendationModal.taskId || ''}
+        showNotification={showNotification}
       />
       <h3>
         <Upload size={20} /> Upload Data Files
