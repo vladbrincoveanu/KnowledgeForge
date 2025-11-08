@@ -21,6 +21,7 @@ interface RecommendationModalProps {
   onApprove: (approvedItems: any) => void;
   onReject: () => void;
   taskId: string;
+  showNotification: (message: string, type: 'success' | 'error' | 'info') => void;
 }
 
 const RecommendationModal: React.FC<RecommendationModalProps> = ({
@@ -29,6 +30,7 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
   onApprove,
   onReject,
   taskId,
+  showNotification,
 }) => {
   const [recommendations, setRecommendations] =
     useState<RecommendationData | null>(null);
@@ -40,6 +42,10 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
     Record<string, EdgeSelectionState>
   >({});
   const [reviewNotes, setReviewNotes] = useState('');
+  const [currentPhase, setCurrentPhase] = useState<'nodes' | 'edges' | 'completed'>(
+    'nodes'
+  );
+  const [readyForEdges, setReadyForEdges] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -51,6 +57,7 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
         .getRecommendations(taskId)
         .then(data => {
           setRecommendations(data);
+          setCurrentPhase(data.phase || 'nodes');
           setLoading(false);
           if (data.node_recommendations) {
             const initialNodes: Record<string, NodeSelectionState> = {};
@@ -210,6 +217,20 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
     });
   };
 
+  const handleGenerateEdges = async () => {
+    if (!taskId) return;
+    setLoading(true);
+    try {
+      const data = await recommendationAPI.generateEdgeRecommendations(taskId);
+      setRecommendations(data);
+      setCurrentPhase('edges');
+    } catch (err) {
+      console.error('Failed to generate edge recommendations:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleApprove = async () => {
     const approvedNodes = Object.entries(nodeSelections)
       .filter(([, sel]) => sel?.approved)
@@ -257,10 +278,46 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
     };
 
     try {
-      await recommendationAPI.submitRecommendationFeedback(taskId, payload);
-      onApprove(payload.items);
+      const response = await recommendationAPI.submitFeedback(taskId, payload);
+      if (response.ready_for_edges) {
+        setReadyForEdges(true);
+        setCurrentPhase('nodes_completed');
+        showNotification('Nodes approved! Generating edge recommendations...', 'info');
+        // If edge recommendations are already available, switch to edge phase
+        if (response.edge_recommendations && response.edge_recommendations.length > 0) {
+            setRecommendations(prev => ({
+                ...prev,
+                node_recommendations: prev?.node_recommendations || [],
+                edge_recommendations: response.edge_recommendations,
+            }));
+            setCurrentPhase('edges');
+        } else {
+            // Otherwise, show loading and poll for edge recommendations
+            setLoading(true);
+            const interval = setInterval(async () => {
+                try {
+                    const data = await recommendationAPI.getRecommendations(taskId);
+                    if (data.phase === 'edges' && data.edge_recommendations.length > 0) {
+                        setRecommendations(data);
+                        setCurrentPhase('edges');
+                        setLoading(false);
+                        clearInterval(interval);
+                        showNotification('Edge recommendations are ready!', 'success');
+                    }
+                } catch (error) {
+                    console.error('Polling for edge recommendations failed:', error);
+                    setLoading(false);
+                    clearInterval(interval);
+                }
+            }, 3000); // Poll every 3 seconds
+        }
+      } else {
+        onApprove(payload.items);
+        showNotification('Feedback submitted successfully!', 'success');
+      }
     } catch (error) {
       console.error('Failed to submit recommendation feedback:', error);
+      showNotification('Failed to submit feedback. Please try again.', 'error');
     }
   };
 
@@ -271,8 +328,10 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
         notes: reviewNotes,
       });
       onReject();
+      showNotification('Recommendations rejected.', 'info');
     } catch (error) {
       console.error('Failed to reject recommendations:', error);
+      showNotification('Failed to reject recommendations. Please try again.', 'error');
     }
   };
 
@@ -290,60 +349,70 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
           <>
             {recommendations && (
               <>
-                <NodeRecommendationList
-                  recommendations={recommendations.node_recommendations}
-                  selections={nodeSelections}
-                  onNodeToggle={handleNodeToggle}
-                  onUpdateSelection={(nodeId, update) =>
-                    setNodeSelections(prev => ({
-                      ...prev,
-                      [nodeId]: {
-                        ...(prev[nodeId] ?? {
-                          approved: true,
-                          finalName:
-                            nodeLookup[nodeId]?.name || 'Untitled node',
-                          entityType:
-                            nodeLookup[nodeId]?.entityType || 'unknown',
-                          confidence: nodeLookup[nodeId]?.confidence || 0.75,
-                          sourceColumns:
-                            nodeLookup[nodeId]?.sourceColumns || [],
-                          metadata:
-                            nodeLookup[nodeId]?.metadata ||
-                            nodeLookup[nodeId]?.llmMetadata ||
-                            {},
-                          linkedEntityId: nodeLookup[nodeId]?.linkedEntityId,
-                        }),
-                        ...update,
-                      },
-                    }))
-                  }
-                  onSelectAll={handleSelectAllNodes}
-                  onDeselectAll={handleDeselectAllNodes}
-                />
-                <EdgeRecommendationList
-                  recommendations={recommendations.edge_recommendations}
-                  selections={edgeSelections}
-                  onEdgeToggle={handleEdgeToggle}
-                  onUpdateSelection={(edgeId, update) =>
-                    setEdgeSelections(prev => ({
-                      ...prev,
-                      [edgeId]: {
-                        ...(prev[edgeId] ?? {
-                          approved: true,
-                          relationshipType:
-                            edgeLookup[edgeId]?.relationshipType ||
-                            'RELATED_TO',
-                          confidence: edgeLookup[edgeId]?.confidence || 0.7,
-                          metadata: edgeLookup[edgeId]?.metadata || {},
-                          reasoning: edgeLookup[edgeId]?.reasoning,
-                        }),
-                        ...update,
-                      },
-                    }))
-                  }
-                  onSelectAll={handleSelectAllEdges}
-                  onDeselectAll={handleDeselectAllEdges}
-                />
+                {currentPhase === 'nodes' && (
+                  <NodeRecommendationList
+                    recommendations={recommendations.node_recommendations}
+                    selections={nodeSelections}
+                    onNodeToggle={handleNodeToggle}
+                    onUpdateSelection={(nodeId, update) =>
+                      setNodeSelections(prev => ({
+                        ...prev,
+                        [nodeId]: {
+                          ...(prev[nodeId] ?? {
+                            approved: true,
+                            finalName:
+                              nodeLookup[nodeId]?.name || 'Untitled node',
+                            entityType:
+                              nodeLookup[nodeId]?.entityType || 'unknown',
+                            confidence: nodeLookup[nodeId]?.confidence || 0.75,
+                            sourceColumns:
+                              nodeLookup[nodeId]?.sourceColumns || [],
+                            metadata:
+                              nodeLookup[nodeId]?.metadata ||
+                              nodeLookup[nodeId]?.llmMetadata ||
+                              {},
+                            linkedEntityId: nodeLookup[nodeId]?.linkedEntityId,
+                          }),
+                          ...update,
+                        },
+                      }))
+                    }
+                    onSelectAll={handleSelectAllNodes}
+                    onDeselectAll={handleDeselectAllNodes}
+                  />
+                )}
+                {currentPhase === 'nodes_completed' && (
+                  <div className="phase-transition">
+                    <p>Nodes approved. Generating relationships, please wait...</p>
+                  </div>
+                )}
+                {currentPhase === 'edges' && (
+                  <EdgeRecommendationList
+                    recommendations={recommendations.edge_recommendations}
+                    selections={edgeSelections}
+                    onEdgeToggle={handleEdgeToggle}
+                    onUpdateSelection={(edgeId, update) =>
+                      setEdgeSelections(prev => ({
+                        ...prev,
+                        [edgeId]: {
+                          ...(prev[edgeId] ?? {
+                            approved: true,
+                            relationshipType:
+                              edgeLookup[edgeId]?.relationshipType ||
+                              'RELATED_TO',
+                            confidence: edgeLookup[edgeId]?.confidence || 0.7,
+                            metadata: edgeLookup[edgeId]?.metadata || {},
+                            reasoning: edgeLookup[edgeId]?.reasoning,
+                          }),
+                          ...update,
+                        },
+                      }))
+                    }
+                    nodeLookup={nodeLookup}
+                    onSelectAll={() => handleSelectAllEdges(true)}
+                    onDeselectAll={() => handleSelectAllEdges(false)}
+                  />
+                )}
                 <div className="review-notes">
                   <label htmlFor="review-notes">
                     Decision notes (optional)

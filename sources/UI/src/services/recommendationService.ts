@@ -105,7 +105,25 @@ export const recommendationAPI = {
   submitRecommendationFeedback: async (
     taskId: string,
     feedback: any
-  ): Promise<void> => {
-    await api.post(`/v1/extract/${taskId}/recommendations/feedback`, feedback);
+  ): Promise<any> => {
+    const response = await api.post(`/v1/extract/${taskId}/recommendations/feedback`, feedback);
+    return response.data;
+  },
+
+  submitFeedback: async (taskId: string, feedback: any): Promise<any> => {
+    const response = await api.post(
+      `/v1/extract/${taskId}/recommendations/feedback`,
+      feedback
+    );
+    return response.data;
+  },
+
+  generateRecommendations: async (taskId: string): Promise<void> => {
+    await api.post(`/v1/extract/${taskId}/generate-recommendations`);
+  },
+
+  generateEdgeRecommendations: async (taskId: string): Promise<RecommendationData> => {
+    const response = await api.post(`/v1/extract/${taskId}/generate-edge-recommendations`);
+    return response.data;
   },
 };

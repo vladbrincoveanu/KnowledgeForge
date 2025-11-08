@@ -227,26 +227,43 @@ class ReinforcementLearningService:
             Respond only with JSON array.
             """
 
-            response = await self.llm_manager.generate_text(
+            logger.info("Calling LLM to generate node recommendations")
+            response = self.llm_manager.generate_text(
                 prompt, max_tokens=500, temperature=0.7
             )
 
             if response:
+                logger.info(f"LLM response received for node recommendations (length: {len(response)})")
                 try:
-                    recommendations = self.llm_manager.parse_json_response(response)
-                    for rec in recommendations:
-                        action = RLAction(
-                            action_type="node",
-                            recommendation=rec,
-                            confidence=rec.get("confidence", 0.5),
-                            reasoning=rec.get("reasoning", "LLM generated"),
-                        )
-                        actions.append(action)
+                    recommendations = self.llm_manager._extract_json_from_response(response)
+                    if recommendations:
+                        # Handle both array and object responses
+                        if isinstance(recommendations, list):
+                            recs_list = recommendations
+                        elif isinstance(recommendations, dict) and 'recommendations' in recommendations:
+                            recs_list = recommendations['recommendations']
+                        else:
+                            recs_list = [recommendations]
+                        
+                        logger.info(f"LLM generated {len(recs_list)} node recommendations")
+                        for rec in recs_list:
+                            action = RLAction(
+                                action_type="node",
+                                recommendation=rec,
+                                confidence=rec.get("confidence", 0.5),
+                                reasoning=rec.get("reasoning", "LLM generated"),
+                            )
+                            actions.append(action)
+                    else:
+                        logger.warning("LLM response did not contain valid JSON for node recommendations")
                 except Exception as e:
                     logger.error(f"Error parsing node recommendations: {e}")
+                    logger.error(f"Response was: {response[:500]}")
+            else:
+                logger.warning("LLM returned empty response for node recommendations")
 
         except Exception as e:
-            logger.error(f"Error generating node actions: {e}")
+            logger.error(f"Error generating node actions: {e}", exc_info=True)
 
         return actions
 
@@ -278,26 +295,43 @@ class ReinforcementLearningService:
             Respond only with JSON array.
             """
 
-            response = await self.llm_manager.generate_text(
+            logger.info("Calling LLM to generate edge recommendations")
+            response = self.llm_manager.generate_text(
                 prompt, max_tokens=500, temperature=0.7
             )
 
             if response:
+                logger.info(f"LLM response received for edge recommendations (length: {len(response)})")
                 try:
-                    recommendations = self.llm_manager.parse_json_response(response)
-                    for rec in recommendations:
-                        action = RLAction(
-                            action_type="edge",
-                            recommendation=rec,
-                            confidence=rec.get("confidence", 0.5),
-                            reasoning=rec.get("reasoning", "LLM generated"),
-                        )
-                        actions.append(action)
+                    recommendations = self.llm_manager._extract_json_from_response(response)
+                    if recommendations:
+                        # Handle both array and object responses
+                        if isinstance(recommendations, list):
+                            recs_list = recommendations
+                        elif isinstance(recommendations, dict) and 'recommendations' in recommendations:
+                            recs_list = recommendations['recommendations']
+                        else:
+                            recs_list = [recommendations]
+                        
+                        logger.info(f"LLM generated {len(recs_list)} edge recommendations")
+                        for rec in recs_list:
+                            action = RLAction(
+                                action_type="edge",
+                                recommendation=rec,
+                                confidence=rec.get("confidence", 0.5),
+                                reasoning=rec.get("reasoning", "LLM generated"),
+                            )
+                            actions.append(action)
+                    else:
+                        logger.warning("LLM response did not contain valid JSON for edge recommendations")
                 except Exception as e:
                     logger.error(f"Error parsing edge recommendations: {e}")
+                    logger.error(f"Response was: {response[:500]}")
+            else:
+                logger.warning("LLM returned empty response for edge recommendations")
 
         except Exception as e:
-            logger.error(f"Error generating edge actions: {e}")
+            logger.error(f"Error generating edge actions: {e}", exc_info=True)
 
         return actions
 
@@ -391,3 +425,17 @@ class ReinforcementLearningService:
     async def _update_model_weights(self, context_metadata: Dict[str, Any]) -> None:
         logger.debug("Updating RL model weights with context metadata: %s", context_metadata)
         # Placeholder: extended RL updates would happen here.
+    
+    def _summarize_feedback(self, feedback_list: List[Dict[str, Any]]) -> str:
+        """Summarize historical feedback for LLM context."""
+        if not feedback_list:
+            return "No previous feedback available"
+        
+        # Summarize recent feedback patterns
+        approved_count = sum(1 for f in feedback_list if f.get('approved', False))
+        total_count = len(feedback_list)
+        
+        summary = f"Total feedback: {total_count}, Approved: {approved_count}, "
+        summary += f"Approval rate: {approved_count/total_count:.2%}" if total_count > 0 else "No data"
+        
+        return summary

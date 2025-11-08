@@ -139,13 +139,11 @@ class Neo4jGraphManager:
             )
             rel_types_query = "CALL db.relationshipTypes() YIELD relationshipType RETURN collect(relationshipType) as types"
 
-            labels_result = session.run(labels_query)
-            rel_types_result = session.run(rel_types_query)
+            labels_result = session.run(labels_query).single()
+            rel_types_result = session.run(rel_types_query).single()
 
-            labels = labels_result.single()["labels"] if labels_result.single() else []
-            rel_types = (
-                rel_types_result.single()["types"] if rel_types_result.single() else []
-            )
+            labels = labels_result["labels"] if labels_result else []
+            rel_types = rel_types_result["types"] if rel_types_result else []
 
             self.graph_schema = GraphSchema(
                 node_labels=labels,
@@ -166,10 +164,11 @@ class Neo4jGraphManager:
     def _create_indexes(self, session: Session):
         """Create performance indexes."""
         indexes = [
-            "CREATE INDEX entity_id_index IF NOT EXISTS FOR (e:Entity) ON (e.id)",
             "CREATE INDEX entity_type_index IF NOT EXISTS FOR (e:Entity) ON (e.entity_type)",
             "CREATE INDEX entity_confidence_index IF NOT EXISTS FOR (e:Entity) ON (e.confidence)",
             "CREATE INDEX entity_timestamp_index IF NOT EXISTS FOR (e:Entity) ON (e.extraction_timestamp)",
+            "CREATE INDEX entity_description_index IF NOT EXISTS FOR (e:Entity) ON (e.description)",
+            "CREATE INDEX entity_semantic_type_index IF NOT EXISTS FOR (e:Entity) ON (e.semantic_type)",
             "CREATE INDEX relationship_type_index IF NOT EXISTS FOR (r:RELATES_TO) ON (r.type)",
             "CREATE INDEX relationship_confidence_index IF NOT EXISTS FOR (r:RELATES_TO) ON (r.confidence)",
             "CREATE INDEX relationship_timestamp_index IF NOT EXISTS FOR (r:RELATES_TO) ON (r.discovered_at)",
@@ -184,6 +183,15 @@ class Neo4jGraphManager:
 
     def _create_constraints(self, session: Session):
         """Create advanced constraints for data integrity."""
+        # Drop legacy index if it exists, to be replaced by a unique constraint
+        try:
+            session.run("DROP INDEX entity_id_index IF EXISTS")
+            logger.info("Dropped legacy index 'entity_id_index' to prepare for unique constraint.")
+        except Exception as e:
+            # It's okay if this fails, the index might not exist under that name.
+            # The important part is handling the constraint creation failure gracefully.
+            logger.debug(f"Could not drop legacy index 'entity_id_index', may not exist: {e}")
+
         constraints = [
             "CREATE CONSTRAINT entity_id_unique IF NOT EXISTS FOR (e:Entity) REQUIRE e.id IS UNIQUE",
             "CREATE CONSTRAINT entity_source_file IF NOT EXISTS FOR (e:Entity) REQUIRE e.source_file IS NOT NULL",
@@ -290,13 +298,12 @@ class Neo4jGraphManager:
             e.entity_type = $entity_type,
             e.confidence = $confidence,
             e.source_columns = $source_columns,
-            e.source_value = $source_value,
-            e.attributes = $attributes,
             e.source_file = $source_file,
             e.extraction_timestamp = $extraction_timestamp,
             e.version = $version,
             e.lineage = $lineage,
             e.task_id = $task_id
+        SET e += $attributes
         """
 
         params = {
@@ -304,9 +311,8 @@ class Neo4jGraphManager:
             "name": entity.name,
             "entity_type": entity.entity_type,
             "confidence": entity.confidence,
-            "source_columns": json.dumps(entity.source_columns),
-            "source_value": entity.source_value,
-            "attributes": json.dumps(entity.attributes),
+            "source_columns": entity.source_columns,
+            "attributes": entity.attributes,
             "source_file": source_file,
             "extraction_timestamp": extraction_timestamp.isoformat(),
             "version": version,
@@ -361,9 +367,9 @@ class Neo4jGraphManager:
         ON MATCH SET r.updated_at = $updated_at
         SET r.type = $rel_type,
             r.confidence = $confidence,
-            r.attributes = $attributes,
             r.discovered_at = $discovered_at,
             r.evidence = $evidence
+        SET r += $attributes
         """
 
         params = {
@@ -372,7 +378,7 @@ class Neo4jGraphManager:
             "rel_id": relationship.id,
             "rel_type": relationship.relationship_type,
             "confidence": relationship.confidence,
-            "attributes": json.dumps(relationship.attributes),
+            "attributes": relationship.attributes,
             "discovered_at": discovered_at.isoformat(),
             "evidence": evidence or "statistical_discovery",
             "created_at": datetime.now().isoformat(),
@@ -881,10 +887,7 @@ class Neo4jGraphManager:
             query = """
             MATCH (e:Entity)
             WHERE e.task_id = $task_id
-            RETURN e.id as id, e.name as name, e.entity_type as entity_type,
-                   e.confidence as confidence, e.attributes as attributes,
-                   e.source_columns as source_columns, 
-                   COALESCE(e.source_value, "N/A") as source_value
+            RETURN e
             ORDER BY e.name
             SKIP $offset LIMIT $limit
             """
@@ -892,10 +895,7 @@ class Neo4jGraphManager:
         else:
             query = """
             MATCH (e:Entity)
-            RETURN e.id as id, e.name as name, e.entity_type as entity_type,
-                   e.confidence as confidence, e.attributes as attributes,
-                   e.source_columns as source_columns, 
-                   COALESCE(e.source_value, "N/A") as source_value
+            RETURN e
             ORDER BY e.name
             SKIP $offset LIMIT $limit
             """
@@ -905,25 +905,19 @@ class Neo4jGraphManager:
             with self.driver.session(database=self.database) as session:
                 result = session.run(query, params)
                 entities = []
+                core_properties = ['id', 'name', 'entity_type', 'confidence', 'source_columns', 'created_at', 'updated_at', 'task_id', 'source_file', 'extraction_timestamp', 'lineage', 'version']
                 for record in result:
-                    # Parse JSON strings back to objects
-                    try:
-                        source_columns = json.loads(record["source_columns"]) if record["source_columns"] else []
-                    except (json.JSONDecodeError, TypeError):
-                        source_columns = []
+                    node = record["e"]
+                    properties = dict(node)
                     
-                    try:
-                        attributes = json.loads(record["attributes"]) if record["attributes"] else {}
-                    except (json.JSONDecodeError, TypeError):
-                        attributes = {}
+                    attributes = {k: v for k, v in properties.items() if k not in core_properties}
                     
                     entity = {
-                        "id": record["id"],
-                        "name": record["name"],
-                        "entity_type": record["entity_type"],
-                        "confidence": record["confidence"],
-                        "source_columns": source_columns,
-                        "source_value": record["source_value"],
+                        "id": properties.get("id"),
+                        "name": properties.get("name"),
+                        "entity_type": properties.get("entity_type"),
+                        "confidence": properties.get("confidence"),
+                        "source_columns": properties.get("source_columns", []),
                         "attributes": attributes,
                     }
                     entities.append(entity)
@@ -957,10 +951,7 @@ class Neo4jGraphManager:
             query = """
             MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity)
             WHERE source.task_id = $task_id AND target.task_id = $task_id
-            RETURN r.id as id, r.type as type, r.confidence as confidence,
-                   source.name as source_entity, target.name as target_entity,
-                   source.id as source_entity_id, target.id as target_entity_id,
-                   r.attributes as attributes
+            RETURN r, source, target
             ORDER BY r.type
             SKIP $offset LIMIT $limit
             """
@@ -968,10 +959,7 @@ class Neo4jGraphManager:
         else:
             query = """
             MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity)
-            RETURN r.id as id, r.type as type, r.confidence as confidence,
-                   source.name as source_entity, target.name as target_entity,
-                   source.id as source_entity_id, target.id as target_entity_id,
-                   r.attributes as attributes
+            RETURN r, source, target
             ORDER BY r.type
             SKIP $offset LIMIT $limit
             """
@@ -981,22 +969,24 @@ class Neo4jGraphManager:
             with self.driver.session(database=self.database) as session:
                 result = session.run(query, params)
                 relationships = []
+                core_properties = ['id', 'type', 'confidence', 'discovered_at', 'evidence', 'created_at', 'updated_at', 'task_id']
                 for record in result:
-                    # Parse JSON strings back to objects
-                    try:
-                        attributes = json.loads(record["attributes"]) if record["attributes"] else {}
-                    except (json.JSONDecodeError, TypeError):
-                        attributes = {}
+                    rel_node = record["r"]
+                    source_node = record["source"]
+                    target_node = record["target"]
+                    properties = dict(rel_node)
+
+                    attributes = {k: v for k, v in properties.items() if k not in core_properties}
                     
                     rel = {
-                        "id": record["id"],
-                        "relationship_type": record["type"],
-                        "type": record["type"],
-                        "confidence": record["confidence"],
-                        "source_entity": record["source_entity"],
-                        "target_entity": record["target_entity"],
-                        "source_entity_id": record["source_entity_id"],
-                        "target_entity_id": record["target_entity_id"],
+                        "id": properties.get("id"),
+                        "relationship_type": properties.get("type"),
+                        "type": properties.get("type"),
+                        "confidence": properties.get("confidence"),
+                        "source_entity": source_node["name"],
+                        "target_entity": target_node["name"],
+                        "source_entity_id": source_node["id"],
+                        "target_entity_id": target_node["id"],
                         "attributes": attributes,
                     }
                     relationships.append(rel)
@@ -1117,10 +1107,7 @@ class Neo4jGraphManager:
         """Get a specific entity by its ID."""
         query = """
         MATCH (e:Entity {id: $entity_id})
-        RETURN e.id as id, e.name as name, e.entity_type as entity_type,
-               e.confidence as confidence, e.attributes as attributes,
-               e.source_columns as source_columns, 
-               COALESCE(e.source_value, "N/A") as source_value
+        RETURN e
         """
 
         try:
@@ -1128,24 +1115,18 @@ class Neo4jGraphManager:
                 result = session.run(query, {"entity_id": entity_id})
                 record = result.single()
                 if record:
-                    # Parse JSON strings back to objects
-                    try:
-                        source_columns = json.loads(record["source_columns"]) if record["source_columns"] else []
-                    except (json.JSONDecodeError, TypeError):
-                        source_columns = []
+                    node = record["e"]
+                    properties = dict(node)
+                    core_properties = ['id', 'name', 'entity_type', 'confidence', 'source_columns', 'created_at', 'updated_at', 'task_id', 'source_file', 'extraction_timestamp', 'lineage', 'version']
                     
-                    try:
-                        attributes = json.loads(record["attributes"]) if record["attributes"] else {}
-                    except (json.JSONDecodeError, TypeError):
-                        attributes = {}
-                    
+                    attributes = {k: v for k, v in properties.items() if k not in core_properties}
+
                     return {
-                        "id": record["id"],
-                        "name": record["name"],
-                        "entity_type": record["entity_type"],
-                        "confidence": record["confidence"],
-                        "source_columns": source_columns,
-                        "source_value": record["source_value"],
+                        "id": properties.get("id"),
+                        "name": properties.get("name"),
+                        "entity_type": properties.get("entity_type"),
+                        "confidence": properties.get("confidence"),
+                        "source_columns": properties.get("source_columns", []),
                         "attributes": attributes,
                     }
                 return None
@@ -1157,10 +1138,7 @@ class Neo4jGraphManager:
         """Get a specific relationship by its ID."""
         query = """
         MATCH (source:Entity)-[r:RELATES_TO {id: $rel_id}]->(target:Entity)
-        RETURN r.id as id, r.type as type, r.confidence as confidence,
-               source.name as source_entity, target.name as target_entity,
-               source.id as source_entity_id, target.id as target_entity_id,
-               r.attributes as attributes
+        RETURN r, source, target
         """
 
         try:
@@ -1168,21 +1146,23 @@ class Neo4jGraphManager:
                 result = session.run(query, {"rel_id": relationship_id})
                 record = result.single()
                 if record:
-                    # Parse JSON strings back to objects
-                    try:
-                        attributes = json.loads(record["attributes"]) if record["attributes"] else {}
-                    except (json.JSONDecodeError, TypeError):
-                        attributes = {}
+                    rel_node = record["r"]
+                    source_node = record["source"]
+                    target_node = record["target"]
+                    properties = dict(rel_node)
+                    core_properties = ['id', 'type', 'confidence', 'discovered_at', 'evidence', 'created_at', 'updated_at', 'task_id']
+
+                    attributes = {k: v for k, v in properties.items() if k not in core_properties}
                     
                     return {
-                        "id": record["id"],
-                        "relationship_type": record["type"],
-                        "type": record["type"],
-                        "confidence": record["confidence"],
-                        "source_entity": record["source_entity"],
-                        "target_entity": record["target_entity"],
-                        "source_entity_id": record["source_entity_id"],
-                        "target_entity_id": record["target_entity_id"],
+                        "id": properties.get("id"),
+                        "relationship_type": properties.get("type"),
+                        "type": properties.get("type"),
+                        "confidence": properties.get("confidence"),
+                        "source_entity": source_node["name"],
+                        "target_entity": target_node["name"],
+                        "source_entity_id": source_node["id"],
+                        "target_entity_id": target_node["id"],
                         "attributes": attributes,
                     }
                 return None
@@ -1374,23 +1354,6 @@ class Neo4jGraphManager:
                 entities = []
                 for record in entities_result:
                     entity_data = dict(record)
-                    # Parse JSON strings back to objects
-                    try:
-                        if entity_data.get('source_columns'):
-                            entity_data['source_columns'] = json.loads(entity_data['source_columns'])
-                        else:
-                            entity_data['source_columns'] = []
-                    except (json.JSONDecodeError, TypeError):
-                        entity_data['source_columns'] = []
-                    
-                    try:
-                        if entity_data.get('attributes'):
-                            entity_data['attributes'] = json.loads(entity_data['attributes'])
-                        else:
-                            entity_data['attributes'] = {}
-                    except (json.JSONDecodeError, TypeError):
-                        entity_data['attributes'] = {}
-                    
                     entities.append(entity_data)
                 
                 # Get relationships for the task (filter by task_id property)
@@ -1423,27 +1386,6 @@ class Neo4jGraphManager:
                 relationships = []
                 for record in relationships_result:
                     relationship_data = dict(record)
-
-                    try:
-                        if relationship_data.get("attributes"):
-                            relationship_data["attributes"] = json.loads(
-                                relationship_data["attributes"]
-                            )
-                        else:
-                            relationship_data["attributes"] = {}
-                    except (json.JSONDecodeError, TypeError):
-                        relationship_data["attributes"] = {}
-
-                    try:
-                        if relationship_data.get("evidence"):
-                            relationship_data["evidence"] = json.loads(
-                                relationship_data["evidence"]
-                            )
-                        else:
-                            relationship_data["evidence"] = {}
-                    except (json.JSONDecodeError, TypeError):
-                        relationship_data["evidence"] = {}
-
                     relationships.append(relationship_data)
                 
                 # Generate basic Cypher queries for visualization

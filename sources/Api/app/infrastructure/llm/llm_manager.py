@@ -222,19 +222,29 @@ Create ontology mappings in JSON format:
     def _test_connection(self) -> bool:
         """Test connection to LM Studio service."""
         try:
+            logger.info(f"Testing connection to LM Studio at {self.lmstudio_url}")
             response = self.session.get(f"{self.lmstudio_url}/v1/models", timeout=5)
             if response.status_code == 200:
+                models = response.json().get("data", [])
+                model_names = [m.get("id", "unknown") for m in models[:3]]
                 logger.info(
-                    f"Successfully connected to LM Studio at {self.lmstudio_url}"
+                    f"✓ Successfully connected to LM Studio at {self.lmstudio_url}"
                 )
+                logger.info(f"✓ Available models: {', '.join(model_names) if model_names else 'None'}")
+                logger.info(f"✓ Using model: {self.default_model}")
                 return True
             else:
                 logger.warning(
-                    f"LM Studio service responded with status {response.status_code}"
+                    f"✗ LM Studio service responded with status {response.status_code}"
                 )
                 return False
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"✗ Cannot connect to LM Studio at {self.lmstudio_url}")
+            logger.error(f"  Make sure LM Studio is running and accessible")
+            logger.error(f"  Error: {e}")
+            return False
         except requests.exceptions.RequestException as e:
-            logger.warning(f"Failed to connect to LM Studio service: {e}")
+            logger.warning(f"✗ Failed to connect to LM Studio service: {e}")
             return False
 
     def _check_rate_limit(self) -> bool:

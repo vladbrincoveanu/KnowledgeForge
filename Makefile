@@ -9,6 +9,8 @@ help:
 	@echo ""
 	@echo "  make up         - Start all services (UI, API, and infrastructure)"
 	@echo "  make down       - Stop all services"
+	@echo "  make restart    - Restart all services with latest code (rebuilds Docker images)"
+	@echo "  make restart-dev - Restart all services (uses volume-mounted code - no rebuild)"
 	@echo "  make dev        - Start development environment"
 	@echo "  make prod       - Start production environment"
 	@echo "  make clean      - Stop and clean all containers and volumes"
@@ -26,6 +28,8 @@ help:
 	@echo "Individual Services:"
 	@echo "  make api-only   - Start API only (local development)"
 	@echo "  make ui-only    - Start UI only (local development)"
+	@echo "  make restart-api - Restart API service with latest code (rebuilds Docker image)"
+	@echo "  make restart-api-dev - Restart API service (uses volume-mounted code - no rebuild)"
 	@echo ""
 	@echo "Infrastructure:"
 	@echo "  make infra      - Start infrastructure services only"
@@ -199,12 +203,22 @@ portainer:
 
 # Development helpers
 restart:
-	@echo "🔄 Restarting all services..."
+	@echo "🔄 Restarting all services with latest code..."
 	make down
+	docker-compose build --no-cache
 	make up
 
+restart-dev:
+	@echo "🔄 Restarting all services (using volume-mounted code - no rebuild)..."
+	docker-compose restart
+
 restart-api:
-	@echo "🔄 Restarting API service..."
+	@echo "🔄 Restarting API service with latest code..."
+	docker-compose build --no-cache api
+	docker-compose up -d api
+
+restart-api-dev:
+	@echo "🔄 Restarting API service (using volume-mounted code - no rebuild)..."
 	docker-compose restart api
 
 restart-ui:
