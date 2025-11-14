@@ -3,6 +3,7 @@
 import json
 import logging
 from datetime import datetime
+from typing import Any, Optional
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -148,8 +149,12 @@ async def websocket_endpoint(websocket: WebSocket):
 
 # Utility function to broadcast task updates
 async def broadcast_task_update(
-    task_id: str, status: str, message: str = "", progress: int = None
-):
+    task_id: str,
+    status: str,
+    message: str = "",
+    progress: Optional[int] = None,
+    extra: Optional[dict[str, Any]] = None,
+) -> None:
     """Broadcast task update to all connected clients."""
     update_message = {
         "type": "task_update",
@@ -161,6 +166,9 @@ async def broadcast_task_update(
 
     if progress is not None:
         update_message["progress"] = progress
+    
+    if extra:
+        update_message.update(extra)
 
     await manager.broadcast(update_message)
     logging.info(f"Broadcasted task update: {task_id} - {status}")

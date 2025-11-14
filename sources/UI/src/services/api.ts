@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
+import { IncrementalSummary } from '@/types';
 
 // TypeScript interfaces
 interface ExtractConfig {
@@ -387,6 +388,12 @@ interface WebSocketMessage {
   type: string;
   data?: unknown;
   timestamp?: string;
+  task_id?: string;
+  status?: string;
+  message?: string;
+  progress?: number;
+  incremental_summary?: IncrementalSummary;
+  [key: string]: unknown;
 }
 
 // WebSocket service for real-time updates

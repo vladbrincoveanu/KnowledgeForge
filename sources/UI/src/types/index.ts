@@ -34,6 +34,14 @@ export interface TaskStatus {
   result?: Record<string, unknown>;
 }
 
+export interface IncrementalSummary {
+  added_entities: number;
+  modified_entities: number;
+  deleted_entities: number;
+  added_relationships: number;
+  deleted_relationships: number;
+}
+
 // Metrics and health interfaces
 export interface SystemMetrics {
   system_metrics?: {

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import './App.scss';
 import Notification from './@components/notification/Notification';
+import { IncrementalSummary } from '@/types';
 
 // TypeScript interfaces
 interface NavItem {
@@ -55,10 +56,12 @@ interface ExtractionTask {
   createdAt: string;
   completedAt?: string;
   timestamp?: string;
+  progress?: number;
   results?: {
     entities: Entity[];
     relationships: Relationship[];
   };
+  incrementalSummary?: IncrementalSummary;
 }
 
 interface Entity {
@@ -107,6 +110,8 @@ interface WebSocketMessage {
   status?: string;
   message?: string;
   timestamp?: string;
+  progress?: number;
+  incremental_summary?: IncrementalSummary;
 }
 
 interface NavigationProps {
@@ -423,7 +428,10 @@ const MainContent: React.FC = () => {
   }, []);
 
   const handleWebSocketMessage = useCallback((data?: unknown) => {
-    const wsData = data as WebSocketMessage & { progress?: number };
+    const wsData = data as WebSocketMessage & {
+      progress?: number;
+      incremental_summary?: IncrementalSummary;
+    };
     if (!wsData?.task_id) {
       return;
     }
@@ -439,6 +447,8 @@ const MainContent: React.FC = () => {
           status: 'pending',
           message: wsData.message || 'Task update received',
           createdAt: wsData.timestamp || new Date().toISOString(),
+          progress: wsData.progress ?? 0,
+          incrementalSummary: wsData.incremental_summary,
         } as ExtractionTask);
 
       const updatedTask: ExtractionTask = {
@@ -446,6 +456,9 @@ const MainContent: React.FC = () => {
         status: (wsData.status as ExtractionTask['status']) || baseTask.status,
         message: wsData.message || baseTask.message,
         timestamp: wsData.timestamp || baseTask.timestamp,
+        progress: wsData.progress ?? baseTask.progress,
+        incrementalSummary:
+          wsData.incremental_summary ?? baseTask.incrementalSummary,
       };
 
       return {
@@ -544,6 +557,8 @@ const MainContent: React.FC = () => {
           status: 'pending',
           message: 'Task created and queued',
           createdAt: new Date().toISOString(),
+          progress: 0,
+          incrementalSummary: undefined,
         },
       }));
 
@@ -612,6 +627,10 @@ const MainContent: React.FC = () => {
   };
 
   const activeTab = getActiveTab();
+  const activeTaskSummary =
+    activeTaskId && extractionTasks[activeTaskId]
+      ? extractionTasks[activeTaskId]?.incrementalSummary
+      : undefined;
 
   return (
     <div className="app">
@@ -801,6 +820,25 @@ const MainContent: React.FC = () => {
                             {extractionTasks[activeTaskId]?.status || 'unknown'}
                           </span>
                         </div>
+                        {activeTaskSummary && (
+                          <div
+                            style={{
+                              marginBottom: '12px',
+                              padding: '8px 12px',
+                              backgroundColor: '#f8f9fa',
+                              border: '1px solid #dee2e6',
+                              borderRadius: '4px',
+                              fontSize: '13px',
+                            }}
+                          >
+                            <strong>Incremental Summary:</strong>{' '}
+                            Entities +{activeTaskSummary.added_entities} · Δ
+                            {activeTaskSummary.modified_entities} · -
+                            {activeTaskSummary.deleted_entities} | Relationships
+                            +{activeTaskSummary.added_relationships} · -
+                            {activeTaskSummary.deleted_relationships}
+                          </div>
+                        )}
                         <button
                           onClick={() => loadGraphData(activeTaskId)}
                           style={{

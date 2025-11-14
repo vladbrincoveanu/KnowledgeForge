@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { ontologyAPI, fileAPI, wsService, apiUtils } from '@/services/api';
-import { UploadedFile } from '@/types';
+import { UploadedFile, IncrementalSummary } from '@/types';
 import {
   Upload,
   FileText,
@@ -38,6 +38,7 @@ interface ExtractionTask {
   processingTime?: number;
   results?: unknown;
   error?: string;
+  incrementalSummary?: IncrementalSummary;
 }
 
 interface ExtendedUploadedFile extends UploadedFile {
@@ -81,6 +82,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
         message?: string;
         progress?: number;
         timestamp?: string;
+        incremental_summary?: IncrementalSummary;
       };
 
       if (!wsData?.task_id) {
@@ -102,6 +104,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
             message: wsData.message || 'Task update received',
             progress: wsData.progress ?? 0,
             createdAt: wsData.timestamp || new Date().toISOString(),
+            incrementalSummary: wsData.incremental_summary,
           } as ExtractionTask);
 
         const updatedTask: ExtractionTask = {
@@ -110,6 +113,8 @@ const FileUploader: React.FC<FileUploaderProps> = ({
             (wsData.status as ExtractionTask['status']) || baseTask.status,
           message: wsData.message || baseTask.message,
           progress: wsData.progress ?? baseTask.progress,
+          incrementalSummary:
+            wsData.incremental_summary ?? baseTask.incrementalSummary,
         };
 
         return {
@@ -408,6 +413,15 @@ const FileUploader: React.FC<FileUploaderProps> = ({
             : task.message}
         </span>
         {task.processingTime && <small>({task.processingTime}s)</small>}
+        {task.incrementalSummary && (
+          <small className="incremental-summary">
+            Entities +{task.incrementalSummary.added_entities} · Δ
+            {task.incrementalSummary.modified_entities} · -
+            {task.incrementalSummary.deleted_entities} | Relationships +
+            {task.incrementalSummary.added_relationships} · -
+            {task.incrementalSummary.deleted_relationships}
+          </small>
+        )}
       </div>
     );
   };
