@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from app.domain.models.code_entities import (
+from domain.models.code_entities import (
     CodeEntity,
     CodeEntityType,
     CodeLanguage,
@@ -13,7 +13,7 @@ from app.domain.models.code_entities import (
     CodeRelationType,
     SourceType,
 )
-from app.services.code_extraction.base_extractor import BaseExtractor
+from services.code_extraction.base_extractor import BaseExtractor
 
 logger = logging.getLogger(__name__)
 

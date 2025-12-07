@@ -1,0 +1,3321 @@
+{
+  "layer1_code_architecture": {
+    "entities": [
+      {
+        "id": "code_2608eeb8a5a1cb3b",
+        "name": "pyproject.toml",
+        "type": "config_file",
+        "language": "python",
+        "file_path": "pyproject.toml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_c3f7ca825630c465",
+        "name": "clearml",
+        "type": "dependency",
+        "language": "python",
+        "file_path": "pyproject.toml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_03146d5565b4e5c7",
+        "name": "fastapi",
+        "type": "dependency",
+        "language": "python",
+        "file_path": "pyproject.toml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_56ec97db4bb5ab76",
+        "name": "kfp",
+        "type": "dependency",
+        "language": "python",
+        "file_path": "pyproject.toml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_47e7c4fb7377961e",
+        "name": "loguru",
+        "type": "dependency",
+        "language": "python",
+        "file_path": "pyproject.toml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_1056c095dd0723c4",
+        "name": "pydantic-settings",
+        "type": "dependency",
+        "language": "python",
+        "file_path": "pyproject.toml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_fc4af83b08bb04b0",
+        "name": "python-dotenv",
+        "type": "dependency",
+        "language": "python",
+        "file_path": "pyproject.toml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_4067562e8ce503f7",
+        "name": "requests",
+        "type": "dependency",
+        "language": "python",
+        "file_path": "pyproject.toml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_cfce12282be932dc",
+        "name": "main",
+        "type": "module",
+        "language": "python",
+        "file_path": "main.py",
+        "line_start": 1,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_fcd6b2af1e0a4299",
+        "name": "main",
+        "type": "function",
+        "language": "python",
+        "file_path": "main.py",
+        "line_start": 1,
+        "line_end": 2,
+        "signature": "main()"
+      },
+      {
+        "id": "code_d54a9cf1d5fe0c52",
+        "name": "clearml_hello_world_slurm",
+        "type": "module",
+        "language": "python",
+        "file_path": "development/clearml_hello_world_slurm.py",
+        "line_start": 1,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_bb326aacc68172c6",
+        "name": "submit_slurm_hello_world_job",
+        "type": "function",
+        "language": "python",
+        "file_path": "development/clearml_hello_world_slurm.py",
+        "line_start": 23,
+        "line_end": 36,
+        "signature": "submit_slurm_hello_world_job(username, token)"
+      },
+      {
+        "id": "code_eb19437f5b242907",
+        "name": "run_slurm_pipeline",
+        "type": "function",
+        "language": "python",
+        "file_path": "development/clearml_hello_world_slurm.py",
+        "line_start": 45,
+        "line_end": 47,
+        "signature": "run_slurm_pipeline(username, token)"
+      },
+      {
+        "id": "code_83addba63dce24d0",
+        "name": "kubeflow_hello_world",
+        "type": "module",
+        "language": "python",
+        "file_path": "development/kubeflow_hello_world.py",
+        "line_start": 1,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_b9d555b194a24b6c",
+        "name": "step_hello",
+        "type": "function",
+        "language": "python",
+        "file_path": "development/kubeflow_hello_world.py",
+        "line_start": 17,
+        "line_end": 21,
+        "signature": "step_hello(count)"
+      },
+      {
+        "id": "code_90ff9c25aa494d6c",
+        "name": "step_world",
+        "type": "function",
+        "language": "python",
+        "file_path": "development/kubeflow_hello_world.py",
+        "line_start": 27,
+        "line_end": 30,
+        "signature": "step_world(count)"
+      },
+      {
+        "id": "code_19a42e3004664185",
+        "name": "hello_world_pipeline",
+        "type": "function",
+        "language": "python",
+        "file_path": "development/kubeflow_hello_world.py",
+        "line_start": 37,
+        "line_end": 40,
+        "signature": "hello_world_pipeline(count)"
+      },
+      {
+        "id": "code_3f4d0b64fd86e2ae",
+        "name": "clearml_hello_world",
+        "type": "module",
+        "language": "python",
+        "file_path": "development/clearml_hello_world.py",
+        "line_start": 1,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_b098fa576497cdb7",
+        "name": "step_hello",
+        "type": "function",
+        "language": "python",
+        "file_path": "development/clearml_hello_world.py",
+        "line_start": 19,
+        "line_end": 22,
+        "signature": "step_hello(count)"
+      },
+      {
+        "id": "code_7f406af7d64e00fd",
+        "name": "step_world",
+        "type": "function",
+        "language": "python",
+        "file_path": "development/clearml_hello_world.py",
+        "line_start": 26,
+        "line_end": 28,
+        "signature": "step_world(count)"
+      },
+      {
+        "id": "code_b623fef79005ea3a",
+        "name": "run_pipeline",
+        "type": "function",
+        "language": "python",
+        "file_path": "development/clearml_hello_world.py",
+        "line_start": 37,
+        "line_end": 39,
+        "signature": "run_pipeline(count)"
+      },
+      {
+        "id": "code_ebff528b65687d44",
+        "name": "kubeflow_hello_world_slurm",
+        "type": "module",
+        "language": "python",
+        "file_path": "development/kubeflow_hello_world_slurm.py",
+        "line_start": 1,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_23e6e2c44e4220b6",
+        "name": "submit_slurm_hello_world_job",
+        "type": "function",
+        "language": "python",
+        "file_path": "development/kubeflow_hello_world_slurm.py",
+        "line_start": 22,
+        "line_end": 39,
+        "signature": "submit_slurm_hello_world_job(username, token)"
+      },
+      {
+        "id": "code_c7ba3943a9da61ab",
+        "name": "print_result",
+        "type": "function",
+        "language": "python",
+        "file_path": "development/kubeflow_hello_world_slurm.py",
+        "line_start": 45,
+        "line_end": 47,
+        "signature": "print_result(result)"
+      },
+      {
+        "id": "code_159a3ec8ae99517c",
+        "name": "hello_world_slurm_pipeline",
+        "type": "function",
+        "language": "python",
+        "file_path": "development/kubeflow_hello_world_slurm.py",
+        "line_start": 54,
+        "line_end": 57,
+        "signature": "hello_world_slurm_pipeline(username, token)"
+      },
+      {
+        "id": "code_f2d8c1dbb8e76377",
+        "name": "__init__",
+        "type": "module",
+        "language": "python",
+        "file_path": "components/ai_factory/logger/__init__.py",
+        "line_start": 1,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_01921ac2995e24e2",
+        "name": "core",
+        "type": "module",
+        "language": "python",
+        "file_path": "components/ai_factory/logger/core.py",
+        "line_start": 1,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_2bae6f9bef126a27",
+        "name": "InterceptHandler",
+        "type": "class",
+        "language": "python",
+        "file_path": "components/ai_factory/logger/core.py",
+        "line_start": 11,
+        "line_end": 22,
+        "signature": null
+      },
+      {
+        "id": "code_192f1405c47d6774",
+        "name": "emit",
+        "type": "method",
+        "language": "python",
+        "file_path": "components/ai_factory/logger/core.py",
+        "line_start": 14,
+        "line_end": 22,
+        "signature": "emit(self, record)"
+      },
+      {
+        "id": "code_4e4b3760231fc9ae",
+        "name": "setup_logger",
+        "type": "function",
+        "language": "python",
+        "file_path": "components/ai_factory/logger/core.py",
+        "line_start": 25,
+        "line_end": 42,
+        "signature": "setup_logger()"
+      },
+      {
+        "id": "code_5da189dedf8c75f8",
+        "name": "get_logger",
+        "type": "function",
+        "language": "python",
+        "file_path": "components/ai_factory/logger/core.py",
+        "line_start": 45,
+        "line_end": 47,
+        "signature": "get_logger()"
+      },
+      {
+        "id": "code_7b250a7cd5505197",
+        "name": "__init__",
+        "type": "module",
+        "language": "python",
+        "file_path": "components/ai_factory/config/__init__.py",
+        "line_start": 1,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_b18bbcf13651ed67",
+        "name": "core",
+        "type": "module",
+        "language": "python",
+        "file_path": "components/ai_factory/config/core.py",
+        "line_start": 1,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_36f1b4d7eec1902b",
+        "name": "SlurmConfig",
+        "type": "class",
+        "language": "python",
+        "file_path": "components/ai_factory/config/core.py",
+        "line_start": 20,
+        "line_end": 31,
+        "signature": null
+      },
+      {
+        "id": "code_80c6efd8b4c36e68",
+        "name": "api_url",
+        "type": "method",
+        "language": "python",
+        "file_path": "components/ai_factory/config/core.py",
+        "line_start": 29,
+        "line_end": 31,
+        "signature": "api_url(self)"
+      },
+      {
+        "id": "code_9c01e3148d9584f7",
+        "name": "SlurmGatewayConfig",
+        "type": "class",
+        "language": "python",
+        "file_path": "components/ai_factory/config/core.py",
+        "line_start": 34,
+        "line_end": 44,
+        "signature": null
+      },
+      {
+        "id": "code_87c538507f040dd3",
+        "name": "prefix",
+        "type": "method",
+        "language": "python",
+        "file_path": "components/ai_factory/config/core.py",
+        "line_start": 41,
+        "line_end": 44,
+        "signature": "prefix(self)"
+      },
+      {
+        "id": "code_b4ca2c4ef06f1a50",
+        "name": "LoggingConfig",
+        "type": "class",
+        "language": "python",
+        "file_path": "components/ai_factory/config/core.py",
+        "line_start": 47,
+        "line_end": 61,
+        "signature": null
+      },
+      {
+        "id": "code_8658e2ae300bd3c7",
+        "name": "validate_log_level",
+        "type": "method",
+        "language": "python",
+        "file_path": "components/ai_factory/config/core.py",
+        "line_start": 55,
+        "line_end": 61,
+        "signature": "validate_log_level(cls, v)"
+      },
+      {
+        "id": "code_fdd393c566d1a366",
+        "name": "Settings",
+        "type": "class",
+        "language": "python",
+        "file_path": "components/ai_factory/config/core.py",
+        "line_start": 64,
+        "line_end": 77,
+        "signature": null
+      },
+      {
+        "id": "code_ce42b98456987caa",
+        "name": "models",
+        "type": "module",
+        "language": "python",
+        "file_path": "components/ai_factory/slurm/models.py",
+        "line_start": 1,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_4f64219c066ff0c2",
+        "name": "SlurmEnvironment",
+        "type": "class",
+        "language": "python",
+        "file_path": "components/ai_factory/slurm/models.py",
+        "line_start": 12,
+        "line_end": 18,
+        "signature": null
+      },
+      {
+        "id": "code_cb642da123e6596d",
+        "name": "SlurmJobBase",
+        "type": "class",
+        "language": "python",
+        "file_path": "components/ai_factory/slurm/models.py",
+        "line_start": 21,
+        "line_end": 34,
+        "signature": null
+      },
+      {
+        "id": "code_e9ef45c674b0592c",
+        "name": "SlurmJobSpec",
+        "type": "class",
+        "language": "python",
+        "file_path": "components/ai_factory/slurm/models.py",
+        "line_start": 37,
+        "line_end": 46,
+        "signature": null
+      },
+      {
+        "id": "code_245114466c5dd638",
+        "name": "SlurmJobSubmission",
+        "type": "class",
+        "language": "python",
+        "file_path": "components/ai_factory/slurm/models.py",
+        "line_start": 49,
+        "line_end": 53,
+        "signature": null
+      },
+      {
+        "id": "code_c3e11ec52ff37aca",
+        "name": "SlurmJobRequest",
+        "type": "class",
+        "language": "python",
+        "file_path": "components/ai_factory/slurm/models.py",
+        "line_start": 56,
+        "line_end": 103,
+        "signature": null
+      },
+      {
+        "id": "code_b983f260d7ce7f8a",
+        "name": "_create_job_spec",
+        "type": "method",
+        "language": "python",
+        "file_path": "components/ai_factory/slurm/models.py",
+        "line_start": 69,
+        "line_end": 90,
+        "signature": "_create_job_spec(self, username)"
+      },
+      {
+        "id": "code_7afb3d3364f502b3",
+        "name": "to_submission",
+        "type": "method",
+        "language": "python",
+        "file_path": "components/ai_factory/slurm/models.py",
+        "line_start": 92,
+        "line_end": 103,
+        "signature": "to_submission(self, username)"
+      },
+      {
+        "id": "code_c40011b3a95fa66e",
+        "name": "ContainerJobRequest",
+        "type": "class",
+        "language": "python",
+        "file_path": "components/ai_factory/slurm/models.py",
+        "line_start": 106,
+        "line_end": 194,
+        "signature": null
+      },
+      {
+        "id": "code_5be32c48a29c049f",
+        "name": "to_submission",
+        "type": "method",
+        "language": "python",
+        "file_path": "components/ai_factory/slurm/models.py",
+        "line_start": 122,
+        "line_end": 135,
+        "signature": "to_submission(self, username)"
+      },
+      {
+        "id": "code_56e2074e401e9f5f",
+        "name": "_generate_apptainer_script",
+        "type": "method",
+        "language": "python",
+        "file_path": "components/ai_factory/slurm/models.py",
+        "line_start": 137,
+        "line_end": 194,
+        "signature": "_generate_apptainer_script(self, username)"
+      },
+      {
+        "id": "code_dd03b290dfa4a6a3",
+        "name": "__init__",
+        "type": "module",
+        "language": "python",
+        "file_path": "components/ai_factory/slurm/__init__.py",
+        "line_start": 1,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_dd94a3944867030f",
+        "name": "__init__",
+        "type": "module",
+        "language": "python",
+        "file_path": "bases/ai_factory/slurm_gateway/__init__.py",
+        "line_start": 1,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_3ebfbc7355cf54a7",
+        "name": "core",
+        "type": "module",
+        "language": "python",
+        "file_path": "bases/ai_factory/slurm_gateway/core.py",
+        "line_start": 1,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_80cd81b87ace2311",
+        "name": "health_check",
+        "type": "function",
+        "language": "python",
+        "file_path": "bases/ai_factory/slurm_gateway/core.py",
+        "line_start": 19,
+        "line_end": 20,
+        "signature": "health_check()"
+      },
+      {
+        "id": "code_e9472ece408a8208",
+        "name": "submit_job",
+        "type": "function",
+        "language": "python",
+        "file_path": "bases/ai_factory/slurm_gateway/core.py",
+        "line_start": 24,
+        "line_end": 72,
+        "signature": "submit_job(job_request, x_slurm_user_name, x_slurm_user_token)"
+      },
+      {
+        "id": "code_44db247a7d389d45",
+        "name": "submit_hello_world_job",
+        "type": "function",
+        "language": "python",
+        "file_path": "bases/ai_factory/slurm_gateway/core.py",
+        "line_start": 76,
+        "line_end": 105,
+        "signature": "submit_hello_world_job(x_slurm_user_name, x_slurm_user_token)"
+      },
+      {
+        "id": "code_2cfd87bca650a5b7",
+        "name": "get_job",
+        "type": "function",
+        "language": "python",
+        "file_path": "bases/ai_factory/slurm_gateway/core.py",
+        "line_start": 109,
+        "line_end": 113,
+        "signature": "get_job(job_id)"
+      },
+      {
+        "id": "code_ffcad324efedb44b",
+        "name": "delete_job",
+        "type": "function",
+        "language": "python",
+        "file_path": "bases/ai_factory/slurm_gateway/core.py",
+        "line_start": 117,
+        "line_end": 121,
+        "signature": "delete_job(job_id)"
+      },
+      {
+        "id": "code_fdcd8966feef7a5f",
+        "name": "submit_container_job",
+        "type": "function",
+        "language": "python",
+        "file_path": "bases/ai_factory/slurm_gateway/core.py",
+        "line_start": 125,
+        "line_end": 181,
+        "signature": "submit_container_job(container_request, x_slurm_user_name, x_slurm_user_token)"
+      },
+      {
+        "id": "code_70ef87de1a79717c",
+        "name": "Dockerfile",
+        "type": "container",
+        "language": "unknown",
+        "file_path": "projects/slurm_gateway_api/Dockerfile",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_25971eb752f432f9",
+        "name": "pyproject.toml",
+        "type": "config_file",
+        "language": "python",
+        "file_path": "projects/slurm_gateway_api/pyproject.toml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_b217d7c87762eef3",
+        "name": "fastapi",
+        "type": "dependency",
+        "language": "python",
+        "file_path": "projects/slurm_gateway_api/pyproject.toml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_25a0c1aeb3d5c209",
+        "name": "loguru",
+        "type": "dependency",
+        "language": "python",
+        "file_path": "projects/slurm_gateway_api/pyproject.toml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_09c4455ab71bafa8",
+        "name": "pydantic",
+        "type": "dependency",
+        "language": "python",
+        "file_path": "projects/slurm_gateway_api/pyproject.toml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_1f8df9489cd29e8e",
+        "name": "pydantic-settings",
+        "type": "dependency",
+        "language": "python",
+        "file_path": "projects/slurm_gateway_api/pyproject.toml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_7a388af4976d073a",
+        "name": "requests",
+        "type": "dependency",
+        "language": "python",
+        "file_path": "projects/slurm_gateway_api/pyproject.toml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_10e25fc16173c16f",
+        "name": "uvicorn",
+        "type": "dependency",
+        "language": "python",
+        "file_path": "projects/slurm_gateway_api/pyproject.toml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_4d73f3dc8d1c8598",
+        "name": "gitlab-runner",
+        "type": "config_file",
+        "language": "unknown",
+        "file_path": "projects/gitlab-runner/chart/Chart.yaml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_bb29f4db3d902b12",
+        "name": "values.yaml",
+        "type": "config_file",
+        "language": "unknown",
+        "file_path": "projects/gitlab-runner/chart/values.yaml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_439d141acbb8a732",
+        "name": "kustomization_resource",
+        "type": "resource",
+        "language": "unknown",
+        "file_path": "projects/kubeflow-pipelines/kustomize/kustomization.yaml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_3002acae694ea85b",
+        "name": "slurm-gateway-api",
+        "type": "config_file",
+        "language": "unknown",
+        "file_path": "projects/slurm_gateway_api/chart/Chart.yaml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_639f47046c9b3d22",
+        "name": "values.yaml",
+        "type": "config_file",
+        "language": "unknown",
+        "file_path": "projects/slurm_gateway_api/chart/values.yaml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_94b74b3f06f3c301",
+        "name": "clearml",
+        "type": "config_file",
+        "language": "unknown",
+        "file_path": "projects/clearml/chart/Chart.yaml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_6b7249887d74cf3a",
+        "name": "values.yaml",
+        "type": "config_file",
+        "language": "unknown",
+        "file_path": "projects/clearml/chart/values.yaml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_0c593d1ac4e195de",
+        "name": "cert-manager",
+        "type": "config_file",
+        "language": "unknown",
+        "file_path": "projects/cert-manager/chart/Chart.yaml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_a2c50c3911bad5ca",
+        "name": "values.yaml",
+        "type": "config_file",
+        "language": "unknown",
+        "file_path": "projects/cert-manager/chart/values.yaml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_b3b7eb10535a0157",
+        "name": "harbor",
+        "type": "config_file",
+        "language": "unknown",
+        "file_path": "projects/harbor/chart/Chart.yaml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_788da9ad393a40c0",
+        "name": "values.yaml",
+        "type": "config_file",
+        "language": "unknown",
+        "file_path": "projects/harbor/chart/values.yaml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_e2ccad514f04ba02",
+        "name": "apisix",
+        "type": "config_file",
+        "language": "unknown",
+        "file_path": "projects/apisix/chart/Chart.yaml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_be17dd7f5f0cca51",
+        "name": "values.yaml",
+        "type": "config_file",
+        "language": "unknown",
+        "file_path": "projects/apisix/chart/values.yaml",
+        "line_start": null,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_3677d18955290661",
+        "name": "test_core",
+        "type": "module",
+        "language": "python",
+        "file_path": "test/components/ai_factory/logger/test_core.py",
+        "line_start": 1,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_53e024487476310b",
+        "name": "test_sample",
+        "type": "function",
+        "language": "python",
+        "file_path": "test/components/ai_factory/logger/test_core.py",
+        "line_start": 4,
+        "line_end": 5,
+        "signature": "test_sample()"
+      },
+      {
+        "id": "code_b2cb96c71851db92",
+        "name": "test_core",
+        "type": "module",
+        "language": "python",
+        "file_path": "test/components/ai_factory/config/test_core.py",
+        "line_start": 1,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_3aa33997b3353de1",
+        "name": "test_sample",
+        "type": "function",
+        "language": "python",
+        "file_path": "test/components/ai_factory/config/test_core.py",
+        "line_start": 4,
+        "line_end": 5,
+        "signature": "test_sample()"
+      },
+      {
+        "id": "code_4e7c97e3b5c1075c",
+        "name": "test_models",
+        "type": "module",
+        "language": "python",
+        "file_path": "test/components/ai_factory/slurm/test_models.py",
+        "line_start": 1,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_e53d9b80fa31be88",
+        "name": "test_to_submission_uses_defaults_when_overrides_not_provided",
+        "type": "function",
+        "language": "python",
+        "file_path": "test/components/ai_factory/slurm/test_models.py",
+        "line_start": 8,
+        "line_end": 27,
+        "signature": "test_to_submission_uses_defaults_when_overrides_not_provided()"
+      },
+      {
+        "id": "code_1bffa7872efc47b3",
+        "name": "test_to_submission_respects_explicit_overrides",
+        "type": "function",
+        "language": "python",
+        "file_path": "test/components/ai_factory/slurm/test_models.py",
+        "line_start": 30,
+        "line_end": 54,
+        "signature": "test_to_submission_respects_explicit_overrides()"
+      },
+      {
+        "id": "code_b31b7faff585b382",
+        "name": "test_resource_parameters_cpus_per_task",
+        "type": "function",
+        "language": "python",
+        "file_path": "test/components/ai_factory/slurm/test_models.py",
+        "line_start": 57,
+        "line_end": 89,
+        "signature": "test_resource_parameters_cpus_per_task()"
+      },
+      {
+        "id": "code_4f284feaa469243a",
+        "name": "test_core",
+        "type": "module",
+        "language": "python",
+        "file_path": "test/bases/ai_factory/slurm_gateway/test_core.py",
+        "line_start": 1,
+        "line_end": null,
+        "signature": null
+      },
+      {
+        "id": "code_40a21f8dc47efdbd",
+        "name": "test_submit_job_forwards_headers_and_body",
+        "type": "function",
+        "language": "python",
+        "file_path": "test/bases/ai_factory/slurm_gateway/test_core.py",
+        "line_start": 10,
+        "line_end": 65,
+        "signature": "test_submit_job_forwards_headers_and_body(monkeypatch)"
+      },
+      {
+        "id": "code_a900a76bce0f067d",
+        "name": "MockResponse",
+        "type": "class",
+        "language": "python",
+        "file_path": "test/bases/ai_factory/slurm_gateway/test_core.py",
+        "line_start": 22,
+        "line_end": 28,
+        "signature": null
+      },
+      {
+        "id": "code_319b1a992add0877",
+        "name": "__init__",
+        "type": "method",
+        "language": "python",
+        "file_path": "test/bases/ai_factory/slurm_gateway/test_core.py",
+        "line_start": 23,
+        "line_end": 25,
+        "signature": "__init__(self)"
+      },
+      {
+        "id": "code_fc500cc95f5dcae2",
+        "name": "json",
+        "type": "method",
+        "language": "python",
+        "file_path": "test/bases/ai_factory/slurm_gateway/test_core.py",
+        "line_start": 27,
+        "line_end": 28,
+        "signature": "json(self)"
+      },
+      {
+        "id": "code_06a560ab465353a4",
+        "name": "mock_post",
+        "type": "function",
+        "language": "python",
+        "file_path": "test/bases/ai_factory/slurm_gateway/test_core.py",
+        "line_start": 30,
+        "line_end": 35,
+        "signature": "mock_post(url, headers, json, timeout)"
+      }
+    ],
+    "relationships": [
+      {
+        "id": "rel_80589fd6bb8de02b",
+        "source": "code_2608eeb8a5a1cb3b",
+        "target": "code_c3f7ca825630c465",
+        "type": "depends_on"
+      },
+      {
+        "id": "rel_f55bd932f678934d",
+        "source": "code_2608eeb8a5a1cb3b",
+        "target": "code_03146d5565b4e5c7",
+        "type": "depends_on"
+      },
+      {
+        "id": "rel_f79141507e4ce509",
+        "source": "code_2608eeb8a5a1cb3b",
+        "target": "code_56ec97db4bb5ab76",
+        "type": "depends_on"
+      },
+      {
+        "id": "rel_2e699bafdd9807fc",
+        "source": "code_2608eeb8a5a1cb3b",
+        "target": "code_47e7c4fb7377961e",
+        "type": "depends_on"
+      },
+      {
+        "id": "rel_4f98e14e4e8e5eb4",
+        "source": "code_2608eeb8a5a1cb3b",
+        "target": "code_1056c095dd0723c4",
+        "type": "depends_on"
+      },
+      {
+        "id": "rel_21cb6128c330537b",
+        "source": "code_2608eeb8a5a1cb3b",
+        "target": "code_fc4af83b08bb04b0",
+        "type": "depends_on"
+      },
+      {
+        "id": "rel_fadff5e4e902323d",
+        "source": "code_2608eeb8a5a1cb3b",
+        "target": "code_4067562e8ce503f7",
+        "type": "depends_on"
+      },
+      {
+        "id": "rel_be39769e23df47c6",
+        "source": "code_fcd6b2af1e0a4299",
+        "target": "code_84d9b8524dff5d1e",
+        "type": "calls"
+      },
+      {
+        "id": "rel_a731c8fe7995bb9b",
+        "source": "code_d54a9cf1d5fe0c52",
+        "target": "code_00b7e59a0f941385",
+        "type": "imports"
+      },
+      {
+        "id": "rel_74c0edb60bcb9a0c",
+        "source": "code_d54a9cf1d5fe0c52",
+        "target": "code_71c93815100544b9",
+        "type": "imports"
+      },
+      {
+        "id": "rel_1bf6c317828d4d0c",
+        "source": "code_d54a9cf1d5fe0c52",
+        "target": "code_ab09abce2608ea6c",
+        "type": "imports"
+      },
+      {
+        "id": "rel_7ac6c538ebffa1f9",
+        "source": "code_d54a9cf1d5fe0c52",
+        "target": "code_95ede4bb46d20a10",
+        "type": "imports"
+      },
+      {
+        "id": "rel_64622329cb90c1c8",
+        "source": "code_d54a9cf1d5fe0c52",
+        "target": "code_d77a173f7ad9f3d6",
+        "type": "imports"
+      },
+      {
+        "id": "rel_a259c8767e72184c",
+        "source": "code_bb326aacc68172c6",
+        "target": "code_a8d674878bdf1141",
+        "type": "calls"
+      },
+      {
+        "id": "rel_e89348cda366d4f4",
+        "source": "code_bb326aacc68172c6",
+        "target": "code_71802ba6cdf5091b",
+        "type": "calls"
+      },
+      {
+        "id": "rel_420ed72d013a38d4",
+        "source": "code_bb326aacc68172c6",
+        "target": "code_dee65625807e0524",
+        "type": "calls"
+      },
+      {
+        "id": "rel_802a9a89c385a156",
+        "source": "code_bb326aacc68172c6",
+        "target": "code_e306660b0ebeaf8d",
+        "type": "calls"
+      },
+      {
+        "id": "rel_f051104701699a4b",
+        "source": "code_bb326aacc68172c6",
+        "target": "code_88e9cee2e0ceb352",
+        "type": "calls"
+      },
+      {
+        "id": "rel_b75d7694e303dee4",
+        "source": "code_bb326aacc68172c6",
+        "target": "code_2562a2d771517e64",
+        "type": "calls"
+      },
+      {
+        "id": "rel_0916620e1ae56d6e",
+        "source": "code_bb326aacc68172c6",
+        "target": "code_b32b2f53c5fbdf12",
+        "type": "calls"
+      },
+      {
+        "id": "rel_051fa73ed793ae25",
+        "source": "code_eb19437f5b242907",
+        "target": "code_a3ee749fc69061f1",
+        "type": "calls"
+      },
+      {
+        "id": "rel_8b7b34cf793c1a4f",
+        "source": "code_eb19437f5b242907",
+        "target": "code_bb326aacc68172c6",
+        "type": "calls"
+      },
+      {
+        "id": "rel_2d0da9569d7f93dc",
+        "source": "code_eb19437f5b242907",
+        "target": "code_d076a613d854bd90",
+        "type": "calls"
+      },
+      {
+        "id": "rel_061f049f54efc32f",
+        "source": "code_83addba63dce24d0",
+        "target": "code_b69554d396db10f1",
+        "type": "imports"
+      },
+      {
+        "id": "rel_91020cf3c6bcf88c",
+        "source": "code_83addba63dce24d0",
+        "target": "code_7fae6e3f11278b2d",
+        "type": "imports"
+      },
+      {
+        "id": "rel_b3d0d16846ce6977",
+        "source": "code_b9d555b194a24b6c",
+        "target": "code_5694f2107c68e784",
+        "type": "calls"
+      },
+      {
+        "id": "rel_461c5a035f316b4d",
+        "source": "code_b9d555b194a24b6c",
+        "target": "code_89a8bd75af7db625",
+        "type": "calls"
+      },
+      {
+        "id": "rel_9eaa1d08357b791c",
+        "source": "code_b9d555b194a24b6c",
+        "target": "code_83fe6eb4877596f8",
+        "type": "calls"
+      },
+      {
+        "id": "rel_8ccfa7a6c448028d",
+        "source": "code_90ff9c25aa494d6c",
+        "target": "code_5694f2107c68e784",
+        "type": "calls"
+      },
+      {
+        "id": "rel_330d95d723309540",
+        "source": "code_90ff9c25aa494d6c",
+        "target": "code_89a8bd75af7db625",
+        "type": "calls"
+      },
+      {
+        "id": "rel_1f1e123d0582b3d9",
+        "source": "code_90ff9c25aa494d6c",
+        "target": "code_83fe6eb4877596f8",
+        "type": "calls"
+      },
+      {
+        "id": "rel_74a3cec2e3b46524",
+        "source": "code_19a42e3004664185",
+        "target": "code_581dd25e51a94683",
+        "type": "calls"
+      },
+      {
+        "id": "rel_0cb302fb19efa113",
+        "source": "code_19a42e3004664185",
+        "target": "code_b9d555b194a24b6c",
+        "type": "calls"
+      },
+      {
+        "id": "rel_1d9bcc245c7f4585",
+        "source": "code_19a42e3004664185",
+        "target": "code_90ff9c25aa494d6c",
+        "type": "calls"
+      },
+      {
+        "id": "rel_c2d6f176040b4470",
+        "source": "code_83addba63dce24d0",
+        "target": "code_d6e5e447bdef8835",
+        "type": "imports"
+      },
+      {
+        "id": "rel_413c313088adf610",
+        "source": "code_83addba63dce24d0",
+        "target": "code_c0e3b223297178ac",
+        "type": "imports"
+      },
+      {
+        "id": "rel_e139e591fc4e44e8",
+        "source": "code_3f4d0b64fd86e2ae",
+        "target": "code_731b0950f5e02a47",
+        "type": "imports"
+      },
+      {
+        "id": "rel_bce02b553d3c241b",
+        "source": "code_b098fa576497cdb7",
+        "target": "code_4b0b423dfe1060b3",
+        "type": "calls"
+      },
+      {
+        "id": "rel_87157dfa0982fdcd",
+        "source": "code_b098fa576497cdb7",
+        "target": "code_b0f0d346b4ba707b",
+        "type": "calls"
+      },
+      {
+        "id": "rel_ceef9df031b26438",
+        "source": "code_b098fa576497cdb7",
+        "target": "code_90bfad7ade816349",
+        "type": "calls"
+      },
+      {
+        "id": "rel_44a001384d11c21a",
+        "source": "code_7f406af7d64e00fd",
+        "target": "code_4b0b423dfe1060b3",
+        "type": "calls"
+      },
+      {
+        "id": "rel_35573028e900f8fc",
+        "source": "code_7f406af7d64e00fd",
+        "target": "code_b0f0d346b4ba707b",
+        "type": "calls"
+      },
+      {
+        "id": "rel_9219a0efb8fb0e1f",
+        "source": "code_7f406af7d64e00fd",
+        "target": "code_90bfad7ade816349",
+        "type": "calls"
+      },
+      {
+        "id": "rel_016550565ad0a45c",
+        "source": "code_b623fef79005ea3a",
+        "target": "code_65e3b8a09fb12dc4",
+        "type": "calls"
+      },
+      {
+        "id": "rel_16da9f6e80c02044",
+        "source": "code_b623fef79005ea3a",
+        "target": "code_b098fa576497cdb7",
+        "type": "calls"
+      },
+      {
+        "id": "rel_4d1a6d4395413b40",
+        "source": "code_b623fef79005ea3a",
+        "target": "code_7f406af7d64e00fd",
+        "type": "calls"
+      },
+      {
+        "id": "rel_36bc0c5f8d55e73e",
+        "source": "code_ebff528b65687d44",
+        "target": "code_1d65844f0bda6f0b",
+        "type": "imports"
+      },
+      {
+        "id": "rel_387cf050b6226071",
+        "source": "code_ebff528b65687d44",
+        "target": "code_f08db26f6171c819",
+        "type": "imports"
+      },
+      {
+        "id": "rel_e2eadc7f309b79d9",
+        "source": "code_ebff528b65687d44",
+        "target": "code_47e4867f066f3c7e",
+        "type": "imports"
+      },
+      {
+        "id": "rel_675e9e4896c486f7",
+        "source": "code_ebff528b65687d44",
+        "target": "code_9953242945073b49",
+        "type": "imports"
+      },
+      {
+        "id": "rel_ecde0044aa41da87",
+        "source": "code_23e6e2c44e4220b6",
+        "target": "code_50a0915f8429c8e6",
+        "type": "calls"
+      },
+      {
+        "id": "rel_cfddebaa12254081",
+        "source": "code_23e6e2c44e4220b6",
+        "target": "code_75d100ea9ec447c0",
+        "type": "calls"
+      },
+      {
+        "id": "rel_b1eae7321859222a",
+        "source": "code_23e6e2c44e4220b6",
+        "target": "code_e6e3b0b71593c575",
+        "type": "calls"
+      },
+      {
+        "id": "rel_d7d8736c7ec54961",
+        "source": "code_23e6e2c44e4220b6",
+        "target": "code_28b3d4fbc4b57b64",
+        "type": "calls"
+      },
+      {
+        "id": "rel_5dcf1c04bf41c3d2",
+        "source": "code_23e6e2c44e4220b6",
+        "target": "code_fc27bbcc6e14cf92",
+        "type": "calls"
+      },
+      {
+        "id": "rel_4d8ed77f9f57772d",
+        "source": "code_c7ba3943a9da61ab",
+        "target": "code_50a0915f8429c8e6",
+        "type": "calls"
+      },
+      {
+        "id": "rel_a74527dc44174bda",
+        "source": "code_c7ba3943a9da61ab",
+        "target": "code_fc27bbcc6e14cf92",
+        "type": "calls"
+      },
+      {
+        "id": "rel_5c9088819cf5fa77",
+        "source": "code_159a3ec8ae99517c",
+        "target": "code_ddc412e0047b18d5",
+        "type": "calls"
+      },
+      {
+        "id": "rel_6eac8c75862401ae",
+        "source": "code_159a3ec8ae99517c",
+        "target": "code_23e6e2c44e4220b6",
+        "type": "calls"
+      },
+      {
+        "id": "rel_4b36d3a9359cc96e",
+        "source": "code_159a3ec8ae99517c",
+        "target": "code_c7ba3943a9da61ab",
+        "type": "calls"
+      },
+      {
+        "id": "rel_12d4002a0839752a",
+        "source": "code_ebff528b65687d44",
+        "target": "code_435487d7b4b7fdf2",
+        "type": "imports"
+      },
+      {
+        "id": "rel_1478b59fafd457c3",
+        "source": "code_ebff528b65687d44",
+        "target": "code_fca5096eb87fe8d4",
+        "type": "imports"
+      },
+      {
+        "id": "rel_7b62ce6634a7fb02",
+        "source": "code_ebff528b65687d44",
+        "target": "code_d606b936a099e375",
+        "type": "imports"
+      },
+      {
+        "id": "rel_ebc50d8a80efb20e",
+        "source": "code_ebff528b65687d44",
+        "target": "code_068d5e871676f353",
+        "type": "imports"
+      },
+      {
+        "id": "rel_b200baa12514f80a",
+        "source": "code_f2d8c1dbb8e76377",
+        "target": "code_4e8e1070718f7460",
+        "type": "imports"
+      },
+      {
+        "id": "rel_e22f62252024431e",
+        "source": "code_01921ac2995e24e2",
+        "target": "code_89080d5ab911a72d",
+        "type": "imports"
+      },
+      {
+        "id": "rel_d70c9d22e4cb1884",
+        "source": "code_01921ac2995e24e2",
+        "target": "code_afa92f229971c898",
+        "type": "imports"
+      },
+      {
+        "id": "rel_d7866ef94b34cc75",
+        "source": "code_01921ac2995e24e2",
+        "target": "code_5a011620642fcdf8",
+        "type": "imports"
+      },
+      {
+        "id": "rel_f0bd778400cab1eb",
+        "source": "code_01921ac2995e24e2",
+        "target": "code_511c3dae98819c37",
+        "type": "imports"
+      },
+      {
+        "id": "rel_1dcf6573b9d44f0c",
+        "source": "code_2bae6f9bef126a27",
+        "target": "code_00f50ee74671d682",
+        "type": "inherits_from"
+      },
+      {
+        "id": "rel_5983fcbff1c6e862",
+        "source": "code_192f1405c47d6774",
+        "target": "code_e7c6d3a765ba7dab",
+        "type": "calls"
+      },
+      {
+        "id": "rel_aea197d99900b804",
+        "source": "code_192f1405c47d6774",
+        "target": "code_c4ca1174ea783640",
+        "type": "calls"
+      },
+      {
+        "id": "rel_8c65bf659830b3ba",
+        "source": "code_192f1405c47d6774",
+        "target": "code_8a0e57dc93f3c10f",
+        "type": "calls"
+      },
+      {
+        "id": "rel_5c020a40ec4ee111",
+        "source": "code_192f1405c47d6774",
+        "target": "code_ef1bfecff195bbd5",
+        "type": "calls"
+      },
+      {
+        "id": "rel_d7a8629de31aaab0",
+        "source": "code_4e4b3760231fc9ae",
+        "target": "code_7ce071ca806cc3af",
+        "type": "calls"
+      },
+      {
+        "id": "rel_9c5abd5e27d759c2",
+        "source": "code_4e4b3760231fc9ae",
+        "target": "code_1a3156ec475e6090",
+        "type": "calls"
+      },
+      {
+        "id": "rel_84d3cb4ef74b9843",
+        "source": "code_4e4b3760231fc9ae",
+        "target": "code_75deb3cfa8b00fad",
+        "type": "calls"
+      },
+      {
+        "id": "rel_224b835da6d86191",
+        "source": "code_4e4b3760231fc9ae",
+        "target": "code_950ab3e1a3f68792",
+        "type": "calls"
+      },
+      {
+        "id": "rel_ecdcd3a80de542a4",
+        "source": "code_4e4b3760231fc9ae",
+        "target": "code_83bcae6f517cff05",
+        "type": "calls"
+      },
+      {
+        "id": "rel_921a7f41706dd1e1",
+        "source": "code_7b250a7cd5505197",
+        "target": "code_2735f49bc4ee6390",
+        "type": "imports"
+      },
+      {
+        "id": "rel_2e1b767c5850c07c",
+        "source": "code_b18bbcf13651ed67",
+        "target": "code_9285260ca85a07c3",
+        "type": "imports"
+      },
+      {
+        "id": "rel_9f7ba1cea8239394",
+        "source": "code_b18bbcf13651ed67",
+        "target": "code_cf0f9a07ca7b29bf",
+        "type": "imports"
+      },
+      {
+        "id": "rel_15cd65a70a2b0969",
+        "source": "code_b18bbcf13651ed67",
+        "target": "code_9314f8738909af4d",
+        "type": "imports"
+      },
+      {
+        "id": "rel_c5006f1d268b93cc",
+        "source": "code_b18bbcf13651ed67",
+        "target": "code_df4a1d3b8cf3783c",
+        "type": "imports"
+      },
+      {
+        "id": "rel_2858ca9df959eff6",
+        "source": "code_b18bbcf13651ed67",
+        "target": "code_953069f179c2acae",
+        "type": "imports"
+      },
+      {
+        "id": "rel_9639094d86220b34",
+        "source": "code_36f1b4d7eec1902b",
+        "target": "code_4ca3a57711c122fb",
+        "type": "inherits_from"
+      },
+      {
+        "id": "rel_827d8e391ebace7c",
+        "source": "code_9c01e3148d9584f7",
+        "target": "code_4ca3a57711c122fb",
+        "type": "inherits_from"
+      },
+      {
+        "id": "rel_97f910da13cd3197",
+        "source": "code_87c538507f040dd3",
+        "target": "code_bf32dc067d78ef58",
+        "type": "calls"
+      },
+      {
+        "id": "rel_f489eb9f247a3369",
+        "source": "code_b4ca2c4ef06f1a50",
+        "target": "code_4ca3a57711c122fb",
+        "type": "inherits_from"
+      },
+      {
+        "id": "rel_173bc1dbf563cc72",
+        "source": "code_8658e2ae300bd3c7",
+        "target": "code_eede9f016ebde681",
+        "type": "calls"
+      },
+      {
+        "id": "rel_bf98f54ae02497d1",
+        "source": "code_8658e2ae300bd3c7",
+        "target": "code_ebad67d10d5004f9",
+        "type": "calls"
+      },
+      {
+        "id": "rel_4707d82fb51f23d5",
+        "source": "code_8658e2ae300bd3c7",
+        "target": "code_d89d239a12b72547",
+        "type": "calls"
+      },
+      {
+        "id": "rel_1ac0cb27e4b8c5c5",
+        "source": "code_fdd393c566d1a366",
+        "target": "code_d48e810ba3994274",
+        "type": "inherits_from"
+      },
+      {
+        "id": "rel_42dca2c4a5f91983",
+        "source": "code_ce42b98456987caa",
+        "target": "code_01fb7065b9c51849",
+        "type": "imports"
+      },
+      {
+        "id": "rel_6a8c3283e2ee143c",
+        "source": "code_ce42b98456987caa",
+        "target": "code_c80b3f854e042c25",
+        "type": "imports"
+      },
+      {
+        "id": "rel_6573e0bc5dcf01dc",
+        "source": "code_ce42b98456987caa",
+        "target": "code_9fb67d3f65d0baac",
+        "type": "imports"
+      },
+      {
+        "id": "rel_c949e78be2936d20",
+        "source": "code_4f64219c066ff0c2",
+        "target": "code_085d91e9fa718e3f",
+        "type": "inherits_from"
+      },
+      {
+        "id": "rel_4c8a717ba84e19ab",
+        "source": "code_cb642da123e6596d",
+        "target": "code_085d91e9fa718e3f",
+        "type": "inherits_from"
+      },
+      {
+        "id": "rel_fb4b54b6cec4140b",
+        "source": "code_e9ef45c674b0592c",
+        "target": "code_cb642da123e6596d",
+        "type": "inherits_from"
+      },
+      {
+        "id": "rel_8fa0534330148134",
+        "source": "code_245114466c5dd638",
+        "target": "code_085d91e9fa718e3f",
+        "type": "inherits_from"
+      },
+      {
+        "id": "rel_bbe081247ad61254",
+        "source": "code_c3e11ec52ff37aca",
+        "target": "code_cb642da123e6596d",
+        "type": "inherits_from"
+      },
+      {
+        "id": "rel_c17528635f8c7bcb",
+        "source": "code_b983f260d7ce7f8a",
+        "target": "code_a3e6dc6926b12bd2",
+        "type": "calls"
+      },
+      {
+        "id": "rel_6d847917625c601f",
+        "source": "code_b983f260d7ce7f8a",
+        "target": "code_343c66acae46afbe",
+        "type": "calls"
+      },
+      {
+        "id": "rel_993dd25844bb2280",
+        "source": "code_7afb3d3364f502b3",
+        "target": "code_2ca5f76ede01b8f2",
+        "type": "calls"
+      },
+      {
+        "id": "rel_2ed50e1f4fd2e586",
+        "source": "code_7afb3d3364f502b3",
+        "target": "code_c55b6d914c71513d",
+        "type": "calls"
+      },
+      {
+        "id": "rel_5c5132d4bf3549af",
+        "source": "code_c40011b3a95fa66e",
+        "target": "code_c3e11ec52ff37aca",
+        "type": "inherits_from"
+      },
+      {
+        "id": "rel_e8fe29268532877a",
+        "source": "code_5be32c48a29c049f",
+        "target": "code_ee7be10a8b2bda8b",
+        "type": "calls"
+      },
+      {
+        "id": "rel_e4a097aece2ada22",
+        "source": "code_5be32c48a29c049f",
+        "target": "code_2ca5f76ede01b8f2",
+        "type": "calls"
+      },
+      {
+        "id": "rel_179610fbe165d13d",
+        "source": "code_5be32c48a29c049f",
+        "target": "code_c55b6d914c71513d",
+        "type": "calls"
+      },
+      {
+        "id": "rel_c3d4d06a1e19510a",
+        "source": "code_56e2074e401e9f5f",
+        "target": "code_d9bd4202a12285ea",
+        "type": "calls"
+      },
+      {
+        "id": "rel_c3d4d06a1e19510a",
+        "source": "code_56e2074e401e9f5f",
+        "target": "code_d9bd4202a12285ea",
+        "type": "calls"
+      },
+      {
+        "id": "rel_c3d4d06a1e19510a",
+        "source": "code_56e2074e401e9f5f",
+        "target": "code_d9bd4202a12285ea",
+        "type": "calls"
+      },
+      {
+        "id": "rel_5a9f6dd9a2c76057",
+        "source": "code_56e2074e401e9f5f",
+        "target": "code_a78d29fccb939f15",
+        "type": "calls"
+      },
+      {
+        "id": "rel_d1dc15a30a4c9185",
+        "source": "code_56e2074e401e9f5f",
+        "target": "code_4e2d461883e43c36",
+        "type": "calls"
+      },
+      {
+        "id": "rel_d1dc15a30a4c9185",
+        "source": "code_56e2074e401e9f5f",
+        "target": "code_4e2d461883e43c36",
+        "type": "calls"
+      },
+      {
+        "id": "rel_58671b215d49af00",
+        "source": "code_56e2074e401e9f5f",
+        "target": "code_e7356374a0ad2597",
+        "type": "calls"
+      },
+      {
+        "id": "rel_58671b215d49af00",
+        "source": "code_56e2074e401e9f5f",
+        "target": "code_e7356374a0ad2597",
+        "type": "calls"
+      },
+      {
+        "id": "rel_d9a33ae506f17d64",
+        "source": "code_56e2074e401e9f5f",
+        "target": "code_d087a0408130819d",
+        "type": "calls"
+      },
+      {
+        "id": "rel_e05c734ef83b4d69",
+        "source": "code_dd03b290dfa4a6a3",
+        "target": "code_c008390902e90274",
+        "type": "imports"
+      },
+      {
+        "id": "rel_421e2278d6864221",
+        "source": "code_dd94a3944867030f",
+        "target": "code_e231032fcfb5de39",
+        "type": "imports"
+      },
+      {
+        "id": "rel_9dc771c3241555d8",
+        "source": "code_3ebfbc7355cf54a7",
+        "target": "code_d78ce41d2ad05470",
+        "type": "imports"
+      },
+      {
+        "id": "rel_1b2d538600f39625",
+        "source": "code_3ebfbc7355cf54a7",
+        "target": "code_b145bde92b6fa255",
+        "type": "imports"
+      },
+      {
+        "id": "rel_23d26226b2c296b6",
+        "source": "code_3ebfbc7355cf54a7",
+        "target": "code_d012678faca7bc27",
+        "type": "imports"
+      },
+      {
+        "id": "rel_6374457c686c2e32",
+        "source": "code_3ebfbc7355cf54a7",
+        "target": "code_beaa195b90731997",
+        "type": "imports"
+      },
+      {
+        "id": "rel_503f70da7f2665c0",
+        "source": "code_3ebfbc7355cf54a7",
+        "target": "code_61ac0f1a8c600de4",
+        "type": "imports"
+      },
+      {
+        "id": "rel_d0b9988591d7408d",
+        "source": "code_3ebfbc7355cf54a7",
+        "target": "code_22b153b310d0973f",
+        "type": "imports"
+      },
+      {
+        "id": "rel_12b2a9be505d6d8d",
+        "source": "code_3ebfbc7355cf54a7",
+        "target": "code_07896fee546c62d5",
+        "type": "imports"
+      },
+      {
+        "id": "rel_b6ae03461210fe16",
+        "source": "code_3ebfbc7355cf54a7",
+        "target": "code_6b40e38bbdf69f96",
+        "type": "imports"
+      },
+      {
+        "id": "rel_ffd5ddfad1b7d8d6",
+        "source": "code_3ebfbc7355cf54a7",
+        "target": "code_f7813bcbbd694422",
+        "type": "imports"
+      },
+      {
+        "id": "rel_4c4c71bc321cd06e",
+        "source": "code_3ebfbc7355cf54a7",
+        "target": "code_589a6387863c62c4",
+        "type": "imports"
+      },
+      {
+        "id": "rel_0817de3fdec0f1bb",
+        "source": "code_3ebfbc7355cf54a7",
+        "target": "code_9326dd78a270ac6e",
+        "type": "imports"
+      },
+      {
+        "id": "rel_57c3691177cd3960",
+        "source": "code_3ebfbc7355cf54a7",
+        "target": "code_a740f2d0dcb99ecf",
+        "type": "imports"
+      },
+      {
+        "id": "rel_064d08f0361a1624",
+        "source": "code_80cd81b87ace2311",
+        "target": "code_f4baa1d224b52042",
+        "type": "calls"
+      },
+      {
+        "id": "rel_232909bb074235a8",
+        "source": "code_e9472ece408a8208",
+        "target": "code_3416c38b6781b2bc",
+        "type": "calls"
+      },
+      {
+        "id": "rel_6dd576a6521710b3",
+        "source": "code_e9472ece408a8208",
+        "target": "code_f17b451dcd708a6d",
+        "type": "calls"
+      },
+      {
+        "id": "rel_6dd576a6521710b3",
+        "source": "code_e9472ece408a8208",
+        "target": "code_f17b451dcd708a6d",
+        "type": "calls"
+      },
+      {
+        "id": "rel_e0d00d69d37ae9d5",
+        "source": "code_e9472ece408a8208",
+        "target": "code_2c0fc8bf841aa017",
+        "type": "calls"
+      },
+      {
+        "id": "rel_c131dbfcdb22a656",
+        "source": "code_e9472ece408a8208",
+        "target": "code_140c58cdb4d85882",
+        "type": "calls"
+      },
+      {
+        "id": "rel_c131dbfcdb22a656",
+        "source": "code_e9472ece408a8208",
+        "target": "code_140c58cdb4d85882",
+        "type": "calls"
+      },
+      {
+        "id": "rel_6b61fb58efa36a0f",
+        "source": "code_e9472ece408a8208",
+        "target": "code_00602cb30694c774",
+        "type": "calls"
+      },
+      {
+        "id": "rel_725052793f6cc147",
+        "source": "code_e9472ece408a8208",
+        "target": "code_fb22b28643f86ad5",
+        "type": "calls"
+      },
+      {
+        "id": "rel_b011b85156c2a2ee",
+        "source": "code_e9472ece408a8208",
+        "target": "code_eed49f038a16005f",
+        "type": "calls"
+      },
+      {
+        "id": "rel_40423ef805de604d",
+        "source": "code_e9472ece408a8208",
+        "target": "code_5a7df6afaeb9f94f",
+        "type": "calls"
+      },
+      {
+        "id": "rel_287e1a3017c51b5a",
+        "source": "code_e9472ece408a8208",
+        "target": "code_8e351ccf04c0729e",
+        "type": "calls"
+      },
+      {
+        "id": "rel_612e5c10a338265e",
+        "source": "code_e9472ece408a8208",
+        "target": "code_d6e24aa2954680bc",
+        "type": "calls"
+      },
+      {
+        "id": "rel_4b2447b8b17c01c0",
+        "source": "code_e9472ece408a8208",
+        "target": "code_27234308f8f5b502",
+        "type": "calls"
+      },
+      {
+        "id": "rel_89f6a61a3868663f",
+        "source": "code_44db247a7d389d45",
+        "target": "code_3416c38b6781b2bc",
+        "type": "calls"
+      },
+      {
+        "id": "rel_c658f9c004f14357",
+        "source": "code_44db247a7d389d45",
+        "target": "code_f17b451dcd708a6d",
+        "type": "calls"
+      },
+      {
+        "id": "rel_c658f9c004f14357",
+        "source": "code_44db247a7d389d45",
+        "target": "code_f17b451dcd708a6d",
+        "type": "calls"
+      },
+      {
+        "id": "rel_e8779ff944d769b1",
+        "source": "code_44db247a7d389d45",
+        "target": "code_3f2d1ff0c51090d5",
+        "type": "calls"
+      },
+      {
+        "id": "rel_5300a286e59358b7",
+        "source": "code_44db247a7d389d45",
+        "target": "code_e9472ece408a8208",
+        "type": "calls"
+      },
+      {
+        "id": "rel_a6f8bfa89dcf53e7",
+        "source": "code_2cfd87bca650a5b7",
+        "target": "code_01f68ba0db513b0b",
+        "type": "calls"
+      },
+      {
+        "id": "rel_eb4b0a2d3aa834e1",
+        "source": "code_2cfd87bca650a5b7",
+        "target": "code_d6e24aa2954680bc",
+        "type": "calls"
+      },
+      {
+        "id": "rel_fa91e57adf84cfb3",
+        "source": "code_ffcad324efedb44b",
+        "target": "code_4a19a250ebb54c29",
+        "type": "calls"
+      },
+      {
+        "id": "rel_b11877d1b200dab0",
+        "source": "code_ffcad324efedb44b",
+        "target": "code_d6e24aa2954680bc",
+        "type": "calls"
+      },
+      {
+        "id": "rel_d468ecd03c198c68",
+        "source": "code_fdcd8966feef7a5f",
+        "target": "code_3416c38b6781b2bc",
+        "type": "calls"
+      },
+      {
+        "id": "rel_22d18fedd75951bf",
+        "source": "code_fdcd8966feef7a5f",
+        "target": "code_f17b451dcd708a6d",
+        "type": "calls"
+      },
+      {
+        "id": "rel_22d18fedd75951bf",
+        "source": "code_fdcd8966feef7a5f",
+        "target": "code_f17b451dcd708a6d",
+        "type": "calls"
+      },
+      {
+        "id": "rel_19b0580980a4b777",
+        "source": "code_fdcd8966feef7a5f",
+        "target": "code_e040ad0ac80d9368",
+        "type": "calls"
+      },
+      {
+        "id": "rel_b4e0efbc0bd87350",
+        "source": "code_fdcd8966feef7a5f",
+        "target": "code_140c58cdb4d85882",
+        "type": "calls"
+      },
+      {
+        "id": "rel_0b37ad05c3f195c5",
+        "source": "code_fdcd8966feef7a5f",
+        "target": "code_b665a6aa3f6f861d",
+        "type": "calls"
+      },
+      {
+        "id": "rel_b4e0efbc0bd87350",
+        "source": "code_fdcd8966feef7a5f",
+        "target": "code_140c58cdb4d85882",
+        "type": "calls"
+      },
+      {
+        "id": "rel_fba517c5c9c6c162",
+        "source": "code_fdcd8966feef7a5f",
+        "target": "code_00602cb30694c774",
+        "type": "calls"
+      },
+      {
+        "id": "rel_0f0e26d81304bb0c",
+        "source": "code_fdcd8966feef7a5f",
+        "target": "code_fb22b28643f86ad5",
+        "type": "calls"
+      },
+      {
+        "id": "rel_33c622f5b3322b9a",
+        "source": "code_fdcd8966feef7a5f",
+        "target": "code_eed49f038a16005f",
+        "type": "calls"
+      },
+      {
+        "id": "rel_0b37ad05c3f195c5",
+        "source": "code_fdcd8966feef7a5f",
+        "target": "code_b665a6aa3f6f861d",
+        "type": "calls"
+      },
+      {
+        "id": "rel_fe7fe8535c697348",
+        "source": "code_fdcd8966feef7a5f",
+        "target": "code_5a7df6afaeb9f94f",
+        "type": "calls"
+      },
+      {
+        "id": "rel_10e70ee0e46533ed",
+        "source": "code_fdcd8966feef7a5f",
+        "target": "code_8e351ccf04c0729e",
+        "type": "calls"
+      },
+      {
+        "id": "rel_ad28efe842035d03",
+        "source": "code_fdcd8966feef7a5f",
+        "target": "code_d6e24aa2954680bc",
+        "type": "calls"
+      },
+      {
+        "id": "rel_4650b2b470866491",
+        "source": "code_fdcd8966feef7a5f",
+        "target": "code_27234308f8f5b502",
+        "type": "calls"
+      },
+      {
+        "id": "rel_5bd545316ada0fb2",
+        "source": "code_70ef87de1a79717c",
+        "target": "code_5d99a07cd3a5f7cb",
+        "type": "depends_on"
+      },
+      {
+        "id": "rel_b5d22edb54baf186",
+        "source": "code_25971eb752f432f9",
+        "target": "code_b217d7c87762eef3",
+        "type": "depends_on"
+      },
+      {
+        "id": "rel_64637abd7e0ed68e",
+        "source": "code_25971eb752f432f9",
+        "target": "code_25a0c1aeb3d5c209",
+        "type": "depends_on"
+      },
+      {
+        "id": "rel_c87bf4476cb1ebf6",
+        "source": "code_25971eb752f432f9",
+        "target": "code_09c4455ab71bafa8",
+        "type": "depends_on"
+      },
+      {
+        "id": "rel_92af619195f720c5",
+        "source": "code_25971eb752f432f9",
+        "target": "code_1f8df9489cd29e8e",
+        "type": "depends_on"
+      },
+      {
+        "id": "rel_cc3d354a9f6b7b04",
+        "source": "code_25971eb752f432f9",
+        "target": "code_7a388af4976d073a",
+        "type": "depends_on"
+      },
+      {
+        "id": "rel_9381d5a2375afa3e",
+        "source": "code_25971eb752f432f9",
+        "target": "code_10e25fc16173c16f",
+        "type": "depends_on"
+      },
+      {
+        "id": "rel_e7f883362102404a",
+        "source": "code_3677d18955290661",
+        "target": "code_e95bf226950d18ae",
+        "type": "imports"
+      },
+      {
+        "id": "rel_09a8998aec680e7c",
+        "source": "code_b2cb96c71851db92",
+        "target": "code_53993a8f3b0bd0b4",
+        "type": "imports"
+      },
+      {
+        "id": "rel_0ff2ffab007bc923",
+        "source": "code_4e7c97e3b5c1075c",
+        "target": "code_77e4b78b443450d1",
+        "type": "imports"
+      },
+      {
+        "id": "rel_288940ae4dbfccf0",
+        "source": "code_4e7c97e3b5c1075c",
+        "target": "code_9b7a64a58fbb7038",
+        "type": "imports"
+      },
+      {
+        "id": "rel_59fed76a91b530e2",
+        "source": "code_4e7c97e3b5c1075c",
+        "target": "code_98e9256e52ecd22b",
+        "type": "imports"
+      },
+      {
+        "id": "rel_7d243e1872db25da",
+        "source": "code_e53d9b80fa31be88",
+        "target": "code_a6e3fd3f8c8ef9e3",
+        "type": "calls"
+      },
+      {
+        "id": "rel_fa4e711456434a72",
+        "source": "code_e53d9b80fa31be88",
+        "target": "code_b633053ee2b8faee",
+        "type": "calls"
+      },
+      {
+        "id": "rel_861be870c5a56872",
+        "source": "code_e53d9b80fa31be88",
+        "target": "code_73380d2045f02766",
+        "type": "calls"
+      },
+      {
+        "id": "rel_8e9646d1efc00848",
+        "source": "code_1bffa7872efc47b3",
+        "target": "code_b9567d1b9594707f",
+        "type": "calls"
+      },
+      {
+        "id": "rel_e12ec4f3fc002e48",
+        "source": "code_1bffa7872efc47b3",
+        "target": "code_a6e3fd3f8c8ef9e3",
+        "type": "calls"
+      },
+      {
+        "id": "rel_9e28157afe26f8d8",
+        "source": "code_1bffa7872efc47b3",
+        "target": "code_b633053ee2b8faee",
+        "type": "calls"
+      },
+      {
+        "id": "rel_8bfeb49f940ef5cb",
+        "source": "code_b31b7faff585b382",
+        "target": "code_a6e3fd3f8c8ef9e3",
+        "type": "calls"
+      },
+      {
+        "id": "rel_97a55376910a17c7",
+        "source": "code_b31b7faff585b382",
+        "target": "code_5fc5e65f98d51916",
+        "type": "calls"
+      },
+      {
+        "id": "rel_8bfeb49f940ef5cb",
+        "source": "code_b31b7faff585b382",
+        "target": "code_a6e3fd3f8c8ef9e3",
+        "type": "calls"
+      },
+      {
+        "id": "rel_3af1a4e09c699748",
+        "source": "code_b31b7faff585b382",
+        "target": "code_7723c0c2888a856a",
+        "type": "calls"
+      },
+      {
+        "id": "rel_8bfeb49f940ef5cb",
+        "source": "code_b31b7faff585b382",
+        "target": "code_a6e3fd3f8c8ef9e3",
+        "type": "calls"
+      },
+      {
+        "id": "rel_427577589938a416",
+        "source": "code_b31b7faff585b382",
+        "target": "code_ca49c7648bdf04fe",
+        "type": "calls"
+      },
+      {
+        "id": "rel_39c6813900da98e4",
+        "source": "code_4f284feaa469243a",
+        "target": "code_e4c57ec9f304ae64",
+        "type": "imports"
+      },
+      {
+        "id": "rel_27b9100c9eca68ee",
+        "source": "code_4f284feaa469243a",
+        "target": "code_041a53738e2384dd",
+        "type": "imports"
+      },
+      {
+        "id": "rel_4119533eae481a47",
+        "source": "code_4f284feaa469243a",
+        "target": "code_f94fc40d03585e54",
+        "type": "imports"
+      },
+      {
+        "id": "rel_20e209849baf2822",
+        "source": "code_4f284feaa469243a",
+        "target": "code_6bca20a0aa1c346c",
+        "type": "imports"
+      },
+      {
+        "id": "rel_701e715c67f16236",
+        "source": "code_4f284feaa469243a",
+        "target": "code_a78b3ec74f90b867",
+        "type": "imports"
+      },
+      {
+        "id": "rel_cf9da7c36533c772",
+        "source": "code_4f284feaa469243a",
+        "target": "code_97d078ac155dc6c0",
+        "type": "imports"
+      },
+      {
+        "id": "rel_51245fa914d9031d",
+        "source": "code_40a21f8dc47efdbd",
+        "target": "code_a12e5d143096c61a",
+        "type": "calls"
+      },
+      {
+        "id": "rel_941d1d30e3dbab65",
+        "source": "code_40a21f8dc47efdbd",
+        "target": "code_e51bd26086782d04",
+        "type": "calls"
+      },
+      {
+        "id": "rel_6a0f4270e287f572",
+        "source": "code_40a21f8dc47efdbd",
+        "target": "code_6b75fc2d4a030e4a",
+        "type": "calls"
+      },
+      {
+        "id": "rel_566b196f32f1f738",
+        "source": "code_40a21f8dc47efdbd",
+        "target": "code_13aec3edd16a4192",
+        "type": "calls"
+      },
+      {
+        "id": "rel_bb3667ca3f049b2d",
+        "source": "code_40a21f8dc47efdbd",
+        "target": "code_d3d4f357cc6c652c",
+        "type": "calls"
+      },
+      {
+        "id": "rel_9e838f0d2c09b902",
+        "source": "code_40a21f8dc47efdbd",
+        "target": "code_800729e6b3393b39",
+        "type": "calls"
+      },
+      {
+        "id": "rel_26ea770b4039c8df",
+        "source": "code_40a21f8dc47efdbd",
+        "target": "code_d2c3ead7a12795b1",
+        "type": "calls"
+      },
+      {
+        "id": "rel_bf84604d880b47e7",
+        "source": "code_40a21f8dc47efdbd",
+        "target": "code_804e7d937e54ce0e",
+        "type": "calls"
+      },
+      {
+        "id": "rel_bc36f135eba78d87",
+        "source": "code_40a21f8dc47efdbd",
+        "target": "code_043c3fb2543d3982",
+        "type": "calls"
+      },
+      {
+        "id": "rel_718251a6142aba66",
+        "source": "code_06a560ab465353a4",
+        "target": "code_800729e6b3393b39",
+        "type": "calls"
+      }
+    ],
+    "statistics": {
+      "total_entities": 95,
+      "total_relationships": 210,
+      "total_files": 37
+    }
+  },
+  "layer2_application_architecture": {
+    "services": {
+      "slurm_gateway_api": {
+        "name": "slurm_gateway_api",
+        "files": [
+          "projects/slurm_gateway_api/Dockerfile",
+          "projects/slurm_gateway_api/pyproject.toml",
+          "projects/slurm_gateway_api/chart/Chart.yaml",
+          "projects/slurm_gateway_api/chart/values.yaml"
+        ],
+        "detection_source": "structure",
+        "type": "service"
+      },
+      "gitlab-runner": {
+        "name": "gitlab-runner",
+        "files": [
+          "projects/gitlab-runner/chart/Chart.yaml",
+          "projects/gitlab-runner/chart/values.yaml"
+        ],
+        "detection_source": "structure",
+        "type": "service"
+      },
+      "kubeflow-pipelines": {
+        "name": "kubeflow-pipelines",
+        "files": [
+          "projects/kubeflow-pipelines/kustomize/kustomization.yaml"
+        ],
+        "detection_source": "structure",
+        "type": "service"
+      },
+      "clearml": {
+        "name": "clearml",
+        "files": [
+          "projects/clearml/chart/Chart.yaml",
+          "projects/clearml/chart/values.yaml"
+        ],
+        "detection_source": "structure",
+        "type": "service"
+      },
+      "cert-manager": {
+        "name": "cert-manager",
+        "files": [
+          "projects/cert-manager/chart/Chart.yaml",
+          "projects/cert-manager/chart/values.yaml"
+        ],
+        "detection_source": "structure",
+        "type": "service"
+      },
+      "harbor": {
+        "name": "harbor",
+        "files": [
+          "projects/harbor/chart/Chart.yaml",
+          "projects/harbor/chart/values.yaml"
+        ],
+        "detection_source": "structure",
+        "type": "service"
+      },
+      "apisix": {
+        "name": "apisix",
+        "files": [
+          "projects/apisix/chart/Chart.yaml",
+          "projects/apisix/chart/values.yaml"
+        ],
+        "detection_source": "structure",
+        "type": "service"
+      },
+      "unknown_service": {
+        "name": "unknown_service",
+        "files": [
+          "main.py"
+        ],
+        "detection_source": "api_main",
+        "type": "service"
+      }
+    },
+    "libraries": {
+      "ai_factory_logger": {
+        "name": "ai_factory_logger",
+        "files": [
+          "components/ai_factory/logger/__init__.py",
+          "components/ai_factory/logger/core.py",
+          "test/components/ai_factory/logger/test_core.py"
+        ],
+        "type": "library"
+      },
+      "ai_factory_config": {
+        "name": "ai_factory_config",
+        "files": [
+          "components/ai_factory/config/__init__.py",
+          "components/ai_factory/config/core.py",
+          "test/components/ai_factory/config/test_core.py"
+        ],
+        "type": "library"
+      }
+    },
+    "service_dependencies": {},
+    "api_endpoints": [],
+    "statistics": {
+      "total_services": 8,
+      "total_libraries": 2,
+      "total_modules": 33
+    }
+  },
+  "layer3_deployment_architecture": {
+    "deployments": {},
+    "k8s_services": {},
+    "ingresses": {},
+    "config_maps": {},
+    "secrets": {},
+    "pvcs": {},
+    "namespaces": [
+      null
+    ],
+    "docker_images": {
+      "code_70ef87de1a79717c": {
+        "id": "code_70ef87de1a79717c",
+        "name": "Dockerfile",
+        "base_images": [
+          "python:3.11"
+        ],
+        "ports": [],
+        "file": "projects/slurm_gateway_api/Dockerfile"
+      }
+    },
+    "routing_topology": [],
+    "external_services": [
+      {
+        "type": "slurm",
+        "detected_in": "submit_slurm_hello_world_job",
+        "file": "development/clearml_hello_world_slurm.py"
+      },
+      {
+        "type": "slurm",
+        "detected_in": "submit_slurm_hello_world_job",
+        "file": "development/kubeflow_hello_world_slurm.py"
+      },
+      {
+        "type": "slurm",
+        "detected_in": "SlurmConfig",
+        "file": "components/ai_factory/config/core.py"
+      },
+      {
+        "type": "slurm",
+        "detected_in": "SlurmEnvironment",
+        "file": "components/ai_factory/slurm/models.py"
+      },
+      {
+        "type": "apptainer",
+        "detected_in": "ContainerJobRequest",
+        "file": "components/ai_factory/slurm/models.py"
+      },
+      {
+        "type": "slurm",
+        "detected_in": "submit_job",
+        "file": "bases/ai_factory/slurm_gateway/core.py"
+      },
+      {
+        "type": "apptainer",
+        "detected_in": "submit_container_job",
+        "file": "bases/ai_factory/slurm_gateway/core.py"
+      }
+    ],
+    "resource_dependencies": {},
+    "statistics": {
+      "total_deployments": 0,
+      "total_services": 0,
+      "total_ingresses": 0,
+      "total_namespaces": 1
+    }
+  },
+  "layer4_data_workflow_architecture": {
+    "workflows": {
+      "code_bb326aacc68172c6": {
+        "id": "code_bb326aacc68172c6",
+        "name": "submit_slurm_hello_world_job",
+        "type": "slurm",
+        "file": "development/clearml_hello_world_slurm.py",
+        "entity_type": "function",
+        "steps": []
+      },
+      "code_23e6e2c44e4220b6": {
+        "id": "code_23e6e2c44e4220b6",
+        "name": "submit_slurm_hello_world_job",
+        "type": "slurm",
+        "file": "development/kubeflow_hello_world_slurm.py",
+        "entity_type": "function",
+        "steps": []
+      },
+      "code_159a3ec8ae99517c": {
+        "id": "code_159a3ec8ae99517c",
+        "name": "hello_world_slurm_pipeline",
+        "type": "slurm",
+        "file": "development/kubeflow_hello_world_slurm.py",
+        "entity_type": "function",
+        "steps": []
+      },
+      "code_e9472ece408a8208": {
+        "id": "code_e9472ece408a8208",
+        "name": "submit_job",
+        "type": "slurm",
+        "file": "bases/ai_factory/slurm_gateway/core.py",
+        "entity_type": "function",
+        "steps": []
+      },
+      "code_44db247a7d389d45": {
+        "id": "code_44db247a7d389d45",
+        "name": "submit_hello_world_job",
+        "type": "slurm",
+        "file": "bases/ai_factory/slurm_gateway/core.py",
+        "entity_type": "function",
+        "steps": []
+      },
+      "code_fdcd8966feef7a5f": {
+        "id": "code_fdcd8966feef7a5f",
+        "name": "submit_container_job",
+        "type": "slurm",
+        "file": "bases/ai_factory/slurm_gateway/core.py",
+        "entity_type": "function",
+        "steps": []
+      },
+      "code_40a21f8dc47efdbd": {
+        "id": "code_40a21f8dc47efdbd",
+        "name": "test_submit_job_forwards_headers_and_body",
+        "type": "slurm",
+        "file": "test/bases/ai_factory/slurm_gateway/test_core.py",
+        "entity_type": "function",
+        "steps": []
+      }
+    },
+    "workflow_sequences": {
+      "code_bb326aacc68172c6": [
+        {
+          "step_id": "code_a8d674878bdf1141",
+          "order": 1
+        },
+        {
+          "step_id": "code_71802ba6cdf5091b",
+          "order": 2
+        },
+        {
+          "step_id": "code_dee65625807e0524",
+          "order": 3
+        },
+        {
+          "step_id": "code_e306660b0ebeaf8d",
+          "order": 4
+        },
+        {
+          "step_id": "code_88e9cee2e0ceb352",
+          "order": 5
+        },
+        {
+          "step_id": "code_2562a2d771517e64",
+          "order": 6
+        },
+        {
+          "step_id": "code_b32b2f53c5fbdf12",
+          "order": 7
+        }
+      ],
+      "code_23e6e2c44e4220b6": [
+        {
+          "step_id": "code_50a0915f8429c8e6",
+          "order": 1
+        },
+        {
+          "step_id": "code_75d100ea9ec447c0",
+          "order": 2
+        },
+        {
+          "step_id": "code_e6e3b0b71593c575",
+          "order": 3
+        },
+        {
+          "step_id": "code_28b3d4fbc4b57b64",
+          "order": 4
+        },
+        {
+          "step_id": "code_fc27bbcc6e14cf92",
+          "order": 5
+        }
+      ],
+      "code_159a3ec8ae99517c": [
+        {
+          "step_id": "code_ddc412e0047b18d5",
+          "order": 1
+        },
+        {
+          "step_id": "code_23e6e2c44e4220b6",
+          "order": 2
+        },
+        {
+          "step_id": "code_c7ba3943a9da61ab",
+          "order": 3
+        }
+      ],
+      "code_e9472ece408a8208": [
+        {
+          "step_id": "code_3416c38b6781b2bc",
+          "order": 1
+        },
+        {
+          "step_id": "code_f17b451dcd708a6d",
+          "order": 2
+        },
+        {
+          "step_id": "code_f17b451dcd708a6d",
+          "order": 3
+        },
+        {
+          "step_id": "code_2c0fc8bf841aa017",
+          "order": 4
+        },
+        {
+          "step_id": "code_140c58cdb4d85882",
+          "order": 5
+        },
+        {
+          "step_id": "code_140c58cdb4d85882",
+          "order": 6
+        },
+        {
+          "step_id": "code_00602cb30694c774",
+          "order": 7
+        },
+        {
+          "step_id": "code_fb22b28643f86ad5",
+          "order": 8
+        },
+        {
+          "step_id": "code_eed49f038a16005f",
+          "order": 9
+        },
+        {
+          "step_id": "code_5a7df6afaeb9f94f",
+          "order": 10
+        },
+        {
+          "step_id": "code_8e351ccf04c0729e",
+          "order": 11
+        },
+        {
+          "step_id": "code_d6e24aa2954680bc",
+          "order": 12
+        },
+        {
+          "step_id": "code_27234308f8f5b502",
+          "order": 13
+        }
+      ],
+      "code_44db247a7d389d45": [
+        {
+          "step_id": "code_3416c38b6781b2bc",
+          "order": 1
+        },
+        {
+          "step_id": "code_f17b451dcd708a6d",
+          "order": 2
+        },
+        {
+          "step_id": "code_f17b451dcd708a6d",
+          "order": 3
+        },
+        {
+          "step_id": "code_3f2d1ff0c51090d5",
+          "order": 4
+        },
+        {
+          "step_id": "code_e9472ece408a8208",
+          "order": 5
+        }
+      ],
+      "code_fdcd8966feef7a5f": [
+        {
+          "step_id": "code_3416c38b6781b2bc",
+          "order": 1
+        },
+        {
+          "step_id": "code_f17b451dcd708a6d",
+          "order": 2
+        },
+        {
+          "step_id": "code_f17b451dcd708a6d",
+          "order": 3
+        },
+        {
+          "step_id": "code_e040ad0ac80d9368",
+          "order": 4
+        },
+        {
+          "step_id": "code_140c58cdb4d85882",
+          "order": 5
+        },
+        {
+          "step_id": "code_b665a6aa3f6f861d",
+          "order": 6
+        },
+        {
+          "step_id": "code_140c58cdb4d85882",
+          "order": 7
+        },
+        {
+          "step_id": "code_00602cb30694c774",
+          "order": 8
+        },
+        {
+          "step_id": "code_fb22b28643f86ad5",
+          "order": 9
+        },
+        {
+          "step_id": "code_eed49f038a16005f",
+          "order": 10
+        },
+        {
+          "step_id": "code_b665a6aa3f6f861d",
+          "order": 11
+        },
+        {
+          "step_id": "code_5a7df6afaeb9f94f",
+          "order": 12
+        },
+        {
+          "step_id": "code_8e351ccf04c0729e",
+          "order": 13
+        },
+        {
+          "step_id": "code_d6e24aa2954680bc",
+          "order": 14
+        },
+        {
+          "step_id": "code_27234308f8f5b502",
+          "order": 15
+        }
+      ],
+      "code_40a21f8dc47efdbd": [
+        {
+          "step_id": "code_a12e5d143096c61a",
+          "order": 1
+        },
+        {
+          "step_id": "code_e51bd26086782d04",
+          "order": 2
+        },
+        {
+          "step_id": "code_6b75fc2d4a030e4a",
+          "order": 3
+        },
+        {
+          "step_id": "code_13aec3edd16a4192",
+          "order": 4
+        },
+        {
+          "step_id": "code_d3d4f357cc6c652c",
+          "order": 5
+        },
+        {
+          "step_id": "code_800729e6b3393b39",
+          "order": 6
+        },
+        {
+          "step_id": "code_d2c3ead7a12795b1",
+          "order": 7
+        },
+        {
+          "step_id": "code_804e7d937e54ce0e",
+          "order": 8
+        },
+        {
+          "step_id": "code_043c3fb2543d3982",
+          "order": 9
+        }
+      ]
+    },
+    "data_flows": [
+      {
+        "from": "run_slurm_pipeline",
+        "from_file": "development/clearml_hello_world_slurm.py",
+        "to": "submit_slurm_hello_world_job",
+        "to_file": "development/clearml_hello_world_slurm.py",
+        "from_outputs": null,
+        "to_inputs": [
+          {
+            "name": "username",
+            "type": "Any"
+          },
+          {
+            "name": "token",
+            "type": "Any"
+          }
+        ]
+      },
+      {
+        "from": "hello_world_pipeline",
+        "from_file": "development/kubeflow_hello_world.py",
+        "to": "step_hello",
+        "to_file": "development/kubeflow_hello_world.py",
+        "from_outputs": null,
+        "to_inputs": [
+          {
+            "name": "count",
+            "type": "Any"
+          }
+        ]
+      },
+      {
+        "from": "hello_world_pipeline",
+        "from_file": "development/kubeflow_hello_world.py",
+        "to": "step_world",
+        "to_file": "development/kubeflow_hello_world.py",
+        "from_outputs": null,
+        "to_inputs": [
+          {
+            "name": "count",
+            "type": "Any"
+          }
+        ]
+      },
+      {
+        "from": "run_pipeline",
+        "from_file": "development/clearml_hello_world.py",
+        "to": "step_hello",
+        "to_file": "development/clearml_hello_world.py",
+        "from_outputs": null,
+        "to_inputs": [
+          {
+            "name": "count",
+            "type": "Any"
+          }
+        ]
+      },
+      {
+        "from": "run_pipeline",
+        "from_file": "development/clearml_hello_world.py",
+        "to": "step_world",
+        "to_file": "development/clearml_hello_world.py",
+        "from_outputs": null,
+        "to_inputs": [
+          {
+            "name": "count",
+            "type": "Any"
+          }
+        ]
+      },
+      {
+        "from": "hello_world_slurm_pipeline",
+        "from_file": "development/kubeflow_hello_world_slurm.py",
+        "to": "submit_slurm_hello_world_job",
+        "to_file": "development/kubeflow_hello_world_slurm.py",
+        "from_outputs": null,
+        "to_inputs": [
+          {
+            "name": "username",
+            "type": "Any"
+          },
+          {
+            "name": "token",
+            "type": "Any"
+          }
+        ]
+      },
+      {
+        "from": "hello_world_slurm_pipeline",
+        "from_file": "development/kubeflow_hello_world_slurm.py",
+        "to": "print_result",
+        "to_file": "development/kubeflow_hello_world_slurm.py",
+        "from_outputs": null,
+        "to_inputs": [
+          {
+            "name": "result",
+            "type": "Any"
+          }
+        ]
+      },
+      {
+        "from": "submit_hello_world_job",
+        "from_file": "bases/ai_factory/slurm_gateway/core.py",
+        "to": "submit_job",
+        "to_file": "bases/ai_factory/slurm_gateway/core.py",
+        "from_outputs": null,
+        "to_inputs": [
+          {
+            "name": "job_request",
+            "type": "Any"
+          },
+          {
+            "name": "x_slurm_user_name",
+            "type": "Any"
+          },
+          {
+            "name": "x_slurm_user_token",
+            "type": "Any"
+          }
+        ]
+      }
+    ],
+    "io_signatures": {
+      "code_fcd6b2af1e0a4299": {
+        "function": "main",
+        "inputs": [],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "main.py"
+      },
+      "code_bb326aacc68172c6": {
+        "function": "submit_slurm_hello_world_job",
+        "inputs": [
+          {
+            "name": "username",
+            "type": "Any"
+          },
+          {
+            "name": "token",
+            "type": "Any"
+          }
+        ],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "development/clearml_hello_world_slurm.py"
+      },
+      "code_eb19437f5b242907": {
+        "function": "run_slurm_pipeline",
+        "inputs": [
+          {
+            "name": "username",
+            "type": "Any"
+          },
+          {
+            "name": "token",
+            "type": "Any"
+          }
+        ],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "development/clearml_hello_world_slurm.py"
+      },
+      "code_b9d555b194a24b6c": {
+        "function": "step_hello",
+        "inputs": [
+          {
+            "name": "count",
+            "type": "Any"
+          }
+        ],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "development/kubeflow_hello_world.py"
+      },
+      "code_90ff9c25aa494d6c": {
+        "function": "step_world",
+        "inputs": [
+          {
+            "name": "count",
+            "type": "Any"
+          }
+        ],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "development/kubeflow_hello_world.py"
+      },
+      "code_19a42e3004664185": {
+        "function": "hello_world_pipeline",
+        "inputs": [
+          {
+            "name": "count",
+            "type": "Any"
+          }
+        ],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "development/kubeflow_hello_world.py"
+      },
+      "code_b098fa576497cdb7": {
+        "function": "step_hello",
+        "inputs": [
+          {
+            "name": "count",
+            "type": "Any"
+          }
+        ],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "development/clearml_hello_world.py"
+      },
+      "code_7f406af7d64e00fd": {
+        "function": "step_world",
+        "inputs": [
+          {
+            "name": "count",
+            "type": "Any"
+          }
+        ],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "development/clearml_hello_world.py"
+      },
+      "code_b623fef79005ea3a": {
+        "function": "run_pipeline",
+        "inputs": [
+          {
+            "name": "count",
+            "type": "Any"
+          }
+        ],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "development/clearml_hello_world.py"
+      },
+      "code_23e6e2c44e4220b6": {
+        "function": "submit_slurm_hello_world_job",
+        "inputs": [
+          {
+            "name": "username",
+            "type": "Any"
+          },
+          {
+            "name": "token",
+            "type": "Any"
+          }
+        ],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "development/kubeflow_hello_world_slurm.py"
+      },
+      "code_c7ba3943a9da61ab": {
+        "function": "print_result",
+        "inputs": [
+          {
+            "name": "result",
+            "type": "Any"
+          }
+        ],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "development/kubeflow_hello_world_slurm.py"
+      },
+      "code_159a3ec8ae99517c": {
+        "function": "hello_world_slurm_pipeline",
+        "inputs": [
+          {
+            "name": "username",
+            "type": "Any"
+          },
+          {
+            "name": "token",
+            "type": "Any"
+          }
+        ],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "development/kubeflow_hello_world_slurm.py"
+      },
+      "code_192f1405c47d6774": {
+        "function": "emit",
+        "inputs": [
+          {
+            "name": "record",
+            "type": "Any"
+          }
+        ],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "components/ai_factory/logger/core.py"
+      },
+      "code_4e4b3760231fc9ae": {
+        "function": "setup_logger",
+        "inputs": [],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "components/ai_factory/logger/core.py"
+      },
+      "code_5da189dedf8c75f8": {
+        "function": "get_logger",
+        "inputs": [],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "components/ai_factory/logger/core.py"
+      },
+      "code_80c6efd8b4c36e68": {
+        "function": "api_url",
+        "inputs": [],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "components/ai_factory/config/core.py"
+      },
+      "code_87c538507f040dd3": {
+        "function": "prefix",
+        "inputs": [],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "components/ai_factory/config/core.py"
+      },
+      "code_8658e2ae300bd3c7": {
+        "function": "validate_log_level",
+        "inputs": [
+          {
+            "name": "v",
+            "type": "Any"
+          }
+        ],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "components/ai_factory/config/core.py"
+      },
+      "code_b983f260d7ce7f8a": {
+        "function": "_create_job_spec",
+        "inputs": [
+          {
+            "name": "username",
+            "type": "Any"
+          }
+        ],
+        "outputs": null,
+        "input_description": {
+          "username": "Slurm username for deriving default paths"
+        },
+        "output_description": "SlurmJobSpec with all required fields populated",
+        "file": "components/ai_factory/slurm/models.py"
+      },
+      "code_7afb3d3364f502b3": {
+        "function": "to_submission",
+        "inputs": [
+          {
+            "name": "username",
+            "type": "Any"
+          }
+        ],
+        "outputs": null,
+        "input_description": {
+          "username": "Slurm username for deriving default paths"
+        },
+        "output_description": "SlurmJobSubmission with all required fields populated",
+        "file": "components/ai_factory/slurm/models.py"
+      },
+      "code_5be32c48a29c049f": {
+        "function": "to_submission",
+        "inputs": [
+          {
+            "name": "username",
+            "type": "Any"
+          }
+        ],
+        "outputs": null,
+        "input_description": {
+          "username": "Slurm username for deriving default paths"
+        },
+        "output_description": "SlurmJobSubmission with Apptainer script",
+        "file": "components/ai_factory/slurm/models.py"
+      },
+      "code_56e2074e401e9f5f": {
+        "function": "_generate_apptainer_script",
+        "inputs": [
+          {
+            "name": "username",
+            "type": "Any"
+          }
+        ],
+        "outputs": null,
+        "input_description": {
+          "username": "Username for path generation"
+        },
+        "output_description": "Complete bash script for Apptainer container execution",
+        "file": "components/ai_factory/slurm/models.py"
+      },
+      "code_80cd81b87ace2311": {
+        "function": "health_check",
+        "inputs": [],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "bases/ai_factory/slurm_gateway/core.py"
+      },
+      "code_e9472ece408a8208": {
+        "function": "submit_job",
+        "inputs": [
+          {
+            "name": "job_request",
+            "type": "Any"
+          },
+          {
+            "name": "x_slurm_user_name",
+            "type": "Any"
+          },
+          {
+            "name": "x_slurm_user_token",
+            "type": "Any"
+          }
+        ],
+        "outputs": null,
+        "input_description": {
+          "job_request": "User's job request",
+          "x_slurm_user_name": "Slurm username",
+          "x_slurm_user_token": "Slurm JWT token"
+        },
+        "output_description": "Slurm API response",
+        "file": "bases/ai_factory/slurm_gateway/core.py"
+      },
+      "code_44db247a7d389d45": {
+        "function": "submit_hello_world_job",
+        "inputs": [
+          {
+            "name": "x_slurm_user_name",
+            "type": "Any"
+          },
+          {
+            "name": "x_slurm_user_token",
+            "type": "Any"
+          }
+        ],
+        "outputs": null,
+        "input_description": {
+          "partition": "Slurm partition to use",
+          "x_slurm_user_name": "Slurm username (from header)",
+          "x_slurm_user_token": "Slurm JWT token (from header)"
+        },
+        "output_description": "Slurm API response",
+        "file": "bases/ai_factory/slurm_gateway/core.py"
+      },
+      "code_2cfd87bca650a5b7": {
+        "function": "get_job",
+        "inputs": [
+          {
+            "name": "job_id",
+            "type": "Any"
+          }
+        ],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "bases/ai_factory/slurm_gateway/core.py"
+      },
+      "code_ffcad324efedb44b": {
+        "function": "delete_job",
+        "inputs": [
+          {
+            "name": "job_id",
+            "type": "Any"
+          }
+        ],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "bases/ai_factory/slurm_gateway/core.py"
+      },
+      "code_fdcd8966feef7a5f": {
+        "function": "submit_container_job",
+        "inputs": [
+          {
+            "name": "container_request",
+            "type": "Any"
+          },
+          {
+            "name": "x_slurm_user_name",
+            "type": "Any"
+          },
+          {
+            "name": "x_slurm_user_token",
+            "type": "Any"
+          }
+        ],
+        "outputs": null,
+        "input_description": {
+          "container_request": "Container job configuration",
+          "x_slurm_user_name": "Slurm username",
+          "x_slurm_user_token": "Slurm JWT token"
+        },
+        "output_description": "HTTPException: If the container request is invalid or Slurm API call fails",
+        "file": "bases/ai_factory/slurm_gateway/core.py"
+      },
+      "code_53e024487476310b": {
+        "function": "test_sample",
+        "inputs": [],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "test/components/ai_factory/logger/test_core.py"
+      },
+      "code_3aa33997b3353de1": {
+        "function": "test_sample",
+        "inputs": [],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "test/components/ai_factory/config/test_core.py"
+      },
+      "code_e53d9b80fa31be88": {
+        "function": "test_to_submission_uses_defaults_when_overrides_not_provided",
+        "inputs": [],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "test/components/ai_factory/slurm/test_models.py"
+      },
+      "code_1bffa7872efc47b3": {
+        "function": "test_to_submission_respects_explicit_overrides",
+        "inputs": [],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "test/components/ai_factory/slurm/test_models.py"
+      },
+      "code_b31b7faff585b382": {
+        "function": "test_resource_parameters_cpus_per_task",
+        "inputs": [],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "test/components/ai_factory/slurm/test_models.py"
+      },
+      "code_40a21f8dc47efdbd": {
+        "function": "test_submit_job_forwards_headers_and_body",
+        "inputs": [
+          {
+            "name": "monkeypatch",
+            "type": "Any"
+          }
+        ],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "test/bases/ai_factory/slurm_gateway/test_core.py"
+      },
+      "code_319b1a992add0877": {
+        "function": "__init__",
+        "inputs": [],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "test/bases/ai_factory/slurm_gateway/test_core.py"
+      },
+      "code_fc500cc95f5dcae2": {
+        "function": "json",
+        "inputs": [],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "test/bases/ai_factory/slurm_gateway/test_core.py"
+      },
+      "code_06a560ab465353a4": {
+        "function": "mock_post",
+        "inputs": [
+          {
+            "name": "url",
+            "type": "Any"
+          },
+          {
+            "name": "headers",
+            "type": "Any"
+          },
+          {
+            "name": "json",
+            "type": "Any"
+          },
+          {
+            "name": "timeout",
+            "type": "Any"
+          }
+        ],
+        "outputs": null,
+        "input_description": {},
+        "output_description": null,
+        "file": "test/bases/ai_factory/slurm_gateway/test_core.py"
+      }
+    },
+    "schemas": {},
+    "artifacts": [],
+    "statistics": {
+      "total_workflows": 7,
+      "total_data_flows": 8,
+      "total_schemas": 0,
+      "total_artifacts": 0
+    }
+  },
+  "metadata": {
+    "repository": "/Users/iuliarinea/Desktop/Coding/KnowledgeForge/monorepo",
+    "extraction_timestamp": "2025-12-07T23:01:32.861268",
+    "languages": [
+      "python",
+      "unknown"
+    ]
+  }
+}

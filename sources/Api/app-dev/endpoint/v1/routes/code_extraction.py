@@ -18,7 +18,6 @@ from app.infrastructure.storage.metadata_store import (
     PostgreSQLMetadataStore as MetadataStore,
 )
 from app.services.code_extraction.repository_scanner import RepositoryScanner
-from app.endpoint.v1.routes.websocket import broadcast_task_update
 from utils.config import get_config
 
 logger = logging.getLogger(__name__)
@@ -219,20 +218,6 @@ async def run_repository_scan(
         task['progress'] = 0.1
         task['message'] = 'Initializing scanner'
         
-        summary_payload = (
-            {'incremental_summary': task['incremental_summary']}
-            if task.get('incremental_summary')
-            else None
-        )
-        
-        await broadcast_task_update(
-            task_id,
-            task['status'],
-            message=task['message'],
-            progress=int(task['progress'] * 100),
-            extra=summary_payload,
-        )
-        
         # Initialize scanner
         scanner = RepositoryScanner(
             repo_path=repo_path,
@@ -241,12 +226,7 @@ async def run_repository_scan(
         
         task['progress'] = 0.2
         task['message'] = 'Scanning repository'
-        await broadcast_task_update(
-            task_id,
-            task['status'],
-            message=task['message'],
-            progress=int(task['progress'] * 100),
-        )
+        logger.info(f"{task['message']} (progress: {int(task['progress'] * 100)}%)")
         
         # Perform scan
         scan_result: Optional[IncrementalScanResult] = None
@@ -278,30 +258,12 @@ async def run_repository_scan(
             }
             task['incremental_result'] = scan_result
         
-        summary_payload = (
-            {'incremental_summary': task['incremental_summary']}
-            if task.get('incremental_summary')
-            else None
-        )
-        
-        await broadcast_task_update(
-            task_id,
-            task['status'],
-            message=task['message'],
-            progress=int(task['progress'] * 100),
-            extra=summary_payload,
-        )
+        logger.info(f"{task['message']} (progress: {int(task['progress'] * 100)}%)")
         
         # Store in Neo4j
         task['progress'] = 0.7
         task['message'] = 'Storing in graph database'
-        await broadcast_task_update(
-            task_id,
-            task['status'],
-            message=task['message'],
-            progress=int(task['progress'] * 100),
-            extra=summary_payload,
-        )
+        logger.info(f"{task['message']} (progress: {int(task['progress'] * 100)}%)")
         
         await store_code_entities_in_neo4j(task_id, extraction_result)
         
@@ -309,14 +271,6 @@ async def run_repository_scan(
         task['status'] = 'completed'
         task['message'] = 'Scan completed successfully'
         task['completed_at'] = datetime.now()
-        
-        await broadcast_task_update(
-            task_id,
-            'completed',
-            message=task['message'],
-            progress=100,
-            extra=summary_payload,
-        )
         
         logger.info(f"Repository scan completed for task {task_id}")
         
@@ -335,22 +289,7 @@ async def run_repository_scan(
             task['status'] = 'failed'
             task['message'] = f'Scan failed: {str(e)}'
             task.setdefault('errors', []).append(str(e))
-            
-            failure_payload = (
-                {'incremental_summary': task['incremental_summary']}
-                if task.get('incremental_summary')
-                else None
-            )
-            try:
-                await broadcast_task_update(
-                    task_id,
-                    'failed',
-                    message=task['message'],
-                    progress=0,
-                    extra=failure_payload,
-                )
-            except Exception as broadcast_error:
-                logger.error(f"Failed to broadcast task update: {broadcast_error}")
+            logger.error(f"Task {task_id} failed: {task['message']}")
         else:
             logger.error(f"Task {task_id} disappeared during error handling")
 

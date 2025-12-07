@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-from app.domain.models.code_entities import (
+from domain.models.code_entities import (
     CodeEntity,
     CodeLanguage,
     CodeRelationship,
@@ -19,14 +19,16 @@ from app.domain.models.code_entities import (
     RepositoryMetadata,
     SourceFile,
 )
-from app.services.code_extraction.base_extractor import BaseExtractor
-from app.services.code_extraction.cicd_extractor import CICDExtractor
-from app.services.code_extraction.config_extractor import ConfigExtractor
-from app.services.code_extraction.docker_extractor import DockerExtractor
-from app.services.code_extraction.iac_extractor import IaCExtractor
-from app.services.code_extraction.javascript_extractor import JavaScriptExtractor
-from app.services.code_extraction.python_extractor import PythonExtractor
-from app.services.code_extraction.kubernetes_extractor import KubernetesExtractor
+from services.code_extraction.base_extractor import BaseExtractor
+from services.code_extraction.layer1_code import (
+    CICDExtractor,
+    ConfigExtractor,
+    DockerExtractor,
+    IaCExtractor,
+    JavaScriptExtractor,
+    PythonExtractor,
+    KubernetesExtractor,
+)
 
 logger = logging.getLogger(__name__)
 
