@@ -465,7 +465,7 @@ class RepositoryScanner:
 # Add this method to BaseExtractor
 def _detect_source_type_impl(self, file_path: Path):
     """Detect source type from file path."""
-    from app.domain.models.code_entities import SourceType
+    from domain.models.code_entities import SourceType
     
     if 'docker' in file_path.name.lower() or file_path.name.lower() == 'dockerfile':
         return SourceType.DOCKER

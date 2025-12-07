@@ -1,6 +1,6 @@
 """Domain models for KnowledgeForge - Code Discovery."""
 
-from app.domain.models.code_entities import (
+from domain.models.code_entities import (
     CodeEntity,
     CodeEntityType,
     CodeLanguage,

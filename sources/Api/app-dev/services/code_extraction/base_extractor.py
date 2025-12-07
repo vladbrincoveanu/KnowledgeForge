@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional
 
-from app.domain.models.code_entities import (
+from domain.models.code_entities import (
     CodeEntity,
     CodeRelationship,
     SourceFile,

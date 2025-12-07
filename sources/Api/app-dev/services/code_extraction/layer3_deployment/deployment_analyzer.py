@@ -1,15 +1,19 @@
 """Deployment topology extraction (Layer 3: Runtime/Deployment Architecture).
 
-This analyzer extracts runtime and deployment architecture:
-- Kubernetes deployments and their relationships
-- Docker image → Deployment mappings
-- Ingress → Service → Pod routing
-- ConfigMaps/Secrets usage
-- External service connections
+This analyzer extracts runtime and deployment architecture from multiple sources:
+- Helm chart templates (structure, not values)
+- ArgoCD/GitOps manifests (deployment order, sync waves)
+- Kustomize overlays
+- Raw Kubernetes manifests
+- Docker Compose files
+- Terraform/IaC deployment configs
+
+Generic approach: detect what exists and extract accordingly.
 """
 
 import logging
 import re
+import yaml
 from pathlib import Path
 from typing import Any, Optional
 from collections import defaultdict
@@ -25,10 +29,11 @@ logger = logging.getLogger(__name__)
 
 
 class DeploymentTopologyAnalyzer:
-    """Analyze deployment topology from K8s manifests and Dockerfiles."""
+    """Analyze deployment topology from multiple deployment tool sources."""
     
-    def __init__(self):
+    def __init__(self, repo_path: Path):
         """Initialize analyzer."""
+        self.repo_path = Path(repo_path)
         self.deployments: dict[str, dict[str, Any]] = {}
         self.services: dict[str, dict[str, Any]] = {}
         self.ingresses: dict[str, dict[str, Any]] = {}
@@ -37,17 +42,45 @@ class DeploymentTopologyAnalyzer:
         self.pvcs: dict[str, dict[str, Any]] = {}
         self.namespaces: set[str] = set()
         self.docker_images: dict[str, dict[str, Any]] = {}
+        self.helm_charts: dict[str, dict[str, Any]] = {}
+        self.deployment_tools: set[str] = set()
     
     def analyze(self, extraction_result: ExtractionResult) -> dict[str, Any]:
         """
-        Analyze deployment topology.
+        Analyze deployment topology from available sources.
+        
+        Auto-detects deployment tooling and extracts accordingly:
+        - Helm charts → structure extraction
+        - ArgoCD → deployment order
+        - Kustomize → overlays
+        - Raw K8s → manifests
+        - Docker Compose → service definitions
         
         Returns:
             Complete deployment architecture
         """
         logger.info("Starting deployment topology analysis...")
         
-        # Extract K8s resources
+        # Detect deployment tools used
+        self._detect_deployment_tools()
+        
+        # Extract from Helm charts (if present)
+        if "helm" in self.deployment_tools:
+            self._extract_helm_charts()
+        
+        # Extract from ArgoCD (if present)
+        if "argocd" in self.deployment_tools or "gitops" in self.deployment_tools:
+            self._extract_argocd_apps()
+        
+        # Extract from Kustomize (if present)
+        if "kustomize" in self.deployment_tools:
+            self._extract_kustomize()
+        
+        # Extract from Docker Compose (if present)
+        if "docker-compose" in self.deployment_tools:
+            self._extract_docker_compose()
+        
+        # Extract K8s resources from code entities (fallback)
         self._extract_k8s_resources(extraction_result)
         
         # Map Docker images to deployments
@@ -63,6 +96,8 @@ class DeploymentTopologyAnalyzer:
         resource_deps = self._build_resource_dependencies()
         
         result = {
+            "deployment_tools": list(self.deployment_tools),
+            "helm_charts": self.helm_charts,
             "deployments": self.deployments,
             "services": self.services,
             "ingresses": self.ingresses,
@@ -75,6 +110,8 @@ class DeploymentTopologyAnalyzer:
             "external_services": external_services,
             "resource_dependencies": resource_deps,
             "statistics": {
+                "total_deployment_tools": len(self.deployment_tools),
+                "total_helm_charts": len(self.helm_charts),
                 "total_deployments": len(self.deployments),
                 "total_services": len(self.services),
                 "total_ingresses": len(self.ingresses),
@@ -83,12 +120,191 @@ class DeploymentTopologyAnalyzer:
         }
         
         logger.info(
-            f"Found {len(self.deployments)} deployments, "
+            f"Found {len(self.deployment_tools)} deployment tools: {', '.join(self.deployment_tools)}"
+        )
+        logger.info(
+            f"Found {len(self.helm_charts)} Helm charts, "
+            f"{len(self.deployments)} deployments, "
             f"{len(self.services)} services, "
             f"{len(self.ingresses)} ingresses"
         )
         
         return result
+    
+    def _detect_deployment_tools(self):
+        """Auto-detect which deployment tools are in use."""
+        # Check for Helm
+        if list(self.repo_path.rglob("Chart.yaml")):
+            self.deployment_tools.add("helm")
+        
+        # Check for ArgoCD/GitOps
+        if list(self.repo_path.rglob("**/gitops/**/*.yaml")) or \
+           list(self.repo_path.rglob("**/argocd/**/*.yaml")):
+            self.deployment_tools.add("argocd")
+            self.deployment_tools.add("gitops")
+        
+        # Check for Kustomize
+        if list(self.repo_path.rglob("kustomization.yaml")):
+            self.deployment_tools.add("kustomize")
+        
+        # Check for Docker Compose
+        if list(self.repo_path.rglob("docker-compose*.yaml")) or \
+           list(self.repo_path.rglob("docker-compose*.yml")):
+            self.deployment_tools.add("docker-compose")
+        
+        # Check for Terraform/IaC K8s
+        tf_files = list(self.repo_path.rglob("*.tf"))
+        if tf_files:
+            for tf_file in tf_files[:10]:  # Sample check
+                try:
+                    content = tf_file.read_text()
+                    if "kubernetes_" in content or "helm_release" in content:
+                        self.deployment_tools.add("terraform")
+                        break
+                except Exception:
+                    continue
+        
+        logger.info(f"Detected deployment tools: {self.deployment_tools}")
+    
+    def _extract_helm_charts(self):
+        """Extract structure from Helm charts."""
+        chart_files = list(self.repo_path.rglob("Chart.yaml"))
+        
+        for chart_file in chart_files:
+            try:
+                with open(chart_file) as f:
+                    chart_data = yaml.safe_load(f)
+                
+                chart_name = chart_data.get("name", chart_file.parent.name)
+                chart_dir = chart_file.parent
+                
+                # Find templates
+                templates_dir = chart_dir / "templates"
+                templates = []
+                resources = defaultdict(list)
+                
+                if templates_dir.exists():
+                    for template_file in templates_dir.glob("*.yaml"):
+                        templates.append(str(template_file.relative_to(self.repo_path)))
+                        
+                        # Try to extract resource type from template
+                        try:
+                            content = template_file.read_text()
+                            # Look for "kind:" even in templates
+                            kind_match = re.search(r'^kind:\s*(\w+)', content, re.MULTILINE)
+                            if kind_match:
+                                kind = kind_match.group(1)
+                                resources[kind].append(template_file.name)
+                                
+                                # Register as deployment resource
+                                if kind in ["Deployment", "StatefulSet", "DaemonSet"]:
+                                    self._register_helm_deployment(chart_name, template_file, kind)
+                                elif kind == "Service":
+                                    self._register_helm_service(chart_name, template_file)
+                                elif kind == "Ingress":
+                                    self._register_helm_ingress(chart_name, template_file)
+                        except Exception as e:
+                            logger.debug(f"Could not parse template {template_file}: {e}")
+                
+                self.helm_charts[chart_name] = {
+                    "name": chart_name,
+                    "version": chart_data.get("version", "unknown"),
+                    "description": chart_data.get("description", ""),
+                    "chart_file": str(chart_file.relative_to(self.repo_path)),
+                    "templates": templates,
+                    "resources": dict(resources),
+                    "values_file": str((chart_dir / "values.yaml").relative_to(self.repo_path)) 
+                                   if (chart_dir / "values.yaml").exists() else None,
+                }
+                
+            except Exception as e:
+                logger.warning(f"Error processing Helm chart {chart_file}: {e}")
+    
+    def _register_helm_deployment(self, chart_name: str, template_file: Path, kind: str):
+        """Register a deployment from Helm template."""
+        deployment_id = f"helm_{chart_name}_{template_file.stem}"
+        self.deployments[deployment_id] = {
+            "id": deployment_id,
+            "name": template_file.stem,
+            "chart": chart_name,
+            "kind": kind,
+            "template": str(template_file.relative_to(self.repo_path)),
+            "source": "helm",
+        }
+    
+    def _register_helm_service(self, chart_name: str, template_file: Path):
+        """Register a service from Helm template."""
+        service_id = f"helm_{chart_name}_{template_file.stem}"
+        self.services[service_id] = {
+            "id": service_id,
+            "name": template_file.stem,
+            "chart": chart_name,
+            "template": str(template_file.relative_to(self.repo_path)),
+            "source": "helm",
+        }
+    
+    def _register_helm_ingress(self, chart_name: str, template_file: Path):
+        """Register an ingress from Helm template."""
+        ingress_id = f"helm_{chart_name}_{template_file.stem}"
+        self.ingresses[ingress_id] = {
+            "id": ingress_id,
+            "name": template_file.stem,
+            "chart": chart_name,
+            "template": str(template_file.relative_to(self.repo_path)),
+            "source": "helm",
+        }
+    
+    def _extract_argocd_apps(self):
+        """Extract ArgoCD application manifests."""
+        # This would parse gitops/**/*.yaml files
+        # Already handled by ServiceDependencyAnalyzer in Layer 2
+        # Could move here if it fits better
+        pass
+    
+    def _extract_kustomize(self):
+        """Extract Kustomize overlays."""
+        kustomize_files = list(self.repo_path.rglob("kustomization.yaml"))
+        
+        for kust_file in kustomize_files:
+            try:
+                with open(kust_file) as f:
+                    kust_data = yaml.safe_load(f)
+                
+                # Track kustomize bases and overlays
+                # Could extract resources, patches, etc.
+                logger.debug(f"Found kustomize: {kust_file}")
+            except Exception as e:
+                logger.debug(f"Error parsing kustomize {kust_file}: {e}")
+    
+    def _extract_docker_compose(self):
+        """Extract Docker Compose service definitions."""
+        compose_files = list(self.repo_path.rglob("docker-compose*.yaml")) + \
+                       list(self.repo_path.rglob("docker-compose*.yml"))
+        
+        for compose_file in compose_files:
+            try:
+                with open(compose_file) as f:
+                    compose_data = yaml.safe_load(f)
+                
+                services = compose_data.get("services", {})
+                for service_name, service_config in services.items():
+                    self._register_compose_service(service_name, service_config, compose_file)
+            except Exception as e:
+                logger.warning(f"Error parsing docker-compose {compose_file}: {e}")
+    
+    def _register_compose_service(self, name: str, config: dict, compose_file: Path):
+        """Register a Docker Compose service."""
+        service_id = f"compose_{name}"
+        self.deployments[service_id] = {
+            "id": service_id,
+            "name": name,
+            "image": config.get("image"),
+            "ports": config.get("ports", []),
+            "environment": config.get("environment", []),
+            "volumes": config.get("volumes", []),
+            "file": str(compose_file.relative_to(self.repo_path)),
+            "source": "docker-compose",
+        }
     
     def _extract_k8s_resources(self, result: ExtractionResult):
         """Extract Kubernetes resources from entities."""

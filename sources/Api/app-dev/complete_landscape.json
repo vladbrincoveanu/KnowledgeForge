@@ -2316,17 +2316,453 @@
       }
     },
     "service_dependencies": {},
-    "api_endpoints": [],
+    "api_endpoints": [
+      {
+        "path": "/health",
+        "method": "GET",
+        "function": "health_check",
+        "file": "bases/ai_factory/slurm_gateway/core.py",
+        "framework": "fastapi",
+        "description": null,
+        "parameters": [],
+        "line": 19
+      },
+      {
+        "path": "/health",
+        "method": "GET",
+        "function": "submit_job",
+        "file": "bases/ai_factory/slurm_gateway/core.py",
+        "framework": "fastapi",
+        "description": "Submit a job request to Slurm.",
+        "parameters": [],
+        "line": 24
+      },
+      {
+        "path": "/jobs/example/hello-world",
+        "method": "POST",
+        "function": "submit_hello_world_job",
+        "file": "bases/ai_factory/slurm_gateway/core.py",
+        "framework": "fastapi",
+        "description": "Submit a hello world job with minimal configuration.",
+        "parameters": [],
+        "line": 76
+      },
+      {
+        "path": "/jobs/{job_id}",
+        "method": "GET",
+        "function": "get_job",
+        "file": "bases/ai_factory/slurm_gateway/core.py",
+        "framework": "fastapi",
+        "description": null,
+        "parameters": [],
+        "line": 109
+      },
+      {
+        "path": "/jobs/{job_id}",
+        "method": "GET",
+        "function": "delete_job",
+        "file": "bases/ai_factory/slurm_gateway/core.py",
+        "framework": "fastapi",
+        "description": null,
+        "parameters": [],
+        "line": 117
+      },
+      {
+        "path": "/jobs/{job_id}",
+        "method": "DELETE",
+        "function": "submit_container_job",
+        "file": "bases/ai_factory/slurm_gateway/core.py",
+        "framework": "fastapi",
+        "description": "Submit a containerized job request using Apptainer.",
+        "parameters": [],
+        "line": 125
+      }
+    ],
+    "dependencies": {
+      "external_services": [
+        {
+          "source_service": "gitlab-runner",
+          "type": "unknown",
+          "url": "https://gitlab.tuwien.ac.at/",
+          "config_path": "gitlab-runner.gitlabUrl",
+          "file": "projects/gitlab-runner/chart/values.yaml"
+        },
+        {
+          "source_service": "gitlab-runner",
+          "type": "unknown",
+          "url": "[[runners]]\n  environment = [\"DOCKER_TLS_CERTDIR=/certs\", \"DOCKER_HOST=tcp://docker:2376\", \"DOCKER_TLS_VERIFY=1\"]\n  [runners.kubernetes]\n    namespace = \"{{.Release.Namespace}}\"\n    image = \"ubuntu:22.04\"\n    privileged = true\n    cpu_request = \"100m\"\n    memory_request = \"128Mi\"\n    service_cpu_request = \"100m\"\n    service_memory_request = \"128Mi\"\n    helper_cpu_request = \"100m\"\n    helper_memory_request = \"128Mi\"\n  [runners.kubernetes.pod_labels]\n    \"app.kubernetes.io/managed-by\" = \"gitlab-runner\"\n  [[runners.kubernetes.volumes.empty_dir]]\n    name = \"docker-certs\"\n    mount_path = \"/certs/client\"\n",
+          "config_path": "gitlab-runner.runners.config",
+          "file": "projects/gitlab-runner/chart/values.yaml"
+        },
+        {
+          "source_service": "cert-manager",
+          "type": "unknown",
+          "url": "https://acme-v02.api.letsencrypt.org/directory",
+          "config_path": "clusterIssuer.server",
+          "file": "projects/cert-manager/chart/values.yaml"
+        },
+        {
+          "source_service": "harbor",
+          "type": "external_url",
+          "url": "https://harbor.ai-factory.datalab.tuwien.ac.at",
+          "config_path": "harbor.externalURL",
+          "file": "projects/harbor/chart/values.yaml"
+        },
+        {
+          "source_service": "apisix",
+          "type": "host",
+          "url": "api.ai-factory.datalab.tuwien.ac.at",
+          "config_path": "apisix.ingress.hosts[0].host",
+          "file": "projects/apisix/chart/values.yaml"
+        },
+        {
+          "source_service": "apisix",
+          "type": "host",
+          "url": "slurmapi.datalab.tuwien.ac.at",
+          "config_path": "slurm.host",
+          "file": "projects/apisix/chart/values.yaml"
+        }
+      ],
+      "internal_routes": [
+        {
+          "ingress": "kubeflow-pipelines-ui",
+          "host": "kubeflow.ai-factory.datalab.tuwien.ac.at",
+          "path": "/pipeline(/|$)(.*)",
+          "service": "ml-pipeline-ui",
+          "port": 80,
+          "type": "http_routing"
+        },
+        {
+          "ingress": "kubeflow-pipelines-api",
+          "host": "kubeflow.ai-factory.datalab.tuwien.ac.at",
+          "path": "/api(/|$)(.*)",
+          "service": "ml-pipeline",
+          "port": 8887,
+          "type": "http_routing"
+        }
+      ],
+      "code_dependencies": [],
+      "deployment_dependencies": [
+        {
+          "application": "cert-manager",
+          "sync_wave": -1,
+          "namespace": "cert-manager",
+          "source_path": "projects/cert-manager/chart",
+          "type": "argocd_app"
+        },
+        {
+          "application": "platform-apps-root",
+          "sync_wave": 0,
+          "namespace": "ai-factory",
+          "source_path": "gitops/platform-apps",
+          "type": "argocd_app"
+        },
+        {
+          "application": "harbor",
+          "sync_wave": 0,
+          "namespace": "harbor",
+          "source_path": "projects/harbor/chart",
+          "type": "argocd_app"
+        },
+        {
+          "application": "gitlab-runner",
+          "sync_wave": 1,
+          "namespace": "gitlab-runner",
+          "source_path": "projects/gitlab-runner/chart",
+          "type": "argocd_app"
+        },
+        {
+          "application": "clearml",
+          "sync_wave": 1,
+          "namespace": "clearml",
+          "source_path": null,
+          "type": "argocd_app"
+        },
+        {
+          "application": "apisix",
+          "sync_wave": 1,
+          "namespace": "apisix",
+          "source_path": "projects/apisix/chart",
+          "type": "argocd_app"
+        },
+        {
+          "application": "kubeflow-pipelines",
+          "sync_wave": 2,
+          "namespace": "kubeflow",
+          "source_path": "projects/kubeflow-pipelines/kustomize",
+          "type": "argocd_app"
+        },
+        {
+          "application": "clearml-agent",
+          "sync_wave": 2,
+          "namespace": "clearml",
+          "source_path": null,
+          "type": "argocd_app"
+        }
+      ],
+      "dependency_graph": {
+        "nodes": [
+          {
+            "id": "gitlab-runner",
+            "type": "internal_service",
+            "label": "gitlab-runner"
+          },
+          {
+            "id": "https://gitlab.tuwien.ac.at/",
+            "type": "external_service",
+            "label": "https://gitlab.tuwien.ac.at/"
+          },
+          {
+            "id": "[[runners]]\n  environment = [\"DOCKER_TLS_CERTDIR=/certs\", \"DOCKER_HOST=tcp://docker:2376\", \"DOCKER_TLS_VERIFY=1\"]\n  [runners.kubernetes]\n    namespace = \"{{.Release.Namespace}}\"\n    image = \"ubuntu:22.04\"\n    privileged = true\n    cpu_request = \"100m\"\n    memory_request = \"128Mi\"\n    service_cpu_request = \"100m\"\n    service_memory_request = \"128Mi\"\n    helper_cpu_request = \"100m\"\n    helper_memory_request = \"128Mi\"\n  [runners.kubernetes.pod_labels]\n    \"app.kubernetes.io/managed-by\" = \"gitlab-runner\"\n  [[runners.kubernetes.volumes.empty_dir]]\n    name = \"docker-certs\"\n    mount_path = \"/certs/client\"\n",
+            "type": "external_service",
+            "label": "[[runners]]\n  environment = [\"DOCKER_TLS_CERTDIR=/certs\", \"DOCKER_HOST=tcp://docker:2376\", \"DOCKER_TLS_VERIFY=1\"]\n  [runners.kubernetes]\n    namespace = \"{{.Release.Namespace}}\"\n    image = \"ubuntu:22.04\"\n    privileged = true\n    cpu_request = \"100m\"\n    memory_request = \"128Mi\"\n    service_cpu_request = \"100m\"\n    service_memory_request = \"128Mi\"\n    helper_cpu_request = \"100m\"\n    helper_memory_request = \"128Mi\"\n  [runners.kubernetes.pod_labels]\n    \"app.kubernetes.io/managed-by\" = \"gitlab-runner\"\n  [[runners.kubernetes.volumes.empty_dir]]\n    name = \"docker-certs\"\n    mount_path = \"/certs/client\"\n"
+          },
+          {
+            "id": "cert-manager",
+            "type": "internal_service",
+            "label": "cert-manager"
+          },
+          {
+            "id": "https://acme-v02.api.letsencrypt.org/directory",
+            "type": "external_service",
+            "label": "https://acme-v02.api.letsencrypt.org/directory"
+          },
+          {
+            "id": "harbor",
+            "type": "internal_service",
+            "label": "harbor"
+          },
+          {
+            "id": "https://harbor.ai-factory.datalab.tuwien.ac.at",
+            "type": "external_service",
+            "label": "https://harbor.ai-factory.datalab.tuwien.ac.at"
+          },
+          {
+            "id": "apisix",
+            "type": "internal_service",
+            "label": "apisix"
+          },
+          {
+            "id": "api.ai-factory.datalab.tuwien.ac.at",
+            "type": "external_service",
+            "label": "api.ai-factory.datalab.tuwien.ac.at"
+          },
+          {
+            "id": "slurmapi.datalab.tuwien.ac.at",
+            "type": "external_service",
+            "label": "slurmapi.datalab.tuwien.ac.at"
+          },
+          {
+            "id": "ml-pipeline-ui",
+            "type": "k8s_service",
+            "label": "ml-pipeline-ui"
+          },
+          {
+            "id": "ml-pipeline",
+            "type": "k8s_service",
+            "label": "ml-pipeline"
+          }
+        ],
+        "edges": [
+          {
+            "from": "gitlab-runner",
+            "to": "https://gitlab.tuwien.ac.at/",
+            "type": "unknown",
+            "label": "gitlab-runner.gitlabUrl"
+          },
+          {
+            "from": "gitlab-runner",
+            "to": "[[runners]]\n  environment = [\"DOCKER_TLS_CERTDIR=/certs\", \"DOCKER_HOST=tcp://docker:2376\", \"DOCKER_TLS_VERIFY=1\"]\n  [runners.kubernetes]\n    namespace = \"{{.Release.Namespace}}\"\n    image = \"ubuntu:22.04\"\n    privileged = true\n    cpu_request = \"100m\"\n    memory_request = \"128Mi\"\n    service_cpu_request = \"100m\"\n    service_memory_request = \"128Mi\"\n    helper_cpu_request = \"100m\"\n    helper_memory_request = \"128Mi\"\n  [runners.kubernetes.pod_labels]\n    \"app.kubernetes.io/managed-by\" = \"gitlab-runner\"\n  [[runners.kubernetes.volumes.empty_dir]]\n    name = \"docker-certs\"\n    mount_path = \"/certs/client\"\n",
+            "type": "unknown",
+            "label": "gitlab-runner.runners.config"
+          },
+          {
+            "from": "cert-manager",
+            "to": "https://acme-v02.api.letsencrypt.org/directory",
+            "type": "unknown",
+            "label": "clusterIssuer.server"
+          },
+          {
+            "from": "harbor",
+            "to": "https://harbor.ai-factory.datalab.tuwien.ac.at",
+            "type": "external_url",
+            "label": "harbor.externalURL"
+          },
+          {
+            "from": "apisix",
+            "to": "api.ai-factory.datalab.tuwien.ac.at",
+            "type": "host",
+            "label": "apisix.ingress.hosts[0].host"
+          },
+          {
+            "from": "apisix",
+            "to": "slurmapi.datalab.tuwien.ac.at",
+            "type": "host",
+            "label": "slurm.host"
+          },
+          {
+            "from": "kubeflow.ai-factory.datalab.tuwien.ac.at",
+            "to": "ml-pipeline-ui",
+            "type": "http_route",
+            "label": "/pipeline(/|$)(.*)"
+          },
+          {
+            "from": "kubeflow.ai-factory.datalab.tuwien.ac.at",
+            "to": "ml-pipeline",
+            "type": "http_route",
+            "label": "/api(/|$)(.*)"
+          }
+        ]
+      },
+      "statistics": {
+        "total_external_services": 6,
+        "total_internal_routes": 2,
+        "total_code_dependencies": 0,
+        "total_deployment_deps": 8
+      }
+    },
     "statistics": {
       "total_services": 8,
       "total_libraries": 2,
-      "total_modules": 33
+      "total_modules": 33,
+      "total_external_services": 6,
+      "total_internal_routes": 2,
+      "total_code_dependencies": 0,
+      "total_deployment_deps": 8
     }
   },
   "layer3_deployment_architecture": {
-    "deployments": {},
-    "k8s_services": {},
-    "ingresses": {},
+    "deployment_tools": [
+      "kustomize",
+      "gitops",
+      "argocd",
+      "helm"
+    ],
+    "helm_charts": {
+      "gitlab-runner": {
+        "name": "gitlab-runner",
+        "version": "0.1.0",
+        "description": "Helm chart for GitLab Runner CI/CD",
+        "chart_file": "projects/gitlab-runner/chart/Chart.yaml",
+        "templates": [],
+        "resources": {},
+        "values_file": "projects/gitlab-runner/chart/values.yaml"
+      },
+      "slurm-gateway-api": {
+        "name": "slurm-gateway-api",
+        "version": "0.1.0",
+        "description": "Helm chart for slurm_gateway_api",
+        "chart_file": "projects/slurm_gateway_api/chart/Chart.yaml",
+        "templates": [
+          "projects/slurm_gateway_api/chart/templates/deployment.yaml",
+          "projects/slurm_gateway_api/chart/templates/ingress.yaml",
+          "projects/slurm_gateway_api/chart/templates/service.yaml"
+        ],
+        "resources": {
+          "Deployment": [
+            "deployment.yaml"
+          ],
+          "Ingress": [
+            "ingress.yaml"
+          ],
+          "Service": [
+            "service.yaml"
+          ]
+        },
+        "values_file": "projects/slurm_gateway_api/chart/values.yaml"
+      },
+      "clearml": {
+        "name": "clearml",
+        "version": "0.1.0",
+        "description": "Helm chart for ClearML platform deployment",
+        "chart_file": "projects/clearml/chart/Chart.yaml",
+        "templates": [],
+        "resources": {},
+        "values_file": "projects/clearml/chart/values.yaml"
+      },
+      "cert-manager": {
+        "name": "cert-manager",
+        "version": "0.1.0",
+        "description": "Helm chart for cert-manager certificate management",
+        "chart_file": "projects/cert-manager/chart/Chart.yaml",
+        "templates": [
+          "projects/cert-manager/chart/templates/clusterissuer.yaml"
+        ],
+        "resources": {
+          "ClusterIssuer": [
+            "clusterissuer.yaml"
+          ]
+        },
+        "values_file": "projects/cert-manager/chart/values.yaml"
+      },
+      "harbor": {
+        "name": "harbor",
+        "version": "0.1.0",
+        "description": "Helm chart for Harbor container registry",
+        "chart_file": "projects/harbor/chart/Chart.yaml",
+        "templates": [],
+        "resources": {},
+        "values_file": "projects/harbor/chart/values.yaml"
+      },
+      "apisix": {
+        "name": "apisix",
+        "version": "0.1.0",
+        "description": "APISIX API Gateway for AI Factory",
+        "chart_file": "projects/apisix/chart/Chart.yaml",
+        "templates": [
+          "projects/apisix/chart/templates/slurm-route.yaml",
+          "projects/apisix/chart/templates/servicemonitor.yaml",
+          "projects/apisix/chart/templates/metrics-service.yaml"
+        ],
+        "resources": {
+          "ApisixRoute": [
+            "slurm-route.yaml"
+          ],
+          "ServiceMonitor": [
+            "servicemonitor.yaml"
+          ],
+          "Service": [
+            "metrics-service.yaml"
+          ]
+        },
+        "values_file": "projects/apisix/chart/values.yaml"
+      }
+    },
+    "deployments": {
+      "helm_slurm-gateway-api_deployment": {
+        "id": "helm_slurm-gateway-api_deployment",
+        "name": "deployment",
+        "chart": "slurm-gateway-api",
+        "kind": "Deployment",
+        "template": "projects/slurm_gateway_api/chart/templates/deployment.yaml",
+        "source": "helm"
+      }
+    },
+    "k8s_services": {
+      "helm_slurm-gateway-api_service": {
+        "id": "helm_slurm-gateway-api_service",
+        "name": "service",
+        "chart": "slurm-gateway-api",
+        "template": "projects/slurm_gateway_api/chart/templates/service.yaml",
+        "source": "helm"
+      },
+      "helm_apisix_metrics-service": {
+        "id": "helm_apisix_metrics-service",
+        "name": "metrics-service",
+        "chart": "apisix",
+        "template": "projects/apisix/chart/templates/metrics-service.yaml",
+        "source": "helm"
+      }
+    },
+    "ingresses": {
+      "helm_slurm-gateway-api_ingress": {
+        "id": "helm_slurm-gateway-api_ingress",
+        "name": "ingress",
+        "chart": "slurm-gateway-api",
+        "template": "projects/slurm_gateway_api/chart/templates/ingress.yaml",
+        "source": "helm"
+      }
+    },
     "config_maps": {},
     "secrets": {},
     "pvcs": {},
@@ -2384,9 +2820,11 @@
     ],
     "resource_dependencies": {},
     "statistics": {
-      "total_deployments": 0,
-      "total_services": 0,
-      "total_ingresses": 0,
+      "total_deployment_tools": 4,
+      "total_helm_charts": 6,
+      "total_deployments": 1,
+      "total_services": 2,
+      "total_ingresses": 1,
       "total_namespaces": 1
     }
   },
@@ -3312,7 +3750,7 @@
   },
   "metadata": {
     "repository": "/Users/iuliarinea/Desktop/Coding/KnowledgeForge/monorepo",
-    "extraction_timestamp": "2025-12-07T23:01:32.861268",
+    "extraction_timestamp": "2025-12-07T23:48:57.124688",
     "languages": [
       "python",
       "unknown"

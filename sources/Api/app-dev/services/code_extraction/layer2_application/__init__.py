@@ -6,11 +6,15 @@ This layer provides service-level architecture analysis:
 - Module organization
 - API endpoint discovery
 - Service dependency mapping
+- External service integration points
 """
 
-from .service_detector import ServiceBoundaryDetector, APIEndpointDetector
+from .service_detector import ServiceBoundaryDetector
+from .dependency_analyzer import ServiceDependencyAnalyzer
+from .api_detector import APIEndpointDetector
 
 __all__ = [
     "ServiceBoundaryDetector",
     "APIEndpointDetector",
+    "ServiceDependencyAnalyzer",
 ]

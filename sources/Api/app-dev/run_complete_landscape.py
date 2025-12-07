@@ -17,7 +17,9 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).parent))
 
 from services.code_extraction.repository_scanner import RepositoryScanner
-from services.code_extraction.layer2_application.service_detector import ServiceBoundaryDetector, APIEndpointDetector
+from services.code_extraction.layer2_application.service_detector import ServiceBoundaryDetector
+from services.code_extraction.layer2_application.api_detector import APIEndpointDetector
+from services.code_extraction.layer2_application.dependency_analyzer import ServiceDependencyAnalyzer
 from services.code_extraction.layer3_deployment.deployment_analyzer import DeploymentTopologyAnalyzer
 from services.code_extraction.layer4_dataflow.dataflow_analyzer import DataFlowAnalyzer, WorkflowSequenceDetector
 from infrastructure.graph.code_entity_storage import CodeEntityNeo4jStorage
@@ -32,11 +34,11 @@ class CompleteITLandscapeExtractor:
         """Initialize complete extractor."""
         self.repo_path = Path(repo_path)
         self.scanner = RepositoryScanner(repo_path=self.repo_path)
-        
         # Layer analyzers
         self.service_detector = ServiceBoundaryDetector(repo_path)
-        self.api_detector = APIEndpointDetector()
-        self.deployment_analyzer = DeploymentTopologyAnalyzer()
+        self.api_detector = APIEndpointDetector(repo_path)
+        self.dependency_analyzer = ServiceDependencyAnalyzer(repo_path)
+        self.deployment_analyzer = DeploymentTopologyAnalyzer(repo_path)
         self.dataflow_analyzer = DataFlowAnalyzer()
         self.workflow_detector = WorkflowSequenceDetector()
     
@@ -64,10 +66,24 @@ class CompleteITLandscapeExtractor:
         logger.info("-" * 80)
         service_analysis = self.service_detector.analyze(base_extraction)
         api_endpoints = self.api_detector.detect_endpoints(base_extraction)
+        dependency_analysis = self.dependency_analyzer.analyze(base_extraction)
         
         logger.info(f"✓ Detected {len(service_analysis['services'])} services")
         logger.info(f"✓ Detected {len(service_analysis['libraries'])} libraries")
         logger.info(f"✓ Detected {len(api_endpoints)} API endpoints")
+        logger.info(f"✓ Mapped {dependency_analysis['statistics']['total_external_services']} external service connections")
+        logger.info(f"✓ Found {dependency_analysis['statistics']['total_internal_routes']} internal routes")
+        
+        # Print key external services
+        if dependency_analysis['external_services']:
+            logger.info("\n🔗 KEY EXTERNAL SERVICES")
+            logger.info("="*80)
+            seen_urls = set()
+            for ext_svc in dependency_analysis['external_services'][:10]:
+                url = ext_svc['url']
+                if url not in seen_urls:
+                    logger.info(f"   {ext_svc['source_service']} → {url}")
+                    seen_urls.add(url)
         
         # Layer 3: Runtime/Deployment Architecture
         logger.info("\n🚀 LAYER 3: Runtime & Deployment Architecture")
@@ -77,7 +93,8 @@ class CompleteITLandscapeExtractor:
         logger.info(f"✓ Found {len(deployment_topology['deployments'])} deployments")
         logger.info(f"✓ Found {len(deployment_topology['services'])} K8s services")
         logger.info(f"✓ Found {len(deployment_topology['ingresses'])} ingresses")
-        logger.info(f"✓ Detected {len(deployment_topology['external_services'])} external services")
+        logger.info(f"✓ Detected {len(deployment_topology.get('deployment_tools', []))} deployment tools")
+        logger.info(f"✓ Found {len(deployment_topology.get('helm_charts', {}))} Helm charts")
         
         # Layer 4: Data & Workflow Architecture
         logger.info("\n📊 LAYER 4: Data & Workflow Architecture")
@@ -129,9 +146,15 @@ class CompleteITLandscapeExtractor:
                 "libraries": service_analysis['libraries'],
                 "service_dependencies": service_analysis['service_dependencies'],
                 "api_endpoints": api_endpoints,
-                "statistics": service_analysis['statistics'],
+                "dependencies": dependency_analysis,
+                "statistics": {
+                    **service_analysis['statistics'],
+                    **dependency_analysis['statistics'],
+                },
             },
             "layer3_deployment_architecture": {
+                "deployment_tools": deployment_topology.get('deployment_tools', []),
+                "helm_charts": deployment_topology.get('helm_charts', {}),
                 "deployments": deployment_topology['deployments'],
                 "k8s_services": deployment_topology['services'],
                 "ingresses": deployment_topology['ingresses'],
