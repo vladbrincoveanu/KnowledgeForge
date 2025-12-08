@@ -7,9 +7,18 @@
 - New directories for each layer
 - Cleanup UI
 
-#### What we did:
-
-Iulia: 
-Vlad:
 
 ## Next meeting: 4.12
+
+Vlad - word doc with entity proposal
+Iulia - working on extraction
+
+## Next meeting: 8.12
+
+Vlad - UI + extraction entities
+Iulia - architecture overview DEV + extraction 
+
+## Next meeting: 16.12
+
+Vlad - 
+Iulia
