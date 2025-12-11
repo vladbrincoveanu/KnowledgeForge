@@ -69,7 +69,7 @@ services:
     build: .
     container_name: knowledgeforge-api
     ports:
-      - "8000:8000"
+      - "8001:8000"  # host:container (change host port if 8000 is taken)
     environment:
       # Database configuration
       - KF_DATABASE__TYPE=postgresql

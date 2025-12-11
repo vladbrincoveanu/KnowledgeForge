@@ -18,7 +18,11 @@ from app.infrastructure.storage.metadata_store import (
 )
 
 # Import actual backend services
-from app.services.entity_extraction.entity_extractor import EntityExtractor
+try:
+    from app.services.entity_extraction.entity_extractor import EntityExtractor
+except (ImportError, ModuleNotFoundError):
+    # EntityExtractor module doesn't exist - create a placeholder
+    EntityExtractor = None
 from app.services.ontology_mapping.ontology_mapper import OntologyMapper
 from app.services.relationship_discovery.relationship_discoverer import (
     RelationshipDiscoverer,

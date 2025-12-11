@@ -1,0 +1,201 @@
+{
+  "task_id": "4a621a40-1adb-428f-b419-703a24f162bc",
+  "total_services": 6,
+  "extracted_at": "2025-12-10T11:49:40.918917",
+  "services": [
+    {
+      "domain": "testing",
+      "owner": null,
+      "owner_contributors": [],
+      "status": "unknown",
+      "status_evidence": null,
+      "tier": "unknown",
+      "data_class": null,
+      "id": "svc-shuup",
+      "name": "shuup",
+      "display_name": "Shuup",
+      "description": null,
+      "language": null,
+      "framework": null,
+      "port": null,
+      "file_path": "docker-compose-dev.yml",
+      "source": "docker_compose",
+      "direct_depends": [
+        "svc-campaigns",
+        "svc-shuup_setup_utils",
+        "svc-shuup_tests"
+      ],
+      "dependencies": [
+        "svc-campaigns",
+        "svc-shuup_setup_utils",
+        "svc-shuup_tests",
+        "svc-doc"
+      ],
+      "dependents": [
+        "svc-campaigns",
+        "svc-shuup_tests",
+        "svc-shuup_workbench"
+      ],
+      "last_commit_date": null,
+      "commit_count_30d": 0,
+      "commit_count_90d": 0,
+      "commit_count_180d": 0,
+      "confidence": 1.0
+    },
+    {
+      "domain": "marketing",
+      "owner": null,
+      "owner_contributors": [],
+      "status": "unknown",
+      "status_evidence": null,
+      "tier": "unknown",
+      "data_class": null,
+      "id": "svc-campaigns",
+      "name": "campaigns",
+      "display_name": "Campaigns",
+      "description": null,
+      "language": null,
+      "framework": null,
+      "port": null,
+      "file_path": "shuup/campaigns/api",
+      "source": "api_routes",
+      "direct_depends": [
+        "svc-shuup"
+      ],
+      "dependencies": [
+        "svc-shuup"
+      ],
+      "dependents": [
+        "svc-shuup",
+        "svc-shuup_tests"
+      ],
+      "last_commit_date": null,
+      "commit_count_30d": 0,
+      "commit_count_90d": 0,
+      "commit_count_180d": 0,
+      "confidence": 1.0
+    },
+    {
+      "domain": "testing",
+      "owner": null,
+      "owner_contributors": [],
+      "status": "unknown",
+      "status_evidence": null,
+      "tier": "unknown",
+      "data_class": null,
+      "id": "svc-shuup_tests",
+      "name": "shuup_tests",
+      "display_name": "Shuup Tests",
+      "description": null,
+      "language": "Python",
+      "framework": null,
+      "port": null,
+      "file_path": "shuup_tests",
+      "source": "top_level_directory",
+      "direct_depends": [
+        "svc-campaigns",
+        "svc-shuup"
+      ],
+      "dependencies": [
+        "svc-campaigns",
+        "svc-shuup"
+      ],
+      "dependents": [
+        "svc-shuup"
+      ],
+      "last_commit_date": null,
+      "commit_count_30d": 0,
+      "commit_count_90d": 0,
+      "commit_count_180d": 0,
+      "confidence": 1.0
+    },
+    {
+      "domain": "core",
+      "owner": null,
+      "owner_contributors": [],
+      "status": "unknown",
+      "status_evidence": null,
+      "tier": "unknown",
+      "data_class": null,
+      "id": "svc-doc",
+      "name": "doc",
+      "display_name": "Doc",
+      "description": null,
+      "language": null,
+      "framework": null,
+      "port": null,
+      "file_path": "doc",
+      "source": "top_level_directory",
+      "direct_depends": [],
+      "dependencies": [],
+      "dependents": [
+        "svc-shuup",
+        "svc-shuup_workbench"
+      ],
+      "last_commit_date": null,
+      "commit_count_30d": 0,
+      "commit_count_90d": 0,
+      "commit_count_180d": 0,
+      "confidence": 1.0
+    },
+    {
+      "domain": null,
+      "owner": null,
+      "owner_contributors": [],
+      "status": "unknown",
+      "status_evidence": null,
+      "tier": "unknown",
+      "data_class": null,
+      "id": "svc-shuup_workbench",
+      "name": "shuup_workbench",
+      "display_name": "Shuup Workbench",
+      "description": null,
+      "language": "Python",
+      "framework": null,
+      "port": null,
+      "file_path": "shuup_workbench",
+      "source": "top_level_directory",
+      "direct_depends": [
+        "svc-shuup"
+      ],
+      "dependencies": [
+        "svc-shuup",
+        "svc-doc"
+      ],
+      "dependents": [],
+      "last_commit_date": null,
+      "commit_count_30d": 0,
+      "commit_count_90d": 0,
+      "commit_count_180d": 0,
+      "confidence": 1.0
+    },
+    {
+      "domain": "core",
+      "owner": null,
+      "owner_contributors": [],
+      "status": "unknown",
+      "status_evidence": null,
+      "tier": "unknown",
+      "data_class": null,
+      "id": "svc-shuup_setup_utils",
+      "name": "shuup_setup_utils",
+      "display_name": "Shuup Setup Utils",
+      "description": null,
+      "language": "Python",
+      "framework": null,
+      "port": null,
+      "file_path": "shuup_setup_utils",
+      "source": "top_level_directory",
+      "direct_depends": [],
+      "dependencies": [],
+      "dependents": [
+        "svc-shuup"
+      ],
+      "last_commit_date": null,
+      "commit_count_30d": 0,
+      "commit_count_90d": 0,
+      "commit_count_180d": 0,
+      "confidence": 1.0
+    }
+  ]
+}

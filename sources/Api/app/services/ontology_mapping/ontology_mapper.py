@@ -10,12 +10,29 @@ from typing import Any, Optional
 
 import numpy as np
 import requests
-from owlready2 import *
+try:
+    from owlready2 import *
+except ImportError:
+    # owlready2 is optional - ontology mapping features will be limited
+    pass
+
 from pydantic import BaseModel
-from rdflib import OWL, RDF, RDFS, XSD, Graph, Literal, Namespace, URIRef
-from rdflib.namespace import DC, FOAF, SKOS
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+
+try:
+    from rdflib import OWL, RDF, RDFS, XSD, Graph, Literal, Namespace, URIRef
+    from rdflib.namespace import DC, FOAF, SKOS
+except ImportError:
+    # rdflib is optional
+    OWL = RDF = RDFS = XSD = Graph = Literal = Namespace = URIRef = None
+    DC = FOAF = SKOS = None
+
+try:
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.metrics.pairwise import cosine_similarity
+except ImportError:
+    # sklearn is optional
+    TfidfVectorizer = None
+    cosine_similarity = None
 
 from app.domain.models.entities import Entity, Relationship
 from app.infrastructure.llm.llm_manager import LLMManager

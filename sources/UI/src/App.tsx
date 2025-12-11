@@ -13,6 +13,7 @@ import Graph from './@components/graph-view/Graph/Graph';
 import OntologyResults from './@components/ontology-results/OntologyResults/OntologyResults';
 import SystemMetrics from './@components/system-metrics/SystemMetrics/SystemMetrics';
 import Settings from './@components/settings/Settings/Settings';
+import ArchitectureMap from './@components/architecture-map/ArchitectureMap';
 import {
   Database,
   Activity,
@@ -20,6 +21,7 @@ import {
   BarChart3,
   Settings as SettingsIcon,
   Brain,
+  Network,
 } from 'lucide-react';
 import './App.scss';
 import Notification from './@components/notification/Notification';
@@ -138,6 +140,12 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab }) => {
       label: 'Graph View',
       icon: <BarChart3 size={20} />,
       path: '/graph',
+    },
+    {
+      id: 'architecture',
+      label: 'Architecture Map',
+      icon: <Network size={20} />,
+      path: '/architecture',
     },
     {
       id: 'metrics',
@@ -621,6 +629,7 @@ const MainContent: React.FC = () => {
     if (path === '/') return 'upload';
     if (path === '/results') return 'results';
     if (path === '/graph') return 'graph';
+    if (path === '/architecture') return 'architecture';
     if (path === '/metrics') return 'metrics';
     if (path === '/settings') return 'settings';
     return 'upload';
@@ -928,6 +937,8 @@ const MainContent: React.FC = () => {
                 </div>
               }
             />
+
+            <Route path="/architecture" element={<ArchitectureMap />} />
 
             <Route
               path="/metrics"

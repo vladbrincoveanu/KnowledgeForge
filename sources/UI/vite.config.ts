@@ -27,7 +27,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: process.env.VITE_API_URL || 'http://localhost:8000',
+        target: 'http://api:8000',
         changeOrigin: true,
         secure: false,
         ws: true
@@ -40,7 +40,7 @@ export default defineConfig({
   },
   define: {
     global: 'globalThis',
-    'import.meta.env.VITE_API_URL': JSON.stringify('/api'),
+    // Don't override VITE_API_URL - let it use the environment variable or default
     'import.meta.env.VITE_API_KEY': JSON.stringify('test-api-key-12345')
   }
 })
