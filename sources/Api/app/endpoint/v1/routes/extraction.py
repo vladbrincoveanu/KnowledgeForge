@@ -23,11 +23,25 @@ try:
 except (ImportError, ModuleNotFoundError):
     # EntityExtractor module doesn't exist - create a placeholder
     EntityExtractor = None
-from app.services.ontology_mapping.ontology_mapper import OntologyMapper
-from app.services.relationship_discovery.relationship_discoverer import (
-    RelationshipDiscoverer,
-)
-from app.services.recommendation.recommendation_service import RecommendationService
+
+try:
+    from app.services.ontology_mapping.ontology_mapper import OntologyMapper
+except (ImportError, ModuleNotFoundError):
+    OntologyMapper = None
+
+logger = logging.getLogger(__name__)
+
+try:
+    from app.services.relationship_discovery.relationship_discoverer import (
+        RelationshipDiscoverer,
+    )
+except (ImportError, ModuleNotFoundError):
+    RelationshipDiscoverer = None
+
+try:
+    from app.services.recommendation.recommendation_service import RecommendationService
+except (ImportError, ModuleNotFoundError):
+    RecommendationService = None
 from utils.config import get_config
 from app.domain.models.recommendations import (
     EdgeRecommendation,
@@ -110,8 +124,10 @@ router = APIRouter(tags=["extraction"])
 
 # Dependency injection
 def get_entity_extractor():
-    """Get entity extractor instance."""
-
+    """Get entity extractor instance (optional if module not available)."""
+    if EntityExtractor is None:
+        logger.warning("EntityExtractor not available - returning None")
+        return None
     
     config = get_config()
     
