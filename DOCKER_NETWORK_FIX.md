@@ -58,3 +58,5 @@ After the fix:
 - `docker-compose.yml`: Lines 126-127
   - Changed from empty strings to `http://api:8000`
 
+
+

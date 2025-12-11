@@ -125,7 +125,8 @@ interface FeedbackData {
 }
 
 // API configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// Use empty string to leverage Vite proxy, or explicit URL for direct connection
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 const API_KEY = import.meta.env.VITE_API_KEY || 'test-api-key-12345';
 
 // Create axios instance with default configuration
@@ -301,6 +302,7 @@ export const ontologyAPI = {
       await api.get('/api/v1/health/ready');
     return response.data;
   },
+
 };
 
 // Service Extraction API
@@ -362,6 +364,7 @@ export const serviceExtractionAPI = {
   },
 };
 
+// File Upload API (for local file processing)
 export const fileAPI = {
   // Process local CSV file
   processLocalFile: async (file: File): Promise<ProcessedFile> => {

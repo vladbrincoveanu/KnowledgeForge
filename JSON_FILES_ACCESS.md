@@ -149,3 +149,5 @@ curl "http://localhost:8000/api/v1/services/extraction/$TASK_ID/json/services" \
 cat sources/data/extractions/$TASK_ID/services.json | jq '.services[0]'
 ```
 
+
+
