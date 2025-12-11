@@ -27,7 +27,8 @@ class GitHubDownloader:
     def download_repository(
         github_url: str,
         output_dir: Optional[Path] = None,
-        use_git: bool = True
+        use_git: bool = True,
+        full_history: Optional[bool] = None,
     ) -> Path:
         """
         Download a GitHub repository.
@@ -91,7 +92,11 @@ class GitHubDownloader:
                 logger.info(f"Attempting git clone for {owner}/{repo}")
                 clone_url = f"https://github.com/{owner}/{repo}.git"
                 
-                clone_cmd = ['git', 'clone', '--depth', '1']
+                clone_cmd = ['git', 'clone']
+                if full_history is None:
+                    full_history = False
+                if not full_history:
+                    clone_cmd.extend(['--depth', '1'])
                 if branch:
                     clone_cmd.extend(['--branch', branch])
                 clone_cmd.extend([clone_url, str(repo_dir)])
@@ -176,4 +181,3 @@ class GitHubDownloader:
         
         logger.info(f"Downloaded ZIP to {zip_path}")
         return zip_path
-

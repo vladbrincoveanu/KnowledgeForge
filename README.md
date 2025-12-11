@@ -59,7 +59,7 @@ cd sources/ui
 npm install
 npm run dev
 ```
-Set `VITE_API_URL`/`VITE_APP_API_URL` in `.env` (defaults point to http://localhost:8000 and the dev server runs on http://localhost:5173).
+Set `VITE_API_URL`/`VITE_APP_API_URL` in `.env` if you want direct API calls, or leave them empty to use the Vite proxy. You can override the proxy target with `VITE_API_PROXY_TARGET` (defaults to `http://localhost:8000`).
 
 ### Running Individual Infrastructure Services
 ```

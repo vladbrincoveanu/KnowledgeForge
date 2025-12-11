@@ -132,3 +132,12 @@ yarn-error.log*
 # Uploaded files
 uploads/
 
+
+# Service extraction artifacts
+sources/Api/data/extractions/
+sources/data/extractions/
+
+# Secrets and sensitive configuration
+.env
+*.env
+!.env.example

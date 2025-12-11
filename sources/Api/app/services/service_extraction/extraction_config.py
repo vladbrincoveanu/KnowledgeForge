@@ -28,6 +28,7 @@ class ExtractionConfig:
     ENABLE_DOMAIN_DETECTION: bool = True   # Domain inference from imports/namespaces
     ENABLE_DEPENDENCY_SCAN: bool = True    # Direct dependencies from imports
     ENABLE_LLM_DESCRIPTIONS: bool = False  # Optional LLM summarization (disabled by default)
+    ENABLE_LLM_LABELS: bool = True         # Optional LLM label/notes enrichment
     
     # Git settings
     GIT_CLONE_FOR_ANALYSIS: bool = True
@@ -36,6 +37,7 @@ class ExtractionConfig:
     # LLM settings
     LLM_MAX_TOKENS: int = 150
     LLM_DESCRIPTION_ENABLED: bool = False
+    LLM_BUDGET_TOKENS: int = 4000  # Rough token cap per extraction to avoid overspend
     
     # Output directory for JSON files
     JSON_OUTPUT_DIR: Path = Path(__file__).parent.parent.parent.parent / "data" / "extractions"
@@ -49,6 +51,7 @@ class ExtractionConfig:
         cls.ENABLE_DOMAIN_DETECTION = os.getenv("KF_ENABLE_DOMAIN_DETECTION", str(cls.ENABLE_DOMAIN_DETECTION)).lower() in ("true", "1", "yes")
         cls.ENABLE_DEPENDENCY_SCAN = os.getenv("KF_ENABLE_DEPENDENCY_SCAN", str(cls.ENABLE_DEPENDENCY_SCAN)).lower() in ("true", "1", "yes")
         cls.ENABLE_LLM_DESCRIPTIONS = os.getenv("KF_ENABLE_LLM_DESCRIPTIONS", str(cls.ENABLE_LLM_DESCRIPTIONS)).lower() in ("true", "1", "yes")
+        cls.ENABLE_LLM_LABELS = os.getenv("KF_ENABLE_LLM_LABELS", str(cls.ENABLE_LLM_LABELS)).lower() in ("true", "1", "yes")
         cls.GIT_CLONE_FOR_ANALYSIS = os.getenv("KF_GIT_CLONE_FOR_ANALYSIS", str(cls.GIT_CLONE_FOR_ANALYSIS)).lower() in ("true", "1", "yes")
         
         contributor_limit = os.getenv("KF_GIT_CONTRIBUTOR_LIMIT")
@@ -58,6 +61,9 @@ class ExtractionConfig:
         llm_max_tokens = os.getenv("KF_LLM_MAX_TOKENS")
         if llm_max_tokens and llm_max_tokens.isdigit():
             cls.LLM_MAX_TOKENS = int(llm_max_tokens)
+        llm_budget_tokens = os.getenv("KF_LLM_BUDGET_TOKENS")
+        if llm_budget_tokens and llm_budget_tokens.isdigit():
+            cls.LLM_BUDGET_TOKENS = int(llm_budget_tokens)
         
         cls.LLM_DESCRIPTION_ENABLED = os.getenv("KF_LLM_DESCRIPTION_ENABLED", str(cls.LLM_DESCRIPTION_ENABLED)).lower() in ("true", "1", "yes")
         
@@ -68,13 +74,15 @@ class ExtractionConfig:
         logger.info(
             "Extraction config: STORE_TO_JSON=%s, STORE_TO_NEO4J=%s, "
             "ENABLE_GIT_ANALYSIS=%s, ENABLE_DOMAIN_DETECTION=%s, "
-            "ENABLE_DEPENDENCY_SCAN=%s, ENABLE_LLM_DESCRIPTIONS=%s",
+            "ENABLE_DEPENDENCY_SCAN=%s, ENABLE_LLM_DESCRIPTIONS=%s, ENABLE_LLM_LABELS=%s, LLM_BUDGET_TOKENS=%s",
             cls.STORE_TO_JSON,
             cls.STORE_TO_NEO4J,
             cls.ENABLE_GIT_ANALYSIS,
             cls.ENABLE_DOMAIN_DETECTION,
             cls.ENABLE_DEPENDENCY_SCAN,
             cls.ENABLE_LLM_DESCRIPTIONS,
+            cls.ENABLE_LLM_LABELS,
+            cls.LLM_BUDGET_TOKENS,
         )
 
 
@@ -149,6 +157,8 @@ class JSONResultStore:
                 "domain": svc.get("domain"),
                 "owner": svc.get("owner"),
                 "owner_contributors": svc.get("owner_contributors", []),
+                "owner_contributor_stats": svc.get("owner_contributor_stats", []),
+                "contributor_count": svc.get("contributor_count", 0),
                 "status": svc.get("status"),
                 "status_evidence": svc.get("status_evidence"),
                 "tier": svc.get("tier"),
@@ -159,6 +169,7 @@ class JSONResultStore:
                 "name": svc.get("name"),
                 "display_name": svc.get("display_name"),
                 "description": svc.get("description"),
+                "notes": svc.get("notes") or svc.get("description"),
                 # ═══════════════════════════════════════════════════════════
                 # Technical details
                 "language": svc.get("language"),
@@ -180,6 +191,7 @@ class JSONResultStore:
                 "commit_count_180d": svc.get("commit_count_180d", 0),
                 # ═══════════════════════════════════════════════════════════
                 # Additional
+                "attributes": svc.get("attributes", {}),
                 "confidence": svc.get("confidence", 1.0),
             }
             clean_services.append(clean_svc)
@@ -353,6 +365,10 @@ ExtractionConfig.load_from_env()
 # Ensure all attributes are defined (safety check for import issues)
 if not hasattr(ExtractionConfig, 'ENABLE_LLM_DESCRIPTIONS'):
     ExtractionConfig.ENABLE_LLM_DESCRIPTIONS = False
+if not hasattr(ExtractionConfig, 'ENABLE_LLM_LABELS'):
+    ExtractionConfig.ENABLE_LLM_LABELS = False
+if not hasattr(ExtractionConfig, 'LLM_BUDGET_TOKENS'):
+    ExtractionConfig.LLM_BUDGET_TOKENS = 4000
 if not hasattr(ExtractionConfig, 'ENABLE_GIT_ANALYSIS'):
     ExtractionConfig.ENABLE_GIT_ANALYSIS = True
 if not hasattr(ExtractionConfig, 'ENABLE_DOMAIN_DETECTION'):

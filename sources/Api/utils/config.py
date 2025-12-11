@@ -18,7 +18,7 @@ class DatabaseConfig(BaseModel):
     port: int = Field(default=5432, description="Database port")
     name: str = Field(default="knowledgeforge", description="Database name")
     username: str = Field(default="knowledgeforge", description="Database username")
-    password: str = Field(default="knowledgeforge123", description="Database password")
+    password: str = Field(default="", description="Database password (set via KF_DATABASE__PASSWORD env var)")
     connection_pool: dict = Field(
         default_factory=lambda: {
             "min_connections": 1,
@@ -41,7 +41,7 @@ class Neo4jConfig(BaseModel):
         default="bolt://localhost:7687", description="Neo4j connection URI"
     )
     username: str = Field(default="neo4j", description="Database username")
-    password: str = Field(default="password", description="Database password")
+    password: str = Field(default="", description="Database password (set via KF_NEO4J__PASSWORD env var)")
     database: str = Field(default="neo4j", description="Database name")
     max_connection_pool_size: int = Field(
         default=50, ge=1, le=1000, description="Maximum connection pool size"

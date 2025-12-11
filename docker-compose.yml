@@ -50,7 +50,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./sources/api/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./sources/Api/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - knowledgeforge-network
     healthcheck:
@@ -63,7 +63,7 @@ services:
   # KnowledgeForge API Service
   api:
     build:
-      context: ./sources/api
+      context: ./sources/Api
       dockerfile: Dockerfile
     container_name: knowledgeforge-api
     restart: unless-stopped
@@ -84,20 +84,32 @@ services:
       - KF_NEO4J__PASSWORD=password
       - KF_NEO4J__ENCRYPTED=false
       # LM Studio Configuration (connects to host machine)
-      - ONTOLOGY_LMSTUDIO__BASE_URL=http://host.docker.internal:1234
+      - ONTOLOGY_LMSTUDIO__BASE_URL=http://localhost:1234
       - ONTOLOGY_LMSTUDIO__MODEL_NAME=llama2
+      # LLM provider for service extraction
+      - KF_LLM_PROVIDER=lmstudio
+      - KF_ENABLE_LLM_LABELS=true
+      # Service extraction LLM settings (used by LLMManager)
+      - LMSTUDIO_BASE_URL=http://host.docker.internal:1234/v1
+      - LMSTUDIO_MODEL_NAME=qwen/qwen2.5-vl-7b
+      - LMSTUDIO_MODEL=qwen/qwen2.5-vl-7b
+      # Config system (KF_ prefix) settings
+      - KF_LMSTUDIO__BASE_URL=http://host.docker.internal:1234/v1
+      - KF_LMSTUDIO__MODEL_NAME=qwen/qwen2.5-vl-7b
       # Application Configuration
       - ONTOLOGY_CONFIG_FILE=/app/config.yaml
       - ONTOLOGY_ENVIRONMENT=development
       - ONTOLOGY_LOGGING__FILE_PATH=/app/logs/api.log
       - LOG_LEVEL=INFO
     volumes:
-      - ./sources/api/config.yaml:/app/config.yaml:ro
+      - ./sources/Api/config.yaml:/app/config.yaml:ro
       - ./sources/data:/app/data
       - ./logs:/app/logs
       - ./uploads:/app/uploads
     networks:
       - knowledgeforge-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy
@@ -112,19 +124,20 @@ services:
   # KnowledgeForge UI (Development)
   ui:
     build:
-      context: ./sources/ui
+      context: ./sources/UI
       dockerfile: Dockerfile
     container_name: knowledgeforge-ui
     restart: unless-stopped
     ports:
       - "3000:3000"
     volumes:
-      - ./sources/ui:/app
+      - ./sources/UI:/app
       - /app/node_modules
     environment:
       - CHOKIDAR_USEPOLLING=true
-      - VITE_API_URL=http://api:8000
-      - VITE_APP_API_URL=http://api:8000
+      - VITE_API_URL=
+      - VITE_APP_API_URL=
+      - VITE_API_PROXY_TARGET=http://api:8000
     networks:
       - knowledgeforge-network
     stdin_open: true

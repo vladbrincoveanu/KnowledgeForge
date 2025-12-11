@@ -85,6 +85,14 @@ class Service(BaseModel):
         default_factory=list,
         description="Top contributors from git history (emails)"
     )
+    owner_contributor_stats: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Top contributors from git history with commit counts"
+    )
+    contributor_count: int = Field(
+        default=0,
+        description="Unique git contributors for this service"
+    )
     
     # 3. status - Where the service is in its lifecycle
     status: ServiceStatus = Field(
@@ -113,6 +121,7 @@ class Service(BaseModel):
     # ═══════════════════════════════════════════════════════════════════════════
     
     description: Optional[str] = Field(None, description="Service description")
+    notes: Optional[str] = Field(None, description="Short service notes")
     language: Optional[str] = Field(None, description="Primary programming language")
     framework: Optional[str] = Field(None, description="Framework used (e.g., 'FastAPI', 'Express')")
     port: Optional[int] = Field(None, description="Service port")
@@ -194,4 +203,3 @@ class ServiceGraph(BaseModel):
         """Update statistics after initialization."""
         self.total_services = len(self.services)
         self.total_connections = len(self.connections)
-

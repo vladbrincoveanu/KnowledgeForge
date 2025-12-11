@@ -9,10 +9,11 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 ENV PYTHONDONTWRITEBYTECODE=1
 
-# Install system dependencies including PostgreSQL client
+# Install system dependencies including PostgreSQL client and git
 RUN apt-get update && apt-get install -y \
     curl \
     wget \
+    git \
     build-essential \
     libpq-dev \
     postgresql-client \
