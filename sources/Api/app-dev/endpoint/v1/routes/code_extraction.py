@@ -12,13 +12,11 @@ from typing import Any, Optional
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
-from app.domain.models.code_entities import ExtractionResult, IncrementalScanResult
-from app.infrastructure.graph.neo4j_manager import Neo4jGraphManager
-from app.infrastructure.storage.metadata_store import (
-    PostgreSQLMetadataStore as MetadataStore,
-)
-from app.services.code_extraction.repository_scanner import RepositoryScanner
-from utils.config import get_config
+from domain.models.code_entities import ExtractionResult, IncrementalScanResult
+from infrastructure.graph.neo4j_manager import Neo4jGraphManager
+from infrastructure.storage.metadata_store import MetadataStore
+from infrastructure.llm.llm_manager import LLMManager
+from services.code_extraction.c4_extractor import C4ArchitectureExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +29,8 @@ scan_tasks: dict[str, dict[str, Any]] = {}
 class ScanRequest(BaseModel):
     """Request model for repository scan."""
     repo_path: Optional[str] = Field(None, description="Local path to repository")
-    incremental: bool = Field(default=False, description="Perform incremental scan")
-    force_full: bool = Field(default=False, description="Force full scan")
-    ignore_patterns: list[str] = Field(default_factory=list, description="Additional patterns to ignore")
+    use_c4_model: bool = Field(default=True, description="Use C4 Model (recommended) vs detailed extraction")
+    max_components_per_domain: int = Field(default=10, description="Group components if more than this")
 
 
 class ScanResponse(BaseModel):
@@ -52,31 +49,32 @@ class ScanStatusResponse(BaseModel):
     message: str
     created_at: datetime
     completed_at: Optional[datetime] = None
-    entities_count: int = 0
-    relationships_count: int = 0
-    dependencies_count: int = 0
+    containers_count: int = 0
+    components_count: int = 0
+    external_deps_count: int = 0
     errors: list[str] = Field(default_factory=list)
-    incremental_summary: Optional[dict[str, int]] = None
+    extraction_mode: str = "c4_model"
 
 
 def get_neo4j_manager():
     """Get Neo4j manager instance."""
-    config = get_config()
     manager = Neo4jGraphManager(
-        uri=config.neo4j.uri,
-        username=config.neo4j.username,
-        password=config.neo4j.password,
-        database=config.neo4j.database,
-        encrypted=config.neo4j.encrypted,
+        uri="bolt://localhost:7687",
+        username="neo4j",
+        password="password",
+        encrypted=False,
     )
     manager.connect()
     return manager
 
 
-def get_metadata_store():
-    """Get metadata store instance."""
-    config = get_config()
-    return MetadataStore(config=config)
+def get_llm_manager():
+    """Get LLM manager instance."""
+    try:
+        return LLMManager(lmstudio_url="http://127.0.0.1:1234")
+    except Exception as e:
+        logger.warning(f"LLM not available: {e}")
+        return None
 
 
 @router.post("/upload-repo", response_model=ScanResponse)
@@ -130,13 +128,11 @@ async def upload_repository(
             'errors': [],
         }
         
-        # Start background scan
+        # Start background scan with C4 Model
         background_tasks.add_task(
-            run_repository_scan,
+            run_c4_extraction,
             task_id,
             repo_path,
-            incremental=False,
-            force_full=True,
         )
         
         return ScanResponse(
@@ -182,14 +178,12 @@ async def scan_repository(
         'errors': [],
     }
     
-    # Start background scan
+    # Start background scan with C4 Model
     background_tasks.add_task(
-        run_repository_scan,
+        run_c4_extraction,
         task_id,
         repo_path,
-        incremental=request.incremental,
-        force_full=request.force_full,
-        ignore_patterns=request.ignore_patterns,
+        max_components=request.max_components_per_domain,
     )
     
     return ScanResponse(
@@ -200,14 +194,12 @@ async def scan_repository(
     )
 
 
-async def run_repository_scan(
+async def run_c4_extraction(
     task_id: str,
     repo_path: Path,
-    incremental: bool = False,
-    force_full: bool = False,
-    ignore_patterns: Optional[list[str]] = None,
+    max_components: int = 10,
 ):
-    """Run repository scan in background."""
+    """Run C4 Model architecture extraction in background."""
     task = scan_tasks.get(task_id)
     if not task:
         logger.error(f"Task {task_id} not found in scan_tasks")
@@ -216,63 +208,43 @@ async def run_repository_scan(
     try:
         task['status'] = 'scanning'
         task['progress'] = 0.1
-        task['message'] = 'Initializing scanner'
+        task['message'] = 'Initializing C4 extractor'
         
-        # Initialize scanner
-        scanner = RepositoryScanner(
-            repo_path=repo_path,
-            ignore_patterns=ignore_patterns or [],
-        )
+        # Initialize LLM (optional)
+        llm = get_llm_manager()
         
-        task['progress'] = 0.2
-        task['message'] = 'Scanning repository'
+        # Initialize C4 extractor
+        extractor = C4ArchitectureExtractor(repo_path=repo_path, llm_manager=llm)
+        
+        task['progress'] = 0.3
+        task['message'] = 'Extracting C4 architecture'
         logger.info(f"{task['message']} (progress: {int(task['progress'] * 100)}%)")
         
-        # Perform scan
-        scan_result: Optional[IncrementalScanResult] = None
-        if incremental and not force_full:
-            logger.info(f"Performing incremental scan for task {task_id}")
-            scan_result = scanner.incremental_scan()
-            # Incremental scan internally calls scan(), so last_result is set
-            extraction_result = scanner.last_result
-            if extraction_result is None:
-                raise RuntimeError("Incremental scan did not produce an extraction result")
-        else:
-            logger.info(f"Performing full scan for task {task_id}")
-            extraction_result = scanner.scan(force_full=force_full)
+        # Extract C4 architecture
+        c4_architecture = extractor.extract(max_components_per_domain=max_components)
         
-        task['progress'] = 0.6
-        task['message'] = f'Extracted {len(extraction_result.entities)} entities'
-        task['entities_count'] = len(extraction_result.entities)
-        task['relationships_count'] = len(extraction_result.relationships)
-        task['dependencies_count'] = len(extraction_result.dependencies)
-        task['errors'] = extraction_result.errors
-        task['extraction_result'] = extraction_result
-        if scan_result:
-            task['incremental_summary'] = {
-                'added_entities': len(scan_result.added_entities),
-                'modified_entities': len(scan_result.modified_entities),
-                'deleted_entities': len(scan_result.deleted_entity_ids),
-                'added_relationships': len(scan_result.added_relationships),
-                'deleted_relationships': len(scan_result.deleted_relationship_ids),
-            }
-            task['incremental_result'] = scan_result
-        
-        logger.info(f"{task['message']} (progress: {int(task['progress'] * 100)}%)")
-        
-        # Store in Neo4j
         task['progress'] = 0.7
-        task['message'] = 'Storing in graph database'
+        task['message'] = f'Extracted {len(c4_architecture["containers"])} containers, {len(c4_architecture["components"])} components'
+        task['containers_count'] = len(c4_architecture['containers'])
+        task['components_count'] = len(c4_architecture['components'])
+        task['external_deps_count'] = len(c4_architecture['system_context'].get('external_dependencies', []))
+        task['c4_architecture'] = c4_architecture
+        
         logger.info(f"{task['message']} (progress: {int(task['progress'] * 100)}%)")
         
-        await store_code_entities_in_neo4j(task_id, extraction_result)
+        # Store in Neo4j (simplified for C4 model)
+        task['progress'] = 0.8
+        task['message'] = 'Storing architecture in graph database'
+        logger.info(f"{task['message']} (progress: {int(task['progress'] * 100)}%)")
+        
+        await store_c4_in_neo4j(task_id, c4_architecture)
         
         task['progress'] = 1.0
         task['status'] = 'completed'
-        task['message'] = 'Scan completed successfully'
+        task['message'] = 'C4 extraction completed successfully'
         task['completed_at'] = datetime.now()
         
-        logger.info(f"Repository scan completed for task {task_id}")
+        logger.info(f"C4 extraction completed for task {task_id}")
         
         # Cleanup temp directory if exists
         if 'temp_dir' in task:
@@ -282,66 +254,117 @@ async def run_repository_scan(
                 logger.warning(f"Failed to cleanup temp directory: {e}")
     
     except Exception as e:
-        logger.error(f"Repository scan failed for task {task_id}: {e}", exc_info=True)
+        logger.error(f"C4 extraction failed for task {task_id}: {e}", exc_info=True)
         
         task = scan_tasks.get(task_id)
         if task:
             task['status'] = 'failed'
-            task['message'] = f'Scan failed: {str(e)}'
+            task['message'] = f'Extraction failed: {str(e)}'
             task.setdefault('errors', []).append(str(e))
             logger.error(f"Task {task_id} failed: {task['message']}")
         else:
             logger.error(f"Task {task_id} disappeared during error handling")
 
 
-async def store_code_entities_in_neo4j(
+async def store_c4_in_neo4j(
     task_id: str,
-    extraction_result: ExtractionResult,
+    c4_architecture: dict[str, Any],
 ):
-    """Store extracted code entities in Neo4j."""
+    """Store C4 architecture in Neo4j (simplified, clean structure)."""
     try:
         neo4j_manager = get_neo4j_manager()
         
         if not neo4j_manager.is_connected():
             neo4j_manager.connect()
         
-        # Store code entities directly (Neo4j manager accepts Pydantic models)
-        for code_entity in extraction_result.entities:
-            if not code_entity.id:
-                continue
-            
-            try:
-                # Store CodeEntity directly - Neo4j manager will extract properties
-                neo4j_manager.store_entity_with_metadata(
-                    entity=code_entity,
-                    source_file=extraction_result.repository.repo_name or "repository",
-                    extraction_timestamp=datetime.now(),
-                    task_id=task_id,
-                )
-            except Exception as entity_error:
-                logger.error(f"Failed to store entity {code_entity.id}: {entity_error}")
+        # Store system context (Level 1)
+        system = c4_architecture['system_context']
+        neo4j_manager.execute_query(
+            """
+            MERGE (s:System {name: $name})
+            SET s.purpose = $purpose,
+                s.c4_level = $c4_level,
+                s.updated_at = datetime()
+            """,
+            name=system['name'],
+            purpose=system['purpose'],
+            c4_level=system['c4_level']
+        )
         
-        # Store code relationships directly
-        for code_rel in extraction_result.relationships:
-            if not code_rel.id:
-                continue
-            
-            try:
-                # Store CodeRelationship directly
-                neo4j_manager.store_relationship_with_metadata(
-                    relationship=code_rel,
-                    discovered_at=datetime.now(),
-                )
-            except Exception as rel_error:
-                logger.error(f"Failed to store relationship {code_rel.id}: {rel_error}")
+        # Store external dependencies
+        for dep in system.get('external_dependencies', []):
+            neo4j_manager.execute_query(
+                """
+                MERGE (e:ExternalService {name: $name})
+                SET e.type = $type,
+                    e.url = $url
+                WITH e
+                MATCH (s:System {name: $system_name})
+                MERGE (s)-[r:DEPENDS_ON]->(e)
+                SET r.detected_from = $detected_from
+                """,
+                name=dep['name'],
+                type=dep['type'],
+                url=dep.get('url', ''),
+                system_name=system['name'],
+                detected_from=dep.get('detected_from', '')
+            )
+        
+        # Store containers (Level 2)
+        for container in c4_architecture['containers']:
+            neo4j_manager.execute_query(
+                """
+                MERGE (c:Container {name: $name})
+                SET c.container_type = $container_type,
+                    c.technology = $technology,
+                    c.protocol = $protocol,
+                    c.c4_level = $c4_level,
+                    c.path = $path
+                WITH c
+                MATCH (s:System {name: $system_name})
+                MERGE (s)-[:CONTAINS]->(c)
+                """,
+                name=container['name'],
+                container_type=container['container_type'],
+                technology=container['technology'],
+                protocol=container['protocol'],
+                c4_level=container['c4_level'],
+                path=container['path'],
+                system_name=system['name']
+            )
+        
+        # Store components (Level 3)
+        for component in c4_architecture['components']:
+            neo4j_manager.execute_query(
+                """
+                MERGE (comp:Component {name: $name})
+                SET comp.component_type = $component_type,
+                    comp.c4_level = $c4_level,
+                    comp.endpoint_path = $endpoint_path,
+                    comp.endpoint_method = $endpoint_method,
+                    comp.function_name = $function_name,
+                    comp.file = $file
+                WITH comp
+                MATCH (c:Container {name: $container_name})
+                MERGE (c)-[:EXPOSES]->(comp)
+                """,
+                name=component['name'],
+                component_type=component['component_type'],
+                c4_level=component['c4_level'],
+                endpoint_path=component.get('endpoint_path', ''),
+                endpoint_method=component.get('endpoint_method', ''),
+                function_name=component.get('function_name', ''),
+                file=component.get('file', ''),
+                container_name=component['container']
+            )
         
         logger.info(
-            f"Stored {len(extraction_result.entities)} entities and "
-            f"{len(extraction_result.relationships)} relationships in Neo4j"
+            f"Stored C4 architecture: {len(c4_architecture['containers'])} containers, "
+            f"{len(c4_architecture['components'])} components in Neo4j"
         )
     
     except Exception as e:
-        logger.error(f"Failed to store in Neo4j: {e}", exc_info=True)
+        logger.error(f"Failed to store C4 architecture in Neo4j: {e}", exc_info=True)
         raise
 
 
@@ -369,7 +392,7 @@ async def get_scan_status(task_id: str):
 
 @router.get("/scan/{task_id}/results", response_model=dict[str, Any])
 async def get_scan_results(task_id: str):
-    """Get detailed results of a completed scan."""
+    """Get C4 architecture results of a completed scan."""
     task = scan_tasks.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -377,35 +400,23 @@ async def get_scan_results(task_id: str):
     if task['status'] != 'completed':
         raise HTTPException(status_code=400, detail="Task not yet completed")
     
-    extraction_result: Optional[ExtractionResult] = task.get('extraction_result')
-    if not extraction_result:
+    c4_architecture: Optional[dict[str, Any]] = task.get('c4_architecture')
+    if not c4_architecture:
         raise HTTPException(status_code=404, detail="Results not found")
-    
-    incremental_result = task.get('incremental_result')
-    incremental_payload = (
-        incremental_result.model_dump()
-        if incremental_result and hasattr(incremental_result, "model_dump")
-        else None
-    )
     
     return {
         'task_id': task_id,
-        'repository': extraction_result.repository.dict(),
+        'extraction_mode': 'c4_model',
+        'system_context': c4_architecture['system_context'],
+        'containers': c4_architecture['containers'],
+        'components': c4_architecture['components'],
         'statistics': {
-            'total_files': len(extraction_result.files),
-            'total_entities': len(extraction_result.entities),
-            'total_relationships': len(extraction_result.relationships),
-            'total_dependencies': len(extraction_result.dependencies),
-            'languages_detected': [lang.value for lang in extraction_result.repository.languages_detected],
-            'file_counts': extraction_result.repository.file_counts,
-            'extraction_duration': extraction_result.extraction_duration_seconds,
+            'total_containers': len(c4_architecture['containers']),
+            'total_components': len(c4_architecture['components']),
+            'total_external_deps': len(c4_architecture['system_context'].get('external_dependencies', [])),
         },
-        'incremental_changes': incremental_payload,
-        'entities': [e.dict() for e in extraction_result.entities[:100]],  # Limit for response size
-        'relationships': [r.dict() for r in extraction_result.relationships[:100]],
-        'dependencies': [d.dict() for d in extraction_result.dependencies[:100]],
-        'errors': extraction_result.errors,
-        'warnings': extraction_result.warnings,
+        'metadata': c4_architecture.get('metadata', {}),
+        'errors': task.get('errors', []),
     }
 
 
