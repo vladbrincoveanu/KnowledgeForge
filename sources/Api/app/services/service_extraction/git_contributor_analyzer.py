@@ -1,4 +1,4 @@
-;le34wy6"""Git contributor analyzer to extract owner and commit statistics from git history."""
+"""Git contributor analyzer to extract owner and commit statistics from git history."""
 
 import logging
 import subprocess

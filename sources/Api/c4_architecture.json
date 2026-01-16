@@ -1,0 +1,5883 @@
+{
+  "c4_model_version": "1.0",
+  "system_context": {
+    "c4_level": 1,
+    "type": "system",
+    "name": "ai-factory-monorepo",
+    "purpose": "Purpose not available",
+    "external_dependencies": [
+      {
+        "name": "Ac",
+        "type": "external_service",
+        "url": "https://gitlab.tuwien.ac.at/",
+        "detected_from": "projects/gitlab-runner/chart/values.yaml"
+      },
+      {
+        "name": "Letsencrypt",
+        "type": "external_service",
+        "url": "https://acme-v02.api.letsencrypt.org/directory",
+        "detected_from": "projects/cert-manager/chart/values.yaml"
+      }
+    ],
+    "owner_team": "Unknown",
+    "business_domain": "API Gateway",
+    "criticality": "Tier 1 - Production Critical"
+  },
+  "containers": [
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "monorepo",
+      "container_type": "Python Service",
+      "technology": "Python",
+      "protocol": "REST",
+      "path": ".",
+      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/.",
+      "runtime_info": "Python 3.11",
+      "dependencies_internal": [],
+      "health_endpoint": "http://localhost:8080/health"
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "slurm_gateway_api",
+      "container_type": "Python Service",
+      "technology": "Python",
+      "protocol": "HTTP",
+      "path": "projects/slurm_gateway_api",
+      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/slurm_gateway_api",
+      "runtime_info": "Python 3.11",
+      "dependencies_internal": [],
+      "health_endpoint": "http://localhost:8080/health"
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "chart",
+      "container_type": "Service",
+      "technology": "Unknown",
+      "protocol": "HTTP",
+      "path": "projects/apisix/chart",
+      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/apisix/chart",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [
+        "apisix"
+      ],
+      "health_endpoint": ""
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "gitlab-runner",
+      "container_type": "Helm Deployed Service",
+      "technology": "Kubernetes",
+      "protocol": "HTTP",
+      "path": "projects/gitlab-runner/chart/Chart.yaml",
+      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/gitlab-runner/chart",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [],
+      "health_endpoint": ""
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "slurm-gateway-api",
+      "container_type": "Helm Deployed Service",
+      "technology": "Kubernetes",
+      "protocol": "HTTP",
+      "path": "projects/slurm_gateway_api/chart/Chart.yaml",
+      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/slurm_gateway_api/chart",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [],
+      "health_endpoint": "http://localhost:8080/health"
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "clearml",
+      "container_type": "Helm Deployed Service",
+      "technology": "Kubernetes",
+      "protocol": "HTTP",
+      "path": "projects/clearml/chart/Chart.yaml",
+      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/clearml/chart",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [],
+      "health_endpoint": ""
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "cert-manager",
+      "container_type": "Helm Deployed Service",
+      "technology": "Kubernetes",
+      "protocol": "HTTP",
+      "path": "projects/cert-manager/chart/Chart.yaml",
+      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/cert-manager/chart",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [],
+      "health_endpoint": ""
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "harbor",
+      "container_type": "Helm Deployed Service",
+      "technology": "Kubernetes",
+      "protocol": "HTTP",
+      "path": "projects/harbor/chart/Chart.yaml",
+      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/harbor/chart",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [],
+      "health_endpoint": ""
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "apisix",
+      "container_type": "Helm Deployed Service",
+      "technology": "Kubernetes",
+      "protocol": "HTTP",
+      "path": "projects/apisix/chart/Chart.yaml",
+      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/apisix/chart",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [],
+      "health_endpoint": ""
+    }
+  ],
+  "components": [
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "GET /api/health-check",
+      "component_type": "API Endpoint",
+      "container": "bases",
+      "file": "bases/ai_factory/slurm_gateway/core.py",
+      "line_start": 19,
+      "signature": "health_check()",
+      "documentation": null,
+      "endpoint_path": "/api/health-check",
+      "endpoint_method": "GET"
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "POST /api/submit-job",
+      "component_type": "API Endpoint",
+      "container": "bases",
+      "file": "bases/ai_factory/slurm_gateway/core.py",
+      "line_start": 24,
+      "signature": "submit_job(job_request, x_slurm_user_name, x_slurm_user_token)",
+      "documentation": "Submit a job request to Slurm.\n\nArgs:\n    job_request: User's job request\n    x_slurm_user_name: Slurm username\n    x_slurm_user_token: Slurm JWT token\n\nReturns:\n    Slurm API response",
+      "endpoint_path": "/api/submit-job",
+      "endpoint_method": "POST"
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "POST /api/submit-hello-world-job",
+      "component_type": "API Endpoint",
+      "container": "bases",
+      "file": "bases/ai_factory/slurm_gateway/core.py",
+      "line_start": 76,
+      "signature": "submit_hello_world_job(x_slurm_user_name, x_slurm_user_token)",
+      "documentation": "Submit a hello world job with minimal configuration.\n\nArgs:\n    partition: Slurm partition to use\n    x_slurm_user_name: Slurm username (from header)\n    x_slurm_user_token: Slurm JWT token (from header)\n\nReturns:\n    Slurm API response",
+      "endpoint_path": "/api/submit-hello-world-job",
+      "endpoint_method": "POST"
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "GET /api/get-job",
+      "component_type": "API Endpoint",
+      "container": "bases",
+      "file": "bases/ai_factory/slurm_gateway/core.py",
+      "line_start": 109,
+      "signature": "get_job(job_id)",
+      "documentation": null,
+      "endpoint_path": "/api/get-job",
+      "endpoint_method": "GET"
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "DELETE /api/delete-job",
+      "component_type": "API Endpoint",
+      "container": "bases",
+      "file": "bases/ai_factory/slurm_gateway/core.py",
+      "line_start": 117,
+      "signature": "delete_job(job_id)",
+      "documentation": null,
+      "endpoint_path": "/api/delete-job",
+      "endpoint_method": "DELETE"
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "POST /api/submit-container-job",
+      "component_type": "API Endpoint",
+      "container": "bases",
+      "file": "bases/ai_factory/slurm_gateway/core.py",
+      "line_start": 125,
+      "signature": "submit_container_job(container_request, x_slurm_user_name, x_slurm_user_token)",
+      "documentation": "Submit a containerized job request using Apptainer.\n\nArgs:\n    container_request: Container job configuration\n    x_slurm_user_name: Slurm username\n    x_slurm_user_token: Slurm JWT token\n\nReturns:\n    Slurm API response\n\nRaises:\n    HTTPException: If the container request is invalid or Slurm API call fails",
+      "endpoint_path": "/api/submit-container-job",
+      "endpoint_method": "POST"
+    }
+  ],
+  "code_level": {
+    "entities": [
+      {
+        "id": "code_43fe85d9379e5d76",
+        "name": "main",
+        "entity_type": "module",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "main.py",
+        "line_start": null,
+        "line_end": null,
+        "signature": null,
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.414473",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_570f75abaff585e0",
+        "name": "main",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "main.py",
+        "line_start": 1,
+        "line_end": 2,
+        "signature": "main()",
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": "code_43fe85d9379e5d76",
+        "attributes": {
+          "parameters": [],
+          "decorators": []
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.414531",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_c44404116b54d09e",
+        "name": "development.clearml_hello_world_slurm",
+        "entity_type": "module",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "development/clearml_hello_world_slurm.py",
+        "line_start": null,
+        "line_end": null,
+        "signature": null,
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415433",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_339f2208dc7cd178",
+        "name": "submit_slurm_hello_world_job",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "development/clearml_hello_world_slurm.py",
+        "line_start": 23,
+        "line_end": 36,
+        "signature": "submit_slurm_hello_world_job(username, token)",
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": "code_c44404116b54d09e",
+        "attributes": {
+          "parameters": [
+            "username",
+            "token"
+          ],
+          "decorators": [
+            "PipelineDecorator.component"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415508",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_34bfe83352230efc",
+        "name": "run_slurm_pipeline",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "development/clearml_hello_world_slurm.py",
+        "line_start": 45,
+        "line_end": 47,
+        "signature": "run_slurm_pipeline(username, token)",
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": "code_c44404116b54d09e",
+        "attributes": {
+          "parameters": [
+            "username",
+            "token"
+          ],
+          "decorators": [
+            "PipelineDecorator.pipeline"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415624",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_38a532138f1e5e0f",
+        "name": "development.kubeflow_hello_world",
+        "entity_type": "module",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "development/kubeflow_hello_world.py",
+        "line_start": null,
+        "line_end": null,
+        "signature": null,
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415940",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_e35248c44edb7eea",
+        "name": "step_hello",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "development/kubeflow_hello_world.py",
+        "line_start": 17,
+        "line_end": 21,
+        "signature": "step_hello(count)",
+        "documentation": "Print 'Hello' count times and return count.",
+        "modifiers": [],
+        "parent_entity_id": "code_38a532138f1e5e0f",
+        "attributes": {
+          "parameters": [
+            "count"
+          ],
+          "decorators": [
+            "dsl.component"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415977",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_b27c4feebba48e4e",
+        "name": "step_world",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "development/kubeflow_hello_world.py",
+        "line_start": 27,
+        "line_end": 30,
+        "signature": "step_world(count)",
+        "documentation": "Print 'World' count times.",
+        "modifiers": [],
+        "parent_entity_id": "code_38a532138f1e5e0f",
+        "attributes": {
+          "parameters": [
+            "count"
+          ],
+          "decorators": [
+            "dsl.component"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416016",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_9e473ade568466ec",
+        "name": "hello_world_pipeline",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "development/kubeflow_hello_world.py",
+        "line_start": 37,
+        "line_end": 40,
+        "signature": "hello_world_pipeline(count)",
+        "documentation": "Pipeline that chains step_hello and step_world.",
+        "modifiers": [],
+        "parent_entity_id": "code_38a532138f1e5e0f",
+        "attributes": {
+          "parameters": [
+            "count"
+          ],
+          "decorators": [
+            "dsl.pipeline"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416053",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_882b31eac357e981",
+        "name": "development.clearml_hello_world",
+        "entity_type": "module",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "development/clearml_hello_world.py",
+        "line_start": null,
+        "line_end": null,
+        "signature": null,
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416326",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_0655e6384cdafc68",
+        "name": "step_hello",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "development/clearml_hello_world.py",
+        "line_start": 19,
+        "line_end": 22,
+        "signature": "step_hello(count)",
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": "code_882b31eac357e981",
+        "attributes": {
+          "parameters": [
+            "count"
+          ],
+          "decorators": [
+            "PipelineDecorator.component"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416349",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_d6c7d7d39650b362",
+        "name": "step_world",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "development/clearml_hello_world.py",
+        "line_start": 26,
+        "line_end": 28,
+        "signature": "step_world(count)",
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": "code_882b31eac357e981",
+        "attributes": {
+          "parameters": [
+            "count"
+          ],
+          "decorators": [
+            "PipelineDecorator.component"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416390",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_25d71e92c043bd07",
+        "name": "run_pipeline",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "development/clearml_hello_world.py",
+        "line_start": 37,
+        "line_end": 39,
+        "signature": "run_pipeline(count)",
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": "code_882b31eac357e981",
+        "attributes": {
+          "parameters": [
+            "count"
+          ],
+          "decorators": [
+            "PipelineDecorator.pipeline"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416424",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_ba6b2b9ba3f347e5",
+        "name": "development.kubeflow_hello_world_slurm",
+        "entity_type": "module",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "development/kubeflow_hello_world_slurm.py",
+        "line_start": null,
+        "line_end": null,
+        "signature": null,
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416725",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_952c3da327d53433",
+        "name": "submit_slurm_hello_world_job",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "development/kubeflow_hello_world_slurm.py",
+        "line_start": 22,
+        "line_end": 39,
+        "signature": "submit_slurm_hello_world_job(username, token)",
+        "documentation": "Submit a hello-world job to SLURM gateway and return the result.",
+        "modifiers": [],
+        "parent_entity_id": "code_ba6b2b9ba3f347e5",
+        "attributes": {
+          "parameters": [
+            "username",
+            "token"
+          ],
+          "decorators": [
+            "dsl.component"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416763",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_a734b8f017411a82",
+        "name": "print_result",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "development/kubeflow_hello_world_slurm.py",
+        "line_start": 45,
+        "line_end": 47,
+        "signature": "print_result(result)",
+        "documentation": "Print the result from SLURM job submission.",
+        "modifiers": [],
+        "parent_entity_id": "code_ba6b2b9ba3f347e5",
+        "attributes": {
+          "parameters": [
+            "result"
+          ],
+          "decorators": [
+            "dsl.component"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416843",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_511cd719d340ac46",
+        "name": "hello_world_slurm_pipeline",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "development/kubeflow_hello_world_slurm.py",
+        "line_start": 54,
+        "line_end": 57,
+        "signature": "hello_world_slurm_pipeline(username, token)",
+        "documentation": "Pipeline that submits a SLURM job and prints the result.",
+        "modifiers": [],
+        "parent_entity_id": "code_ba6b2b9ba3f347e5",
+        "attributes": {
+          "parameters": [
+            "username",
+            "token"
+          ],
+          "decorators": [
+            "dsl.pipeline"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416876",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_1570af7fa0a4e9be",
+        "name": "components.ai_factory.logger.__init__",
+        "entity_type": "module",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/logger/__init__.py",
+        "line_start": null,
+        "line_end": null,
+        "signature": null,
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420268",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_5142ccff9f02921f",
+        "name": "components.ai_factory.logger.core",
+        "entity_type": "module",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/logger/core.py",
+        "line_start": null,
+        "line_end": null,
+        "signature": null,
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420428",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_683adb721da15de9",
+        "name": "InterceptHandler",
+        "entity_type": "class",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/logger/core.py",
+        "line_start": 11,
+        "line_end": 22,
+        "signature": null,
+        "documentation": "Intercept standard logging and redirect to Loguru.",
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {
+          "base_classes": []
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420459",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_412ee12a3d63ccde",
+        "name": "emit",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/logger/core.py",
+        "line_start": 14,
+        "line_end": 22,
+        "signature": "emit(self, record)",
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": "code_683adb721da15de9",
+        "attributes": {
+          "parameters": [
+            "self",
+            "record"
+          ],
+          "decorators": []
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420470",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_e565fae58d9f5bb9",
+        "name": "setup_logger",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/logger/core.py",
+        "line_start": 25,
+        "line_end": 42,
+        "signature": "setup_logger()",
+        "documentation": "Set up centralized JSON logging and intercept standard library logging.",
+        "modifiers": [],
+        "parent_entity_id": "code_5142ccff9f02921f",
+        "attributes": {
+          "parameters": [],
+          "decorators": []
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420522",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_8a49c0cf2b2a2363",
+        "name": "get_logger",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/logger/core.py",
+        "line_start": 45,
+        "line_end": 47,
+        "signature": "get_logger()",
+        "documentation": "Get the configured logger instance.",
+        "modifiers": [],
+        "parent_entity_id": "code_5142ccff9f02921f",
+        "attributes": {
+          "parameters": [],
+          "decorators": []
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420578",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_e438980fa322e60e",
+        "name": "components.ai_factory.config.__init__",
+        "entity_type": "module",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/config/__init__.py",
+        "line_start": null,
+        "line_end": null,
+        "signature": null,
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420657",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_53cf850b0d57aa67",
+        "name": "components.ai_factory.config.core",
+        "entity_type": "module",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/config/core.py",
+        "line_start": null,
+        "line_end": null,
+        "signature": null,
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420890",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_5d8efc403f9002c5",
+        "name": "SlurmConfig",
+        "entity_type": "class",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/config/core.py",
+        "line_start": 20,
+        "line_end": 31,
+        "signature": null,
+        "documentation": "SLURM settings.",
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {
+          "base_classes": [
+            "BaseModel"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420930",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_96b52cf815f433bc",
+        "name": "api_url",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/config/core.py",
+        "line_start": 29,
+        "line_end": 31,
+        "signature": "api_url(self)",
+        "documentation": "Return the full URL for the SLURM REST API.",
+        "modifiers": [],
+        "parent_entity_id": "code_5d8efc403f9002c5",
+        "attributes": {
+          "parameters": [
+            "self"
+          ],
+          "decorators": [
+            "property"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420976",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_a00ec8ea0cfe048e",
+        "name": "SlurmGatewayConfig",
+        "entity_type": "class",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/config/core.py",
+        "line_start": 34,
+        "line_end": 44,
+        "signature": null,
+        "documentation": "Gateway API settings.",
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {
+          "base_classes": [
+            "BaseModel"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421003",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_e3b5dd7ba39ac1c4",
+        "name": "prefix",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/config/core.py",
+        "line_start": 41,
+        "line_end": 44,
+        "signature": "prefix(self)",
+        "documentation": "Return versioned API prefix, e.g., /slurm-gateway/v1.",
+        "modifiers": [],
+        "parent_entity_id": "code_a00ec8ea0cfe048e",
+        "attributes": {
+          "parameters": [
+            "self"
+          ],
+          "decorators": [
+            "property"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421030",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_f3a720df6aae3f4a",
+        "name": "LoggingConfig",
+        "entity_type": "class",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/config/core.py",
+        "line_start": 47,
+        "line_end": 61,
+        "signature": null,
+        "documentation": "Application logging configuration.",
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {
+          "base_classes": [
+            "BaseModel"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421062",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_562c16ff3f3f061c",
+        "name": "validate_log_level",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/config/core.py",
+        "line_start": 55,
+        "line_end": 61,
+        "signature": "validate_log_level(cls, v)",
+        "documentation": "Validate log level is a valid option.",
+        "modifiers": [],
+        "parent_entity_id": "code_f3a720df6aae3f4a",
+        "attributes": {
+          "parameters": [
+            "cls",
+            "v"
+          ],
+          "decorators": [
+            "field_validator",
+            "classmethod"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421092",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_14658859004c6714",
+        "name": "Settings",
+        "entity_type": "class",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/config/core.py",
+        "line_start": 64,
+        "line_end": 77,
+        "signature": null,
+        "documentation": "Top-level application settings.",
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {
+          "base_classes": [
+            "BaseSettings"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421141",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_0d275586f61e0169",
+        "name": "components.ai_factory.slurm.models",
+        "entity_type": "module",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/slurm/models.py",
+        "line_start": null,
+        "line_end": null,
+        "signature": null,
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421594",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_30a459c70aaa74f9",
+        "name": "SlurmEnvironment",
+        "entity_type": "class",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/slurm/models.py",
+        "line_start": 12,
+        "line_end": 18,
+        "signature": null,
+        "documentation": "Environment variables for Slurm job execution.",
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {
+          "base_classes": [
+            "BaseModel"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421620",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_e3ceacd40c2fac70",
+        "name": "SlurmJobBase",
+        "entity_type": "class",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/slurm/models.py",
+        "line_start": 21,
+        "line_end": 34,
+        "signature": null,
+        "documentation": "Slurm job base model.",
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {
+          "base_classes": [
+            "BaseModel"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421650",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_1a588b6eef95f829",
+        "name": "SlurmJobSpec",
+        "entity_type": "class",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/slurm/models.py",
+        "line_start": 37,
+        "line_end": 46,
+        "signature": null,
+        "documentation": "Internal Slurm job specification - inherits common fields from base.",
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {
+          "base_classes": [
+            "SlurmJobBase"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421715",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_417b4868095565fb",
+        "name": "SlurmJobSubmission",
+        "entity_type": "class",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/slurm/models.py",
+        "line_start": 49,
+        "line_end": 53,
+        "signature": null,
+        "documentation": "Slurm job submission request.",
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {
+          "base_classes": [
+            "BaseModel"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421743",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_a8fafe28bf261a63",
+        "name": "SlurmJobRequest",
+        "entity_type": "class",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/slurm/models.py",
+        "line_start": 56,
+        "line_end": 103,
+        "signature": null,
+        "documentation": "User's slurm job request.",
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {
+          "base_classes": [
+            "SlurmJobBase"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421769",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_c6afa81e7243f211",
+        "name": "_create_job_spec",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/slurm/models.py",
+        "line_start": 69,
+        "line_end": 90,
+        "signature": "_create_job_spec(self, username)",
+        "documentation": "Create a SlurmJobSpec with default values filled in.\n\nArgs:\n    username: Slurm username for deriving default paths\n\nReturns:\n    SlurmJobSpec with all required fields populated",
+        "modifiers": [],
+        "parent_entity_id": "code_a8fafe28bf261a63",
+        "attributes": {
+          "parameters": [
+            "self",
+            "username"
+          ],
+          "decorators": []
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421812",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_8dd47968a3f9855f",
+        "name": "to_submission",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/slurm/models.py",
+        "line_start": 92,
+        "line_end": 103,
+        "signature": "to_submission(self, username)",
+        "documentation": "Converts a user request to an internal Slurm job submission.\n\nArgs:\n    username: Slurm username for deriving default paths\n\nReturns:\n    SlurmJobSubmission with all required fields populated",
+        "modifiers": [],
+        "parent_entity_id": "code_a8fafe28bf261a63",
+        "attributes": {
+          "parameters": [
+            "self",
+            "username"
+          ],
+          "decorators": []
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421861",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_819c59b04dc8ef90",
+        "name": "ContainerJobRequest",
+        "entity_type": "class",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/slurm/models.py",
+        "line_start": 106,
+        "line_end": 194,
+        "signature": null,
+        "documentation": "Container job request using Apptainer.",
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {
+          "base_classes": [
+            "SlurmJobRequest"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421890",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_8dd47968a3f9855f",
+        "name": "to_submission",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/slurm/models.py",
+        "line_start": 122,
+        "line_end": 135,
+        "signature": "to_submission(self, username)",
+        "documentation": "Convert container request to Slurm job submission with generated script.\n\nArgs:\n    username: Slurm username for deriving default paths\n\nReturns:\n    SlurmJobSubmission with Apptainer script",
+        "modifiers": [],
+        "parent_entity_id": "code_819c59b04dc8ef90",
+        "attributes": {
+          "parameters": [
+            "self",
+            "username"
+          ],
+          "decorators": []
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421928",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_6bf27966d26e8f8c",
+        "name": "_generate_apptainer_script",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/slurm/models.py",
+        "line_start": 137,
+        "line_end": 194,
+        "signature": "_generate_apptainer_script(self, username)",
+        "documentation": "Generate simple Apptainer execution script.\n\nArgs:\n    username: Username for path generation\n\nReturns:\n    Complete bash script for Apptainer container execution",
+        "modifiers": [],
+        "parent_entity_id": "code_819c59b04dc8ef90",
+        "attributes": {
+          "parameters": [
+            "self",
+            "username"
+          ],
+          "decorators": []
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421963",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_95bd1a7522c647b6",
+        "name": "components.ai_factory.slurm.__init__",
+        "entity_type": "module",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "components/ai_factory/slurm/__init__.py",
+        "line_start": null,
+        "line_end": null,
+        "signature": null,
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422180",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_398fc8371ef2c719",
+        "name": "bases.ai_factory.slurm_gateway.__init__",
+        "entity_type": "module",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "bases/ai_factory/slurm_gateway/__init__.py",
+        "line_start": null,
+        "line_end": null,
+        "signature": null,
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422298",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_965692e474c47aae",
+        "name": "bases.ai_factory.slurm_gateway.core",
+        "entity_type": "module",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "bases/ai_factory/slurm_gateway/core.py",
+        "line_start": null,
+        "line_end": null,
+        "signature": null,
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422689",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_eaa187b4210a7c8a",
+        "name": "health_check",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "bases/ai_factory/slurm_gateway/core.py",
+        "line_start": 19,
+        "line_end": 20,
+        "signature": "health_check()",
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": "code_965692e474c47aae",
+        "attributes": {
+          "parameters": [],
+          "decorators": [
+            "app.get"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422770",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_d7cb098c812350d3",
+        "name": "submit_job",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "bases/ai_factory/slurm_gateway/core.py",
+        "line_start": 24,
+        "line_end": 72,
+        "signature": "submit_job(job_request, x_slurm_user_name, x_slurm_user_token)",
+        "documentation": "Submit a job request to Slurm.\n\nArgs:\n    job_request: User's job request\n    x_slurm_user_name: Slurm username\n    x_slurm_user_token: Slurm JWT token\n\nReturns:\n    Slurm API response",
+        "modifiers": [],
+        "parent_entity_id": "code_965692e474c47aae",
+        "attributes": {
+          "parameters": [
+            "job_request",
+            "x_slurm_user_name",
+            "x_slurm_user_token"
+          ],
+          "decorators": [
+            "api.post"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422798",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_30eca68b54bba1c9",
+        "name": "submit_hello_world_job",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "bases/ai_factory/slurm_gateway/core.py",
+        "line_start": 76,
+        "line_end": 105,
+        "signature": "submit_hello_world_job(x_slurm_user_name, x_slurm_user_token)",
+        "documentation": "Submit a hello world job with minimal configuration.\n\nArgs:\n    partition: Slurm partition to use\n    x_slurm_user_name: Slurm username (from header)\n    x_slurm_user_token: Slurm JWT token (from header)\n\nReturns:\n    Slurm API response",
+        "modifiers": [],
+        "parent_entity_id": "code_965692e474c47aae",
+        "attributes": {
+          "parameters": [
+            "x_slurm_user_name",
+            "x_slurm_user_token"
+          ],
+          "decorators": [
+            "api.post"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422951",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_43331cfd0c25ab21",
+        "name": "get_job",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "bases/ai_factory/slurm_gateway/core.py",
+        "line_start": 109,
+        "line_end": 113,
+        "signature": "get_job(job_id)",
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": "code_965692e474c47aae",
+        "attributes": {
+          "parameters": [
+            "job_id"
+          ],
+          "decorators": [
+            "api.get"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.423001",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_abe94170b848479e",
+        "name": "delete_job",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "bases/ai_factory/slurm_gateway/core.py",
+        "line_start": 117,
+        "line_end": 121,
+        "signature": "delete_job(job_id)",
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": "code_965692e474c47aae",
+        "attributes": {
+          "parameters": [
+            "job_id"
+          ],
+          "decorators": [
+            "api.delete"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.425367",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_0393211e59c1fd60",
+        "name": "submit_container_job",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "bases/ai_factory/slurm_gateway/core.py",
+        "line_start": 125,
+        "line_end": 181,
+        "signature": "submit_container_job(container_request, x_slurm_user_name, x_slurm_user_token)",
+        "documentation": "Submit a containerized job request using Apptainer.\n\nArgs:\n    container_request: Container job configuration\n    x_slurm_user_name: Slurm username\n    x_slurm_user_token: Slurm JWT token\n\nReturns:\n    Slurm API response\n\nRaises:\n    HTTPException: If the container request is invalid or Slurm API call fails",
+        "modifiers": [],
+        "parent_entity_id": "code_965692e474c47aae",
+        "attributes": {
+          "parameters": [
+            "container_request",
+            "x_slurm_user_name",
+            "x_slurm_user_token"
+          ],
+          "decorators": [
+            "api.post"
+          ]
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.425397",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_be820d8bcc760a2e",
+        "name": "test.components.ai_factory.logger.test_core",
+        "entity_type": "module",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "test/components/ai_factory/logger/test_core.py",
+        "line_start": null,
+        "line_end": null,
+        "signature": null,
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.426325",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_bc5269b251c2798b",
+        "name": "test_sample",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "test/components/ai_factory/logger/test_core.py",
+        "line_start": 4,
+        "line_end": 5,
+        "signature": "test_sample()",
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": "code_be820d8bcc760a2e",
+        "attributes": {
+          "parameters": [],
+          "decorators": []
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.426338",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_62dcb7ae7e3536b2",
+        "name": "test.components.ai_factory.logger.__init__",
+        "entity_type": "module",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "test/components/ai_factory/logger/__init__.py",
+        "line_start": null,
+        "line_end": null,
+        "signature": null,
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.426393",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_3cd509113f22d8ab",
+        "name": "test.components.ai_factory.config.test_core",
+        "entity_type": "module",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "test/components/ai_factory/config/test_core.py",
+        "line_start": null,
+        "line_end": null,
+        "signature": null,
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.426589",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_e1495eeffc29a04a",
+        "name": "test_sample",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "test/components/ai_factory/config/test_core.py",
+        "line_start": 4,
+        "line_end": 5,
+        "signature": "test_sample()",
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": "code_3cd509113f22d8ab",
+        "attributes": {
+          "parameters": [],
+          "decorators": []
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.426601",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_0311353de7bec8b1",
+        "name": "test.components.ai_factory.config.__init__",
+        "entity_type": "module",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "test/components/ai_factory/config/__init__.py",
+        "line_start": null,
+        "line_end": null,
+        "signature": null,
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.426651",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_02cb3940eb007d8a",
+        "name": "test.components.ai_factory.slurm.__init__",
+        "entity_type": "module",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "test/components/ai_factory/slurm/__init__.py",
+        "line_start": null,
+        "line_end": null,
+        "signature": null,
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.426704",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_de972f7ab336927c",
+        "name": "test.components.ai_factory.slurm.test_models",
+        "entity_type": "module",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "test/components/ai_factory/slurm/test_models.py",
+        "line_start": null,
+        "line_end": null,
+        "signature": null,
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.426986",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_209dc72d83949085",
+        "name": "test_to_submission_uses_defaults_when_overrides_not_provided",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "test/components/ai_factory/slurm/test_models.py",
+        "line_start": 8,
+        "line_end": 27,
+        "signature": "test_to_submission_uses_defaults_when_overrides_not_provided()",
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": "code_de972f7ab336927c",
+        "attributes": {
+          "parameters": [],
+          "decorators": []
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427005",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_996d25a2309ceb44",
+        "name": "test_to_submission_respects_explicit_overrides",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "test/components/ai_factory/slurm/test_models.py",
+        "line_start": 30,
+        "line_end": 54,
+        "signature": "test_to_submission_respects_explicit_overrides()",
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": "code_de972f7ab336927c",
+        "attributes": {
+          "parameters": [],
+          "decorators": []
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427075",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_e1c282227bc6abe6",
+        "name": "test_resource_parameters_cpus_per_task",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "test/components/ai_factory/slurm/test_models.py",
+        "line_start": 57,
+        "line_end": 89,
+        "signature": "test_resource_parameters_cpus_per_task()",
+        "documentation": "Test that cpus_per_task parameter is properly handled.",
+        "modifiers": [],
+        "parent_entity_id": "code_de972f7ab336927c",
+        "attributes": {
+          "parameters": [],
+          "decorators": []
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427148",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_88c37877d16a2fae",
+        "name": "test.bases.ai_factory.slurm_gateway.test_core",
+        "entity_type": "module",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "test/bases/ai_factory/slurm_gateway/test_core.py",
+        "line_start": null,
+        "line_end": null,
+        "signature": null,
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427525",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_2c3c8504668af184",
+        "name": "test_submit_job_forwards_headers_and_body",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "test/bases/ai_factory/slurm_gateway/test_core.py",
+        "line_start": 10,
+        "line_end": 65,
+        "signature": "test_submit_job_forwards_headers_and_body(monkeypatch)",
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": "code_88c37877d16a2fae",
+        "attributes": {
+          "parameters": [
+            "monkeypatch"
+          ],
+          "decorators": []
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427556",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_38a368dcaf04dfd0",
+        "name": "MockResponse",
+        "entity_type": "class",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "test/bases/ai_factory/slurm_gateway/test_core.py",
+        "line_start": 22,
+        "line_end": 28,
+        "signature": null,
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {
+          "base_classes": []
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427597",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_519d0973c21ec50a",
+        "name": "__init__",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "test/bases/ai_factory/slurm_gateway/test_core.py",
+        "line_start": 23,
+        "line_end": 25,
+        "signature": "__init__(self)",
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": "code_38a368dcaf04dfd0",
+        "attributes": {
+          "parameters": [
+            "self"
+          ],
+          "decorators": []
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427602",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_ac859dc9717b92fa",
+        "name": "json",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "test/bases/ai_factory/slurm_gateway/test_core.py",
+        "line_start": 27,
+        "line_end": 28,
+        "signature": "json(self)",
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": "code_38a368dcaf04dfd0",
+        "attributes": {
+          "parameters": [
+            "self"
+          ],
+          "decorators": []
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427617",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_6b4c020f16b87fda",
+        "name": "mock_post",
+        "entity_type": "function",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "test/bases/ai_factory/slurm_gateway/test_core.py",
+        "line_start": 30,
+        "line_end": 35,
+        "signature": "mock_post(url, headers, json, timeout)",
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": "code_2c3c8504668af184",
+        "attributes": {
+          "parameters": [
+            "url",
+            "headers",
+            "json",
+            "timeout"
+          ],
+          "decorators": []
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427631",
+        "extractor_version": "1.0.0"
+      },
+      {
+        "id": "code_5b1a47acb776e700",
+        "name": "test.bases.ai_factory.slurm_gateway.__init__",
+        "entity_type": "module",
+        "language": "python",
+        "source_type": "code",
+        "file_path": "test/bases/ai_factory/slurm_gateway/__init__.py",
+        "line_start": null,
+        "line_end": null,
+        "signature": null,
+        "documentation": null,
+        "modifiers": [],
+        "parent_entity_id": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427798",
+        "extractor_version": "1.0.0"
+      }
+    ],
+    "relationships": [
+      {
+        "id": "rel_8957187b5fa8eaf0",
+        "source_entity_id": "code_570f75abaff585e0",
+        "target_entity_id": null,
+        "target_entity_name": "print",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to print",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.414572"
+      },
+      {
+        "id": "rel_b941f06782786e60",
+        "source_entity_id": "code_43fe85d9379e5d76",
+        "target_entity_id": "code_570f75abaff585e0",
+        "target_entity_name": "main",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to main",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.414608"
+      },
+      {
+        "id": "rel_bcc18249217bf813",
+        "source_entity_id": "code_c44404116b54d09e",
+        "target_entity_id": "code_ac859dc9717b92fa",
+        "target_entity_name": "json",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "import json",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415446"
+      },
+      {
+        "id": "rel_43789279c1ec9d4a",
+        "source_entity_id": "code_c44404116b54d09e",
+        "target_entity_id": null,
+        "target_entity_name": "os",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "import os",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415453"
+      },
+      {
+        "id": "rel_7323727be2de14c1",
+        "source_entity_id": "code_c44404116b54d09e",
+        "target_entity_id": null,
+        "target_entity_name": "urllib.request",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "import urllib.request",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415458"
+      },
+      {
+        "id": "rel_9cea6a052532847a",
+        "source_entity_id": "code_c44404116b54d09e",
+        "target_entity_id": null,
+        "target_entity_name": "dotenv.load_dotenv",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from dotenv import load_dotenv",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415464"
+      },
+      {
+        "id": "rel_1df5dd1577a4e326",
+        "source_entity_id": "code_c44404116b54d09e",
+        "target_entity_id": null,
+        "target_entity_name": "clearml.automation.controller.PipelineDecorator",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from clearml.automation.controller import PipelineDecorator",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415473"
+      },
+      {
+        "id": "rel_16ae4acdfe0c891a",
+        "source_entity_id": "code_c44404116b54d09e",
+        "target_entity_id": null,
+        "target_entity_name": "load_dotenv",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to load_dotenv",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415479"
+      },
+      {
+        "id": "rel_6f25719dacb8cd07",
+        "source_entity_id": "code_c44404116b54d09e",
+        "target_entity_id": null,
+        "target_entity_name": "PipelineDecorator.set_default_execution_queue",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to PipelineDecorator.set_default_execution_queue",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415489"
+      },
+      {
+        "id": "rel_1f33dd8cf53d907a",
+        "source_entity_id": "code_339f2208dc7cd178",
+        "target_entity_id": null,
+        "target_entity_name": "urllib.request.Request",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to urllib.request.Request",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415535"
+      },
+      {
+        "id": "rel_28cfd5256d14ab5e",
+        "source_entity_id": "code_339f2208dc7cd178",
+        "target_entity_id": null,
+        "target_entity_name": "urllib.request.urlopen",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to urllib.request.urlopen",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415548"
+      },
+      {
+        "id": "rel_7fac35ac4211a5bb",
+        "source_entity_id": "code_339f2208dc7cd178",
+        "target_entity_id": null,
+        "target_entity_name": "Exception",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Exception",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415563"
+      },
+      {
+        "id": "rel_78a76c768b2924b0",
+        "source_entity_id": "code_339f2208dc7cd178",
+        "target_entity_id": null,
+        "target_entity_name": "json.loads",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to json.loads",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415578"
+      },
+      {
+        "id": "rel_cf82876155fa1ffc",
+        "source_entity_id": "code_339f2208dc7cd178",
+        "target_entity_id": null,
+        "target_entity_name": "decode",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to decode",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415584"
+      },
+      {
+        "id": "rel_055985488d865340",
+        "source_entity_id": "code_339f2208dc7cd178",
+        "target_entity_id": null,
+        "target_entity_name": "response.read",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to response.read",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415589"
+      },
+      {
+        "id": "rel_13fee548b340c2cf",
+        "source_entity_id": "code_339f2208dc7cd178",
+        "target_entity_id": null,
+        "target_entity_name": "PipelineDecorator.component",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to PipelineDecorator.component",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415601"
+      },
+      {
+        "id": "rel_1cda5299654fbf2f",
+        "source_entity_id": "code_34bfe83352230efc",
+        "target_entity_id": "code_952c3da327d53433",
+        "target_entity_name": "submit_slurm_hello_world_job",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to submit_slurm_hello_world_job",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415636"
+      },
+      {
+        "id": "rel_fddb4724594b1941",
+        "source_entity_id": "code_34bfe83352230efc",
+        "target_entity_id": null,
+        "target_entity_name": "print",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to print",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415644"
+      },
+      {
+        "id": "rel_84e6c59c844d4422",
+        "source_entity_id": "code_34bfe83352230efc",
+        "target_entity_id": null,
+        "target_entity_name": "PipelineDecorator.pipeline",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to PipelineDecorator.pipeline",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415650"
+      },
+      {
+        "id": "rel_ada75fe12f46e5c7",
+        "source_entity_id": "code_c44404116b54d09e",
+        "target_entity_id": null,
+        "target_entity_name": "os.getenv",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to os.getenv",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415670"
+      },
+      {
+        "id": "rel_ada75fe12f46e5c7",
+        "source_entity_id": "code_c44404116b54d09e",
+        "target_entity_id": null,
+        "target_entity_name": "os.getenv",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to os.getenv",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415678"
+      },
+      {
+        "id": "rel_c098c4517e02d669",
+        "source_entity_id": "code_c44404116b54d09e",
+        "target_entity_id": null,
+        "target_entity_name": "ValueError",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to ValueError",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415688"
+      },
+      {
+        "id": "rel_c098c4517e02d669",
+        "source_entity_id": "code_c44404116b54d09e",
+        "target_entity_id": null,
+        "target_entity_name": "ValueError",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to ValueError",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415697"
+      },
+      {
+        "id": "rel_45458934b756d111",
+        "source_entity_id": "code_c44404116b54d09e",
+        "target_entity_id": "code_34bfe83352230efc",
+        "target_entity_name": "run_slurm_pipeline",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to run_slurm_pipeline",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415703"
+      },
+      {
+        "id": "rel_ebe8dffd70b96699",
+        "source_entity_id": "code_38a532138f1e5e0f",
+        "target_entity_id": null,
+        "target_entity_name": "kfp.dsl",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from kfp import dsl",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415948"
+      },
+      {
+        "id": "rel_ed8ced7022b3c862",
+        "source_entity_id": "code_38a532138f1e5e0f",
+        "target_entity_id": null,
+        "target_entity_name": "kfp.compiler",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from kfp import compiler",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415953"
+      },
+      {
+        "id": "rel_54fc2f33219c6b9d",
+        "source_entity_id": "code_e35248c44edb7eea",
+        "target_entity_id": null,
+        "target_entity_name": "range",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to range",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415989"
+      },
+      {
+        "id": "rel_20ba0b840c8f06b5",
+        "source_entity_id": "code_e35248c44edb7eea",
+        "target_entity_id": null,
+        "target_entity_name": "print",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to print",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.415995"
+      },
+      {
+        "id": "rel_ffefaa720675ee60",
+        "source_entity_id": "code_e35248c44edb7eea",
+        "target_entity_id": null,
+        "target_entity_name": "dsl.component",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to dsl.component",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416003"
+      },
+      {
+        "id": "rel_e05dafce8a18acca",
+        "source_entity_id": "code_b27c4feebba48e4e",
+        "target_entity_id": null,
+        "target_entity_name": "range",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to range",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416028"
+      },
+      {
+        "id": "rel_2ac976b159ad624d",
+        "source_entity_id": "code_b27c4feebba48e4e",
+        "target_entity_id": null,
+        "target_entity_name": "print",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to print",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416034"
+      },
+      {
+        "id": "rel_0867ac943faf7b82",
+        "source_entity_id": "code_b27c4feebba48e4e",
+        "target_entity_id": null,
+        "target_entity_name": "dsl.component",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to dsl.component",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416041"
+      },
+      {
+        "id": "rel_be707a4aece83f7e",
+        "source_entity_id": "code_9e473ade568466ec",
+        "target_entity_id": "code_0655e6384cdafc68",
+        "target_entity_name": "step_hello",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to step_hello",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416064"
+      },
+      {
+        "id": "rel_92666883f7295159",
+        "source_entity_id": "code_9e473ade568466ec",
+        "target_entity_id": "code_d6c7d7d39650b362",
+        "target_entity_name": "step_world",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to step_world",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416071"
+      },
+      {
+        "id": "rel_5f718c0f984b30ed",
+        "source_entity_id": "code_9e473ade568466ec",
+        "target_entity_id": null,
+        "target_entity_name": "dsl.pipeline",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to dsl.pipeline",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416078"
+      },
+      {
+        "id": "rel_37d7ed5e869abff6",
+        "source_entity_id": "code_38a532138f1e5e0f",
+        "target_entity_id": null,
+        "target_entity_name": "sys",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "import sys",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416092"
+      },
+      {
+        "id": "rel_3bc7d128d72db7db",
+        "source_entity_id": "code_38a532138f1e5e0f",
+        "target_entity_id": null,
+        "target_entity_name": "compile",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to compile",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416097"
+      },
+      {
+        "id": "rel_206f1cee73d6da89",
+        "source_entity_id": "code_38a532138f1e5e0f",
+        "target_entity_id": null,
+        "target_entity_name": "compiler.Compiler",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to compiler.Compiler",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416102"
+      },
+      {
+        "id": "rel_6a769f7514bb1aba",
+        "source_entity_id": "code_38a532138f1e5e0f",
+        "target_entity_id": null,
+        "target_entity_name": "print",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to print",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416111"
+      },
+      {
+        "id": "rel_fea54e3d04ca4b1e",
+        "source_entity_id": "code_38a532138f1e5e0f",
+        "target_entity_id": null,
+        "target_entity_name": "len",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to len",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416119"
+      },
+      {
+        "id": "rel_292e73edaf0192bd",
+        "source_entity_id": "code_38a532138f1e5e0f",
+        "target_entity_id": null,
+        "target_entity_name": "kfp.Client",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from kfp import Client",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416133"
+      },
+      {
+        "id": "rel_04cfc1861db24e1b",
+        "source_entity_id": "code_38a532138f1e5e0f",
+        "target_entity_id": null,
+        "target_entity_name": "Client",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Client",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416139"
+      },
+      {
+        "id": "rel_3b52630a1317abf9",
+        "source_entity_id": "code_38a532138f1e5e0f",
+        "target_entity_id": null,
+        "target_entity_name": "client.upload_pipeline",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to client.upload_pipeline",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416147"
+      },
+      {
+        "id": "rel_6a769f7514bb1aba",
+        "source_entity_id": "code_38a532138f1e5e0f",
+        "target_entity_id": null,
+        "target_entity_name": "print",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to print",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416155"
+      },
+      {
+        "id": "rel_e2052180df48998d",
+        "source_entity_id": "code_38a532138f1e5e0f",
+        "target_entity_id": null,
+        "target_entity_name": "client.create_run_from_pipeline_package",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to client.create_run_from_pipeline_package",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416163"
+      },
+      {
+        "id": "rel_6a769f7514bb1aba",
+        "source_entity_id": "code_38a532138f1e5e0f",
+        "target_entity_id": null,
+        "target_entity_name": "print",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to print",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416175"
+      },
+      {
+        "id": "rel_6a769f7514bb1aba",
+        "source_entity_id": "code_38a532138f1e5e0f",
+        "target_entity_id": null,
+        "target_entity_name": "print",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to print",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416180"
+      },
+      {
+        "id": "rel_6a769f7514bb1aba",
+        "source_entity_id": "code_38a532138f1e5e0f",
+        "target_entity_id": null,
+        "target_entity_name": "print",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to print",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416186"
+      },
+      {
+        "id": "rel_371820793059a391",
+        "source_entity_id": "code_882b31eac357e981",
+        "target_entity_id": null,
+        "target_entity_name": "clearml.automation.controller.PipelineDecorator",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from clearml.automation.controller import PipelineDecorator",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416333"
+      },
+      {
+        "id": "rel_e090416f42e3722d",
+        "source_entity_id": "code_882b31eac357e981",
+        "target_entity_id": null,
+        "target_entity_name": "PipelineDecorator.set_default_execution_queue",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to PipelineDecorator.set_default_execution_queue",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416339"
+      },
+      {
+        "id": "rel_78b934bedda9dfce",
+        "source_entity_id": "code_0655e6384cdafc68",
+        "target_entity_id": null,
+        "target_entity_name": "range",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to range",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416359"
+      },
+      {
+        "id": "rel_ac81bc771b531596",
+        "source_entity_id": "code_0655e6384cdafc68",
+        "target_entity_id": null,
+        "target_entity_name": "print",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to print",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416365"
+      },
+      {
+        "id": "rel_fd94683617c97961",
+        "source_entity_id": "code_0655e6384cdafc68",
+        "target_entity_id": null,
+        "target_entity_name": "PipelineDecorator.component",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to PipelineDecorator.component",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416374"
+      },
+      {
+        "id": "rel_d6211bcd8350da91",
+        "source_entity_id": "code_d6c7d7d39650b362",
+        "target_entity_id": null,
+        "target_entity_name": "range",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to range",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416398"
+      },
+      {
+        "id": "rel_0b521c7f4a4aa954",
+        "source_entity_id": "code_d6c7d7d39650b362",
+        "target_entity_id": null,
+        "target_entity_name": "print",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to print",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416404"
+      },
+      {
+        "id": "rel_9580b17afb0a7c58",
+        "source_entity_id": "code_d6c7d7d39650b362",
+        "target_entity_id": null,
+        "target_entity_name": "PipelineDecorator.component",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to PipelineDecorator.component",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416410"
+      },
+      {
+        "id": "rel_2278efb5abbd40c9",
+        "source_entity_id": "code_25d71e92c043bd07",
+        "target_entity_id": "code_0655e6384cdafc68",
+        "target_entity_name": "step_hello",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to step_hello",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416433"
+      },
+      {
+        "id": "rel_3279b15be7894299",
+        "source_entity_id": "code_25d71e92c043bd07",
+        "target_entity_id": "code_d6c7d7d39650b362",
+        "target_entity_name": "step_world",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to step_world",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416439"
+      },
+      {
+        "id": "rel_ee9a3de79362bf65",
+        "source_entity_id": "code_25d71e92c043bd07",
+        "target_entity_id": null,
+        "target_entity_name": "PipelineDecorator.pipeline",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to PipelineDecorator.pipeline",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416446"
+      },
+      {
+        "id": "rel_955d328409b77c76",
+        "source_entity_id": "code_882b31eac357e981",
+        "target_entity_id": "code_25d71e92c043bd07",
+        "target_entity_name": "run_pipeline",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to run_pipeline",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416462"
+      },
+      {
+        "id": "rel_75ce69d1f637cbb6",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "os",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "import os",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416733"
+      },
+      {
+        "id": "rel_ffdfc91d489a6156",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "dotenv.load_dotenv",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from dotenv import load_dotenv",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416738"
+      },
+      {
+        "id": "rel_fbae51d17aee967c",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "kfp.dsl",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from kfp import dsl",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416743"
+      },
+      {
+        "id": "rel_7d2b201f2c4a31e2",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "kfp.compiler",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from kfp import compiler",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416748"
+      },
+      {
+        "id": "rel_1dcbce6320881d54",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "load_dotenv",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to load_dotenv",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416753"
+      },
+      {
+        "id": "rel_3fc32d259f7d801d",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "requests",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "import requests",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416773"
+      },
+      {
+        "id": "rel_841fc8c412d30480",
+        "source_entity_id": "code_952c3da327d53433",
+        "target_entity_id": null,
+        "target_entity_name": "requests.post",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to requests.post",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416793"
+      },
+      {
+        "id": "rel_40989133a43ef13d",
+        "source_entity_id": "code_952c3da327d53433",
+        "target_entity_id": null,
+        "target_entity_name": "response.raise_for_status",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to response.raise_for_status",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416802"
+      },
+      {
+        "id": "rel_2b253e854bc2cf8e",
+        "source_entity_id": "code_952c3da327d53433",
+        "target_entity_id": null,
+        "target_entity_name": "response.json",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to response.json",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416809"
+      },
+      {
+        "id": "rel_61fc5dde3a1eece7",
+        "source_entity_id": "code_952c3da327d53433",
+        "target_entity_id": null,
+        "target_entity_name": "print",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to print",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416815"
+      },
+      {
+        "id": "rel_f56b08b2014f5b6f",
+        "source_entity_id": "code_952c3da327d53433",
+        "target_entity_id": null,
+        "target_entity_name": "dsl.component",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to dsl.component",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416825"
+      },
+      {
+        "id": "rel_ae7515d4eaf00d4d",
+        "source_entity_id": "code_a734b8f017411a82",
+        "target_entity_id": null,
+        "target_entity_name": "print",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to print",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416852"
+      },
+      {
+        "id": "rel_91e8210eb6dbf353",
+        "source_entity_id": "code_a734b8f017411a82",
+        "target_entity_id": null,
+        "target_entity_name": "dsl.component",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to dsl.component",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416863"
+      },
+      {
+        "id": "rel_75d8f423c7540699",
+        "source_entity_id": "code_511cd719d340ac46",
+        "target_entity_id": "code_952c3da327d53433",
+        "target_entity_name": "submit_slurm_hello_world_job",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to submit_slurm_hello_world_job",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416887"
+      },
+      {
+        "id": "rel_e6a7e13de91b6bbe",
+        "source_entity_id": "code_511cd719d340ac46",
+        "target_entity_id": "code_a734b8f017411a82",
+        "target_entity_name": "print_result",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to print_result",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416894"
+      },
+      {
+        "id": "rel_1b7191632dd47d84",
+        "source_entity_id": "code_511cd719d340ac46",
+        "target_entity_id": null,
+        "target_entity_name": "dsl.pipeline",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to dsl.pipeline",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416902"
+      },
+      {
+        "id": "rel_d4a56f29dc629a5a",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "sys",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "import sys",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416919"
+      },
+      {
+        "id": "rel_52d8d24c5677853e",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "compile",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to compile",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416924"
+      },
+      {
+        "id": "rel_b005e772b75ceaac",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "compiler.Compiler",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to compiler.Compiler",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416928"
+      },
+      {
+        "id": "rel_95006cbb4fa1c8fc",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "print",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to print",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416938"
+      },
+      {
+        "id": "rel_8cfdebd69df2a17f",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "len",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to len",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416945"
+      },
+      {
+        "id": "rel_029cb1eb4220eb87",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "kfp.Client",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from kfp import Client",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416959"
+      },
+      {
+        "id": "rel_dc6333eba50374d0",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "time",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "import time",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416964"
+      },
+      {
+        "id": "rel_4088f9de698ec1cc",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "Client",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Client",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416969"
+      },
+      {
+        "id": "rel_e8ecf6cf37002a91",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "int",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to int",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416976"
+      },
+      {
+        "id": "rel_4cc79a652763c666",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "time.time",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to time.time",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416981"
+      },
+      {
+        "id": "rel_d7e3088cfa520f2e",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "client.upload_pipeline",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to client.upload_pipeline",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.416993"
+      },
+      {
+        "id": "rel_95006cbb4fa1c8fc",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "print",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to print",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.417001"
+      },
+      {
+        "id": "rel_c8e4516d2fac37bf",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "os.getenv",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to os.getenv",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.417008"
+      },
+      {
+        "id": "rel_c8e4516d2fac37bf",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "os.getenv",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to os.getenv",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.417016"
+      },
+      {
+        "id": "rel_781c6b7b573c21c4",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "ValueError",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to ValueError",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.417028"
+      },
+      {
+        "id": "rel_781c6b7b573c21c4",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "ValueError",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to ValueError",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.417037"
+      },
+      {
+        "id": "rel_5cc5855de9a194c2",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "client.create_run_from_pipeline_package",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to client.create_run_from_pipeline_package",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.417044"
+      },
+      {
+        "id": "rel_95006cbb4fa1c8fc",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "print",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to print",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.417059"
+      },
+      {
+        "id": "rel_95006cbb4fa1c8fc",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "print",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to print",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.417065"
+      },
+      {
+        "id": "rel_95006cbb4fa1c8fc",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "print",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to print",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.417073"
+      },
+      {
+        "id": "rel_95006cbb4fa1c8fc",
+        "source_entity_id": "code_ba6b2b9ba3f347e5",
+        "target_entity_id": null,
+        "target_entity_name": "print",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to print",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.417079"
+      },
+      {
+        "id": "rel_620f5475e435d780",
+        "source_entity_id": "code_1570af7fa0a4e9be",
+        "target_entity_id": null,
+        "target_entity_name": "ai_factory.logger.core.get_logger",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from ai_factory.logger.core import get_logger",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420274"
+      },
+      {
+        "id": "rel_76f97099ddde01f0",
+        "source_entity_id": "code_5142ccff9f02921f",
+        "target_entity_id": null,
+        "target_entity_name": "logging",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "import logging",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420435"
+      },
+      {
+        "id": "rel_8213595d14949d35",
+        "source_entity_id": "code_5142ccff9f02921f",
+        "target_entity_id": null,
+        "target_entity_name": "sys",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "import sys",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420439"
+      },
+      {
+        "id": "rel_32ccc38de3934126",
+        "source_entity_id": "code_5142ccff9f02921f",
+        "target_entity_id": null,
+        "target_entity_name": "loguru.logger",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from loguru import logger",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420444"
+      },
+      {
+        "id": "rel_a523bb3f95d44c40",
+        "source_entity_id": "code_5142ccff9f02921f",
+        "target_entity_id": null,
+        "target_entity_name": "ai_factory.config.settings",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from ai_factory.config import settings",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420449"
+      },
+      {
+        "id": "rel_67d87d1f40f0f9cd",
+        "source_entity_id": "code_412ee12a3d63ccde",
+        "target_entity_id": null,
+        "target_entity_name": "logger.level",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to logger.level",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420481"
+      },
+      {
+        "id": "rel_ef20817e839e0ec0",
+        "source_entity_id": "code_412ee12a3d63ccde",
+        "target_entity_id": null,
+        "target_entity_name": "log",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to log",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420495"
+      },
+      {
+        "id": "rel_87c5d1850f9404b5",
+        "source_entity_id": "code_412ee12a3d63ccde",
+        "target_entity_id": null,
+        "target_entity_name": "logger.opt",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to logger.opt",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420499"
+      },
+      {
+        "id": "rel_63d34ca916af9832",
+        "source_entity_id": "code_412ee12a3d63ccde",
+        "target_entity_id": null,
+        "target_entity_name": "record.getMessage",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to record.getMessage",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420511"
+      },
+      {
+        "id": "rel_8d3230d44dca7297",
+        "source_entity_id": "code_e565fae58d9f5bb9",
+        "target_entity_id": null,
+        "target_entity_name": "logger.remove",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to logger.remove",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420529"
+      },
+      {
+        "id": "rel_d498912754938131",
+        "source_entity_id": "code_e565fae58d9f5bb9",
+        "target_entity_id": null,
+        "target_entity_name": "logger.add",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to logger.add",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420535"
+      },
+      {
+        "id": "rel_ddbaf8e0cead6a61",
+        "source_entity_id": "code_e565fae58d9f5bb9",
+        "target_entity_id": null,
+        "target_entity_name": "logging.basicConfig",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to logging.basicConfig",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420549"
+      },
+      {
+        "id": "rel_94967099b45e234a",
+        "source_entity_id": "code_e565fae58d9f5bb9",
+        "target_entity_id": "code_683adb721da15de9",
+        "target_entity_name": "InterceptHandler",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to InterceptHandler",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420555"
+      },
+      {
+        "id": "rel_9fc3b26fe0a35afa",
+        "source_entity_id": "code_e565fae58d9f5bb9",
+        "target_entity_id": null,
+        "target_entity_name": "logger.info",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to logger.info",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420564"
+      },
+      {
+        "id": "rel_ff93748cec5f02d6",
+        "source_entity_id": "code_5142ccff9f02921f",
+        "target_entity_id": "code_e565fae58d9f5bb9",
+        "target_entity_name": "setup_logger",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to setup_logger",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420586"
+      },
+      {
+        "id": "rel_8c5bc774e81c440d",
+        "source_entity_id": "code_e438980fa322e60e",
+        "target_entity_id": null,
+        "target_entity_name": "ai_factory.config.core.settings",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from ai_factory.config.core import settings",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420663"
+      },
+      {
+        "id": "rel_757dadeaa4f60f8d",
+        "source_entity_id": "code_53cf850b0d57aa67",
+        "target_entity_id": null,
+        "target_entity_name": "pydantic.BaseModel",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from pydantic import BaseModel",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420896"
+      },
+      {
+        "id": "rel_44fecb05978aae76",
+        "source_entity_id": "code_53cf850b0d57aa67",
+        "target_entity_id": null,
+        "target_entity_name": "pydantic.Field",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from pydantic import Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420901"
+      },
+      {
+        "id": "rel_753fd06d8555e868",
+        "source_entity_id": "code_53cf850b0d57aa67",
+        "target_entity_id": null,
+        "target_entity_name": "pydantic.field_validator",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from pydantic import field_validator",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420905"
+      },
+      {
+        "id": "rel_70ef7cffb4c22a6f",
+        "source_entity_id": "code_53cf850b0d57aa67",
+        "target_entity_id": null,
+        "target_entity_name": "pydantic_settings.BaseSettings",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from pydantic_settings import BaseSettings",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420913"
+      },
+      {
+        "id": "rel_aef6b528be0c5c83",
+        "source_entity_id": "code_53cf850b0d57aa67",
+        "target_entity_id": null,
+        "target_entity_name": "pydantic_settings.SettingsConfigDict",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from pydantic_settings import SettingsConfigDict",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420916"
+      },
+      {
+        "id": "rel_0ac587af5a10ab78",
+        "source_entity_id": "code_5d8efc403f9002c5",
+        "target_entity_id": null,
+        "target_entity_name": "BaseModel",
+        "relationship_type": "inherits_from",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "class SlurmConfig inherits from BaseModel",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420924"
+      },
+      {
+        "id": "rel_2cae81dfe93c4b29",
+        "source_entity_id": "code_5d8efc403f9002c5",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420941"
+      },
+      {
+        "id": "rel_2cae81dfe93c4b29",
+        "source_entity_id": "code_5d8efc403f9002c5",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420951"
+      },
+      {
+        "id": "rel_2cae81dfe93c4b29",
+        "source_entity_id": "code_5d8efc403f9002c5",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420959"
+      },
+      {
+        "id": "rel_2cae81dfe93c4b29",
+        "source_entity_id": "code_5d8efc403f9002c5",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420967"
+      },
+      {
+        "id": "rel_7524bdc49d78609f",
+        "source_entity_id": "code_a00ec8ea0cfe048e",
+        "target_entity_id": null,
+        "target_entity_name": "BaseModel",
+        "relationship_type": "inherits_from",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "class SlurmGatewayConfig inherits from BaseModel",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.420999"
+      },
+      {
+        "id": "rel_3c574704cc61d9d4",
+        "source_entity_id": "code_a00ec8ea0cfe048e",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421012"
+      },
+      {
+        "id": "rel_3c574704cc61d9d4",
+        "source_entity_id": "code_a00ec8ea0cfe048e",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421021"
+      },
+      {
+        "id": "rel_4ef744f1b80850a9",
+        "source_entity_id": "code_e3b5dd7ba39ac1c4",
+        "target_entity_id": null,
+        "target_entity_name": "self.path.rstrip",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to self.path.rstrip",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421039"
+      },
+      {
+        "id": "rel_bf310dfd6f1c27dc",
+        "source_entity_id": "code_f3a720df6aae3f4a",
+        "target_entity_id": null,
+        "target_entity_name": "BaseModel",
+        "relationship_type": "inherits_from",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "class LoggingConfig inherits from BaseModel",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421056"
+      },
+      {
+        "id": "rel_d089c79e3765faf2",
+        "source_entity_id": "code_f3a720df6aae3f4a",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421072"
+      },
+      {
+        "id": "rel_d089c79e3765faf2",
+        "source_entity_id": "code_f3a720df6aae3f4a",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421081"
+      },
+      {
+        "id": "rel_21a49f1aa5131775",
+        "source_entity_id": "code_562c16ff3f3f061c",
+        "target_entity_id": null,
+        "target_entity_name": "v.upper",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to v.upper",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421109"
+      },
+      {
+        "id": "rel_6aaf763952f48c35",
+        "source_entity_id": "code_562c16ff3f3f061c",
+        "target_entity_id": null,
+        "target_entity_name": "ValueError",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to ValueError",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421118"
+      },
+      {
+        "id": "rel_46d47c20d2391776",
+        "source_entity_id": "code_562c16ff3f3f061c",
+        "target_entity_id": null,
+        "target_entity_name": "field_validator",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to field_validator",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421127"
+      },
+      {
+        "id": "rel_9afb163d233890f7",
+        "source_entity_id": "code_14658859004c6714",
+        "target_entity_id": null,
+        "target_entity_name": "BaseSettings",
+        "relationship_type": "inherits_from",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "class Settings inherits from BaseSettings",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421137"
+      },
+      {
+        "id": "rel_cacfb617bcbe081a",
+        "source_entity_id": "code_14658859004c6714",
+        "target_entity_id": null,
+        "target_entity_name": "SettingsConfigDict",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to SettingsConfigDict",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421149"
+      },
+      {
+        "id": "rel_05b2c0916375c671",
+        "source_entity_id": "code_14658859004c6714",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421161"
+      },
+      {
+        "id": "rel_05b2c0916375c671",
+        "source_entity_id": "code_14658859004c6714",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421170"
+      },
+      {
+        "id": "rel_05b2c0916375c671",
+        "source_entity_id": "code_14658859004c6714",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421177"
+      },
+      {
+        "id": "rel_ae5df95fc1a1f6ba",
+        "source_entity_id": "code_53cf850b0d57aa67",
+        "target_entity_id": "code_14658859004c6714",
+        "target_entity_name": "Settings",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Settings",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421187"
+      },
+      {
+        "id": "rel_6c61f7c576a759ae",
+        "source_entity_id": "code_0d275586f61e0169",
+        "target_entity_id": null,
+        "target_entity_name": "typing.Optional",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from typing import Optional",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421601"
+      },
+      {
+        "id": "rel_f6982af4d84024f7",
+        "source_entity_id": "code_0d275586f61e0169",
+        "target_entity_id": null,
+        "target_entity_name": "pydantic.BaseModel",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from pydantic import BaseModel",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421606"
+      },
+      {
+        "id": "rel_5b331fbaa85dd50d",
+        "source_entity_id": "code_0d275586f61e0169",
+        "target_entity_id": null,
+        "target_entity_name": "pydantic.Field",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from pydantic import Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421609"
+      },
+      {
+        "id": "rel_7f766060fba820ab",
+        "source_entity_id": "code_30a459c70aaa74f9",
+        "target_entity_id": null,
+        "target_entity_name": "BaseModel",
+        "relationship_type": "inherits_from",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "class SlurmEnvironment inherits from BaseModel",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421616"
+      },
+      {
+        "id": "rel_1a4b4d5c947222eb",
+        "source_entity_id": "code_30a459c70aaa74f9",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421629"
+      },
+      {
+        "id": "rel_1a4b4d5c947222eb",
+        "source_entity_id": "code_30a459c70aaa74f9",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421638"
+      },
+      {
+        "id": "rel_7ff09c1a8cec4f16",
+        "source_entity_id": "code_e3ceacd40c2fac70",
+        "target_entity_id": null,
+        "target_entity_name": "BaseModel",
+        "relationship_type": "inherits_from",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "class SlurmJobBase inherits from BaseModel",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421647"
+      },
+      {
+        "id": "rel_72579b0716e77c65",
+        "source_entity_id": "code_e3ceacd40c2fac70",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421658"
+      },
+      {
+        "id": "rel_72579b0716e77c65",
+        "source_entity_id": "code_e3ceacd40c2fac70",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421668"
+      },
+      {
+        "id": "rel_72579b0716e77c65",
+        "source_entity_id": "code_e3ceacd40c2fac70",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421678"
+      },
+      {
+        "id": "rel_72579b0716e77c65",
+        "source_entity_id": "code_e3ceacd40c2fac70",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421690"
+      },
+      {
+        "id": "rel_72579b0716e77c65",
+        "source_entity_id": "code_e3ceacd40c2fac70",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421702"
+      },
+      {
+        "id": "rel_e506eed390ef9785",
+        "source_entity_id": "code_1a588b6eef95f829",
+        "target_entity_id": "code_e3ceacd40c2fac70",
+        "target_entity_name": "SlurmJobBase",
+        "relationship_type": "inherits_from",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "class SlurmJobSpec inherits from SlurmJobBase",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421712"
+      },
+      {
+        "id": "rel_49fd07214fedcfc5",
+        "source_entity_id": "code_1a588b6eef95f829",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421724"
+      },
+      {
+        "id": "rel_49fd07214fedcfc5",
+        "source_entity_id": "code_1a588b6eef95f829",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421732"
+      },
+      {
+        "id": "rel_2e623a8e6a9701c6",
+        "source_entity_id": "code_417b4868095565fb",
+        "target_entity_id": null,
+        "target_entity_name": "BaseModel",
+        "relationship_type": "inherits_from",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "class SlurmJobSubmission inherits from BaseModel",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421739"
+      },
+      {
+        "id": "rel_e0e6559b477ca9a7",
+        "source_entity_id": "code_417b4868095565fb",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421751"
+      },
+      {
+        "id": "rel_e0e6559b477ca9a7",
+        "source_entity_id": "code_417b4868095565fb",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421758"
+      },
+      {
+        "id": "rel_ed8ed459548511b6",
+        "source_entity_id": "code_a8fafe28bf261a63",
+        "target_entity_id": "code_e3ceacd40c2fac70",
+        "target_entity_name": "SlurmJobBase",
+        "relationship_type": "inherits_from",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "class SlurmJobRequest inherits from SlurmJobBase",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421766"
+      },
+      {
+        "id": "rel_380b96ad0efc31d9",
+        "source_entity_id": "code_a8fafe28bf261a63",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421777"
+      },
+      {
+        "id": "rel_380b96ad0efc31d9",
+        "source_entity_id": "code_a8fafe28bf261a63",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421786"
+      },
+      {
+        "id": "rel_380b96ad0efc31d9",
+        "source_entity_id": "code_a8fafe28bf261a63",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421797"
+      },
+      {
+        "id": "rel_4ce69af41e674da9",
+        "source_entity_id": "code_c6afa81e7243f211",
+        "target_entity_id": "code_1a588b6eef95f829",
+        "target_entity_name": "SlurmJobSpec",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to SlurmJobSpec",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421821"
+      },
+      {
+        "id": "rel_74274f01ca2aaab3",
+        "source_entity_id": "code_c6afa81e7243f211",
+        "target_entity_id": "code_30a459c70aaa74f9",
+        "target_entity_name": "SlurmEnvironment",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to SlurmEnvironment",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421847"
+      },
+      {
+        "id": "rel_4e7fd744d3012182",
+        "source_entity_id": "code_8dd47968a3f9855f",
+        "target_entity_id": "code_417b4868095565fb",
+        "target_entity_name": "SlurmJobSubmission",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to SlurmJobSubmission",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421870"
+      },
+      {
+        "id": "rel_5323a9ac9949da6e",
+        "source_entity_id": "code_8dd47968a3f9855f",
+        "target_entity_id": null,
+        "target_entity_name": "self._create_job_spec",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to self._create_job_spec",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421877"
+      },
+      {
+        "id": "rel_a3f609036396bbbf",
+        "source_entity_id": "code_819c59b04dc8ef90",
+        "target_entity_id": "code_a8fafe28bf261a63",
+        "target_entity_name": "SlurmJobRequest",
+        "relationship_type": "inherits_from",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "class ContainerJobRequest inherits from SlurmJobRequest",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421886"
+      },
+      {
+        "id": "rel_1516ae6aebc0fef3",
+        "source_entity_id": "code_819c59b04dc8ef90",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421898"
+      },
+      {
+        "id": "rel_1516ae6aebc0fef3",
+        "source_entity_id": "code_819c59b04dc8ef90",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421907"
+      },
+      {
+        "id": "rel_1516ae6aebc0fef3",
+        "source_entity_id": "code_819c59b04dc8ef90",
+        "target_entity_id": null,
+        "target_entity_name": "Field",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Field",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421916"
+      },
+      {
+        "id": "rel_84420774efcf104b",
+        "source_entity_id": "code_8dd47968a3f9855f",
+        "target_entity_id": null,
+        "target_entity_name": "self._generate_apptainer_script",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to self._generate_apptainer_script",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421938"
+      },
+      {
+        "id": "rel_4e7fd744d3012182",
+        "source_entity_id": "code_8dd47968a3f9855f",
+        "target_entity_id": "code_417b4868095565fb",
+        "target_entity_name": "SlurmJobSubmission",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to SlurmJobSubmission",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421946"
+      },
+      {
+        "id": "rel_5323a9ac9949da6e",
+        "source_entity_id": "code_8dd47968a3f9855f",
+        "target_entity_id": null,
+        "target_entity_name": "self._create_job_spec",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to self._create_job_spec",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421952"
+      },
+      {
+        "id": "rel_c6b48a6afc64c51f",
+        "source_entity_id": "code_6bf27966d26e8f8c",
+        "target_entity_id": null,
+        "target_entity_name": "lines.append",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to lines.append",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421977"
+      },
+      {
+        "id": "rel_c6b48a6afc64c51f",
+        "source_entity_id": "code_6bf27966d26e8f8c",
+        "target_entity_id": null,
+        "target_entity_name": "lines.append",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to lines.append",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421987"
+      },
+      {
+        "id": "rel_c6b48a6afc64c51f",
+        "source_entity_id": "code_6bf27966d26e8f8c",
+        "target_entity_id": null,
+        "target_entity_name": "lines.append",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to lines.append",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.421996"
+      },
+      {
+        "id": "rel_71d148a54dbd8043",
+        "source_entity_id": "code_6bf27966d26e8f8c",
+        "target_entity_id": null,
+        "target_entity_name": "replace",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to replace",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422004"
+      },
+      {
+        "id": "rel_c04b979a0a19b12d",
+        "source_entity_id": "code_6bf27966d26e8f8c",
+        "target_entity_id": null,
+        "target_entity_name": "self.image.split",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to self.image.split",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422010"
+      },
+      {
+        "id": "rel_238ac0b576012bcf",
+        "source_entity_id": "code_6bf27966d26e8f8c",
+        "target_entity_id": null,
+        "target_entity_name": "lines.extend",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to lines.extend",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422034"
+      },
+      {
+        "id": "rel_238ac0b576012bcf",
+        "source_entity_id": "code_6bf27966d26e8f8c",
+        "target_entity_id": null,
+        "target_entity_name": "lines.extend",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to lines.extend",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422067"
+      },
+      {
+        "id": "rel_379126b9247e2668",
+        "source_entity_id": "code_6bf27966d26e8f8c",
+        "target_entity_id": null,
+        "target_entity_name": "join",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to join",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422074"
+      },
+      {
+        "id": "rel_379126b9247e2668",
+        "source_entity_id": "code_6bf27966d26e8f8c",
+        "target_entity_id": null,
+        "target_entity_name": "join",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to join",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422099"
+      },
+      {
+        "id": "rel_8ed664a1944413b3",
+        "source_entity_id": "code_95bd1a7522c647b6",
+        "target_entity_id": null,
+        "target_entity_name": "ai_factory.slurm.models",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from ai_factory.slurm import models",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422185"
+      },
+      {
+        "id": "rel_fd43e4608599abe8",
+        "source_entity_id": "code_398fc8371ef2c719",
+        "target_entity_id": null,
+        "target_entity_name": "ai_factory.slurm_gateway.core",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from ai_factory.slurm_gateway import core",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422303"
+      },
+      {
+        "id": "rel_f24c0642eeeafd11",
+        "source_entity_id": "code_965692e474c47aae",
+        "target_entity_id": null,
+        "target_entity_name": "typing.Any",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from typing import Any",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422694"
+      },
+      {
+        "id": "rel_cc0b37831b1c671c",
+        "source_entity_id": "code_965692e474c47aae",
+        "target_entity_id": null,
+        "target_entity_name": "requests",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "import requests",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422699"
+      },
+      {
+        "id": "rel_db464814a5c10a23",
+        "source_entity_id": "code_965692e474c47aae",
+        "target_entity_id": null,
+        "target_entity_name": "fastapi.APIRouter",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from fastapi import APIRouter",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422704"
+      },
+      {
+        "id": "rel_6f6b362fdd38630c",
+        "source_entity_id": "code_965692e474c47aae",
+        "target_entity_id": null,
+        "target_entity_name": "fastapi.FastAPI",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from fastapi import FastAPI",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422708"
+      },
+      {
+        "id": "rel_5474debd7ac7a883",
+        "source_entity_id": "code_965692e474c47aae",
+        "target_entity_id": null,
+        "target_entity_name": "fastapi.HTTPException",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from fastapi import HTTPException",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422711"
+      },
+      {
+        "id": "rel_11a00b60c1c40257",
+        "source_entity_id": "code_965692e474c47aae",
+        "target_entity_id": null,
+        "target_entity_name": "fastapi.Header",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from fastapi import Header",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422714"
+      },
+      {
+        "id": "rel_0a7d35cd1f2fc7c1",
+        "source_entity_id": "code_965692e474c47aae",
+        "target_entity_id": null,
+        "target_entity_name": "fastapi.status",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from fastapi import status",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422717"
+      },
+      {
+        "id": "rel_6bac4c6d63e5820f",
+        "source_entity_id": "code_965692e474c47aae",
+        "target_entity_id": null,
+        "target_entity_name": "fastapi.responses.JSONResponse",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from fastapi.responses import JSONResponse",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422724"
+      },
+      {
+        "id": "rel_4d9667e7c35bca09",
+        "source_entity_id": "code_965692e474c47aae",
+        "target_entity_id": null,
+        "target_entity_name": "ai_factory.config.settings",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from ai_factory.config import settings",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422729"
+      },
+      {
+        "id": "rel_faede2d753cae7ed",
+        "source_entity_id": "code_965692e474c47aae",
+        "target_entity_id": null,
+        "target_entity_name": "ai_factory.slurm.models.SlurmJobRequest",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from ai_factory.slurm.models import SlurmJobRequest",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422734"
+      },
+      {
+        "id": "rel_0f1e09ba7da55404",
+        "source_entity_id": "code_965692e474c47aae",
+        "target_entity_id": null,
+        "target_entity_name": "ai_factory.slurm.models.ContainerJobRequest",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from ai_factory.slurm.models import ContainerJobRequest",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422737"
+      },
+      {
+        "id": "rel_69d05dba707ff459",
+        "source_entity_id": "code_965692e474c47aae",
+        "target_entity_id": null,
+        "target_entity_name": "ai_factory.logger.get_logger",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from ai_factory.logger import get_logger",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422742"
+      },
+      {
+        "id": "rel_7993b334186bc380",
+        "source_entity_id": "code_965692e474c47aae",
+        "target_entity_id": "code_8a49c0cf2b2a2363",
+        "target_entity_name": "get_logger",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to get_logger",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422747"
+      },
+      {
+        "id": "rel_2ecaa7f90addba3f",
+        "source_entity_id": "code_965692e474c47aae",
+        "target_entity_id": null,
+        "target_entity_name": "FastAPI",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to FastAPI",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422753"
+      },
+      {
+        "id": "rel_f9bf2863b7d7e96a",
+        "source_entity_id": "code_965692e474c47aae",
+        "target_entity_id": null,
+        "target_entity_name": "APIRouter",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to APIRouter",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422759"
+      },
+      {
+        "id": "rel_32a25b434f82ed7f",
+        "source_entity_id": "code_eaa187b4210a7c8a",
+        "target_entity_id": null,
+        "target_entity_name": "app.get",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to app.get",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422779"
+      },
+      {
+        "id": "rel_0bc9b508d4389def",
+        "source_entity_id": "code_d7cb098c812350d3",
+        "target_entity_id": null,
+        "target_entity_name": "Header",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Header",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422807"
+      },
+      {
+        "id": "rel_0bc9b508d4389def",
+        "source_entity_id": "code_d7cb098c812350d3",
+        "target_entity_id": null,
+        "target_entity_name": "Header",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Header",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422813"
+      },
+      {
+        "id": "rel_01c3f9153b2338b9",
+        "source_entity_id": "code_d7cb098c812350d3",
+        "target_entity_id": null,
+        "target_entity_name": "job_request.to_submission",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to job_request.to_submission",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422822"
+      },
+      {
+        "id": "rel_7f872fe7d859f21f",
+        "source_entity_id": "code_d7cb098c812350d3",
+        "target_entity_id": null,
+        "target_entity_name": "logger.info",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to logger.info",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422847"
+      },
+      {
+        "id": "rel_207cbd4e3f454098",
+        "source_entity_id": "code_d7cb098c812350d3",
+        "target_entity_id": null,
+        "target_entity_name": "requests.post",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to requests.post",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422861"
+      },
+      {
+        "id": "rel_156ed64c632be58f",
+        "source_entity_id": "code_d7cb098c812350d3",
+        "target_entity_id": null,
+        "target_entity_name": "job_submission.model_dump",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to job_submission.model_dump",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422869"
+      },
+      {
+        "id": "rel_7cd7e507ea9c4afd",
+        "source_entity_id": "code_d7cb098c812350d3",
+        "target_entity_id": null,
+        "target_entity_name": "HTTPException",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to HTTPException",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422881"
+      },
+      {
+        "id": "rel_7f872fe7d859f21f",
+        "source_entity_id": "code_d7cb098c812350d3",
+        "target_entity_id": null,
+        "target_entity_name": "logger.info",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to logger.info",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422892"
+      },
+      {
+        "id": "rel_dce336480a88f40e",
+        "source_entity_id": "code_d7cb098c812350d3",
+        "target_entity_id": null,
+        "target_entity_name": "upstream_response.headers.get",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to upstream_response.headers.get",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422903"
+      },
+      {
+        "id": "rel_ca7f15e09cfb629d",
+        "source_entity_id": "code_d7cb098c812350d3",
+        "target_entity_id": null,
+        "target_entity_name": "content_type.startswith",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to content_type.startswith",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422911"
+      },
+      {
+        "id": "rel_a0dca5ac2e993b0c",
+        "source_entity_id": "code_d7cb098c812350d3",
+        "target_entity_id": null,
+        "target_entity_name": "upstream_response.json",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to upstream_response.json",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422920"
+      },
+      {
+        "id": "rel_5060931f130d0e25",
+        "source_entity_id": "code_d7cb098c812350d3",
+        "target_entity_id": null,
+        "target_entity_name": "JSONResponse",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to JSONResponse",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422930"
+      },
+      {
+        "id": "rel_b11961e7fff1a318",
+        "source_entity_id": "code_d7cb098c812350d3",
+        "target_entity_id": null,
+        "target_entity_name": "api.post",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to api.post",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422938"
+      },
+      {
+        "id": "rel_238b657f4aa4a16b",
+        "source_entity_id": "code_30eca68b54bba1c9",
+        "target_entity_id": null,
+        "target_entity_name": "Header",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Header",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422959"
+      },
+      {
+        "id": "rel_238b657f4aa4a16b",
+        "source_entity_id": "code_30eca68b54bba1c9",
+        "target_entity_id": null,
+        "target_entity_name": "Header",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Header",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422965"
+      },
+      {
+        "id": "rel_6cebe7ac7de75b64",
+        "source_entity_id": "code_30eca68b54bba1c9",
+        "target_entity_id": "code_a8fafe28bf261a63",
+        "target_entity_name": "SlurmJobRequest",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to SlurmJobRequest",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422977"
+      },
+      {
+        "id": "rel_77a4923a1da84af7",
+        "source_entity_id": "code_30eca68b54bba1c9",
+        "target_entity_id": "code_d7cb098c812350d3",
+        "target_entity_name": "submit_job",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to submit_job",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422984"
+      },
+      {
+        "id": "rel_334979e8451307be",
+        "source_entity_id": "code_30eca68b54bba1c9",
+        "target_entity_id": null,
+        "target_entity_name": "api.post",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to api.post",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.422991"
+      },
+      {
+        "id": "rel_6c17a681a8a753a3",
+        "source_entity_id": "code_43331cfd0c25ab21",
+        "target_entity_id": null,
+        "target_entity_name": "HTTPException",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to HTTPException",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.423008"
+      },
+      {
+        "id": "rel_b0ddc11b53c15237",
+        "source_entity_id": "code_43331cfd0c25ab21",
+        "target_entity_id": null,
+        "target_entity_name": "api.get",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to api.get",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.425355"
+      },
+      {
+        "id": "rel_04f0e9e92c40e7a5",
+        "source_entity_id": "code_abe94170b848479e",
+        "target_entity_id": null,
+        "target_entity_name": "HTTPException",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to HTTPException",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.425374"
+      },
+      {
+        "id": "rel_c80f669b344619dc",
+        "source_entity_id": "code_abe94170b848479e",
+        "target_entity_id": null,
+        "target_entity_name": "api.delete",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to api.delete",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.425383"
+      },
+      {
+        "id": "rel_f83555913d523937",
+        "source_entity_id": "code_0393211e59c1fd60",
+        "target_entity_id": null,
+        "target_entity_name": "Header",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Header",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.425406"
+      },
+      {
+        "id": "rel_f83555913d523937",
+        "source_entity_id": "code_0393211e59c1fd60",
+        "target_entity_id": null,
+        "target_entity_name": "Header",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to Header",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.425412"
+      },
+      {
+        "id": "rel_c1733c2cf59891a2",
+        "source_entity_id": "code_0393211e59c1fd60",
+        "target_entity_id": null,
+        "target_entity_name": "container_request.to_submission",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to container_request.to_submission",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.425421"
+      },
+      {
+        "id": "rel_f42e2dd7e4769a28",
+        "source_entity_id": "code_0393211e59c1fd60",
+        "target_entity_id": null,
+        "target_entity_name": "logger.info",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to logger.info",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.425447"
+      },
+      {
+        "id": "rel_455a26cac61c251b",
+        "source_entity_id": "code_0393211e59c1fd60",
+        "target_entity_id": null,
+        "target_entity_name": "logger.debug",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to logger.debug",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.425460"
+      },
+      {
+        "id": "rel_455a26cac61c251b",
+        "source_entity_id": "code_0393211e59c1fd60",
+        "target_entity_id": null,
+        "target_entity_name": "logger.debug",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to logger.debug",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.425472"
+      },
+      {
+        "id": "rel_b6b2172f0023ac40",
+        "source_entity_id": "code_0393211e59c1fd60",
+        "target_entity_id": null,
+        "target_entity_name": "requests.post",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to requests.post",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.425482"
+      },
+      {
+        "id": "rel_973051ceda5b0134",
+        "source_entity_id": "code_0393211e59c1fd60",
+        "target_entity_id": null,
+        "target_entity_name": "job_submission.model_dump",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to job_submission.model_dump",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.425490"
+      },
+      {
+        "id": "rel_1b2c291071970605",
+        "source_entity_id": "code_0393211e59c1fd60",
+        "target_entity_id": null,
+        "target_entity_name": "HTTPException",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to HTTPException",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.425502"
+      },
+      {
+        "id": "rel_f42e2dd7e4769a28",
+        "source_entity_id": "code_0393211e59c1fd60",
+        "target_entity_id": null,
+        "target_entity_name": "logger.info",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to logger.info",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.425515"
+      },
+      {
+        "id": "rel_174da81390c29bd8",
+        "source_entity_id": "code_0393211e59c1fd60",
+        "target_entity_id": null,
+        "target_entity_name": "upstream_response.headers.get",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to upstream_response.headers.get",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.425525"
+      },
+      {
+        "id": "rel_dfcc352fca733fde",
+        "source_entity_id": "code_0393211e59c1fd60",
+        "target_entity_id": null,
+        "target_entity_name": "content_type.startswith",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to content_type.startswith",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.425534"
+      },
+      {
+        "id": "rel_6e060d73ab45ed63",
+        "source_entity_id": "code_0393211e59c1fd60",
+        "target_entity_id": null,
+        "target_entity_name": "upstream_response.json",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to upstream_response.json",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.425543"
+      },
+      {
+        "id": "rel_e6138ac6fe2acec9",
+        "source_entity_id": "code_0393211e59c1fd60",
+        "target_entity_id": null,
+        "target_entity_name": "JSONResponse",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to JSONResponse",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.425553"
+      },
+      {
+        "id": "rel_af8d1dc1de17d350",
+        "source_entity_id": "code_0393211e59c1fd60",
+        "target_entity_id": null,
+        "target_entity_name": "api.post",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to api.post",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.425561"
+      },
+      {
+        "id": "rel_8f608fd2560d9fc7",
+        "source_entity_id": "code_965692e474c47aae",
+        "target_entity_id": null,
+        "target_entity_name": "app.include_router",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to app.include_router",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.425571"
+      },
+      {
+        "id": "rel_5b557b36f59103bb",
+        "source_entity_id": "code_be820d8bcc760a2e",
+        "target_entity_id": null,
+        "target_entity_name": "ai_factory.logger.core",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from ai_factory.logger import core",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.426331"
+      },
+      {
+        "id": "rel_7384ef35ba8fa283",
+        "source_entity_id": "code_3cd509113f22d8ab",
+        "target_entity_id": null,
+        "target_entity_name": "ai_factory.config.core",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from ai_factory.config import core",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.426595"
+      },
+      {
+        "id": "rel_cfb5d3f39fb679ba",
+        "source_entity_id": "code_de972f7ab336927c",
+        "target_entity_id": null,
+        "target_entity_name": "ai_factory.slurm.models.SlurmEnvironment",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from ai_factory.slurm.models import SlurmEnvironment",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.426991"
+      },
+      {
+        "id": "rel_1fc62e6d508f9a2c",
+        "source_entity_id": "code_de972f7ab336927c",
+        "target_entity_id": null,
+        "target_entity_name": "ai_factory.slurm.models.SlurmJobRequest",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from ai_factory.slurm.models import SlurmJobRequest",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.426995"
+      },
+      {
+        "id": "rel_f6ae7b0854fd3a8d",
+        "source_entity_id": "code_de972f7ab336927c",
+        "target_entity_id": null,
+        "target_entity_name": "ai_factory.slurm.models.SlurmJobSubmission",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from ai_factory.slurm.models import SlurmJobSubmission",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.426998"
+      },
+      {
+        "id": "rel_0b4ee92c7a853cf8",
+        "source_entity_id": "code_209dc72d83949085",
+        "target_entity_id": "code_a8fafe28bf261a63",
+        "target_entity_name": "SlurmJobRequest",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to SlurmJobRequest",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427012"
+      },
+      {
+        "id": "rel_24b3ad7506dffb25",
+        "source_entity_id": "code_209dc72d83949085",
+        "target_entity_id": null,
+        "target_entity_name": "request.to_submission",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to request.to_submission",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427022"
+      },
+      {
+        "id": "rel_49058ea8a2e86bfe",
+        "source_entity_id": "code_209dc72d83949085",
+        "target_entity_id": null,
+        "target_entity_name": "isinstance",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to isinstance",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427030"
+      },
+      {
+        "id": "rel_ddc7d38a247218e4",
+        "source_entity_id": "code_996d25a2309ceb44",
+        "target_entity_id": "code_30a459c70aaa74f9",
+        "target_entity_name": "SlurmEnvironment",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to SlurmEnvironment",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427081"
+      },
+      {
+        "id": "rel_21dbb77bfa4a3100",
+        "source_entity_id": "code_996d25a2309ceb44",
+        "target_entity_id": "code_a8fafe28bf261a63",
+        "target_entity_name": "SlurmJobRequest",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to SlurmJobRequest",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427088"
+      },
+      {
+        "id": "rel_f4beac43a49287b6",
+        "source_entity_id": "code_996d25a2309ceb44",
+        "target_entity_id": null,
+        "target_entity_name": "request.to_submission",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to request.to_submission",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427105"
+      },
+      {
+        "id": "rel_8ae1f64bfabee7dc",
+        "source_entity_id": "code_e1c282227bc6abe6",
+        "target_entity_id": "code_a8fafe28bf261a63",
+        "target_entity_name": "SlurmJobRequest",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to SlurmJobRequest",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427156"
+      },
+      {
+        "id": "rel_3017059d8d3215ad",
+        "source_entity_id": "code_e1c282227bc6abe6",
+        "target_entity_id": null,
+        "target_entity_name": "request_cpus.to_submission",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to request_cpus.to_submission",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427166"
+      },
+      {
+        "id": "rel_8ae1f64bfabee7dc",
+        "source_entity_id": "code_e1c282227bc6abe6",
+        "target_entity_id": "code_a8fafe28bf261a63",
+        "target_entity_name": "SlurmJobRequest",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to SlurmJobRequest",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427181"
+      },
+      {
+        "id": "rel_719f6ea1158197dc",
+        "source_entity_id": "code_e1c282227bc6abe6",
+        "target_entity_id": null,
+        "target_entity_name": "request_high_cpus.to_submission",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to request_high_cpus.to_submission",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427191"
+      },
+      {
+        "id": "rel_8ae1f64bfabee7dc",
+        "source_entity_id": "code_e1c282227bc6abe6",
+        "target_entity_id": "code_a8fafe28bf261a63",
+        "target_entity_name": "SlurmJobRequest",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to SlurmJobRequest",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427205"
+      },
+      {
+        "id": "rel_737a5b35c2af53e4",
+        "source_entity_id": "code_e1c282227bc6abe6",
+        "target_entity_id": null,
+        "target_entity_name": "request_default.to_submission",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to request_default.to_submission",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427214"
+      },
+      {
+        "id": "rel_a9fa63e25ad01204",
+        "source_entity_id": "code_88c37877d16a2fae",
+        "target_entity_id": null,
+        "target_entity_name": "typing.Any",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from typing import Any",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427530"
+      },
+      {
+        "id": "rel_f8d3a4954daa5317",
+        "source_entity_id": "code_88c37877d16a2fae",
+        "target_entity_id": null,
+        "target_entity_name": "typing.Dict",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from typing import Dict",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427533"
+      },
+      {
+        "id": "rel_8a3d24d0eac370b0",
+        "source_entity_id": "code_88c37877d16a2fae",
+        "target_entity_id": null,
+        "target_entity_name": "fastapi.testclient.TestClient",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from fastapi.testclient import TestClient",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427538"
+      },
+      {
+        "id": "rel_d6134cb3c84f9649",
+        "source_entity_id": "code_88c37877d16a2fae",
+        "target_entity_id": null,
+        "target_entity_name": "ai_factory.config.core.settings",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from ai_factory.config.core import settings",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427542"
+      },
+      {
+        "id": "rel_7ebc00f0441a1214",
+        "source_entity_id": "code_88c37877d16a2fae",
+        "target_entity_id": null,
+        "target_entity_name": "ai_factory.slurm.models.SlurmJobRequest",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from ai_factory.slurm.models import SlurmJobRequest",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427546"
+      },
+      {
+        "id": "rel_52fdff0e21f9b33e",
+        "source_entity_id": "code_88c37877d16a2fae",
+        "target_entity_id": null,
+        "target_entity_name": "ai_factory.slurm_gateway.core",
+        "relationship_type": "imports",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "from ai_factory.slurm_gateway import core",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427550"
+      },
+      {
+        "id": "rel_9eb4328ecc748824",
+        "source_entity_id": "code_2c3c8504668af184",
+        "target_entity_id": null,
+        "target_entity_name": "TestClient",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to TestClient",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427563"
+      },
+      {
+        "id": "rel_358940a1302fdd30",
+        "source_entity_id": "code_2c3c8504668af184",
+        "target_entity_id": "code_a8fafe28bf261a63",
+        "target_entity_name": "SlurmJobRequest",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to SlurmJobRequest",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427575"
+      },
+      {
+        "id": "rel_ead14fccdddfd551",
+        "source_entity_id": "code_2c3c8504668af184",
+        "target_entity_id": null,
+        "target_entity_name": "job_request.to_submission",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to job_request.to_submission",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427584"
+      },
+      {
+        "id": "rel_bf59faa11a104591",
+        "source_entity_id": "code_6b4c020f16b87fda",
+        "target_entity_id": "code_38a368dcaf04dfd0",
+        "target_entity_name": "MockResponse",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to MockResponse",
+        "line_number": null,
+        "attributes": {},
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427657"
+      },
+      {
+        "id": "rel_8ff3d699719670e5",
+        "source_entity_id": "code_2c3c8504668af184",
+        "target_entity_id": null,
+        "target_entity_name": "monkeypatch.setattr",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to monkeypatch.setattr",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427663"
+      },
+      {
+        "id": "rel_79351db53289ec61",
+        "source_entity_id": "code_2c3c8504668af184",
+        "target_entity_id": null,
+        "target_entity_name": "client.post",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to client.post",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427673"
+      },
+      {
+        "id": "rel_533a05effd1d8c95",
+        "source_entity_id": "code_2c3c8504668af184",
+        "target_entity_id": null,
+        "target_entity_name": "job_request.model_dump",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to job_request.model_dump",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427679"
+      },
+      {
+        "id": "rel_5c9531197482d6be",
+        "source_entity_id": "code_2c3c8504668af184",
+        "target_entity_id": null,
+        "target_entity_name": "response.json",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to response.json",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427695"
+      },
+      {
+        "id": "rel_93682c1126c120c8",
+        "source_entity_id": "code_2c3c8504668af184",
+        "target_entity_id": null,
+        "target_entity_name": "expected_submission.model_dump",
+        "relationship_type": "calls",
+        "direction": "forward",
+        "strength": 1.0,
+        "context": "call to expected_submission.model_dump",
+        "line_number": null,
+        "attributes": {
+          "is_external": true
+        },
+        "confidence": 1.0,
+        "extracted_at": "2026-01-15T21:45:39.427738"
+      }
+    ]
+  },
+  "metadata": {
+    "total_containers": 9,
+    "total_components": 6,
+    "total_code_entities": 70,
+    "extraction_approach": "c4_model_hybrid"
+  }
+}

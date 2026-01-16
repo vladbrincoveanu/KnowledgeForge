@@ -519,3 +519,32 @@ async def delete_scan_task(task_id: str):
     del scan_tasks[task_id]
     
     return {"message": "Task deleted successfully"}
+
+
+@router.get("/architecture")
+async def get_code_architecture():
+    """
+    Get the C4 architecture data from the latest extraction.
+    
+    Serves the c4_architecture.json file from app-dev if it exists.
+    """
+    import json
+    
+    # Look for c4_architecture.json in the app-dev directory
+    arch_file = Path(__file__).parent.parent.parent.parent.parent / "app-dev" / "c4_architecture.json"
+    
+    if not arch_file.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Architecture file not found. Please run extraction first: python -m services.code_extraction.c4_extractor"
+        )
+    
+    try:
+        with open(arch_file, 'r') as f:
+            architecture_data = json.load(f)
+        
+        return architecture_data
+    except Exception as e:
+        logger.error(f"Failed to read architecture file: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to read architecture file: {str(e)}")
+

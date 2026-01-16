@@ -612,4 +612,42 @@ export const apiUtils = {
   },
 };
 
+// Code Architecture API
+export const codeArchitectureAPI = {
+  // Get C4 architecture data
+  getArchitecture: async (): Promise<any> => {
+    try {
+      const response: AxiosResponse = await api.get('/api/v1/code/architecture');
+      return response.data;
+    } catch (error) {
+      console.error('Failed to fetch code architecture:', error);
+      throw error;
+    }
+  },
+
+  // Trigger code extraction
+  extractArchitecture: async (repositoryPath: string): Promise<{ task_id: string }> => {
+    try {
+      const response: AxiosResponse = await api.post('/api/code-architecture/extract', {
+        repository_path: repositoryPath,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to extract code architecture:', error);
+      throw error;
+    }
+  },
+
+  // Get extraction status
+  getExtractionStatus: async (taskId: string): Promise<TaskStatus> => {
+    try {
+      const response: AxiosResponse = await api.get(`/api/code-architecture/status/${taskId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to get extraction status:', error);
+      throw error;
+    }
+  },
+};
+
 export default api;

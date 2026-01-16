@@ -4,10 +4,15 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@types/cytoscape": "^3.21.9",
+    "@types/dagre": "^0.7.53",
     "axios": "^1.6.0",
+    "cytoscape": "^3.33.1",
+    "dagre": "^0.8.5",
     "lucide-react": "^0.263.1",
     "papaparse": "^5.4.1",
     "react": "^18.2.0",
+    "react-cytoscapejs": "^2.0.0",
     "react-dom": "^18.2.0",
     "react-force-graph": "^1.29.3",
     "react-force-graph-2d": "^1.28.0",
@@ -15,6 +20,7 @@
     "react-json-pretty": "^2.2.0",
     "react-query": "^3.39.3",
     "react-router-dom": "^6.8.0",
+    "reactflow": "^11.11.4",
     "recharts": "^2.8.0",
     "web-vitals": "^3.5.0"
   },

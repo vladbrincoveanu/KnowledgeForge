@@ -17,6 +17,10 @@ from typing import Any, Optional
 from collections import defaultdict
 from abc import ABC, abstractmethod
 
+from services.code_extraction.python_ast_extractor import PythonASTExtractor
+from domain.models.code_entities import CodeEntityType, CodeEntity
+
+
 import yaml
 import tomli
 
@@ -243,6 +247,15 @@ class C4ArchitectureExtractor:
         self.system_context = {}  # Level 1
         self.containers = {}       # Level 2
         self.components = {}       # Level 3
+        self.context_relationships = []
+        self.container_relationships = []
+        
+        # Detailed code graph structures
+        self.detailed_entities = []
+        self.detailed_relationships = []
+
+        # Extractors
+        self.ast_extractor = PythonASTExtractor(self.repo_path)
         
         # Language detectors (Strategy Pattern)
         self.language_detectors = [
@@ -250,6 +263,9 @@ class C4ArchitectureExtractor:
             JavaScriptLanguageDetector(),
             JavaLanguageDetector(),
         ]
+
+        # Kubernetes/GitOps hints
+        self.gitops_paths = self._detect_gitops_paths()
         
         # Framework manifest files that indicate a deployable service
         self.framework_manifests = {
@@ -265,13 +281,15 @@ class C4ArchitectureExtractor:
             'Cargo.toml',
             'requirements.txt',
             'Chart.yaml',
+            'kustomization.yaml',
         }
     
-    def extract(self, max_components_per_domain: int = 10) -> dict[str, Any]:
+    def extract(self, max_components_per_domain: int = 10, group_components_by_domain: bool = False) -> dict[str, Any]:
         """Extract C4 architecture.
         
         Args:
             max_components_per_domain: Group components if more than this
+            group_components_by_domain: Enable domain grouping of components
             
         Returns:
             C4 architecture with 3 levels
@@ -301,15 +319,33 @@ class C4ArchitectureExtractor:
         logger.info(f"✓ Domain: {self.system_context.get('business_domain', 'Unknown')}")
         logger.info(f"✓ Criticality: {self.system_context.get('criticality', 'Unknown')}")
         logger.info(f"✓ External dependencies: {len(self.system_context.get('external_dependencies', []))}")
+
+        # Build context/container relationships (C4 links)
+        self.context_relationships = self._build_context_relationships()
+        self.container_relationships = self._build_container_relationships()
         
-        # Level 3: Components (Public Entry Points Only)
+        # Level 4: Detailed Code Graph (AST-based) - MUST RUN BEFORE LEVEL 3
+        logger.info("\n🔬 LEVEL 4: Code (Detailed AST Scan)")
+        logger.info("-"*80)
+        self._extract_level4_code_details()
+        logger.info(f"✓ Detailed entities: {len(self.detailed_entities)}")
+        logger.info(f"✓ Detailed relationships: {len(self.detailed_relationships)}")
+        
+        # Level 3: Components (Deep Architectural Scan from code entities)
         logger.info("\n🔌 LEVEL 3: Components")
         logger.info("-"*80)
         self._extract_level3_components()
         logger.info(f"✓ Components: {len(self.components)}")
         
+        # Create relationships between components and containers
+        self._link_components_to_containers()
+        logger.info(f"✓ Component-container links created")
+        
+        # Level 4 code details already extracted above
+        # (Needed for Component extraction)
+        
         # Group by domain if too many
-        if len(self.components) > max_components_per_domain:
+        if group_components_by_domain and len(self.components) > max_components_per_domain:
             logger.info(f"✓ Grouping {len(self.components)} components by domain...")
             self._group_by_domain()
         
@@ -319,10 +355,19 @@ class C4ArchitectureExtractor:
             "system_context": self.system_context,
             "containers": list(self.containers.values()),
             "components": list(self.components.values()),
+            "relationships": {
+                "context": self.context_relationships,
+                "containers": self.container_relationships,
+            },
+            "code_level": {
+                "entities": [e.model_dump(mode='json') for e in self.detailed_entities],
+                "relationships": [r.model_dump(mode='json') for r in self.detailed_relationships],
+            },
             "metadata": {
                 "total_containers": len(self.containers),
                 "total_components": len(self.components),
-                "extraction_approach": "c4_model_focused"
+                "total_code_entities": len(self.detailed_entities),
+                "extraction_approach": "c4_model_hybrid"
             }
         }
         
@@ -359,6 +404,7 @@ class C4ArchitectureExtractor:
         owner_team = self._detect_owner_team()
         business_domain = self._infer_business_domain()
         criticality = self._determine_criticality()
+        actors = self._detect_context_actors()
         
         self.system_context = {
             "c4_level": 1,
@@ -366,12 +412,89 @@ class C4ArchitectureExtractor:
             "name": system_name,
             "purpose": system_purpose,
             "external_dependencies": external_deps,
+            "actors": actors,
             
             # IT Landscape fields
             "owner_team": owner_team,
             "business_domain": business_domain,
             "criticality": criticality,
         }
+
+    def _detect_context_actors(self) -> list[dict[str, Any]]:
+        """Detect human/system actors for Context diagram.
+
+        Heuristics based on README/docs headings and common role keywords.
+        """
+        actor_candidates = set()
+        role_keywords = {
+            'user': 'User',
+            'admin': 'Administrator',
+            'operator': 'Operator',
+            'developer': 'Developer',
+            'engineer': 'Engineer',
+            'client': 'API Client',
+            'customer': 'Customer',
+            'analyst': 'Analyst',
+        }
+
+        candidate_files = []
+        for name in ["README.md", "README.rst", "README.txt"]:
+            path = self.repo_path / name
+            if path.exists():
+                candidate_files.append(path)
+
+        candidate_files.extend(self.repo_path.rglob("docs/*.md"))
+        candidate_files.extend(self.repo_path.rglob("documentation/*.md"))
+
+        for doc in candidate_files:
+            try:
+                with open(doc, 'r', encoding='utf-8', errors='ignore') as f:
+                    for line in f:
+                        line_lower = line.lower()
+                        # Prefer headings for roles/personas
+                        if line.strip().startswith('#'):
+                            for key, label in role_keywords.items():
+                                if key in line_lower:
+                                    actor_candidates.add(label)
+                        # Catch inline mentions of CLI or SDK usage
+                        if 'cli' in line_lower:
+                            actor_candidates.add('CLI User')
+                        if 'sdk' in line_lower or 'api client' in line_lower:
+                            actor_candidates.add('API Client')
+            except Exception:
+                continue
+
+        if not actor_candidates:
+            actor_candidates.add('User')
+
+        return [{"name": name, "type": "person"} for name in sorted(actor_candidates)]
+
+    def _build_context_relationships(self) -> list[dict[str, Any]]:
+        """Build relationships for the Context diagram (actors + external systems)."""
+        relationships = []
+        system_name = self.system_context.get('name', self.repo_path.name)
+
+        # Actor -> System relationships
+        for actor in self.system_context.get('actors', []):
+            relationships.append({
+                "source": actor.get('name', 'User'),
+                "destination": system_name,
+                "description": "uses",
+                "relationship_type": "uses",
+            })
+
+        # System -> External dependency relationships
+        for dep in self.system_context.get('external_dependencies', []):
+            dep_name = dep.get('name') or dep.get('service') or 'External Service'
+            dep_type = dep.get('type') or dep.get('category') or 'external'
+            relationships.append({
+                "source": system_name,
+                "destination": dep_name,
+                "description": f"uses {dep_type}",
+                "relationship_type": "uses",
+            })
+
+        return relationships
     
     def _detect_system_name(self) -> str:
         """Detect system name from project files."""
@@ -1098,6 +1221,12 @@ Team name:"""
             
             # Get the directory containing this manifest
             service_dir = manifest_file.parent
+
+            # Normalize Helm chart/kustomize layouts (chart folder -> parent service)
+            if manifest_file.name == 'Chart.yaml' and service_dir.name in {'chart', 'charts'}:
+                service_dir = service_dir.parent
+            if manifest_file.name == 'kustomization.yaml' and service_dir.name in {'kustomize', 'kustomization'}:
+                service_dir = service_dir.parent
             
             # Skip if in excluded directory
             if any(excluded in service_dir.parts for excluded in excluded_dirs):
@@ -1132,6 +1261,10 @@ Team name:"""
         # Also check for chart subdirectory (Helm)
         if (directory / "chart" / "Chart.yaml").exists():
             return True
+
+        # Check for kustomize subdirectory
+        if (directory / "kustomize" / "kustomization.yaml").exists():
+            return True
         
         return False
     
@@ -1143,6 +1276,12 @@ Team name:"""
         """
         # Ensure absolute path
         project_dir = Path(project_dir).resolve()
+
+        # Avoid registering repo root in multi-service repos
+        if project_dir == self.repo_path:
+            common_service_dirs = {'projects', 'services', 'apps', 'packages', 'components', 'bases'}
+            if any((self.repo_path / d).exists() for d in common_service_dirs):
+                return
         
         # Get relative path from repo root (standardized)
         rel_path = project_dir.relative_to(self.repo_path)
@@ -1169,6 +1308,21 @@ Team name:"""
         
         container_type = self._infer_container_type(project_dir)
         protocol = self._infer_protocol(project_dir)
+
+        runtime_environment = None
+        deployment = None
+        if (project_dir / "chart" / "Chart.yaml").exists():
+            runtime_environment = "Kubernetes"
+            deployment = "Helm"
+        elif (project_dir / "kustomize" / "kustomization.yaml").exists():
+            runtime_environment = "Kubernetes"
+            deployment = "Kustomize"
+        elif self._directory_has_k8s_manifest(project_dir):
+            runtime_environment = "Kubernetes"
+            deployment = "Manifest"
+        elif self._path_matches_gitops(rel_path_str):
+            runtime_environment = "Kubernetes"
+            deployment = "GitOps"
         
         self.containers[container_name] = {
             "c4_level": 2,
@@ -1178,6 +1332,9 @@ Team name:"""
             "technology": self._detect_technology_stack(project_dir),
             "protocol": protocol,
             "path": rel_path_str,  # Always relative to repo root
+            "runtime_environment": runtime_environment,
+            "deployment": deployment,
+            "description": self._extract_container_description(project_dir),
             
             # IT Landscape fields
             "repository_url": self._get_repository_url(project_dir),
@@ -1185,6 +1342,12 @@ Team name:"""
             "dependencies_internal": [],  # Will be populated later
             "health_endpoint": self._extract_health_endpoint(project_dir),
         }
+
+        if not self.containers[container_name].get("description") and runtime_environment:
+            deployment_label = deployment or "Kubernetes"
+            self.containers[container_name]["description"] = (
+                f"Kubernetes workload deployed via {deployment_label}."
+            )
     
     def _infer_container_type(self, project_dir: Path) -> str:
         """Infer what type of container this is."""
@@ -1307,6 +1470,208 @@ Team name:"""
             return ', '.join(sorted(protocols))
         
         return "HTTP"  # Default
+
+    def _extract_container_description(self, project_dir: Path) -> str:
+        """Extract a short description for a container from README/Chart.yaml or LLM."""
+        description_sources = []
+        readme_text = ""
+
+        # README in container directory
+        for readme_name in ["README.md", "README.rst", "README.txt"]:
+            readme_path = project_dir / readme_name
+            if readme_path.exists():
+                try:
+                    with open(readme_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read(4000)
+                    readme_text = content
+                    description_sources.append(content)
+                    break
+                except Exception:
+                    pass
+
+        # Helm Chart.yaml description
+        chart_yaml = project_dir / "chart" / "Chart.yaml"
+        if chart_yaml.exists():
+            try:
+                with open(chart_yaml, 'r', encoding='utf-8', errors='ignore') as f:
+                    data = yaml.safe_load(f)
+                if isinstance(data, dict) and data.get('description'):
+                    chart_desc = str(data.get('description')).strip()
+                    if len(chart_desc) > 10:
+                        return chart_desc
+            except Exception:
+                pass
+
+        if readme_text:
+            # Try first paragraph from README
+            lines = [line.strip() for line in readme_text.splitlines()]
+            paragraph = []
+            for line in lines:
+                if not line:
+                    if paragraph:
+                        break
+                    continue
+                if line.startswith('#') and not paragraph:
+                    continue
+                paragraph.append(line)
+            if paragraph:
+                summary = ' '.join(paragraph).strip()
+                if len(summary) > 12:
+                    return summary[:240]
+
+            # Fallback to first descriptive line
+            for line in lines:
+                clean = line.lstrip('#').strip()
+                if clean and len(clean) > 12:
+                    return clean[:200]
+
+        # Optional LLM summary if available
+        if self.llm_manager and description_sources:
+            prompt = f"""Summarize this service in one short sentence (max 20 words).
+
+Content:
+{description_sources[0][:1200]}
+
+Answer:"""
+            try:
+                response = self.llm_manager.generate_text(
+                    prompt,
+                    max_tokens=40,
+                    temperature=0.2,
+                    use_cache=True
+                )
+                if response:
+                    summary = response.strip()
+                    summary = re.sub(r'<think>.*?</think>', '', summary, flags=re.DOTALL).strip()
+                    summary = re.sub(r'^["\'\s]+|["\'\s]+$', '', summary)
+                    # Reject generic or meta responses
+                    if len(summary) < 12 or 'user' in summary.lower() and 'query' in summary.lower():
+                        return ""
+                    # Keep only first sentence
+                    sentence = re.split(r'[.!?]', summary)[0].strip()
+                    if sentence:
+                        return sentence[:200]
+            except Exception:
+                pass
+
+        return ""
+
+    def _detect_gitops_paths(self) -> set[str]:
+        """Detect GitOps/ArgoCD application paths that imply Kubernetes deployment."""
+        gitops_paths: set[str] = set()
+
+        # Only scan YAML in likely GitOps folders to keep it cheap
+        candidate_dirs = [
+            self.repo_path / "gitops",
+            self.repo_path / "argo",
+            self.repo_path / "argocd",
+        ]
+
+        for base_dir in candidate_dirs:
+            if not base_dir.exists():
+                continue
+
+            for yaml_file in base_dir.rglob("*.y*ml"):
+                try:
+                    with open(yaml_file, "r", encoding="utf-8", errors="ignore") as f:
+                        content = f.read(20000)
+
+                    if "argoproj.io" not in content and "Application" not in content:
+                        continue
+
+                    docs = list(yaml.safe_load_all(content))
+                    for doc in docs:
+                        if not isinstance(doc, dict):
+                            continue
+
+                        kind = str(doc.get("kind", ""))
+                        if kind not in {"Application", "ApplicationSet"}:
+                            continue
+
+                        # Application spec
+                        spec = doc.get("spec", {})
+                        self._collect_gitops_paths_from_spec(spec, gitops_paths)
+
+                        # ApplicationSet template spec
+                        template = spec.get("template", {}) if isinstance(spec, dict) else {}
+                        template_spec = template.get("spec", {}) if isinstance(template, dict) else {}
+                        self._collect_gitops_paths_from_spec(template_spec, gitops_paths)
+                except Exception:
+                    continue
+
+        return {p.strip("/ ") for p in gitops_paths if p}
+
+    def _collect_gitops_paths_from_spec(self, spec: dict, gitops_paths: set[str]):
+        """Collect source paths from ArgoCD Application specs."""
+        if not isinstance(spec, dict):
+            return
+
+        source = spec.get("source")
+        if isinstance(source, dict):
+            path = source.get("path")
+            if isinstance(path, str):
+                gitops_paths.add(path)
+
+        sources = spec.get("sources")
+        if isinstance(sources, list):
+            for src in sources:
+                if isinstance(src, dict):
+                    path = src.get("path")
+                    if isinstance(path, str):
+                        gitops_paths.add(path)
+
+    def _path_matches_gitops(self, rel_path: str) -> bool:
+        """Check if a container path is referenced by GitOps application paths."""
+        if not rel_path or not self.gitops_paths:
+            return False
+
+        rel_path = rel_path.strip("/ ")
+        for gitops_path in self.gitops_paths:
+            if rel_path == gitops_path:
+                return True
+            if rel_path.startswith(gitops_path + "/"):
+                return True
+            if gitops_path.startswith(rel_path + "/"):
+                return True
+        return False
+
+    def _directory_has_k8s_manifest(self, directory: Path) -> bool:
+        """Detect Kubernetes manifests by apiVersion/kind patterns."""
+        k8s_kinds = {
+            "deployment",
+            "statefulset",
+            "daemonset",
+            "service",
+            "ingress",
+            "job",
+            "cronjob",
+            "configmap",
+            "secret",
+            "serviceaccount",
+            "clusterrole",
+            "role",
+            "clusterrolebinding",
+            "rolebinding",
+            "networkpolicy",
+            "persistentvolume",
+            "persistentvolumeclaim",
+        }
+
+        for yaml_file in directory.rglob("*.y*ml"):
+            try:
+                with open(yaml_file, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read(4000).lower()
+
+                if "apiversion" not in content or "kind" not in content:
+                    continue
+
+                for kind in k8s_kinds:
+                    if f"kind: {kind}" in content:
+                        return True
+            except Exception:
+                continue
+
+        return False
     
     def _detect_containers_from_compose(self):
         """Detect containers from docker-compose files."""
@@ -1354,10 +1719,38 @@ Team name:"""
                 with open(chart_file) as f:
                     data = yaml.safe_load(f)
                 
-                chart_name = data.get('name', chart_file.parent.name)
                 chart_dir = chart_file.parent
-                
-                if chart_name not in self.containers:
+                service_dir = chart_dir
+                if chart_dir.name in {'chart', 'charts'} and chart_dir.parent != self.repo_path:
+                    service_dir = chart_dir.parent
+
+                chart_name = data.get('name', service_dir.name)
+                rel_service_path = str(service_dir.relative_to(self.repo_path))
+
+                # Try to find an existing container by path or name variants
+                existing = None
+                existing_key = None
+
+                for key, container in self.containers.items():
+                    if container.get('path') == rel_service_path:
+                        existing = container
+                        existing_key = key
+                        break
+
+                if not existing:
+                    candidate_names = {
+                        chart_name,
+                        service_dir.name,
+                        chart_name.replace('-', '_'),
+                        chart_name.replace('_', '-'),
+                    }
+                    for name in candidate_names:
+                        if name in self.containers:
+                            existing = self.containers[name]
+                            existing_key = name
+                            break
+
+                if not existing:
                     self.containers[chart_name] = {
                         "c4_level": 2,
                         "type": "container",
@@ -1365,14 +1758,33 @@ Team name:"""
                         "container_type": "Helm Deployed Service",
                         "technology": "Kubernetes",
                         "protocol": "HTTP",
-                        "path": str(chart_file.relative_to(self.repo_path)),
+                        "path": rel_service_path,
+                        "runtime_environment": "Kubernetes",
+                        "deployment": "Helm",
+                        "description": data.get('description') or self._extract_container_description(service_dir),
                         
                         # IT Landscape fields
-                        "repository_url": self._get_repository_url(chart_dir),
-                        "runtime_info": self._extract_runtime_version(chart_dir),
+                        "repository_url": self._get_repository_url(service_dir),
+                        "runtime_info": self._extract_runtime_version(service_dir),
                         "dependencies_internal": [],
-                        "health_endpoint": self._extract_health_endpoint(chart_dir),
+                        "health_endpoint": self._extract_health_endpoint(service_dir),
                     }
+                else:
+                    # Merge Helm info into existing container without duplicating
+                    if existing.get("container_type") in {"Service", "Unknown", None}:
+                        existing["container_type"] = "Helm Deployed Service"
+                    if existing.get("technology") in {"Unknown", None}:
+                        existing["technology"] = "Kubernetes"
+                    if not existing.get("protocol"):
+                        existing["protocol"] = "HTTP"
+                    if existing.get("path") in {".", ""}:
+                        existing["path"] = rel_service_path
+                    existing["runtime_environment"] = "Kubernetes"
+                    existing["deployment"] = "Helm"
+                    if not existing.get("description"):
+                        existing["description"] = data.get('description') or self._extract_container_description(service_dir)
+                    if not existing.get("description"):
+                        existing["description"] = "Kubernetes workload deployed via Helm."
             
             except Exception as e:
                 logger.debug(f"Error parsing {chart_file}: {e}")
@@ -1666,74 +2078,569 @@ Team name:"""
         return ""
     
     def _map_internal_dependencies(self):
-        """Map dependencies between containers (creates the connection lines).
-        
-        Analyzes:
-        - values.yaml (service URLs, endpoints)
-        - Source code (HTTP calls to other services)
-        - Environment variables (service discovery)
-        """
-        for container_name, container_info in self.containers.items():
-            dependencies = set()
-            container_path = self.repo_path / container_info['path']
-            
-            # Check values.yaml for service references
-            values_file = container_path / "chart" / "values.yaml"
-            if values_file.exists():
+        """Map dependencies between containers based on code analysis."""
+        # This is a placeholder for a more sophisticated dependency mapping
+        # For now, we'll rely on Helm chart dependencies as a proxy
+        for container in self.containers.values():
+            chart_path = self.repo_path / container['path'] / 'Chart.yaml'
+            if chart_path.exists():
                 try:
-                    with open(values_file) as f:
-                        content = f.read()
-                    
-                    # Look for other container names in the config
-                    for other_container in self.containers.keys():
-                        if other_container != container_name:
-                            # Check if other service is referenced
-                            if other_container in content:
-                                dependencies.add(other_container)
-                
-                except Exception:
-                    pass
-            
-            # Check source code for HTTP calls
-            for py_file in container_path.rglob("*.py"):
-                try:
-                    with open(py_file) as f:
-                        content = f.read()
-                    
-                    # Look for requests to other services
-                    # Pattern: requests.post(f"http://{service_name}")
-                    for other_container in self.containers.keys():
-                        if other_container != container_name:
-                            if other_container in content.lower():
-                                dependencies.add(other_container)
-                
-                except Exception:
+                    with open(chart_path, 'r') as f:
+                        chart_data = yaml.safe_load(f)
+                        if 'dependencies' in chart_data:
+                            for dep in chart_data['dependencies']:
+                                dep_name = dep['name']
+                                if dep_name in self.containers and dep_name != container['name']:
+                                    container.setdefault('dependencies_internal', []).append(dep_name)
+                except Exception as e:
+                    logger.warning(f"Could not parse {chart_path}: {e}")
+
+    def _build_container_relationships(self) -> list[dict[str, Any]]:
+        """Build container-to-container relationships for the Container diagram."""
+        relationships = []
+        seen = set()
+
+        for container in self.containers.values():
+            source = container.get('name')
+            for dep in container.get('dependencies_internal', []) or []:
+                key = (source, dep)
+                if key in seen or not dep:
                     continue
+                relationships.append({
+                    "source": source,
+                    "destination": dep,
+                    "description": "depends on",
+                    "relationship_type": "depends_on",
+                })
+                seen.add(key)
+
+        return relationships
+
+    def _extract_level4_code_details(self):
+        """
+        Run detailed AST-based extraction on Python containers.
+        """
+        python_containers = [
+            c for c in self.containers.values() 
+            if c.get('technology') == 'Python'
+        ]
+
+        for container in python_containers:
+            container_path = self.repo_path / container['path']
+            logger.info(f"  Scanning Python container: {container['name']} at {container_path}")
             
-            # Update container with dependencies
-            container_info['dependencies_internal'] = sorted(list(dependencies))
+            for file_path in container_path.rglob('*.py'):
+                if self.ast_extractor.can_handle(file_path):
+                    entities, relationships = self.ast_extractor.extract(file_path)
+                    # The extractor already accumulates these, but if it were
+                    # multi-threaded, you'd aggregate here.
+            
+        # After scanning all files, the extractor instance holds the results
+        self.detailed_entities = self.ast_extractor.entities
+        self.detailed_relationships = self.ast_extractor.relationships
+        
+        # Resolve relationship placeholders
+        self._resolve_relationships()
+        
+        # Link components to AST entities
+        self._link_components_to_entities()
+    
+    def _link_components_to_entities(self):
+        """Link C4 Level 3 components (API endpoints) to AST-extracted function entities."""
+        for component in self.components.values():
+            func_name = component.get('function_name')
+            file_path = component.get('file')
+            
+            if func_name and file_path:
+                # Find matching AST entity
+                matching_entity = next(
+                    (e for e in self.detailed_entities 
+                     if e.name == func_name and e.file_path == file_path),
+                    None
+                )
+                if matching_entity:
+                    component['ast_entity_id'] = matching_entity.id
+                    component['signature'] = matching_entity.signature
+                    component['documentation'] = matching_entity.documentation
+
+    def _resolve_relationships(self):
+        """
+        Attempt to resolve named relationship targets to concrete entity IDs.
+        Separates internal references from external dependencies.
+        """
+        # Build map of internal entities
+        entity_map = {e.name: e.id for e in self.detailed_entities if e.id}
+        entity_map.update({f"{e.file_path}::{e.name}": e.id for e in self.detailed_entities if e.id})
+        
+        # Known external libraries (expandable)
+        external_references = {
+            'BaseModel', 'BaseSettings', 'Field', 'validator',  # Pydantic
+            'FastAPI', 'APIRouter', 'Depends', 'HTTPException',  # FastAPI
+            'Enum', 'dataclass', 'ABC', 'abstractmethod',  # Python stdlib
+            'List', 'Dict', 'Optional', 'Any', 'Union',  # typing
+            'logging', 'datetime', 'Path', 'json', 'yaml',  # Common modules
+        }
+
+        for rel in self.detailed_relationships:
+            if rel.target_entity_name and not rel.target_entity_id:
+                # Try to resolve as internal reference
+                target_id = entity_map.get(rel.target_entity_name)
+                if target_id:
+                    rel.target_entity_id = target_id
+                # Mark external dependencies
+                elif rel.target_entity_name in external_references or '.' in rel.target_entity_name:
+                    rel.attributes['is_external'] = True
     
     def _extract_level3_components(self):
-        """Extract Level 3: Components (Public Entry Points Only).
+        """Extract Level 3: Components using AST for Python and LanguageDetectors for others.
         
-        Scans for:
-        - @Controller, @RestController (Java/Spring)
-        - @router.get, @app.post (Python/FastAPI)
-        - export function handler (JavaScript/Node)
+        Only registers components if:
+        - Python: AST finds function with decorator matching entry_point_patterns
+        - Other languages: LanguageDetector finds matching patterns
         
-        IGNORES:
-        - Private methods
-        - Helper functions
-        - Internal classes
-        
-        Generic approach: Scans entire repository, adapts to any structure.
+        If container has >10 components, uses LLM to suggest functional groups.
         """
-        # Scan from repository root (works for any structure)
-        components = self._scan_for_entry_points(self.repo_path, "root")
+        logger.info("Extracting components using AST for Python and detectors for other languages...")
         
-        for comp in components:
-            comp_id = f"{comp['container']}::{comp['name']}"
-            self.components[comp_id] = comp
+        # Track components per container for grouping
+        components_by_container = defaultdict(list)
+        
+        # 1. Extract Python entry points using AST
+        python_extractor = PythonASTExtractor(self.repo_path)
+        python_files = list(self.repo_path.rglob("*.py"))
+        
+        # Filter out excluded directories
+        excluded_dirs = {'node_modules', 'test', 'tests', '__tests__', '__pycache__', '.git', 'venv', '.venv'}
+        python_files = [
+            f for f in python_files 
+            if not any(excluded in f.parts for excluded in excluded_dirs)
+        ]
+        
+        logger.info(f"Scanning {len(python_files)} Python files for entry point decorators...")
+        
+        for py_file in python_files:
+            try:
+                # Extract all entities from this file
+                entities, _ = python_extractor.extract(py_file)
+                
+                # Find functions with route decorators (entry points)
+                for entity in entities:
+                    if entity.entity_type != CodeEntityType.FUNCTION:
+                        continue
+                    
+                    decorators = entity.attributes.get('decorators', [])
+                    if not decorators:
+                        continue
+                    
+                    # Check if any decorator matches entry point patterns
+                    is_entry_point = any(
+                        self._is_route_decorator(dec) for dec in decorators
+                    )
+                    
+                    if is_entry_point:
+                        # Extract endpoint info
+                        endpoint_info = self._extract_route_info_from_decorators(decorators, entity.name)
+                        if endpoint_info:
+                            container = self._infer_container_from_path(py_file)
+                            rel_path = py_file.relative_to(self.repo_path)
+                            
+                            component = {
+                                'c4_level': 3,
+                                'type': 'component',
+                                'name': f"{endpoint_info['method']} {endpoint_info['path']}",
+                                'component_type': 'API Endpoint',
+                                'container': container,
+                                'file': str(rel_path),
+                                'line_start': entity.line_start,
+                                'signature': entity.signature,
+                                'documentation': entity.documentation,
+                                'endpoint_path': endpoint_info['path'],
+                                'endpoint_method': endpoint_info['method'],
+                            }
+                            
+                            component_id = f"endpoint_{entity.id}"
+                            self.components[component_id] = component
+                            components_by_container[container].append(component)
+                            
+            except Exception as e:
+                logger.warning(f"Failed to parse {py_file}: {e}")
+        
+        logger.info(f"Found {len(self.components)} Python entry point components")
+
+        # 1b. Extract class-level components for deeper Component diagrams
+        class_component_count = 0
+        for entity in self.detailed_entities:
+            if entity.entity_type != CodeEntityType.CLASS:
+                continue
+
+            component_type = self._classify_component(entity)
+            if not component_type:
+                continue
+
+            try:
+                file_path = Path(entity.file_path)
+                container = self._infer_container_from_path(file_path)
+                rel_path = file_path.relative_to(self.repo_path)
+            except Exception:
+                container = None
+                rel_path = entity.file_path
+
+            component_id = f"class_{entity.id}"
+            if component_id in self.components:
+                continue
+
+            component = {
+                'c4_level': 3,
+                'type': 'component',
+                'name': entity.name,
+                'component_type': component_type,
+                'container': container,
+                'file': str(rel_path),
+                'line_start': entity.line_start,
+                'signature': entity.signature,
+                'documentation': entity.documentation,
+                'component_kind': 'Class',
+            }
+
+            self.components[component_id] = component
+            components_by_container[container].append(component)
+            class_component_count += 1
+
+        if class_component_count:
+            logger.info(f"Added {class_component_count} class-level components")
+        
+        # 2. Fall back to LanguageDetectors for non-Python files
+        for detector in self.language_detectors:
+            if isinstance(detector, PythonLanguageDetector):
+                continue  # Already handled above
+            
+            extensions = detector.get_file_extensions()
+            for ext in extensions:
+                files = list(self.repo_path.rglob(f"*{ext}"))
+                files = [
+                    f for f in files 
+                    if not any(excluded in f.parts for excluded in excluded_dirs)
+                ]
+                
+                logger.info(f"Scanning {len(files)} {ext} files with {detector.__class__.__name__}...")
+                
+                for file_path in files:
+                    try:
+                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                            content = f.read()
+                        
+                        entry_points = detector.extract_entry_points(file_path, content)
+                        
+                        for point in entry_points:
+                            container = self._infer_container_from_path(file_path)
+                            rel_path = file_path.relative_to(self.repo_path)
+                            
+                            component = {
+                                'c4_level': 3,
+                                'type': 'component',
+                                'name': point.get('name', 'Unknown'),
+                                'component_type': 'API Endpoint',
+                                'container': container,
+                                'file': str(rel_path),
+                                'line_number': point.get('line_number'),
+                                'endpoint_path': point.get('path'),
+                                'endpoint_method': point.get('method'),
+                            }
+                            
+                            component_id = f"endpoint_{file_path.name}_{point.get('name')}"
+                            self.components[component_id] = component
+                            components_by_container[container].append(component)
+                            
+                    except Exception as e:
+                        logger.warning(f"Failed to parse {file_path}: {e}")
+        
+        logger.info(f"Total components extracted: {len(self.components)}")
+
+        # 4. Fallback: add infra components for containers with no code-level components
+        self._add_infra_components_for_empty_containers(components_by_container)
+        
+        # 3. Group components by functional groups if container has >10 components
+        self._apply_functional_grouping(components_by_container)
+
+    def _add_infra_components_for_empty_containers(self, components_by_container: dict[str, list]):
+        """Create minimal components from Helm/Kustomize manifests when no code components exist."""
+        for container_name, container in self.containers.items():
+            if components_by_container.get(container_name):
+                continue
+
+            container_path = self.repo_path / container.get('path', '')
+            infra_components = self._extract_infra_components(container_path)
+
+            for comp in infra_components:
+                component_id = f"infra_{container_name}_{comp['name'].lower().replace(' ', '_')}"
+                component = {
+                    'c4_level': 3,
+                    'type': 'component',
+                    'name': comp['name'],
+                    'component_type': comp['component_type'],
+                    'container': container_name,
+                    'file': comp.get('file'),
+                    'line_start': None,
+                    'signature': None,
+                    'documentation': None,
+                    'component_kind': 'Manifest',
+                }
+                self.components[component_id] = component
+                components_by_container[container_name].append(component)
+
+    def _extract_infra_components(self, container_path: Path) -> list[dict[str, Any]]:
+        """Extract infra-level components from Helm/Kustomize manifests."""
+        components = []
+
+        # Helm chart templates
+        chart_templates = container_path / 'chart' / 'templates'
+        if chart_templates.exists():
+            for file_path in chart_templates.rglob('*.yaml'):
+                name = file_path.stem.replace('-', ' ').replace('_', ' ').title()
+                comp_type = self._infer_infra_component_type(file_path.name)
+                rel_path = file_path.relative_to(self.repo_path)
+                components.append({
+                    'name': name,
+                    'component_type': comp_type,
+                    'file': str(rel_path),
+                })
+
+        # Kustomize base
+        kustomize_dir = container_path / 'kustomize'
+        if kustomize_dir.exists():
+            for file_path in kustomize_dir.rglob('*.yaml'):
+                if file_path.name == 'kustomization.yaml':
+                    continue
+                name = file_path.stem.replace('-', ' ').replace('_', ' ').title()
+                comp_type = self._infer_infra_component_type(file_path.name)
+                rel_path = file_path.relative_to(self.repo_path)
+                components.append({
+                    'name': name,
+                    'component_type': comp_type,
+                    'file': str(rel_path),
+                })
+
+        return components
+
+    def _infer_infra_component_type(self, filename: str) -> str:
+        """Infer infra component type from manifest filename."""
+        name = filename.lower()
+        if 'deployment' in name:
+            return 'Deployment'
+        if 'service' in name:
+            return 'Service'
+        if 'ingress' in name or 'route' in name:
+            return 'Ingress'
+        if 'configmap' in name:
+            return 'ConfigMap'
+        if 'secret' in name:
+            return 'Secret'
+        if 'statefulset' in name:
+            return 'StatefulSet'
+        if 'job' in name or 'cronjob' in name:
+            return 'Job'
+        if 'serviceaccount' in name:
+            return 'Service Account'
+        if 'role' in name or 'rbac' in name:
+            return 'RBAC'
+        return 'Infrastructure'
+    
+    def _link_components_to_containers(self):
+        """Create relationships between components and their containers."""
+        for comp_id, component in self.components.items():
+            container_name = component.get('container')
+            
+            # Find the matching container
+            for cont_id, container in self.containers.items():
+                if container['name'] == container_name:
+                    # Add relationship: component -> container
+                    if 'components' not in container:
+                        container['components'] = []
+                    
+                    container['components'].append({
+                        'id': comp_id,
+                        'name': component['name'],
+                        'type': component.get('component_type', 'Component')
+                    })
+                    
+                    # Store the relationship for the graph
+                    component['container_id'] = cont_id
+                    break
+    
+    def _apply_functional_grouping(self, components_by_container: dict[str, list]):
+        """Use LLM to suggest functional groups for containers with >10 components."""
+        for container, components in components_by_container.items():
+            if len(components) <= 10:
+                continue
+            
+            logger.info(f"Container '{container}' has {len(components)} components, applying LLM grouping...")
+            
+            if not self.llm_manager:
+                logger.warning("LLM not available, skipping functional grouping")
+                continue
+            
+            # Extract endpoint paths for LLM analysis
+            endpoint_paths = [
+                comp.get('endpoint_path', comp.get('name', ''))
+                for comp in components
+            ]
+            
+            # Ask LLM to suggest 3 functional groups
+            prompt = f"""Given these API endpoints from a '{container}' service:
+
+{chr(10).join(f"- {path}" for path in endpoint_paths[:50])}
+
+Suggest exactly 3 functional group names that best categorize these endpoints.
+Examples: "Authentication", "User Management", "Data Processing", "Reporting", etc.
+
+Return only 3 group names, one per line, no explanations."""
+            
+            try:
+                response = self.llm_manager.complete(prompt, max_tokens=100)
+                group_names = [line.strip() for line in response.strip().split('\n') if line.strip()][:3]
+                
+                if len(group_names) == 3:
+                    logger.info(f"LLM suggested groups for {container}: {group_names}")
+                    self._reassign_components_to_groups(container, components, group_names)
+                else:
+                    logger.warning(f"LLM returned {len(group_names)} groups instead of 3, skipping grouping")
+                    
+            except Exception as e:
+                logger.error(f"Failed to get LLM grouping: {e}")
+    
+    def _reassign_components_to_groups(self, container: str, components: list, group_names: list[str]):
+        """Reassign components to functional groups using LLM."""
+        if not self.llm_manager or len(group_names) != 3:
+            return
+        
+        # Ask LLM to assign each endpoint to a group
+        endpoint_list = '\n'.join(
+            f"{i+1}. {comp.get('endpoint_path', comp.get('name', ''))}"
+            for i, comp in enumerate(components)
+        )
+        
+        prompt = f"""Given these functional groups:
+1. {group_names[0]}
+2. {group_names[1]}
+3. {group_names[2]}
+
+Assign each endpoint to the most appropriate group (1, 2, or 3):
+
+{endpoint_list}
+
+Return only the group numbers (1, 2, or 3), one per line, matching the endpoint order."""
+        
+        try:
+            response = self.llm_manager.complete(prompt, max_tokens=200)
+            assignments = [line.strip() for line in response.strip().split('\n') if line.strip()]
+            
+            # Update component metadata with group assignment
+            for i, comp in enumerate(components):
+                if i < len(assignments):
+                    try:
+                        group_idx = int(assignments[i]) - 1
+                        if 0 <= group_idx < 3:
+                            comp['functional_group'] = group_names[group_idx]
+                    except ValueError:
+                        pass
+                        
+        except Exception as e:
+            logger.error(f"Failed to assign components to groups: {e}")
+    
+    def _extract_route_info_from_decorators(self, decorators: list[str], func_name: str) -> Optional[dict]:
+        """Extract route method and path from function decorators."""
+        for decorator in decorators:
+            lower_dec = decorator.lower()
+            for method in ['get', 'post', 'put', 'delete', 'patch']:
+                if f'.{method}' in lower_dec:
+                    # Try to extract path from decorator
+                    # Format: @app.get("/path") or @router.post('/path')
+                    import re
+                    path_match = re.search(r'["\']([^"\']+)["\']', decorator)
+                    if path_match:
+                        path = path_match.group(1)
+                    else:
+                        # Fallback to function name
+                        path = f"/api/{func_name.replace('_', '-')}"
+                    
+                    return {'method': method.upper(), 'path': path}
+        return None
+    
+    def _classify_component(self, class_entity: CodeEntity) -> Optional[str]:
+        """Classify a class as an architectural component type.
+        
+        Returns component type or None if not architecturally significant.
+        """
+        name = class_entity.name.lower()
+        file_path = class_entity.file_path.lower()
+        
+        # Configuration classes
+        if 'config' in name or 'settings' in name or 'config' in file_path:
+            return 'Configuration'
+        
+        # Model/Data classes
+        if 'model' in name or 'schema' in name or 'entity' in name or 'models.py' in file_path:
+            return 'Data Model'
+        
+        # Service/Business Logic
+        if 'service' in name or 'manager' in name or 'handler' in name:
+            return 'Service'
+        
+        # API/Controller
+        if 'controller' in name or 'api' in name or 'router' in name:
+            return 'Controller'
+        
+        # Gateway/Client
+        if 'gateway' in name or 'client' in name or 'adapter' in name:
+            return 'Integration'
+        
+        # Repository/DAO
+        if 'repository' in name or 'dao' in name:
+            return 'Repository'
+        
+        # Base classes are important
+        base_classes = class_entity.attributes.get('base_classes', [])
+        if base_classes and len(base_classes) > 0:
+            # If it inherits from BaseModel, BaseSettings, ABC, etc.
+            for base in base_classes:
+                if any(keyword in str(base).lower() for keyword in ['base', 'abc', 'protocol']):
+                    return 'Base Class'
+        
+        # Has decorators (likely framework-specific important classes)
+        decorators = class_entity.attributes.get('decorators', [])
+        if decorators:
+            return 'Decorated Component'
+        
+        # Default: not architecturally significant
+        return None
+    
+    def _get_module_path(self, file_path: str) -> str:
+        """Convert file path to module path (e.g., 'components/ai_factory/config/core.py' -> 'components.ai_factory.config')."""
+        path = Path(file_path)
+        parts = path.parts[:-1]  # Remove filename
+        return '.'.join(parts) if parts else 'root'
+    
+    def _is_route_decorator(self, decorator: str) -> bool:
+        """Check if decorator is a route decorator."""
+        route_keywords = ['app.get', 'app.post', 'app.put', 'app.delete', 'app.patch',
+                         'router.get', 'router.post', 'router.put', 'router.delete', 'router.patch',
+                         'api.get', 'api.post', 'api.put', 'api.delete', 'api.patch']
+        return any(kw in decorator.lower() for kw in route_keywords)
+    
+    def _extract_route_info_from_entity(self, func_entity: CodeEntity) -> Optional[dict]:
+        """Extract route path and method from function entity decorators."""
+        decorators = func_entity.attributes.get('decorators', [])
+        
+        for decorator in decorators:
+            lower_dec = decorator.lower()
+            for method in ['get', 'post', 'put', 'delete', 'patch']:
+                if f'.{method}' in lower_dec:
+                    # Decorator format: "app.get" or "router.post"
+                    # Path would need to be extracted from original source
+                    # For now, use function name as fallback
+                    path = f"/api/{func_entity.name.replace('_', '-')}"
+                    return {'method': method.upper(), 'path': path}
+        return None
     
     def _scan_for_entry_points(self, directory: Path, container_name: str) -> list[dict[str, Any]]:
         """Scan for public entry points (APIs, controllers, routes).
@@ -1840,10 +2747,28 @@ Team name:"""
                     if str(rel_path).startswith(container_path):
                         return container_name
             
-            # Strategy 2: Walk up directory tree to find closest container
-            # Look for directories with framework manifests
+            # Strategy 2: Match by name similarity (e.g., slurm_gateway in path → slurm_gateway_api container)
+            file_path_str = str(rel_path).lower()
+            best_match = None
+            best_match_score = 0
+            
+            for container_name, container_info in self.containers.items():
+                # Extract keywords from container name
+                container_keywords = container_name.lower().replace('-', '_').split('_')
+                
+                # Count how many keywords appear in the file path
+                match_score = sum(1 for keyword in container_keywords if keyword in file_path_str and len(keyword) > 2)
+                
+                if match_score > best_match_score:
+                    best_match = container_name
+                    best_match_score = match_score
+            
+            if best_match and best_match_score > 0:
+                return best_match
+            
+            # Strategy 3: Walk up directory tree to find closest container
             current = file_path.parent
-            max_depth = 5  # Prevent infinite loops
+            max_depth = 5
             depth = 0
             
             while (current != self.repo_path and 
@@ -1854,9 +2779,17 @@ Team name:"""
                 current = current.parent
                 depth += 1
             
-            # Strategy 3: Fallback to first directory level
-            if len(parts) >= 1:
-                return parts[0]
+            # Strategy 4: Ultimate fallback to monorepo root container
+            root_container = next(
+                (c['name'] for c in self.containers.values() if c.get('path') in {'.', ''}),
+                None
+            )
+            if root_container:
+                return root_container
+            
+            # Final fallback: use first available container
+            if self.containers:
+                return next(iter(self.containers.keys()))
             
             return None
         

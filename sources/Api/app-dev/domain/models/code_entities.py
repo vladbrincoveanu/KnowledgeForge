@@ -157,7 +157,8 @@ class CodeRelationship(BaseModel):
     """Represents a relationship between code entities."""
     id: Optional[str] = Field(None, description="Deterministic ID")
     source_entity_id: str
-    target_entity_id: str
+    target_entity_id: Optional[str] = None
+    target_entity_name: Optional[str] = Field(None, description="Placeholder for name-based resolution")
     relationship_type: CodeRelationType
     
     # Relationship details

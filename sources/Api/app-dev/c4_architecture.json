@@ -4,7 +4,7 @@
     "c4_level": 1,
     "type": "system",
     "name": "ai-factory-monorepo",
-    "purpose": "Hmm, the user has provided a series of steps to set up a Python development environment using uv and pre-commit hooks, but they haven't actually asked any question yet.",
+    "purpose": "Hmm, the user has provided a series of steps to set up a Python development environment using uv and pre-commit hooks, but they haven't actually asked any question.",
     "external_dependencies": [
       {
         "name": "Ac",
@@ -19,6 +19,12 @@
         "detected_from": "projects/cert-manager/chart/values.yaml"
       }
     ],
+    "actors": [
+      {
+        "name": "User",
+        "type": "person"
+      }
+    ],
     "owner_team": "Unknown",
     "business_domain": "API Gateway",
     "criticality": "Tier 1 - Production Critical"
@@ -27,73 +33,66 @@
     {
       "c4_level": 2,
       "type": "container",
-      "name": "apisix",
-      "container_type": "Service",
-      "technology": "Unknown",
-      "protocol": "HTTP",
-      "path": "projects/apisix",
-      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/apisix",
-      "runtime_info": "Unknown",
-      "dependencies_internal": [
-        "cert-manager"
-      ],
-      "health_endpoint": ""
-    },
-    {
-      "c4_level": 2,
-      "type": "container",
-      "name": "harbor",
-      "container_type": "Service",
-      "technology": "Unknown",
-      "protocol": "HTTP",
-      "path": "projects/harbor",
-      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/harbor",
-      "runtime_info": "Unknown",
-      "dependencies_internal": [
-        "cert-manager"
-      ],
-      "health_endpoint": ""
-    },
-    {
-      "c4_level": 2,
-      "type": "container",
-      "name": "cert-manager",
-      "container_type": "Service",
-      "technology": "Unknown",
-      "protocol": "HTTP",
-      "path": "projects/cert-manager",
-      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/cert-manager",
-      "runtime_info": "Unknown",
-      "dependencies_internal": [],
-      "health_endpoint": ""
-    },
-    {
-      "c4_level": 2,
-      "type": "container",
-      "name": "clearml",
-      "container_type": "Service",
-      "technology": "Unknown",
-      "protocol": "HTTP",
-      "path": "projects/clearml",
-      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/clearml",
-      "runtime_info": "Unknown",
-      "dependencies_internal": [],
-      "health_endpoint": ""
-    },
-    {
-      "c4_level": 2,
-      "type": "container",
       "name": "slurm_gateway_api",
       "container_type": "Python Service",
       "technology": "Python",
       "protocol": "HTTP",
       "path": "projects/slurm_gateway_api",
+      "runtime_environment": "Kubernetes",
+      "deployment": "Helm",
+      "description": "Helm chart for slurm_gateway_api",
       "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/slurm_gateway_api",
       "runtime_info": "Python 3.11",
-      "dependencies_internal": [
-        "harbor"
-      ],
-      "health_endpoint": "http://localhost:8080/health"
+      "dependencies_internal": [],
+      "health_endpoint": "http://localhost:8080/health",
+      "components": [
+        {
+          "id": "endpoint_code_eaa187b4210a7c8a",
+          "name": "GET /api/health-check",
+          "type": "API Endpoint"
+        },
+        {
+          "id": "endpoint_code_d7cb098c812350d3",
+          "name": "POST /api/submit-job",
+          "type": "API Endpoint"
+        },
+        {
+          "id": "endpoint_code_30eca68b54bba1c9",
+          "name": "POST /api/submit-hello-world-job",
+          "type": "API Endpoint"
+        },
+        {
+          "id": "endpoint_code_43331cfd0c25ab21",
+          "name": "GET /api/get-job",
+          "type": "API Endpoint"
+        },
+        {
+          "id": "endpoint_code_abe94170b848479e",
+          "name": "DELETE /api/delete-job",
+          "type": "API Endpoint"
+        },
+        {
+          "id": "endpoint_code_0393211e59c1fd60",
+          "name": "POST /api/submit-container-job",
+          "type": "API Endpoint"
+        }
+      ]
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "gitlab-runner",
+      "container_type": "Helm Deployed Service",
+      "technology": "Kubernetes",
+      "protocol": "HTTP",
+      "path": "projects/gitlab-runner",
+      "runtime_environment": "Kubernetes",
+      "deployment": "Helm",
+      "description": "Helm chart for GitLab Runner CI/CD",
+      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/gitlab-runner",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [],
+      "health_endpoint": ""
     },
     {
       "c4_level": 2,
@@ -103,147 +102,328 @@
       "technology": "Unknown",
       "protocol": "HTTP",
       "path": "projects/kubeflow-pipelines",
+      "runtime_environment": "Kubernetes",
+      "deployment": "Kustomize",
+      "description": "Kubernetes workload deployed via Kustomize.",
       "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/kubeflow-pipelines",
       "runtime_info": "Unknown",
       "dependencies_internal": [],
-      "health_endpoint": ""
+      "health_endpoint": "",
+      "components": [
+        {
+          "id": "infra_kubeflow-pipelines_ui_patch",
+          "name": "Ui Patch",
+          "type": "Infrastructure"
+        },
+        {
+          "id": "infra_kubeflow-pipelines_ingress",
+          "name": "Ingress",
+          "type": "Ingress"
+        },
+        {
+          "id": "infra_kubeflow-pipelines_network_policy",
+          "name": "Network Policy",
+          "type": "Infrastructure"
+        }
+      ]
     },
     {
       "c4_level": 2,
       "type": "container",
-      "name": "gitlab-runner",
-      "container_type": "Service",
-      "technology": "Unknown",
-      "protocol": "HTTP",
-      "path": "projects/gitlab-runner",
-      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/gitlab-runner",
-      "runtime_info": "Unknown",
-      "dependencies_internal": [],
-      "health_endpoint": ""
-    },
-    {
-      "c4_level": 2,
-      "type": "container",
-      "name": "slurm-gateway-api",
+      "name": "clearml",
       "container_type": "Helm Deployed Service",
       "technology": "Kubernetes",
       "protocol": "HTTP",
-      "path": "projects/slurm_gateway_api/chart/Chart.yaml",
-      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/slurm_gateway_api/chart",
+      "path": "projects/clearml",
+      "runtime_environment": "Kubernetes",
+      "deployment": "Helm",
+      "description": "Helm chart for ClearML platform deployment",
+      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/clearml",
       "runtime_info": "Unknown",
       "dependencies_internal": [],
-      "health_endpoint": "http://localhost:8080/health"
+      "health_endpoint": ""
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "cert-manager",
+      "container_type": "Helm Deployed Service",
+      "technology": "Kubernetes",
+      "protocol": "HTTP",
+      "path": "projects/cert-manager",
+      "runtime_environment": "Kubernetes",
+      "deployment": "Helm",
+      "description": "Helm chart for cert-manager certificate management",
+      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/cert-manager",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "components": [
+        {
+          "id": "infra_cert-manager_clusterissuer",
+          "name": "Clusterissuer",
+          "type": "Infrastructure"
+        }
+      ]
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "harbor",
+      "container_type": "Helm Deployed Service",
+      "technology": "Kubernetes",
+      "protocol": "HTTP",
+      "path": "projects/harbor",
+      "runtime_environment": "Kubernetes",
+      "deployment": "Helm",
+      "description": "Helm chart for Harbor container registry",
+      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/harbor",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [],
+      "health_endpoint": ""
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "apisix",
+      "container_type": "Helm Deployed Service",
+      "technology": "Kubernetes",
+      "protocol": "HTTP",
+      "path": "projects/apisix",
+      "runtime_environment": "Kubernetes",
+      "deployment": "Helm",
+      "description": "APISIX API Gateway for AI Factory",
+      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/apisix",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "components": [
+        {
+          "id": "infra_apisix_slurm_route",
+          "name": "Slurm Route",
+          "type": "Ingress"
+        },
+        {
+          "id": "infra_apisix_servicemonitor",
+          "name": "Servicemonitor",
+          "type": "Service"
+        },
+        {
+          "id": "infra_apisix_metrics_service",
+          "name": "Metrics Service",
+          "type": "Service"
+        }
+      ]
     }
   ],
   "components": [
     {
       "c4_level": 3,
       "type": "component",
-      "name": "GET /health",
-      "function_name": "health_check",
+      "name": "GET /api/health-check",
       "component_type": "API Endpoint",
-      "container": "bases",
-      "endpoint_path": "/health",
+      "container": "slurm_gateway_api",
+      "file": "bases/ai_factory/slurm_gateway/core.py",
+      "line_start": 19,
+      "signature": "health_check()",
+      "documentation": null,
+      "endpoint_path": "/api/health-check",
       "endpoint_method": "GET",
-      "file": "bases/ai_factory/slurm_gateway/core.py",
-      "api_visibility": "internal",
-      "data_model": {
-        "request": null,
-        "response": null
-      }
+      "container_id": "slurm_gateway_api"
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "POST /jobs",
-      "function_name": "submit_job",
+      "name": "POST /api/submit-job",
       "component_type": "API Endpoint",
-      "container": "bases",
-      "endpoint_path": "/jobs",
+      "container": "slurm_gateway_api",
+      "file": "bases/ai_factory/slurm_gateway/core.py",
+      "line_start": 24,
+      "signature": "submit_job(job_request, x_slurm_user_name, x_slurm_user_token)",
+      "documentation": "Submit a job request to Slurm.\n\nArgs:\n    job_request: User's job request\n    x_slurm_user_name: Slurm username\n    x_slurm_user_token: Slurm JWT token\n\nReturns:\n    Slurm API response",
+      "endpoint_path": "/api/submit-job",
       "endpoint_method": "POST",
-      "file": "bases/ai_factory/slurm_gateway/core.py",
-      "api_visibility": "internal",
-      "data_model": {
-        "request": {
-          "model_name": "SlurmJobRequest",
-          "param_name": "job_request",
-          "fields": []
-        },
-        "response": null
-      }
+      "container_id": "slurm_gateway_api"
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "POST /jobs/example/hello-world",
-      "function_name": "submit_hello_world_job",
+      "name": "POST /api/submit-hello-world-job",
       "component_type": "API Endpoint",
-      "container": "bases",
-      "endpoint_path": "/jobs/example/hello-world",
+      "container": "slurm_gateway_api",
+      "file": "bases/ai_factory/slurm_gateway/core.py",
+      "line_start": 76,
+      "signature": "submit_hello_world_job(x_slurm_user_name, x_slurm_user_token)",
+      "documentation": "Submit a hello world job with minimal configuration.\n\nArgs:\n    partition: Slurm partition to use\n    x_slurm_user_name: Slurm username (from header)\n    x_slurm_user_token: Slurm JWT token (from header)\n\nReturns:\n    Slurm API response",
+      "endpoint_path": "/api/submit-hello-world-job",
       "endpoint_method": "POST",
-      "file": "bases/ai_factory/slurm_gateway/core.py",
-      "api_visibility": "internal",
-      "data_model": {
-        "request": null,
-        "response": null
-      }
+      "container_id": "slurm_gateway_api"
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "GET /jobs/{job_id}",
-      "function_name": "get_job",
+      "name": "GET /api/get-job",
       "component_type": "API Endpoint",
-      "container": "bases",
-      "endpoint_path": "/jobs/{job_id}",
+      "container": "slurm_gateway_api",
+      "file": "bases/ai_factory/slurm_gateway/core.py",
+      "line_start": 109,
+      "signature": "get_job(job_id)",
+      "documentation": null,
+      "endpoint_path": "/api/get-job",
       "endpoint_method": "GET",
-      "file": "bases/ai_factory/slurm_gateway/core.py",
-      "api_visibility": "internal",
-      "data_model": {
-        "request": null,
-        "response": null
-      }
+      "container_id": "slurm_gateway_api"
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "DELETE /jobs/{job_id}",
-      "function_name": "delete_job",
+      "name": "DELETE /api/delete-job",
       "component_type": "API Endpoint",
-      "container": "bases",
-      "endpoint_path": "/jobs/{job_id}",
+      "container": "slurm_gateway_api",
+      "file": "bases/ai_factory/slurm_gateway/core.py",
+      "line_start": 117,
+      "signature": "delete_job(job_id)",
+      "documentation": null,
+      "endpoint_path": "/api/delete-job",
       "endpoint_method": "DELETE",
-      "file": "bases/ai_factory/slurm_gateway/core.py",
-      "api_visibility": "internal",
-      "data_model": {
-        "request": null,
-        "response": null
-      }
+      "container_id": "slurm_gateway_api"
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "POST /jobs/container",
-      "function_name": "submit_container_job",
+      "name": "POST /api/submit-container-job",
       "component_type": "API Endpoint",
-      "container": "bases",
-      "endpoint_path": "/jobs/container",
-      "endpoint_method": "POST",
+      "container": "slurm_gateway_api",
       "file": "bases/ai_factory/slurm_gateway/core.py",
-      "api_visibility": "internal",
-      "data_model": {
-        "request": {
-          "model_name": "ContainerJobRequest",
-          "param_name": "container_request",
-          "fields": []
-        },
-        "response": null
-      }
+      "line_start": 125,
+      "signature": "submit_container_job(container_request, x_slurm_user_name, x_slurm_user_token)",
+      "documentation": "Submit a containerized job request using Apptainer.\n\nArgs:\n    container_request: Container job configuration\n    x_slurm_user_name: Slurm username\n    x_slurm_user_token: Slurm JWT token\n\nReturns:\n    Slurm API response\n\nRaises:\n    HTTPException: If the container request is invalid or Slurm API call fails",
+      "endpoint_path": "/api/submit-container-job",
+      "endpoint_method": "POST",
+      "container_id": "slurm_gateway_api"
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "Ui Patch",
+      "component_type": "Infrastructure",
+      "container": "kubeflow-pipelines",
+      "file": "projects/kubeflow-pipelines/kustomize/ui-patch.yaml",
+      "line_start": null,
+      "signature": null,
+      "documentation": null,
+      "component_kind": "Manifest",
+      "container_id": "kubeflow-pipelines"
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "Ingress",
+      "component_type": "Ingress",
+      "container": "kubeflow-pipelines",
+      "file": "projects/kubeflow-pipelines/kustomize/ingress.yaml",
+      "line_start": null,
+      "signature": null,
+      "documentation": null,
+      "component_kind": "Manifest",
+      "container_id": "kubeflow-pipelines"
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "Network Policy",
+      "component_type": "Infrastructure",
+      "container": "kubeflow-pipelines",
+      "file": "projects/kubeflow-pipelines/kustomize/network-policy.yaml",
+      "line_start": null,
+      "signature": null,
+      "documentation": null,
+      "component_kind": "Manifest",
+      "container_id": "kubeflow-pipelines"
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "Clusterissuer",
+      "component_type": "Infrastructure",
+      "container": "cert-manager",
+      "file": "projects/cert-manager/chart/templates/clusterissuer.yaml",
+      "line_start": null,
+      "signature": null,
+      "documentation": null,
+      "component_kind": "Manifest",
+      "container_id": "cert-manager"
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "Slurm Route",
+      "component_type": "Ingress",
+      "container": "apisix",
+      "file": "projects/apisix/chart/templates/slurm-route.yaml",
+      "line_start": null,
+      "signature": null,
+      "documentation": null,
+      "component_kind": "Manifest",
+      "container_id": "apisix"
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "Servicemonitor",
+      "component_type": "Service",
+      "container": "apisix",
+      "file": "projects/apisix/chart/templates/servicemonitor.yaml",
+      "line_start": null,
+      "signature": null,
+      "documentation": null,
+      "component_kind": "Manifest",
+      "container_id": "apisix"
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "Metrics Service",
+      "component_type": "Service",
+      "container": "apisix",
+      "file": "projects/apisix/chart/templates/metrics-service.yaml",
+      "line_start": null,
+      "signature": null,
+      "documentation": null,
+      "component_kind": "Manifest",
+      "container_id": "apisix"
     }
   ],
+  "relationships": {
+    "context": [
+      {
+        "source": "User",
+        "destination": "ai-factory-monorepo",
+        "description": "uses",
+        "relationship_type": "uses"
+      },
+      {
+        "source": "ai-factory-monorepo",
+        "destination": "Ac",
+        "description": "uses external_service",
+        "relationship_type": "uses"
+      },
+      {
+        "source": "ai-factory-monorepo",
+        "destination": "Letsencrypt",
+        "description": "uses external_service",
+        "relationship_type": "uses"
+      }
+    ],
+    "containers": []
+  },
+  "code_level": {
+    "entities": [],
+    "relationships": []
+  },
   "metadata": {
-    "total_containers": 8,
-    "total_components": 6,
-    "extraction_approach": "c4_model_focused"
+    "total_containers": 7,
+    "total_components": 13,
+    "total_code_entities": 0,
+    "extraction_approach": "c4_model_hybrid"
   }
 }

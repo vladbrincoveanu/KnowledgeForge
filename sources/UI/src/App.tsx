@@ -14,6 +14,7 @@ import OntologyResults from './@components/ontology-results/OntologyResults/Onto
 import SystemMetrics from './@components/system-metrics/SystemMetrics/SystemMetrics';
 import Settings from './@components/settings/Settings/Settings';
 import ArchitectureMap from './@components/architecture-map/ArchitectureMap';
+import CodeArchitectureViewer from './@components/architecture-map/CodeArchitectureViewer/CodeArchitectureViewer';
 import {
   Database,
   Activity,
@@ -22,6 +23,7 @@ import {
   Settings as SettingsIcon,
   Brain,
   Network,
+  Code,
 } from 'lucide-react';
 import './App.scss';
 import Notification from './@components/notification/Notification';
@@ -146,6 +148,12 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab }) => {
       label: 'Architecture Map',
       icon: <Network size={20} />,
       path: '/architecture',
+    },
+    {
+      id: 'code-architecture',
+      label: 'Code Architecture',
+      icon: <Code size={20} />,
+      path: '/code-architecture',
     },
     {
       id: 'metrics',
@@ -939,6 +947,8 @@ const MainContent: React.FC = () => {
             />
 
             <Route path="/architecture" element={<ArchitectureMap />} />
+            
+            <Route path="/code-architecture" element={<CodeArchitectureViewer />} />
 
             <Route
               path="/metrics"
