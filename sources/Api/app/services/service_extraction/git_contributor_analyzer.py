@@ -12,9 +12,18 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class ContributorSummary:
+    """Summary for a top contributor."""
+    email: str
+    name: Optional[str]
+    commit_count: int
+
+
+@dataclass
 class GitContributorStats:
     """Statistics about contributors to a service."""
-    top_contributors: list[tuple[str, int]]  # (email, commit_count)
+    top_contributors: list[ContributorSummary]
+    unique_contributors: int
     total_commits: int
     last_commit_date: Optional[datetime]
     first_commit_date: Optional[datetime]
@@ -76,7 +85,7 @@ class GitContributorAnalyzer:
             # Build git log command
             cmd = [
                 'git', 'log',
-                '--format=%H|%ae|%ad|%s',  # hash|email|date|subject
+                '--format=%H|%an|%ae|%ad|%s',  # hash|author|email|date|subject
                 '--date=iso',
                 '--all',
             ]
@@ -108,6 +117,7 @@ class GitContributorAnalyzer:
             # Parse commits
             commits = []
             contributors = Counter()
+            contributor_names: dict[str, Optional[str]] = {}
             now = datetime.now()
             thirty_days_ago = now - timedelta(days=30)
             ninety_days_ago = now - timedelta(days=90)
@@ -128,11 +138,12 @@ class GitContributorAnalyzer:
                 if not line:
                     continue
                 
-                parts = line.split('|', 3)
-                if len(parts) < 4:
+                parts = line.split('|', 4)
+                if len(parts) < 5:
                     continue
                 
-                commit_hash, email, date_str, message = parts
+                commit_hash, author_name, email, date_str, message = parts
+                author_name = author_name.strip() if author_name else None
                 
                 try:
                     # Parse ISO date format: "2024-12-08 15:30:45 +0000" or "2024-12-08T15:30:45+00:00"
@@ -167,6 +178,8 @@ class GitContributorAnalyzer:
                 
                 # Count contributors
                 contributors[email] += 1
+                if email not in contributor_names and author_name:
+                    contributor_names[email] = author_name
                 
                 # Categorize commit type
                 message_lower = message.lower()
@@ -195,10 +208,19 @@ class GitContributorAnalyzer:
                 })
             
             # Get top contributors
-            top_contributors = contributors.most_common(max_contributors)
+            top_contributors_raw = contributors.most_common(max_contributors)
+            top_contributors = [
+                ContributorSummary(
+                    email=email,
+                    name=contributor_names.get(email),
+                    commit_count=count,
+                )
+                for email, count in top_contributors_raw
+            ]
             
             stats = GitContributorStats(
                 top_contributors=top_contributors,
+                unique_contributors=len(contributors),
                 total_commits=len(commits),
                 last_commit_date=last_commit_date,
                 first_commit_date=first_commit_date,
@@ -213,7 +235,7 @@ class GitContributorAnalyzer:
             
             logger.debug(
                 f"Analyzed {len(commits)} commits for {service_path}: "
-                f"{commits_30d} in 30d, top contributor: {top_contributors[0][0] if top_contributors else 'N/A'}"
+                f"{commits_30d} in 30d, top contributor: {top_contributors[0].email if top_contributors else 'N/A'}"
             )
             
             return stats
@@ -238,18 +260,21 @@ class GitContributorAnalyzer:
             service_name: Service name
         
         Returns:
-            (primary_owner_email, list_of_top_contributor_emails)
+            (primary_owner_name, list_of_top_contributor_emails)
+            Note: primary_owner_name uses the contributor's name if available, 
+            otherwise falls back to email
         """
         stats = self.analyze_service_contributors(service_path, service_name)
         
         if not stats or not stats.top_contributors:
             return None, []
         
-        # Primary owner is the top contributor
-        primary_owner = stats.top_contributors[0][0]
+        # Primary owner is the top contributor - use name if available, fallback to email
+        top_contributor = stats.top_contributors[0]
+        primary_owner = top_contributor.name or top_contributor.email
         
         # All top contributors (for owner_contributors field)
-        all_contributors = [email for email, _ in stats.top_contributors]
+        all_contributors = [contributor.email for contributor in stats.top_contributors]
         
         return primary_owner, all_contributors
     
@@ -285,4 +310,3 @@ class GitContributorAnalyzer:
             
             # Assume it's already relative
             return service_path
-

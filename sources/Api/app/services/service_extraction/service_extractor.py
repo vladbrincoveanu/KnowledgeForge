@@ -13,8 +13,12 @@ from app.services.service_extraction.extraction_config import ExtractionConfig
 from app.services.service_extraction.domain_extractor import DomainExtractor
 from app.services.service_extraction.dependency_extractor import DependencyExtractor
 from app.services.service_extraction.description_generator import ServiceDescriptionGenerator
-from app.services.service_extraction.git_status_analyzer import GitStatusAnalyzer
+from app.services.service_extraction.llm_service_enricher import ServiceLLMEnricher
+from app.services.service_extraction.llm_budget import LLMCallBudget
+# Import order matters: GitContributorAnalyzer must be imported before GitStatusAnalyzer
+# because GitStatusAnalyzer depends on GitContributorAnalyzer
 from app.services.service_extraction.git_contributor_analyzer import GitContributorAnalyzer
+from app.services.service_extraction.git_status_analyzer import GitStatusAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +42,23 @@ class ServiceExtractor:
         self.contributor_analyzer = GitContributorAnalyzer(self.repo_root)
         self.domain_extractor = DomainExtractor(self.repo_root)
         self.dependency_extractor: Optional[DependencyExtractor] = None
+        self.llm_manager = llm_manager
+        self.llm_budget: Optional[LLMCallBudget] = None
+        if llm_manager and getattr(ExtractionConfig, 'LLM_BUDGET_TOKENS', 0) > 0:
+            self.llm_budget = LLMCallBudget(getattr(ExtractionConfig, 'LLM_BUDGET_TOKENS', 0))
         self.description_generator = ServiceDescriptionGenerator(
             llm_manager=llm_manager,
             max_tokens=ExtractionConfig.LLM_MAX_TOKENS,
+            budget=self.llm_budget,
+        )
+        self.llm_enricher = (
+            ServiceLLMEnricher(
+                llm_manager=llm_manager,
+                max_tokens=ExtractionConfig.LLM_MAX_TOKENS,
+                budget=self.llm_budget,
+            )
+            if llm_manager
+            else None
         )
     
     def extract_services(self) -> list[Service]:
@@ -56,42 +74,149 @@ class ServiceExtractor:
         
         logger.info(f"Starting service extraction from {self.repo_root}")
         
-        # Extract from docker-compose files
-        self._extract_from_docker_compose()
+        try:
+            logger.info("Step 1/6: Extracting from docker-compose files...")
+            self._extract_from_docker_compose()
+            logger.info(f"After docker-compose: {len(self.services)} services found")
+        except Exception as e:
+            logger.error(f"Error in _extract_from_docker_compose: {e}", exc_info=True)
+            self.errors.append(f"docker-compose extraction failed: {str(e)}")
         
-        # Extract from Kubernetes manifests
-        self._extract_from_kubernetes()
+        try:
+            logger.info("Step 2/6: Extracting from Kubernetes manifests...")
+            self._extract_from_kubernetes()
+            logger.info(f"After kubernetes: {len(self.services)} services found")
+        except Exception as e:
+            logger.error(f"Error in _extract_from_kubernetes: {e}", exc_info=True)
+            self.errors.append(f"kubernetes extraction failed: {str(e)}")
         
-        # Extract from API route files
-        self._extract_from_api_routes()
+        try:
+            logger.info("Step 3/6: Extracting from API route files...")
+            self._extract_from_api_routes()
+            logger.info(f"After API routes: {len(self.services)} services found")
+        except Exception as e:
+            logger.error(f"Error in _extract_from_api_routes: {e}", exc_info=True)
+            self.errors.append(f"API routes extraction failed: {str(e)}")
         
-        # Extract from service configuration files
-        self._extract_from_service_configs()
+        try:
+            logger.info("Step 4/6: Extracting from service configuration files...")
+            self._extract_from_service_configs()
+            logger.info(f"After service configs: {len(self.services)} services found")
+        except Exception as e:
+            logger.error(f"Error in _extract_from_service_configs: {e}", exc_info=True)
+            self.errors.append(f"service configs extraction failed: {str(e)}")
         
-        # Extract from microservice patterns
-        self._extract_from_microservice_patterns()
+        try:
+            logger.info("Step 5/6: Extracting from microservice patterns...")
+            self._extract_from_microservice_patterns()
+            logger.info(f"After microservice patterns: {len(self.services)} services found")
+        except Exception as e:
+            logger.error(f"Error in _extract_from_microservice_patterns: {e}", exc_info=True)
+            self.errors.append(f"microservice patterns extraction failed: {str(e)}")
         
-        # Extract from top-level directories (for monorepos like Django apps, addons, etc.)
-        self._extract_from_top_level_directories()
+        try:
+            logger.info("Step 6/6: Extracting from top-level directories...")
+            self._extract_from_top_level_directories()
+            logger.info(f"After top-level directories: {len(self.services)} services found")
+        except Exception as e:
+            logger.error(f"Error in _extract_from_top_level_directories: {e}", exc_info=True)
+            self.errors.append(f"top-level directories extraction failed: {str(e)}")
         
         # Enhance with git history analysis for status
         if ExtractionConfig.ENABLE_GIT_ANALYSIS:
-            self._enhance_with_git_status()
+            try:
+                logger.info("Enhancing with git status analysis...")
+                self._enhance_with_git_status()
+                logger.info("Git status enhancement completed")
+            except Exception as e:
+                logger.error(f"Error in _enhance_with_git_status: {e}", exc_info=True)
+                self.errors.append(f"git status enhancement failed: {str(e)}")
         
         # Infer domain from imports/namespaces
         if ExtractionConfig.ENABLE_DOMAIN_DETECTION:
-            self._enhance_with_domain_detection()
+            try:
+                logger.info("Enhancing with domain detection...")
+                self._enhance_with_domain_detection()
+                logger.info("Domain detection enhancement completed")
+            except Exception as e:
+                logger.error(f"Error in _enhance_with_domain_detection: {e}", exc_info=True)
+                self.errors.append(f"domain detection enhancement failed: {str(e)}")
         
         # Populate direct dependencies from imports
         if ExtractionConfig.ENABLE_DEPENDENCY_SCAN:
-            self._enhance_with_dependencies()
+            try:
+                logger.info("Enhancing with dependency scan...")
+                self._enhance_with_dependencies()
+                logger.info("Dependency scan enhancement completed")
+            except Exception as e:
+                logger.error(f"Error in _enhance_with_dependencies: {e}", exc_info=True)
+                self.errors.append(f"dependency scan enhancement failed: {str(e)}")
         
         # Generate short descriptions via LLM (optional)
         enable_llm = getattr(ExtractionConfig, 'ENABLE_LLM_DESCRIPTIONS', False)
-        if enable_llm:
-            self._enhance_with_descriptions()
+        enable_llm_labels = getattr(ExtractionConfig, 'ENABLE_LLM_LABELS', False)
+        # #region agent log
+        logger.info(f"LLM enrichment check: enable_llm_labels={enable_llm_labels}, llm_enricher={self.llm_enricher is not None}, llm_manager={self.llm_manager is not None}")
+        # #endregion
         
-        logger.info(f"Extracted {len(self.services)} services")
+        # Check if LLM is available before attempting enrichment (to avoid hanging)
+        llm_available = False
+        if enable_llm_labels or enable_llm:
+            try:
+                if self.llm_manager:
+                    # Quick connectivity check with 2 second timeout
+                    import requests
+                    if hasattr(self.llm_manager, 'base_url'):
+                        base_url = str(self.llm_manager.base_url).rstrip("/")
+                        if base_url.endswith("/v1"):
+                            test_url = f"{base_url}/models"
+                        else:
+                            test_url = f"{base_url}/v1/models"
+                        try:
+                            headers = {}
+                            if getattr(self.llm_manager, "use_openai", False) and getattr(self.llm_manager, "openai_api_key", None):
+                                headers["Authorization"] = f"Bearer {self.llm_manager.openai_api_key}"
+                            response = requests.get(test_url, headers=headers, timeout=2)
+                            if headers:
+                                llm_available = response.status_code == 200
+                            else:
+                                llm_available = response.status_code in [200, 401, 403]
+                        except Exception:
+                            llm_available = False
+                    else:
+                        llm_available = False
+            except Exception as e:
+                logger.warning(f"LLM availability check failed: {e}, skipping LLM enrichment")
+                llm_available = False
+        
+        if enable_llm_labels:
+            try:
+                if not llm_available:
+                    logger.warning("LLM labels enabled but models probe failed; attempting enrichment anyway - LLM may not be reachable")
+                if not self.llm_enricher:
+                    logger.error("LLM labels enabled but llm_enricher is None - LLM manager was not initialized")
+                else:
+                    logger.info("Enhancing with LLM labels...")
+                    self._enhance_with_llm_enrichment()
+                logger.info("LLM labels enhancement completed")
+            except Exception as e:
+                logger.error(f"Error in _enhance_with_llm_enrichment: {e}", exc_info=True)
+                self.errors.append(f"LLM labels enhancement failed: {str(e)}")
+        elif enable_llm_labels and not llm_available:
+            logger.info("Skipping LLM labels enrichment - LLM not available")
+        
+        if enable_llm and llm_available:
+            try:
+                logger.info("Enhancing with LLM descriptions...")
+                self._enhance_with_descriptions()
+                logger.info("LLM descriptions enhancement completed")
+            except Exception as e:
+                logger.error(f"Error in _enhance_with_descriptions: {e}", exc_info=True)
+                self.errors.append(f"LLM descriptions enhancement failed: {str(e)}")
+        elif enable_llm and not llm_available:
+            logger.info("Skipping LLM descriptions enrichment - LLM not available")
+        
+        logger.info(f"Extraction completed: {len(self.services)} services extracted, {len(self.errors)} errors, {len(self.warnings)} warnings")
         
         return self.services
     
@@ -183,7 +308,28 @@ class ServiceExtractor:
     
     def _extract_from_kubernetes(self) -> None:
         """Extract services from Kubernetes manifests."""
-        k8s_files = list(self.repo_root.rglob('*.yaml')) + list(self.repo_root.rglob('*.yml'))
+        # Limit search to avoid hanging on large repos - only check common k8s locations
+        k8s_patterns = [
+            '**/k8s/**/*.yaml',
+            '**/k8s/**/*.yml',
+            '**/kubernetes/**/*.yaml',
+            '**/kubernetes/**/*.yml',
+            '**/manifests/**/*.yaml',
+            '**/manifests/**/*.yml',
+            '*.yaml',  # Root level only
+            '*.yml',   # Root level only
+        ]
+        k8s_files = []
+        for pattern in k8s_patterns:
+            try:
+                k8s_files.extend(list(self.repo_root.glob(pattern))[:50])  # Limit per pattern
+            except Exception as e:
+                logger.warning(f"Error searching for k8s files with pattern {pattern}: {e}")
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        k8s_files = [f for f in k8s_files if f not in seen and not seen.add(f)]
+        k8s_files = k8s_files[:200]  # Overall limit to prevent hangs
         
         for k8s_file in k8s_files:
             # Skip docker-compose files
@@ -673,11 +819,17 @@ class ServiceExtractor:
             has_service_files = any((item / indicator).exists() for indicator in service_indicators)
             
             # Also check if it's a Python package (has __init__.py in subdirectories)
+            # Limit search depth to avoid hanging on large repos - only check immediate subdirs
             if not has_service_files:
-                for subitem in item.rglob('__init__.py'):
-                    if subitem.parent == item or len(subitem.parent.relative_to(item).parts) <= 2:
-                        has_service_files = True
-                        break
+                try:
+                    # Only check immediate subdirectories, not full recursive search
+                    for subdir in item.iterdir():
+                        if subdir.is_dir() and (subdir / '__init__.py').exists():
+                            has_service_files = True
+                            break
+                except (PermissionError, OSError) as e:
+                    logger.warning(f"Error checking subdirectories in {item}: {e}")
+                    # Continue without this check if we can't access the directory
             
             if has_service_files:
                 service_id = f"svc-{dir_name}"
@@ -982,43 +1134,50 @@ class ServiceExtractor:
             return
         
         logger.info("Enhancing services with git history analysis (owner, status, stats)")
+        max_contributors = max(1, ExtractionConfig.GIT_CONTRIBUTOR_LIMIT)
         
         for service in self.services:
             # Try to find service path - prioritize directory path
             service_path = self._resolve_service_path(service)
             
             # ═══════════════════════════════════════════════════════════
-            # 1. EXTRACT OWNER FROM GIT CONTRIBUTORS
-            # ═══════════════════════════════════════════════════════════
-            if not service.owner:  # Only if not already set from config
-                primary_owner, all_contributors = self.contributor_analyzer.extract_owner(
-                    service_path=service_path,
-                    service_name=service.name,
-                )
-                if primary_owner:
-                    service.owner = primary_owner
-                    service.owner_contributors = all_contributors
-                    logger.debug(
-                        f"Service '{service.name}': extracted owner '{primary_owner}' "
-                        f"from git (contributors: {len(all_contributors)})"
-                    )
-            
-            # ═══════════════════════════════════════════════════════════
-            # 2. GET CONTRIBUTOR STATS (for commit counts and dates)
+            # 1. GET CONTRIBUTOR STATS (owners, commit counts, dates)
             # ═══════════════════════════════════════════════════════════
             contributor_stats = self.contributor_analyzer.analyze_service_contributors(
                 service_path=service_path,
                 service_name=service.name,
+                max_contributors=max_contributors,
             )
             
             if contributor_stats:
+                top_contributors = contributor_stats.top_contributors
+                if top_contributors:
+                    if not service.owner:  # Only if not already set from config
+                        # Use name if available, fallback to email
+                        top_contributor = top_contributors[0]
+                        service.owner = top_contributor.name or top_contributor.email
+                        logger.debug(
+                            f"Service '{service.name}': extracted owner '{service.owner}' "
+                            f"from git (contributors: {len(top_contributors)})"
+                        )
+                    service.owner_contributors = [contributor.email for contributor in top_contributors]
+                    service.owner_contributor_stats = [
+                        {
+                            "email": contributor.email,
+                            "name": contributor.name,
+                            "commit_count": contributor.commit_count,
+                        }
+                        for contributor in top_contributors
+                    ]
+                service.contributor_count = contributor_stats.unique_contributors
+
                 # Populate commit statistics
                 service.last_commit_date = contributor_stats.last_commit_date
                 service.commit_count_30d = contributor_stats.commits_30d
                 service.commit_count_90d = contributor_stats.commits_90d
                 service.commit_count_180d = contributor_stats.commits_180d
                 
-                # Build status evidence
+                # Build status evidence (include recent commit messages for LLM enrichment)
                 service.status_evidence = {
                     'total_commits': contributor_stats.total_commits,
                     'commits_30d': contributor_stats.commits_30d,
@@ -1029,7 +1188,17 @@ class ServiceExtractor:
                     'chore_commits': contributor_stats.chore_commits,
                     'last_commit_date': contributor_stats.last_commit_date.isoformat() if contributor_stats.last_commit_date else None,
                     'first_commit_date': contributor_stats.first_commit_date.isoformat() if contributor_stats.first_commit_date else None,
-                    'top_contributors': [email for email, _ in contributor_stats.top_contributors],
+                    'unique_contributors': contributor_stats.unique_contributors,
+                    'top_contributors': [contributor.email for contributor in top_contributors],
+                    'top_contributor_stats': [
+                        {
+                            "email": contributor.email,
+                            "name": contributor.name,
+                            "commit_count": contributor.commit_count,
+                        }
+                        for contributor in top_contributors
+                    ],
+                    'recent_commit_messages': contributor_stats.recent_commit_messages[:10],  # Last 10 for LLM context
                 }
             
             # ═══════════════════════════════════════════════════════════
@@ -1157,8 +1326,178 @@ class ServiceExtractor:
                 service_name=service.name,
                 service_path=scan_path,
                 language=service.language,
+                repo_root=self.repo_root,
             )
             
             if description:
                 service.description = description
                 logger.debug(f"Service '{service.name}': generated description")
+
+    def _enhance_with_llm_enrichment(self) -> None:
+        """Use LLM to fill missing labels and notes."""
+        # #region agent log
+        logger.info(f"_enhance_with_llm_enrichment called: services={len(self.services) if self.services else 0}, llm_enricher={self.llm_enricher is not None}")
+        # #endregion
+        if not self.services or not self.llm_enricher:
+            # #region agent log
+            logger.warning(f"LLM enrichment skipped: services={self.services is not None}, llm_enricher={self.llm_enricher is not None}")
+            # #endregion
+            return
+
+        logger.info("Enhancing services with LLM labels and notes")
+        
+        # Track if LLM is working - stop after a hard failure to avoid hanging
+        llm_working = True
+
+        for service in self.services:
+            if not llm_working:
+                break
+            # #region agent log
+            logger.debug(f"Service '{service.name}': requesting LLM enrichment")
+            # #endregion
+
+            service_path = self._resolve_service_path(service)
+            if not service_path:
+                # #region agent log
+                logger.debug(f"Service '{service.name}': no service_path resolved, using repo root")
+                # #endregion
+                service_path = self.repo_root
+
+            scan_path = service_path if service_path.is_dir() else service_path.parent
+            enrichment = {}
+            try:
+                # Use threading timeout to prevent hanging if LLM is unavailable
+                import threading
+                result_container = {'enrichment': None, 'error': None, 'completed': False}
+                
+                def enrich_with_timeout():
+                    try:
+                        result_container['enrichment'] = self.llm_enricher.enrich_service(
+                            service,
+                            scan_path,
+                            repo_root=self.repo_root,
+                        )
+                        result_container['completed'] = True
+                    except Exception as e:
+                        result_container['error'] = e
+                        result_container['completed'] = True
+                
+                thread = threading.Thread(target=enrich_with_timeout)
+                thread.daemon = True
+                thread.start()
+                thread.join(timeout=5)  # 5 second timeout per service (reduced from 10)
+                
+                if thread.is_alive():
+                    logger.warning(f"LLM enrichment timed out for service '{service.name}' after 5 seconds - LLM appears unavailable, skipping remaining services")
+                    llm_working = False
+                    enrichment = {}
+                elif result_container['error']:
+                    logger.warning(f"LLM enrichment failed for service '{service.name}': {result_container['error']}")
+                    # If it's a connection error, mark LLM as not working
+                    if 'connection' in str(result_container['error']).lower() or 'refused' in str(result_container['error']).lower():
+                        llm_working = False
+                    enrichment = {}
+                else:
+                    enrichment = result_container['enrichment'] or {}
+            except Exception as e:
+                logger.warning(f"LLM enrichment error for service '{service.name}': {e}")
+                llm_working = False
+                enrichment = {}
+            
+            # #region agent log
+            logger.info(f"Service '{service.name}': LLM enrichment result={enrichment}")
+            # #endregion
+            if not enrichment:
+                continue
+
+            inferred = service.attributes.setdefault("inferred_fields", {})
+
+            domain = enrichment.get("domain")
+            if domain:
+                service.domain = domain
+                inferred["domain"] = {"confidence": "low", "source": "llm"}
+
+            owner = enrichment.get("owner")
+            if self._is_missing_label(service.owner) and owner:
+                service.owner = owner
+                inferred["owner"] = {"confidence": "low", "source": "llm"}
+
+            data_class = enrichment.get("data_class")
+            if self._is_missing_label(service.data_class) and data_class:
+                service.data_class = data_class
+                inferred["data_class"] = {"confidence": "low", "source": "llm"}
+
+            status = self._normalize_status_label(enrichment.get("status"))
+            if service.status == ServiceStatus.UNKNOWN and status:
+                service.status = status
+                inferred["status"] = {"confidence": "low", "source": "llm"}
+
+            tier = self._normalize_tier_label(enrichment.get("tier"))
+            if service.tier == ServiceTier.UNKNOWN and tier:
+                service.tier = tier
+                inferred["tier"] = {"confidence": "low", "source": "llm"}
+
+            notes = enrichment.get("notes")
+            if notes:
+                service.notes = notes
+                service.description = notes
+                inferred["notes"] = {"confidence": "low", "source": "llm"}
+
+    def _needs_llm_enrichment(self, service: Service) -> bool:
+        """Check if service has missing labels or notes."""
+        if self._is_missing_label(service.domain):
+            return True
+        if self._is_missing_label(service.data_class):
+            return True
+        if service.status == ServiceStatus.UNKNOWN:
+            return True
+        if service.tier == ServiceTier.UNKNOWN:
+            return True
+        if not service.description:
+            return True
+        return False
+
+    def _is_missing_label(self, value: Optional[str]) -> bool:
+        """Normalize missing label values."""
+        if not value:
+            return True
+        if not isinstance(value, str):
+            return True
+        lowered = value.strip().lower()
+        return lowered in {"unknown", "unclassified", "none", "n/a", "null"}
+
+    def _normalize_status_label(self, value: Optional[str]) -> Optional[ServiceStatus]:
+        if not value:
+            return None
+        if not isinstance(value, str):
+            return None
+        lowered = value.strip().lower()
+        if not lowered:
+            return None
+        if any(token in lowered for token in ["deprecat", "sunset", "retire", "frozen", "legacy", "eol"]):
+            return ServiceStatus.DEPRECATED
+        if any(token in lowered for token in ["maint", "bugfix", "support", "stabil", "patch"]):
+            return ServiceStatus.MAINTENANCE_ONLY
+        if any(token in lowered for token in ["active", "dev", "feature"]):
+            return ServiceStatus.ACTIVE_DEV
+        if lowered in {"unknown", "unclassified", "n/a", "null"}:
+            return None
+        return None
+
+    def _normalize_tier_label(self, value: Optional[str]) -> Optional[ServiceTier]:
+        if not value:
+            return None
+        if not isinstance(value, str):
+            return None
+        lowered = value.strip().lower()
+        if not lowered:
+            return None
+        if any(token in lowered for token in ["tier 1", "tier1", "t1", "critical", "p0", "p1"]):
+            return ServiceTier.TIER_1
+        if any(token in lowered for token in ["tier 2", "tier2", "t2", "important", "p2", "medium"]):
+            return ServiceTier.TIER_2
+        if any(token in lowered for token in ["tier 3", "tier3", "t3", "minor", "p3", "low"]):
+            return ServiceTier.TIER_3
+        if lowered in {"unknown", "unclassified", "n/a", "null"}:
+            return None
+        return None

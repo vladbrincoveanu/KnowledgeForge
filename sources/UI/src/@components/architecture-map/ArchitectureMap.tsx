@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import {
   AlertTriangle,
@@ -24,6 +24,15 @@ interface ServiceMetadata {
   description?: string;
   source?: string;
   risk?: string;
+  attributes?: {
+    inferred_fields?: {
+      [key: string]: {
+        confidence?: string;
+        source?: string;
+      };
+    };
+    [key: string]: any;
+  };
 }
 
 interface ChecklistItem {
@@ -173,14 +182,27 @@ const extractServicesFromText = (rawText: string): ServiceMetadata[] => {
 };
 
 const ArchitectureGraph: React.FC<{ data: GraphData }> = ({ data }) => {
-  const canvasWidth =
-    typeof window !== 'undefined'
-      ? Math.max(320, Math.min(900, window.innerWidth - 220))
-      : 900;
-  const canvasHeight =
-    typeof window !== 'undefined'
-      ? Math.max(380, Math.min(560, window.innerHeight - 260))
-      : 520;
+  const graphContainerRef = useRef<HTMLDivElement>(null);
+  const [dimensions, setDimensions] = useState({ width: 900, height: 600 });
+
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (graphContainerRef.current) {
+        const rect = graphContainerRef.current.getBoundingClientRect();
+        setDimensions({
+          width: Math.max(320, rect.width - 32),
+          height: Math.max(380, rect.height - 32),
+        });
+      }
+    };
+
+    updateDimensions();
+    window.addEventListener('resize', updateDimensions);
+    return () => window.removeEventListener('resize', updateDimensions);
+  }, []);
+
+  const canvasWidth = dimensions.width;
+  const canvasHeight = dimensions.height;
 
   const nodeCanvasObject = (node: any, ctx: CanvasRenderingContext2D) => {
     const metadata = node.metadata || {};
@@ -232,7 +254,7 @@ const ArchitectureGraph: React.FC<{ data: GraphData }> = ({ data }) => {
   };
 
   return (
-    <div className="architecture-graph">
+    <div className="architecture-graph" ref={graphContainerRef}>
       <ForceGraph2D
         graphData={data}
         nodeCanvasObject={nodeCanvasObject}
@@ -258,6 +280,8 @@ const ArchitectureMap: React.FC = () => {
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionError, setExtractionError] = useState<string | null>(null);
   const [hasExtractedData, setHasExtractedData] = useState(false);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const servicesListRef = useRef<HTMLDivElement>(null);
 
   const graphData = useMemo<GraphData>(() => {
     const nodes = [
@@ -335,77 +359,247 @@ const ArchitectureMap: React.FC = () => {
   };
 
   const handleExtractFromGithub = async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ArchitectureMap.tsx:337',message:'handleExtractFromGithub called',data:{githubUrl,hasExistingInterval:!!pollIntervalRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    
     if (!githubUrl.trim()) {
       setExtractionError('Please enter a GitHub URL');
       return;
     }
 
+    // #region agent log
+    if (pollIntervalRef.current) {
+      fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ArchitectureMap.tsx:343',message:'Clearing existing interval before starting new extraction',data:{existingIntervalId:!!pollIntervalRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+    // #endregion
+
     setIsExtracting(true);
     setExtractionError(null);
 
     try {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ArchitectureMap.tsx:347',message:'Calling extractFromGitHub API',data:{githubUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      
       const response = await serviceExtractionAPI.extractFromGitHub(githubUrl, true);
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ArchitectureMap.tsx:350',message:'extractFromGitHub response received',data:{taskId:response.task_id,status:response.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       
       if (response.task_id) {
         // Poll for results
         let attempts = 0;
-        const maxAttempts = 60; // 60 seconds max
+        const maxAttempts = 120; // 120 seconds max (allow time for LLM enrichment)
+        let lastProgress = -1;
+        let stuckProgressAttempts = 0;
+        const maxStuckAttempts = 30; // 30 seconds of no progress change = stuck
         
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ArchitectureMap.tsx:354',message:'Creating polling interval',data:{taskId:response.task_id,maxAttempts},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
+        
+        let lastLoggedStatus = '';
+        let lastLoggedAttempt = 0;
         const pollInterval = setInterval(async () => {
           attempts++;
           
           try {
             const status = await serviceExtractionAPI.getExtractionStatus(response.task_id);
             
-            if (status.status === 'completed') {
+            // Detect stuck extraction (progress hasn't changed)
+            const currentProgress = status.progress ?? 0;
+            if (currentProgress === lastProgress && (status.status === 'extracting' || status.status === 'running')) {
+              stuckProgressAttempts++;
+            } else {
+              stuckProgressAttempts = 0;
+              lastProgress = currentProgress;
+            }
+            
+            // Only log on state changes or every 30 seconds (30 attempts) to drastically reduce noise
+            const shouldLog = status.status !== lastLoggedStatus || (attempts - lastLoggedAttempt) >= 30;
+            if (shouldLog) {
+              console.log(`[ArchitectureMap] Poll attempt ${attempts}: status="${status.status}", progress=${status.progress}, message="${status.message}"`);
+              // #region agent log
+              fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ArchitectureMap.tsx:360',message:'Status response received',data:{attempts,status:status.status,statusType:typeof status.status,progress:status.progress,message:status.message,stuckAttempts:stuckProgressAttempts},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+              // #endregion
+              lastLoggedStatus = status.status;
+              lastLoggedAttempt = attempts;
+            }
+            
+            // Detect if extraction is stuck (no progress for too long) - but only if still extracting
+            // Don't show stuck error if it eventually completes
+            if (stuckProgressAttempts >= maxStuckAttempts && (status.status === 'extracting' || status.status === 'running')) {
+              // #region agent log
+              fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ArchitectureMap.tsx:370',message:'Extraction appears stuck, clearing interval',data:{attempts,stuckAttempts:stuckProgressAttempts,progress:status.progress},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+              // #endregion
+              
               clearInterval(pollInterval);
+              pollIntervalRef.current = null;
+              setIsExtracting(false);
+              setExtractionError(`Extraction appears to be stuck at ${Math.round((status.progress || 0) * 100)}% progress. The backend extraction may be hanging. Please check backend logs or try again.`);
+              return;
+            }
+            
+            // Handle all possible terminal states
+            if (status.status === 'completed') {
+              // #region agent log
+              fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ArchitectureMap.tsx:361',message:'Status is completed, clearing interval',data:{attempts},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+              // #endregion
+              
+              clearInterval(pollInterval);
+              pollIntervalRef.current = null;
               setIsExtracting(false);
               
-              const results = await serviceExtractionAPI.getExtractionResults(response.task_id);
+              // #region agent log
+              fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ArchitectureMap.tsx:431',message:'Fetching extraction results',data:{taskId:response.task_id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+              // #endregion
+              
+              let results;
+              try {
+                results = await serviceExtractionAPI.getExtractionResults(response.task_id);
+              } catch (error: any) {
+                // #region agent log
+                fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ArchitectureMap.tsx:435',message:'Error fetching results',data:{error:error?.message,response:error?.response?.data},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+                // #endregion
+                setExtractionError(`Failed to fetch extraction results: ${error?.message || 'Unknown error'}`);
+                return;
+              }
+              
+              // #region agent log
+              fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ArchitectureMap.tsx:433',message:'Results received',data:{servicesCount:results.services?.length,servicesSample:results.services?.[0],hasServices:!!results.services},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+              // #endregion
               
               if (results.services && results.services.length > 0) {
-                const extractedServices: ServiceMetadata[] = results.services.map((svc: any) => ({
-                  id: svc.id || `svc-${Date.now()}-${Math.random()}`,
-                  name: svc.name || svc.display_name || 'Unknown Service',
-                  domain: svc.domain || svc.attributes?.domain || 'Unclassified',
-                  owner: svc.owner || svc.attributes?.owner || 'Unassigned',
-                  status: normalizeStatus(svc.status || svc.attributes?.status),
-                  description: svc.description || svc.notes || svc.attributes?.description || '',
-                  source: 'GitHub extraction',
-                }));
+                const extractedServices: ServiceMetadata[] = results.services.map((svc: any, index: number) => {
+                  // Handle different service formats from backend
+                  // Ensure we handle null, undefined, and empty string values explicitly
+                  const serviceId = String(svc.id || svc.service_id || `svc-extracted-${index}`);
+                  const serviceName = String(svc.name || svc.display_name || svc.service_name || 'Unknown Service');
+                  // Handle domain - can be null, so explicitly check
+                  const serviceDomain = svc.domain != null && svc.domain !== '' 
+                    ? String(svc.domain) 
+                    : (svc.attributes?.domain != null && svc.attributes.domain !== '' 
+                        ? String(svc.attributes.domain) 
+                        : 'Unclassified');
+                  // Handle owner - can be null
+                  const serviceOwner = svc.owner != null && svc.owner !== ''
+                    ? String(svc.owner)
+                    : (svc.attributes?.owner != null && svc.attributes.owner !== ''
+                        ? String(svc.attributes.owner)
+                        : 'Unassigned');
+                  // Handle status - can be string "unknown" or enum object
+                  let serviceStatus = 'Active-Dev';
+                  if (svc.status != null) {
+                    if (typeof svc.status === 'string') {
+                      serviceStatus = svc.status;
+                    } else if (svc.status.value != null) {
+                      serviceStatus = String(svc.status.value);
+                    } else if (svc.attributes?.status != null) {
+                      serviceStatus = String(svc.attributes.status);
+                    }
+                  }
+                  // Handle description - can be null
+                  const serviceDescription = svc.description != null && svc.description !== ''
+                    ? String(svc.description)
+                    : (svc.notes != null && svc.notes !== ''
+                        ? String(svc.notes)
+                        : (svc.attributes?.description != null && svc.attributes.description !== ''
+                            ? String(svc.attributes.description)
+                            : ''));
+                  
+                  // #region agent log
+                  fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ArchitectureMap.tsx:453',message:'Mapping service',data:{index,serviceId,serviceName,serviceDomain,serviceOwner,serviceStatus,rawDomain:svc.domain,rawOwner:svc.owner,rawStatus:svc.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                  // #endregion
+                  
+                  return {
+                    id: serviceId,
+                    name: serviceName,
+                    domain: serviceDomain,
+                    owner: serviceOwner,
+                    status: normalizeStatus(serviceStatus),
+                    description: serviceDescription,
+                    source: 'GitHub extraction',
+                    attributes: svc.attributes || {},
+                  };
+                });
+                
+                // #region agent log
+                fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ArchitectureMap.tsx:450',message:'Setting extracted services',data:{count:extractedServices.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                // #endregion
                 
                 setServices(extractedServices);
                 setGithubUrl(''); // Clear input on success
                 setHasExtractedData(true); // Show graph after extraction
               } else {
+                // #region agent log
+                fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ArchitectureMap.tsx:451',message:'No services in results',data:{resultsKeys:Object.keys(results),services:results.services},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                // #endregion
                 setExtractionError('No services found in the repository');
               }
             } else if (status.status === 'failed' || status.status === 'error') {
+              // #region agent log
+              fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ArchitectureMap.tsx:383',message:'Status is failed/error, clearing interval',data:{attempts,status:status.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+              // #endregion
+              
               clearInterval(pollInterval);
+              pollIntervalRef.current = null;
               setIsExtracting(false);
               setExtractionError(status.message || 'Extraction failed');
             } else if (attempts >= maxAttempts) {
+              // #region agent log
+              fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ArchitectureMap.tsx:387',message:'Max attempts reached, clearing interval',data:{attempts,maxAttempts,lastStatus:status.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+              // #endregion
+              
               clearInterval(pollInterval);
+              pollIntervalRef.current = null;
               setIsExtracting(false);
               setExtractionError('Extraction timed out. Please check the task status manually.');
             }
           } catch (error: any) {
+            // #region agent log
+            fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ArchitectureMap.tsx:392',message:'Error in poll attempt',data:{attempts,maxAttempts,errorMessage:error?.message,errorType:error?.constructor?.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+            // #endregion
+            
             if (attempts >= maxAttempts) {
               clearInterval(pollInterval);
+              pollIntervalRef.current = null;
               setIsExtracting(false);
               setExtractionError(error.message || 'Failed to get extraction status');
             }
           }
         }, 1000);
+        
+        pollIntervalRef.current = pollInterval;
       } else {
         setIsExtracting(false);
         setExtractionError('Failed to start extraction');
       }
     } catch (error: any) {
       setIsExtracting(false);
-      setExtractionError(error.message || 'Failed to extract from GitHub');
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ArchitectureMap.tsx:404',message:'Error in handleExtractFromGithub',data:{errorMessage:error?.message,errorResponse:error?.response?.data,status:error?.response?.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
+      const errorMsg = error?.response?.data?.detail || error?.response?.data?.message || error?.message || 'Failed to extract from GitHub';
+      setExtractionError(errorMsg);
     }
   };
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ArchitectureMap.tsx:408',message:'Component unmounting, clearing interval',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   const resetView = () => {
     setServices([]);
@@ -417,180 +611,238 @@ const ArchitectureMap: React.FC = () => {
 
   return (
     <div className="architecture-map">
-      <div className="card" style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <div className="card-header">
-          <Wand2 size={18} />
-          <span>Extract Services</span>
-        </div>
-        <div className="project-form">
-          <label>
-            GitHub Repository URL
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-              <input
-                type="text"
-                value={githubUrl}
-                onChange={e => setGithubUrl(e.target.value)}
-                placeholder="https://github.com/owner/repo"
-                disabled={isExtracting}
-                style={{ flex: 1 }}
-              />
-              <button
-                className="primary"
-                onClick={handleExtractFromGithub}
-                disabled={isExtracting || !githubUrl.trim()}
-                style={{ whiteSpace: 'nowrap' }}
-              >
-                {isExtracting ? (
-                  <>
-                    <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Extracting...
-                  </>
-                ) : (
-                  <>
-                    <Github size={16} /> Extract from GitHub
-                  </>
-                )}
-              </button>
+      <div className="architecture-layout">
+        <div className="extract-section">
+          <div className="card extract-card">
+            <div className="card-header">
+              <Wand2 size={18} />
+              <span>Extract Services</span>
             </div>
-            {extractionError && (
-              <div style={{ color: '#ef4444', fontSize: '14px', marginBottom: '8px' }}>
-                <AlertTriangle size={14} /> {extractionError}
-              </div>
-            )}
-          </label>
-          <label>
-            Or paste service manifests
-            <textarea
-              value={rawInput}
-              onChange={e => setRawInput(e.target.value)}
-              rows={8}
-              placeholder="Paste YAML, JSON, or free-form service notes"
-            />
-          </label>
-          <div className="project-actions">
-            <button className="primary" onClick={handleExtract}>
-              <Wand2 size={16} /> Extract metadata
-            </button>
-            <button className="ghost" onClick={addService} style={{ marginLeft: '8px' }}>
-              <Plus size={16} /> Add service manually
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {hasExtractedData && (
-      <div className="layout-grid">
-        <div className="card service-list">
-          <div className="card-header">
-            <span>Services</span>
-            <button className="ghost" onClick={addService}>
-              <Plus size={14} /> Add service
-            </button>
-          </div>
-
-          <div className="service-items">
-            {services.map(service => (
-              <div key={service.id} className="service-item">
-                <div className="service-top">
+            <div className="project-form">
+              <label>
+                GitHub Repository URL
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
                   <input
-                    className="service-name"
-                    value={service.name}
-                    onChange={e =>
-                      updateService(service.id, { name: e.target.value })
-                    }
+                    type="text"
+                    value={githubUrl}
+                    onChange={e => setGithubUrl(e.target.value)}
+                    onKeyDown={e => {
+                      // Allow Ctrl+A / Cmd+A to select all
+                      if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+                        e.stopPropagation();
+                      }
+                    }}
+                    placeholder="https://github.com/owner/repo"
+                    disabled={isExtracting}
+                    style={{ flex: 1 }}
                   />
-                  <select
-                    value={service.status}
-                  onChange={e =>
-                      updateService(service.id, {
-                        status: e.target.value as ServiceStatus,
-                      })
-                    }
-                    className={`status ${service.status
-                      .toLowerCase()
-                      .replace(/[^a-z0-9]+/g, '-')}`}
+                  <button
+                    className="primary"
+                    onClick={handleExtractFromGithub}
+                    disabled={isExtracting || !githubUrl.trim()}
+                    style={{ whiteSpace: 'nowrap' }}
                   >
-                    <option value="Active-Dev">Active-Dev</option>
-                    <option value="Maintenance-Only">Maintenance-Only</option>
-                    <option value="Deprecated / Frozen">Deprecated / Frozen</option>
-                  </select>
-                </div>
-
-                <div className="service-fields">
-                  <label>
-                    Domain
-                    <input
-                      value={service.domain}
-                      onChange={e =>
-                        updateService(service.id, { domain: e.target.value })
-                      }
-                    />
-                  </label>
-                  <label>
-                    Owner
-                    <input
-                      value={service.owner}
-                      onChange={e =>
-                        updateService(service.id, { owner: e.target.value })
-                      }
-                    />
-                  </label>
-                </div>
-
-                <label className="service-notes">
-                  Notes
-                  <textarea
-                    value={service.description || ''}
-                    onChange={e =>
-                      updateService(service.id, {
-                        description: e.target.value,
-                      })
-                    }
-                    rows={2}
-                    placeholder="What does this service do? Any lifecycle caveats?"
-                  />
-                </label>
-
-                <div className="service-footer">
-                  <div className="tags">
-                    <span className="pill subtle">{service.domain}</span>
-                    <span className="pill subtle">{service.owner}</span>
-                    {service.risk && (
-                      <span className="pill warning">
-                        <AlertTriangle size={12} /> {service.risk}
-                      </span>
+                    {isExtracting ? (
+                      <>
+                        <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Extracting...
+                      </>
+                    ) : (
+                      <>
+                        <Github size={16} /> Extract from GitHub
+                      </>
                     )}
-                  </div>
-                  <button className="ghost danger" onClick={() => removeService(service.id)}>
-                    Remove
                   </button>
                 </div>
+                {extractionError && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginBottom: '8px' }}>
+                    <AlertTriangle size={12} /> {extractionError}
+                  </div>
+                )}
+              </label>
+              <label>
+                Or paste service manifests
+                <textarea
+                  value={rawInput}
+                  onChange={e => setRawInput(e.target.value)}
+                  onKeyDown={e => {
+                    // Allow Ctrl+A / Cmd+A to select all
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+                      e.stopPropagation();
+                    }
+                  }}
+                  rows={4}
+                  placeholder="Paste YAML, JSON, or free-form service notes"
+                />
+              </label>
+              <div className="project-actions">
+                <button className="primary" onClick={handleExtract}>
+                  <Wand2 size={16} /> Extract metadata
+                </button>
+                <button className="ghost" onClick={addService} style={{ marginLeft: '8px' }}>
+                  <Plus size={16} /> Add service manually
+                </button>
               </div>
-            ))}
+            </div>
           </div>
         </div>
 
-        <div className="card graph-card">
-          <div className="card-header">
-            <span>Architecture graph</span>
-            <div className="legend">
-              <span className="legend-item">
-                <span className="dot" style={{ background: statusPalette['Active-Dev'] }} />
-                Active-Dev
-              </span>
-              <span className="legend-item">
-                <span className="dot" style={{ background: statusPalette['Maintenance-Only'] }} />
-                Maintenance-Only
-              </span>
-              <span className="legend-item">
-                <span className="dot" style={{ background: statusPalette['Deprecated / Frozen'] }} />
-                Deprecated / Frozen
-              </span>
+        <div className="main-grid">
+          <div className="card service-list">
+            <div className="card-header">
+              <span>Services</span>
+              <button className="ghost" onClick={addService}>
+                <Plus size={14} /> Add service
+              </button>
+            </div>
+
+            <div className="service-items" ref={servicesListRef}>
+              {services.length === 0 ? (
+                <div className="empty-services">
+                  <p>No services yet. Extract from GitHub or add manually.</p>
+                </div>
+              ) : (
+                services.map(service => (
+                  <div key={service.id} className="service-item">
+                    <div className="service-top">
+                      <input
+                        className="service-name"
+                        value={service.name || ''}
+                        onChange={e =>
+                          updateService(service.id, { name: e.target.value })
+                        }
+                        onKeyDown={e => {
+                          // Allow Ctrl+A / Cmd+A to select all
+                          if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+                            e.stopPropagation();
+                          }
+                        }}
+                      />
+                      <select
+                        value={service.status || 'Active-Dev'}
+                      onChange={e =>
+                        updateService(service.id, {
+                          status: e.target.value as ServiceStatus,
+                        })
+                      }
+                        className={`status ${(service.status || 'Active-Dev')
+                          .toLowerCase()
+                          .replace(/[^a-z0-9]+/g, '-')}`}
+                      >
+                        <option value="Active-Dev">Active-Dev</option>
+                        <option value="Maintenance-Only">Maintenance-Only</option>
+                        <option value="Deprecated / Frozen">Deprecated / Frozen</option>
+                      </select>
+                    </div>
+
+                    <div className="service-fields">
+                      <label>
+                        Domain
+                        <input
+                          value={service.domain || ''}
+                          onChange={e =>
+                            updateService(service.id, { domain: e.target.value })
+                          }
+                          onKeyDown={e => {
+                            // Allow Ctrl+A / Cmd+A to select all
+                            if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+                              e.stopPropagation();
+                            }
+                          }}
+                        />
+                      </label>
+                      <label>
+                        Owner
+                        <input
+                          value={service.owner || ''}
+                          onChange={e =>
+                            updateService(service.id, { owner: e.target.value })
+                          }
+                          onKeyDown={e => {
+                            // Allow Ctrl+A / Cmd+A to select all
+                            if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+                              e.stopPropagation();
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+
+                    <label className="service-notes">
+                      Notes
+                      <textarea
+                        value={service.description || ''}
+                        onChange={e =>
+                          updateService(service.id, {
+                            description: e.target.value,
+                          })
+                        }
+                        onKeyDown={e => {
+                          // Allow Ctrl+A / Cmd+A to select all
+                          if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+                            e.stopPropagation();
+                          }
+                        }}
+                        rows={2}
+                        placeholder="What does this service do? Any lifecycle caveats?"
+                      />
+                    </label>
+
+                    <div className="service-footer">
+                      <div className="tags">
+                        <span className="pill subtle">{service.domain || 'Unclassified'}</span>
+                        <span className="pill subtle">{service.owner || 'Unassigned'}</span>
+                        {service.risk && (
+                          <span className="pill warning">
+                            <AlertTriangle size={12} /> {service.risk}
+                          </span>
+                        )}
+                        {service.attributes?.inferred_fields && Object.keys(service.attributes.inferred_fields).length > 0 && (
+                          <>
+                            {Object.entries(service.attributes.inferred_fields).map(([field, info]: [string, any]) => {
+                              if (info?.confidence === 'low') {
+                                return (
+                                  <span key={field} className="pill inferred" title={`${field} inferred with low confidence (${info.source || 'unknown source'})`}>
+                                    <Sparkles size={10} /> {field}
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })}
+                          </>
+                        )}
+                      </div>
+                      <button className="ghost danger" onClick={() => removeService(service.id)}>
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
-          <ArchitectureGraph data={graphData} />
+
+          <div className="card graph-card">
+            <div className="card-header">
+              <span>Architecture graph</span>
+              <div className="legend">
+                <span className="legend-item">
+                  <span className="dot" style={{ background: statusPalette['Active-Dev'] }} />
+                  Active-Dev
+                </span>
+                <span className="legend-item">
+                  <span className="dot" style={{ background: statusPalette['Maintenance-Only'] }} />
+                  Maintenance-Only
+                </span>
+                <span className="legend-item">
+                  <span className="dot" style={{ background: statusPalette['Deprecated / Frozen'] }} />
+                  Deprecated / Frozen
+                </span>
+              </div>
+            </div>
+            <ArchitectureGraph data={graphData} />
+          </div>
         </div>
       </div>
-      )}
     </div>
   );
 };

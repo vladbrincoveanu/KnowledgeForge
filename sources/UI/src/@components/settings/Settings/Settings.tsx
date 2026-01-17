@@ -60,6 +60,12 @@ const Settings: React.FC<SettingsProps> = ({ onSettingsChange }) => {
             type="text"
             value={settings.apiBaseUrl}
             onChange={e => handleInputChange('apiBaseUrl', e.target.value)}
+            onKeyDown={e => {
+              // Allow Ctrl+A / Cmd+A to select all
+              if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+                e.stopPropagation();
+              }
+            }}
             placeholder="API base URL"
           />
         </div>
@@ -70,6 +76,12 @@ const Settings: React.FC<SettingsProps> = ({ onSettingsChange }) => {
             type="password"
             value={settings.apiKey}
             onChange={e => handleInputChange('apiKey', e.target.value)}
+            onKeyDown={e => {
+              // Allow Ctrl+A / Cmd+A to select all
+              if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+                e.stopPropagation();
+              }
+            }}
             placeholder="API key"
           />
         </div>

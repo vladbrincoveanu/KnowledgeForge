@@ -11,19 +11,40 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
-# Simple keyword mapping to normalize domain labels
+# Comprehensive keyword mapping to normalize domain labels
 DOMAIN_KEYWORDS: dict[str, list[str]] = {
-    "core": ["core", "base", "common", "shared", "utils"],
-    "checkout": ["checkout", "cart", "basket", "purchase"],
-    "payments": ["payment", "billing", "invoice", "transaction"],
-    "identity": ["auth", "user", "account", "identity", "login"],
-    "admin": ["admin", "backoffice", "management", "cms"],
-    "marketing": ["marketing", "campaign", "promotion", "discount", "coupon"],
-    "catalog": ["catalog", "product", "inventory", "sku"],
-    "shipping": ["shipping", "delivery", "logistics", "fulfillment"],
-    "notifications": ["notification", "email", "sms", "message"],
-    "analytics": ["analytics", "metrics", "reporting", "stats"],
-    "testing": ["test", "e2e", "integration", "fixture"],
+    # AI/ML domains (high priority for ML repos)
+    "ai": [
+        "ai", "ml", "machine", "learning", "llm", "nlp", "language", "model",
+        "neural", "deep", "tensor", "transformer", "embedding", "vector",
+        "inference", "training", "prediction", "classification", "extraction",
+        "ner", "tokenize", "parse", "langchain", "openai", "anthropic",
+        "huggingface", "pytorch", "tensorflow", "scikit", "spacy", "gpt",
+        "bert", "llama", "ollama", "chunk", "rag", "retrieval", "semantic",
+    ],
+    # Core infrastructure
+    "core": ["core", "base", "common", "shared", "utils", "lib", "sdk", "platform"],
+    "infrastructure": ["infra", "devops", "deploy", "ci", "cd", "kubernetes", "k8s", "docker", "terraform"],
+    "database": ["database", "db", "postgres", "mysql", "mongo", "redis", "cache", "storage"],
+    "messaging": ["queue", "kafka", "rabbitmq", "pubsub", "event", "stream", "message"],
+    # Business domains
+    "checkout": ["checkout", "cart", "basket", "purchase", "order"],
+    "payments": ["payment", "billing", "invoice", "transaction", "stripe", "paypal"],
+    "identity": ["auth", "user", "account", "identity", "login", "oauth", "sso", "jwt", "session"],
+    "admin": ["admin", "backoffice", "management", "cms", "dashboard", "portal"],
+    "marketing": ["marketing", "campaign", "promotion", "discount", "coupon", "ads", "seo"],
+    "catalog": ["catalog", "product", "inventory", "sku", "listing", "item"],
+    "shipping": ["shipping", "delivery", "logistics", "fulfillment", "tracking", "carrier"],
+    "notifications": ["notification", "email", "sms", "push", "alert", "webhook"],
+    "analytics": ["analytics", "metrics", "reporting", "stats", "telemetry", "observability", "monitoring"],
+    "search": ["search", "elastic", "solr", "index", "query", "filter"],
+    # Development domains
+    "api": ["api", "gateway", "rest", "graphql", "grpc", "endpoint"],
+    "frontend": ["frontend", "web", "ui", "react", "vue", "angular", "client"],
+    "mobile": ["mobile", "ios", "android", "app", "native"],
+    "testing": ["test", "e2e", "integration", "fixture", "mock", "spec", "cypress", "playwright"],
+    "security": ["security", "crypto", "encrypt", "audit", "compliance", "vulnerability"],
+    "docs": ["docs", "documentation", "readme", "wiki", "guide"],
 }
 
 
@@ -61,6 +82,10 @@ class DomainExtractor:
             if self._should_skip(py_file):
                 continue
             candidates.extend(self._extract_python_import_roots(py_file))
+
+        # Collect README keywords from service and repo root
+        for readme_text in self._read_readme_texts(service_path):
+            candidates.extend(self._tokenize_text(readme_text))
 
         # Collect package.json namespace if present (JS/TS services)
         pkg_file = service_path / "package.json"
@@ -109,24 +134,58 @@ class DomainExtractor:
             logger.debug(f"Failed to parse package.json at {pkg_file}: {e}")
             return None
 
+    def extract_domain_from_text(self, text: str) -> Optional[str]:
+        """Extract domain from README or description text."""
+        tokens = self._tokenize_text(text)
+        return self._score_candidates(tokens)
+
+    def _tokenize_text(self, text: str) -> list[str]:
+        """Split text into lowercase tokens for scoring."""
+        return [token.lower() for token in re.split(r"[^A-Za-z0-9]+", text) if token]
+
+    def _read_readme_texts(self, service_path: Path) -> list[str]:
+        """Collect README text from service path and repo root."""
+        readme_names = ["README.md", "README.rst", "readme.md", "readme.rst"]
+        texts: list[str] = []
+
+        for base in {service_path, self.repo_root}:
+            for name in readme_names:
+                candidate = base / name
+                if candidate.exists():
+                    try:
+                        texts.append(candidate.read_text(encoding="utf-8", errors="ignore")[:4000])
+                    except Exception:
+                        continue
+
+        return texts
+
     def _score_candidates(self, candidates: list[str]) -> Optional[str]:
-        """Map candidate keywords to a domain using a simple frequency score."""
+        """Map candidate keywords to a domain using weighted frequency score."""
         if not candidates:
             return None
 
         scores: Counter[str] = Counter()
         for candidate in candidates:
+            candidate_lower = candidate.lower()
             for domain, keywords in DOMAIN_KEYWORDS.items():
-                if candidate == domain:
-                    scores[domain] += 2  # exact match gets higher weight
-                elif any(candidate.startswith(k) or k in candidate for k in keywords):
+                # Exact match with domain name
+                if candidate_lower == domain:
+                    scores[domain] += 5
+                # Exact match with any keyword
+                elif candidate_lower in keywords:
+                    scores[domain] += 3
+                # Partial match (keyword contained in candidate or vice versa)
+                elif any(k in candidate_lower for k in keywords):
+                    scores[domain] += 2
+                elif any(candidate_lower in k for k in keywords if len(candidate_lower) >= 3):
                     scores[domain] += 1
 
         if not scores:
             return None
 
         # Return the domain with the highest score
-        domain, _ = scores.most_common(1)[0]
+        domain, score = scores.most_common(1)[0]
+        logger.debug(f"Domain scoring: top={domain} (score={score}), all={dict(scores.most_common(5))}")
         return domain
 
     def _should_skip(self, file_path: Path) -> bool:
