@@ -17,8 +17,8 @@ from typing import Any, Optional
 from collections import defaultdict
 from abc import ABC, abstractmethod
 
-from services.code_extraction.python_ast_extractor import PythonASTExtractor
-from domain.models.code_entities import CodeEntityType, CodeEntity
+from app.services.code_extraction.python_ast_extractor import PythonASTExtractor
+from app.domain.models.code_entities import CodeEntityType, CodeEntity
 
 
 import yaml
@@ -2330,13 +2330,21 @@ Data:\n{chr(10).join(snippets)}\n\nAnswer:"""
         }
 
         for rel in self.detailed_relationships:
-            if rel.target_entity_name and not rel.target_entity_id:
-                # Try to resolve as internal reference
-                target_id = entity_map.get(rel.target_entity_name)
+            target_name = None
+            if rel.attributes:
+                target_name = rel.attributes.get('target_entity_name')
+
+            if rel.target_entity_id in entity_map.values():
+                continue
+
+            if not target_name:
+                target_name = rel.target_entity_id
+
+            if target_name:
+                target_id = entity_map.get(target_name)
                 if target_id:
                     rel.target_entity_id = target_id
-                # Mark external dependencies
-                elif rel.target_entity_name in external_references or '.' in rel.target_entity_name:
+                elif target_name in external_references or '.' in target_name:
                     rel.attributes['is_external'] = True
     
     def _extract_level3_components(self):
@@ -3140,19 +3148,22 @@ Answer:"""
 def main():
     """Test C4 extractor."""
     import sys
+
+    def find_repo_root(start: Path) -> Path:
+        for parent in [start] + list(start.parents):
+            if (parent / ".git").exists():
+                return parent
+        return start
     
-    # Add app-dev to path (go up 3 levels: c4_extractor -> code_extraction -> services -> app-dev)
-    app_dev_path = Path(__file__).parent.parent.parent
-    sys.path.insert(0, str(app_dev_path))
+    # Add app to path (go up 3 levels: c4_extractor -> code_extraction -> services -> app)
+    app_path = Path(__file__).resolve().parent.parent.parent
+    sys.path.insert(0, str(app_path))
     
     from infrastructure.llm.llm_manager import LLMManager
     
-    # Path to monorepo (go up 4 more levels to KnowledgeForge)
-    monorepo_path = Path(__file__).parent.parent.parent.parent.parent.parent / "monorepo"
-    
-    if not monorepo_path.exists():
-        print(f"❌ Monorepo not found: {monorepo_path}")
-        sys.exit(1)
+    repo_root = find_repo_root(app_path)
+    monorepo_path = repo_root / "monorepo"
+    target_repo = monorepo_path if monorepo_path.exists() else repo_root
     
     # Initialize LLM (optional)
     try:
@@ -3162,13 +3173,14 @@ def main():
         print("⚠️  LLM not available, proceeding without system purpose generation")
     
     # Create extractor
-    extractor = C4ArchitectureExtractor(monorepo_path, llm_manager=llm)
+    extractor = C4ArchitectureExtractor(target_repo, llm_manager=llm)
     
     # Extract C4 architecture
     c4_architecture = extractor.extract()
     
     # Save
-    output_file = app_dev_path / "c4_architecture.json"
+    api_root = repo_root / "sources" / "Api"
+    output_file = api_root / "c4_architecture.json" if api_root.exists() else repo_root / "c4_architecture.json"
     extractor.save(c4_architecture, output_file)
     
     # Print summary

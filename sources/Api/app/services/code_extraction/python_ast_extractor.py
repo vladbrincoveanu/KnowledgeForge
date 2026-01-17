@@ -18,7 +18,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from domain.models.code_entities import (
+from app.domain.models.code_entities import (
     CodeEntity,
     CodeEntityType,
     CodeLanguage,
@@ -26,7 +26,7 @@ from domain.models.code_entities import (
     CodeRelationType,
     SourceType,
 )
-from services.code_extraction.base_extractor import BaseExtractor
+from app.services.code_extraction.base_extractor import BaseExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -118,9 +118,10 @@ class _ASTVisitor(ast.NodeVisitor):
                 rel = CodeRelationship(
                     id=rel_id,
                     source_entity_id=class_id,
-                    target_entity_name=base_name,
+                    target_entity_id=base_name,
                     relationship_type=CodeRelationType.INHERITS_FROM,
                     context=f"class {node.name} inherits from {base_name}",
+                    attributes={"target_entity_name": base_name},
                 )
                 self.relationships.append(rel)
 
@@ -192,9 +193,10 @@ class _ASTVisitor(ast.NodeVisitor):
             rel = CodeRelationship(
                 id=rel_id,
                 source_entity_id=self.current_scope[0], # Module ID
-                target_entity_name=alias.name,
+                target_entity_id=alias.name,
                 relationship_type=CodeRelationType.IMPORTS,
                 context=f"import {alias.name}" + (f" as {alias.asname}" if alias.asname else ""),
+                attributes={"target_entity_name": alias.name},
             )
             self.relationships.append(rel)
         self.generic_visit(node)
@@ -208,9 +210,10 @@ class _ASTVisitor(ast.NodeVisitor):
             rel = CodeRelationship(
                 id=rel_id,
                 source_entity_id=self.current_scope[0], # Module ID
-                target_entity_name=target_name,
+                target_entity_id=target_name,
                 relationship_type=CodeRelationType.IMPORTS,
                 context=f"from {module_name} import {alias.name}" + (f" as {alias.asname}" if alias.asname else ""),
+                attributes={"target_entity_name": target_name},
             )
             self.relationships.append(rel)
         self.generic_visit(node)
@@ -240,9 +243,10 @@ class _ASTVisitor(ast.NodeVisitor):
             rel = CodeRelationship(
                 id=rel_id,
                 source_entity_id=self.current_scope[-1], # ID of the calling function/class/module
-                target_entity_name=target_name, # Placeholder
+                target_entity_id=target_name, # Placeholder
                 relationship_type=CodeRelationType.CALLS,
                 context=f"call to {target_name}",
+                attributes={"target_entity_name": target_name},
             )
             self.relationships.append(rel)
             

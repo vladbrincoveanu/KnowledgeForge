@@ -1,4 +1,0 @@
-# Streamlit Graph Viewer Dependencies
-streamlit>=1.30.0
-pyvis>=0.3.2
-networkx>=3.2

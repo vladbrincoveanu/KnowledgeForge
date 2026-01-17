@@ -13,6 +13,8 @@ from fastapi.responses import JSONResponse
 # Add the current directory (sources/api) to the Python path so routes can access utils
 current_dir = Path(__file__).parent
 sys.path.insert(0, str(current_dir))
+app_dir = current_dir / "app"
+sys.path.insert(0, str(app_dir))
 
 # Lifespan context manager
 from contextlib import asynccontextmanager
