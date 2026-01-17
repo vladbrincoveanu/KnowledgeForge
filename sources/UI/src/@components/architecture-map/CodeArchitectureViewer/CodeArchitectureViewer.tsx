@@ -67,6 +67,12 @@ interface C4Architecture {
   containers?: any[];  // Array format from backend
   components?: any[];  // Array format from backend
   relationships?: C4Relationships;
+  metadata?: {
+    runtime?: {
+      platform?: string;
+      cluster?: any;
+    };
+  };
   context_level?: C4Level;
   container_level?: C4Level;  // Transformed format
   component_level?: C4Level;  // Transformed format
@@ -230,7 +236,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
   const { fitView } = useReactFlow();
   
   // Filters - default to showing only component level (components auto-connect)
-  const [selectedLevels, setSelectedLevels] = useState<string[]>(['component_level']);
+  const [selectedLevel, setSelectedLevel] = useState<string>('component_level');
   const [selectedEntityTypes, setSelectedEntityTypes] = useState<string[]>([]);
   const [selectedRelationshipTypes, setSelectedRelationshipTypes] = useState<string[]>([]);
   const [showExternal, setShowExternal] = useState(false);
@@ -510,19 +516,17 @@ const CodeArchitectureViewerInner: React.FC = () => {
     const allEntities: CodeEntity[] = [];
     const allRelationships: CodeRelationship[] = [];
 
-    // Collect entities and relationships from selected levels
-    selectedLevels.forEach(level => {
-      if (architecture[level as keyof C4Architecture]) {
-        const levelData = architecture[level as keyof C4Architecture] as C4Level;
-        if (levelData.entities) {
-          // Add level metadata to each entity
-          allEntities.push(...levelData.entities.map(e => ({ ...e, level })));
-        }
-        if (levelData.relationships) {
-          allRelationships.push(...levelData.relationships);
-        }
+    // Collect entities and relationships from the selected level
+    if (architecture[selectedLevel as keyof C4Architecture]) {
+      const levelData = architecture[selectedLevel as keyof C4Architecture] as C4Level;
+      if (levelData.entities) {
+        // Add level metadata to each entity
+        allEntities.push(...levelData.entities.map(e => ({ ...e, level: selectedLevel })));
       }
-    });
+      if (levelData.relationships) {
+        allRelationships.push(...levelData.relationships);
+      }
+    }
 
     // Filter entities
     let filteredEntities = allEntities.filter(e => {
@@ -551,7 +555,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
     const rfNodes: Node[] = [];
     
     // If we're showing components, create container frames based on their actual container assignment
-    if (selectedLevels.includes('component_level') && filteredEntities.some(e => e.entity_type === 'component')) {
+    if (selectedLevel === 'component_level' && filteredEntities.some(e => e.entity_type === 'component')) {
       const componentEntities = filteredEntities.filter(e => e.entity_type === 'component');
       
       // Group components by their actual container attribute
@@ -682,40 +686,36 @@ const CodeArchitectureViewerInner: React.FC = () => {
       });
     } else {
       // Container-level framing for Kubernetes
-      const hasContainerLevel = selectedLevels.includes('container_level');
+      const hasContainerLevel = selectedLevel === 'container_level';
       const containerEntities = filteredEntities.filter(e => e.entity_type === 'container');
       const containerInfoByName = new Map(
         (architecture?.containers || []).map((container: any) => [container.name, container])
       );
 
+      const isKubernetesEntity = (entity: CodeEntity) => {
+        const tech = String(entity.language || '').toLowerCase();
+        const containerType = String(entity.attributes?.container_type || '').toLowerCase();
+        const runtimeEnv = String(entity.attributes?.runtime_environment || '').toLowerCase();
+        const deployment = String(entity.attributes?.deployment || '').toLowerCase();
+
+        return tech.includes('kubernetes') ||
+          containerType.includes('helm') ||
+          containerType.includes('kubernetes') ||
+          runtimeEnv.includes('kubernetes') ||
+          deployment.includes('helm') ||
+          deployment.includes('kustomize') ||
+          deployment.includes('manifest');
+      };
+
       let clusterNodeId: string | null = null;
-      const kubernetesContainerNames = new Set<string>();
 
       if (hasContainerLevel && containerEntities.length > 0) {
-        containerEntities.forEach(e => {
-          const tech = String(e.language || '').toLowerCase();
-          const containerType = String(e.attributes?.container_type || '').toLowerCase();
-          const runtimeEnv = String(e.attributes?.runtime_environment || '').toLowerCase();
-          const deployment = String(e.attributes?.deployment || '').toLowerCase();
-
-          const isKubernetes = tech.includes('kubernetes') ||
-            containerType.includes('helm') ||
-            containerType.includes('kubernetes') ||
-            runtimeEnv.includes('kubernetes') ||
-            deployment.includes('helm') ||
-            deployment.includes('kustomize') ||
-            deployment.includes('manifest');
-
-          if (isKubernetes) {
-            kubernetesContainerNames.add(e.name);
-          }
-        });
-
-        const kubernetesContainers = containerEntities.filter(e =>
-          kubernetesContainerNames.has(e.name)
-        );
+        const kubernetesContainers = containerEntities.filter(isKubernetesEntity);
 
         if (kubernetesContainers.length > 0) {
+          const rows = Math.ceil(kubernetesContainers.length / 2);
+          const clusterHeight = Math.max(520, rows * 150 + 140);
+          const clusterMeta = architecture?.metadata?.runtime?.cluster;
           clusterNodeId = 'cluster_kubernetes';
           rfNodes.push({
             id: clusterNodeId,
@@ -726,10 +726,11 @@ const CodeArchitectureViewerInner: React.FC = () => {
               label: 'Kubernetes Cluster',
               containerType: 'Runtime Environment',
               technology: 'Kubernetes',
+              clusterMeta,
             },
             style: {
               width: Math.max(900, kubernetesContainers.length * 240),
-              height: 520,
+              height: clusterHeight,
               backgroundColor: 'rgba(148, 163, 184, 0.08)',
               border: '2px dashed #cbd5e1',
               borderRadius: '16px',
@@ -786,11 +787,9 @@ const CodeArchitectureViewerInner: React.FC = () => {
           },
         };
 
-        if (clusterNodeId && e.entity_type === 'container') {
-          if (kubernetesContainerNames.has(e.name)) {
-            node.parentNode = clusterNodeId;
-            node.extent = 'parent';
-          }
+        if (clusterNodeId && e.entity_type === 'container' && isKubernetesEntity(e)) {
+          node.parentNode = clusterNodeId;
+          node.extent = 'parent';
         }
 
         rfNodes.push(node);
@@ -830,7 +829,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
         });
       }, 100);
     });
-  }, [architecture, selectedLevels, selectedEntityTypes, selectedRelationshipTypes, showExternal, searchTerm, fitView]);
+  }, [architecture, selectedLevel, selectedEntityTypes, selectedRelationshipTypes, showExternal, searchTerm, fitView]);
 
   const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
     setSelectedNode(node.data);
@@ -841,11 +840,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
     : '0';
 
   const toggleLevel = (level: string) => {
-    setSelectedLevels(prev =>
-      prev.includes(level)
-        ? prev.filter(l => l !== level)
-        : [...prev, level]
-    );
+    setSelectedLevel(level);
   };
 
   const toggleRelationshipType = (type: string) => {
@@ -919,8 +914,9 @@ const CodeArchitectureViewerInner: React.FC = () => {
             {['context_level', 'container_level', 'component_level', 'code_level'].map(level => (
               <label key={level} className="checkbox-label">
                 <input
-                  type="checkbox"
-                  checked={selectedLevels.includes(level)}
+                  type="radio"
+                  name="c4-level"
+                  checked={selectedLevel === level}
                   onChange={() => toggleLevel(level)}
                 />
                 <span>{level.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
@@ -1037,6 +1033,49 @@ const CodeArchitectureViewerInner: React.FC = () => {
                     <div className="detail-row">
                       <span className="detail-label">Repository:</span>
                       <span className="detail-value">{selectedNode.containerMeta.repository_url}</span>
+                    </div>
+                  )}
+                </>
+              )}
+              {selectedNode.label === 'Kubernetes Cluster' && selectedNode.clusterMeta && (
+                <>
+                  {selectedNode.clusterMeta.summary && (
+                    <div className="detail-row">
+                      <span className="detail-label">Summary:</span>
+                      <span className="detail-value">
+                        {selectedNode.clusterMeta.summary
+                          .replace(/<think>.*?<\/think>/gis, '')
+                          .replace(/<think>/gi, '')
+                          .replace(/\s+/g, ' ')
+                          .trim()}
+                      </span>
+                    </div>
+                  )}
+                  {selectedNode.clusterMeta.namespaces?.length > 0 && (
+                    <div className="detail-row">
+                      <span className="detail-label">Namespaces:</span>
+                      <span className="detail-value">
+                        {selectedNode.clusterMeta.namespaces.slice(0, 8).join(', ')}
+                        {selectedNode.clusterMeta.namespaces.length > 8 ? '…' : ''}
+                      </span>
+                    </div>
+                  )}
+                  {selectedNode.clusterMeta.servers?.length > 0 && (
+                    <div className="detail-row">
+                      <span className="detail-label">Servers:</span>
+                      <span className="detail-value">
+                        {selectedNode.clusterMeta.servers.slice(0, 5).join(', ')}
+                        {selectedNode.clusterMeta.servers.length > 5 ? '…' : ''}
+                      </span>
+                    </div>
+                  )}
+                  {selectedNode.clusterMeta.gitops_files?.length > 0 && (
+                    <div className="detail-row">
+                      <span className="detail-label">GitOps Files:</span>
+                      <span className="detail-value">
+                        {selectedNode.clusterMeta.gitops_files.slice(0, 6).join(', ')}
+                        {selectedNode.clusterMeta.gitops_files.length > 6 ? '…' : ''}
+                      </span>
                     </div>
                   )}
                 </>

@@ -2,6 +2,7 @@
 
 import hashlib
 import logging
+from datetime import datetime
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional
@@ -81,7 +82,7 @@ class BaseExtractor(ABC):
         try:
             stat = file_path.stat()
             size_bytes = stat.st_size
-            last_modified = stat.st_mtime
+            last_modified = datetime.fromtimestamp(stat.st_mtime)
         except Exception:
             size_bytes = 0
             last_modified = None

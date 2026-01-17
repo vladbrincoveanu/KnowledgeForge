@@ -249,6 +249,7 @@ class C4ArchitectureExtractor:
         self.components = {}       # Level 3
         self.context_relationships = []
         self.container_relationships = []
+        self.cluster_metadata = {}
         
         # Detailed code graph structures
         self.detailed_entities = []
@@ -323,6 +324,7 @@ class C4ArchitectureExtractor:
         # Build context/container relationships (C4 links)
         self.context_relationships = self._build_context_relationships()
         self.container_relationships = self._build_container_relationships()
+        self.cluster_metadata = self._detect_cluster_metadata()
         
         # Level 4: Detailed Code Graph (AST-based) - MUST RUN BEFORE LEVEL 3
         logger.info("\n🔬 LEVEL 4: Code (Detailed AST Scan)")
@@ -367,7 +369,11 @@ class C4ArchitectureExtractor:
                 "total_containers": len(self.containers),
                 "total_components": len(self.components),
                 "total_code_entities": len(self.detailed_entities),
-                "extraction_approach": "c4_model_hybrid"
+                "extraction_approach": "c4_model_hybrid",
+                "runtime": {
+                    "platform": "Kubernetes" if self.cluster_metadata else "Unknown",
+                    "cluster": self.cluster_metadata,
+                },
             }
         }
         
@@ -734,7 +740,8 @@ class C4ArchitectureExtractor:
     
     def _generate_system_purpose(self) -> str:
         """Generate 1-sentence system purpose using LLM."""
-        if not self.llm_manager:
+        llm = self.llm_manager
+        if llm is None:
             return "Purpose not available (LLM not configured)"
         
         # Read README for context
@@ -763,7 +770,7 @@ Answer format: "This system [does something]."
 Your answer:"""
         
         try:
-            response = self.llm_manager.generate_text(
+            response = llm.generate_text(
                 prompt,
                 max_tokens=40,
                 temperature=0.2,
@@ -933,7 +940,8 @@ Your answer:"""
         Returns:
             Suggested team name or None
         """
-        if not self.llm_manager or not contributors:
+        llm = self.llm_manager
+        if llm is None or not contributors:
             return None
         
         # Build contributor list string
@@ -951,7 +959,7 @@ If uncertain, return the email domain of the top contributor.
 Team name:"""
         
         try:
-            response = self.llm_manager.generate_text(
+            response = llm.generate_text(
                 prompt,
                 max_tokens=50,
                 temperature=0.3,
@@ -1526,7 +1534,8 @@ Team name:"""
                     return clean[:200]
 
         # Optional LLM summary if available
-        if self.llm_manager and description_sources:
+        llm = self.llm_manager
+        if llm and description_sources:
             prompt = f"""Summarize this service in one short sentence (max 20 words).
 
 Content:
@@ -1534,7 +1543,7 @@ Content:
 
 Answer:"""
             try:
-                response = self.llm_manager.generate_text(
+                response = llm.generate_text(
                     prompt,
                     max_tokens=40,
                     temperature=0.2,
@@ -1672,6 +1681,119 @@ Answer:"""
                 continue
 
         return False
+
+    def _detect_cluster_metadata(self) -> dict[str, Any]:
+        """Detect Kubernetes cluster metadata from GitOps and manifests."""
+        namespaces = set()
+        servers = set()
+        gitops_files = []
+
+        for base_dir in [self.repo_path / "gitops", self.repo_path / "argo", self.repo_path / "argocd"]:
+            if not base_dir.exists():
+                continue
+
+            for yaml_file in base_dir.rglob("*.y*ml"):
+                try:
+                    with open(yaml_file, "r", encoding="utf-8", errors="ignore") as f:
+                        content = f.read(20000)
+                    docs = list(yaml.safe_load_all(content))
+                    if docs:
+                        gitops_files.append(str(yaml_file.relative_to(self.repo_path)))
+                    for doc in docs:
+                        if not isinstance(doc, dict):
+                            continue
+                        spec = doc.get("spec", {})
+                        destination = spec.get("destination", {}) if isinstance(spec, dict) else {}
+                        if isinstance(destination, dict):
+                            if destination.get("namespace"):
+                                namespaces.add(str(destination.get("namespace")))
+                            if destination.get("server"):
+                                servers.add(str(destination.get("server")))
+                        template = spec.get("template", {}) if isinstance(spec, dict) else {}
+                        template_spec = template.get("spec", {}) if isinstance(template, dict) else {}
+                        template_dest = template_spec.get("destination", {}) if isinstance(template_spec, dict) else {}
+                        if isinstance(template_dest, dict):
+                            if template_dest.get("namespace"):
+                                namespaces.add(str(template_dest.get("namespace")))
+                            if template_dest.get("server"):
+                                servers.add(str(template_dest.get("server")))
+                except Exception:
+                    continue
+
+        if not namespaces and not servers:
+            return {}
+
+        # Filter out templated namespaces
+        namespaces = {ns for ns in namespaces if "{{" not in ns and "}}" not in ns}
+
+        cluster_meta = {
+            "name": "Kubernetes Cluster",
+            "type": "Kubernetes",
+            "namespaces": sorted(namespaces),
+            "servers": sorted(servers),
+            "gitops_files": gitops_files[:10],
+        }
+
+        if self.llm_manager and gitops_files:
+            cluster_meta["summary"] = self._summarize_cluster_metadata(gitops_files)
+
+        return cluster_meta
+
+    def _summarize_cluster_metadata(self, gitops_files: list[str]) -> str:
+        """Use LLM to summarize cluster context for managers."""
+        llm = self.llm_manager
+        if llm is None:
+            return ""
+        sample_files = [self.repo_path / path for path in gitops_files[:3]]
+        snippets = []
+
+        for file_path in sample_files:
+            try:
+                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                    snippets.append(f"{file_path.name}:\n" + f.read(1200))
+            except Exception:
+                continue
+
+        if not snippets:
+            return ""
+
+        prompt = f"""Summarize the Kubernetes cluster context in one short sentence for executives.
+Focus on what this cluster runs and how it's deployed. Max 20 words.
+
+Data:\n{chr(10).join(snippets)}\n\nAnswer:"""
+
+        try:
+            response = llm.generate_text(
+                prompt,
+                max_tokens=40,
+                temperature=0.2,
+                use_cache=True
+            )
+            if response:
+                summary = response.strip()
+                summary = re.sub(r'<think>.*?</think>', '', summary, flags=re.DOTALL).strip()
+                summary = re.sub(r'^["\'\s]+|["\'\s]+$', '', summary)
+                # Remove templated fragments
+                summary = re.sub(r'\{\{.*?\}\}', '', summary).strip()
+                sentence = re.split(r'[.!?]', summary)[0].strip()
+                if sentence:
+                    lower = sentence.lower()
+                    if any(phrase in lower for phrase in [
+                        "the user",
+                        "wants me",
+                        "summarize",
+                        "short sentence",
+                        "executives",
+                        "instruction",
+                        "prompt",
+                    ]):
+                        return ""
+                if len(sentence) > 10:
+                    return sentence[:200]
+        except Exception:
+            pass
+
+        return ""
     
     def _detect_containers_from_compose(self):
         """Detect containers from docker-compose files."""
@@ -2125,15 +2247,41 @@ Answer:"""
             if c.get('technology') == 'Python'
         ]
 
+        excluded_dirs = {'node_modules', 'test', 'tests', '__tests__', '__pycache__', '.git', 'venv', '.venv'}
+        excluded_files = {'__init__.py', '__main__.py'}
+
+        def iter_python_files(root: Path):
+            for file_path in root.rglob('*.py'):
+                if any(excluded in file_path.parts for excluded in excluded_dirs):
+                    continue
+                if file_path.name in excluded_files:
+                    continue
+                yield file_path
+
         for container in python_containers:
             container_path = self.repo_path / container['path']
             logger.info(f"  Scanning Python container: {container['name']} at {container_path}")
-            
-            for file_path in container_path.rglob('*.py'):
+
+            # Scan container path
+            if container_path.exists():
+                for file_path in iter_python_files(container_path):
+                    if self.ast_extractor.can_handle(file_path):
+                        self.ast_extractor.extract(file_path)
+
+            # Scan shared library paths (common in monorepos)
+            for shared_dir in ['bases', 'components', 'libs', 'packages']:
+                shared_path = self.repo_path / shared_dir
+                if shared_path.exists():
+                    for file_path in iter_python_files(shared_path):
+                        if self.ast_extractor.can_handle(file_path):
+                            self.ast_extractor.extract(file_path)
+
+        # Fallback: if nothing was found, do a repo-wide scan
+        if not self.ast_extractor.entities:
+            logger.info("  No Python entities found in container paths; scanning repository...")
+            for file_path in iter_python_files(self.repo_path):
                 if self.ast_extractor.can_handle(file_path):
-                    entities, relationships = self.ast_extractor.extract(file_path)
-                    # The extractor already accumulates these, but if it were
-                    # multi-threaded, you'd aggregate here.
+                    self.ast_extractor.extract(file_path)
             
         # After scanning all files, the extractor instance holds the results
         self.detailed_entities = self.ast_extractor.entities
@@ -2893,7 +3041,8 @@ Return only the group numbers (1, 2, or 3), one per line, matching the endpoint 
     
     def _extract_models_with_llm(self, func_code: str, func_name: str, method: str) -> Optional[dict[str, Any]]:
         """Extract data models using LLM for detailed analysis."""
-        if not self.llm_manager:
+        llm = self.llm_manager
+        if llm is None:
             return None
         
         prompt = f"""Analyze this API endpoint function and extract the request and response data models.
@@ -2922,7 +3071,7 @@ Format as JSON:
 Answer:"""
         
         try:
-            response = self.llm_manager.generate_text(
+            response = llm.generate_text(
                 prompt,
                 max_tokens=200,
                 temperature=0.2,
