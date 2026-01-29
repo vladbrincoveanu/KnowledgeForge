@@ -1,14 +1,18 @@
 """Container manager for Level 2 C4 Model extraction."""
 
 import logging
+import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional, Tuple
 
 import yaml
+
+from . import utils
 
 from .structure_detector import StructureDetector
 from .compose_detector import ComposeDetector
 from .helm_detector import HelmDetector
+from .terraform_detector import TerraformDetector
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +39,7 @@ class ContainerManager:
             StructureDetector(self.repo_path, llm_manager, self.gitops_paths),
             ComposeDetector(self.repo_path),
             HelmDetector(self.repo_path, llm_manager),
+            TerraformDetector(self.repo_path),
         ]
     
     def detect_all_containers(self) -> dict[str, dict[str, Any]]:
@@ -50,14 +55,14 @@ class ContainerManager:
         structure_containers = structure_detector.detect()
         for container in structure_containers:
             if container:
-                self._register_container(container)
+                self._register_or_merge_container(container, source="structure")
         
         # Run compose detection (may add new containers or enrich existing)
         compose_detector = self.detectors[1]
         if compose_detector.can_detect():
             compose_containers = compose_detector.detect()
             for container in compose_containers:
-                self._register_or_merge_container(container)
+                self._register_or_merge_container(container, source="compose")
         
         # Run Helm detection (merge with existing containers)
         helm_detector = self.detectors[2]
@@ -65,6 +70,13 @@ class ContainerManager:
             helm_containers = helm_detector.detect()
             for container in helm_containers:
                 self._merge_helm_container(container)
+
+        # Run Terraform detection (passive containers)
+        terraform_detector = self.detectors[3]
+        if terraform_detector.can_detect():
+            terraform_containers = terraform_detector.detect()
+            for container in terraform_containers:
+                self._register_or_merge_container(container, source="terraform")
         
         # Map internal dependencies
         self._map_internal_dependencies()
@@ -72,77 +84,101 @@ class ContainerManager:
         logger.info(f"Container detection complete. Found {len(self.containers)} containers.")
         return self.containers
     
-    def _register_container(self, container: dict[str, Any]) -> None:
-        """Register a new container."""
-        name = container.get('name')
-        if name and name not in self.containers:
-            self.containers[name] = container
-    
-    def _register_or_merge_container(self, container: dict[str, Any]) -> None:
-        """Register a new container or merge if exists."""
+    def _register_or_merge_container(self, container: dict[str, Any], source: str) -> None:
+        """Register a new container or merge if an identity match exists."""
         name = container.get('name')
         if not name:
             return
-        
-        if name not in self.containers:
+
+        existing_key, existing = self._find_existing_container(container)
+        if not existing:
             self.containers[name] = container
-        else:
-            # Container exists, merge information
-            existing = self.containers[name]
-            # Don't overwrite existing fields with empty/None values
-            for key, value in container.items():
-                if value and not existing.get(key):
-                    existing[key] = value
+            return
+
+        self._merge_container_data(existing, container)
+        if source == "helm":
+            self._apply_helm_overrides(existing, container)
     
     def _merge_helm_container(self, helm_container: dict[str, Any]) -> None:
         """Merge Helm container info with existing containers."""
-        chart_name = helm_container.get('name')
-        rel_service_path = helm_container.get('path')
-        
-        # Try to find an existing container by path or name variants
-        existing = None
-        existing_key = None
-
-        for key, container in self.containers.items():
-            if container.get('path') == rel_service_path:
-                existing = container
-                existing_key = key
-                break
-
-        if not existing and chart_name:
-            candidate_names = {
-                chart_name,
-                chart_name.replace('-', '_'),
-                chart_name.replace('_', '-'),
-            }
-            for name in candidate_names:
-                if name in self.containers:
-                    existing = self.containers[name]
-                    existing_key = name
-                    break
-
+        existing_key, existing = self._find_existing_container(helm_container)
         if not existing:
-            # Register as new container
-            self.containers[chart_name] = helm_container
-        else:
-            # Merge Helm info into existing container
-            if existing.get("container_type") in {"Service", "Unknown", None}:
-                existing["container_type"] = "Helm Deployed Service"
-            if existing.get("technology") in {"Unknown", None}:
-                existing["technology"] = "Kubernetes"
-            if not existing.get("protocol"):
-                existing["protocol"] = "HTTP"
-            if existing.get("path") in {".", ""}:
-                existing["path"] = rel_service_path
-            existing["runtime_environment"] = "Kubernetes"
-            existing["deployment"] = "Helm"
-            if not existing.get("description"):
-                existing["description"] = helm_container.get("description", "")
-            if not existing.get("description"):
-                existing["description"] = "Kubernetes workload deployed via Helm."
+            self.containers[helm_container.get('name')] = helm_container
+            return
+
+        self._merge_container_data(existing, helm_container)
+        self._apply_helm_overrides(existing, helm_container)
+
+    def _merge_container_data(self, existing: dict[str, Any], incoming: dict[str, Any]) -> None:
+        """Merge incoming container data into existing without overwriting truthy values."""
+        for key, value in incoming.items():
+            if value and not existing.get(key):
+                existing[key] = value
+
+    def _apply_helm_overrides(self, existing: dict[str, Any], helm_container: dict[str, Any]) -> None:
+        """Apply Helm-specific fields to an existing container."""
+        rel_service_path = helm_container.get('path')
+        if existing.get("container_type") in {"Service", "Unknown", None}:
+            existing["container_type"] = "Helm Deployed Service"
+        if existing.get("technology") in {"Unknown", None}:
+            existing["technology"] = "Kubernetes"
+        if not existing.get("protocol"):
+            existing["protocol"] = "HTTP"
+        if existing.get("path") in {".", ""}:
+            existing["path"] = rel_service_path
+        existing["runtime_environment"] = "Kubernetes"
+        existing["deployment"] = "Helm"
+        if not existing.get("description"):
+            existing["description"] = helm_container.get("description", "")
+        if not existing.get("description"):
+            existing["description"] = "Kubernetes workload deployed via Helm."
+
+    def _find_existing_container(self, container: dict[str, Any]) -> Tuple[Optional[str], Optional[dict[str, Any]]]:
+        """Find an existing container by identity-based matching."""
+        incoming_slugs = self._get_container_slugs(container)
+        incoming_path = container.get("path")
+
+        for key, existing in self.containers.items():
+            if incoming_path and existing.get("path") == incoming_path:
+                return key, existing
+            existing_slugs = self._get_container_slugs(existing)
+            if incoming_slugs & existing_slugs:
+                return key, existing
+
+        return None, None
+
+    def _get_container_slugs(self, container: dict[str, Any]) -> set[str]:
+        """Build identity slugs from container name, path, and parent directory."""
+        slugs: set[str] = set()
+        name = container.get("name")
+        path = container.get("path")
+        generic_parents = {"projects", "services", "apps", "packages", "components", "bases"}
+
+        if name:
+            slugs.add(self._slugify(name))
+
+        if path:
+            slugs.add(self._slugify(path))
+            path_obj = Path(path)
+            slugs.add(self._slugify(path_obj.name))
+            if path_obj.parent and str(path_obj.parent) not in {".", ""}:
+                parent_name = path_obj.parent.name
+                if parent_name and parent_name.lower() not in generic_parents:
+                    slugs.add(self._slugify(parent_name))
+
+        return {s for s in slugs if s}
+
+    def _slugify(self, value: str) -> str:
+        """Normalize names/paths to a slug for identity matching."""
+        normalized = value.strip().lower()
+        normalized = normalized.replace("/", "-").replace("\\", "-")
+        normalized = re.sub(r"[\s_]+", "-", normalized)
+        normalized = re.sub(r"[^a-z0-9-]", "", normalized)
+        normalized = re.sub(r"-+", "-", normalized)
+        return normalized.strip("-")
     
     def _map_internal_dependencies(self) -> None:
-        """Map dependencies between containers based on Helm charts."""
+        """Map dependencies between containers based on Helm charts and env references."""
         for container in self.containers.values():
             chart_path = self.repo_path / container['path'] / 'Chart.yaml'
             if chart_path.exists():
@@ -156,6 +192,75 @@ class ContainerManager:
                                     container.setdefault('dependencies_internal', []).append(dep_name)
                 except Exception as e:
                     logger.warning(f"Could not parse {chart_path}: {e}")
+
+        self._discover_runtime_dependencies()
+
+    def _discover_runtime_dependencies(self) -> None:
+        """Discover internal dependencies from compose, k8s manifests, and env files."""
+        files = []
+        files.extend(self.repo_path.rglob("docker-compose*.yml"))
+        files.extend(self.repo_path.rglob("docker-compose*.yaml"))
+        files.extend(self.repo_path.rglob("*.env"))
+        files.extend(self.repo_path.rglob(".env*"))
+        files.extend(self.repo_path.rglob("*.yml"))
+        files.extend(self.repo_path.rglob("*.yaml"))
+
+        for file_path in files:
+            if not file_path.is_file():
+                continue
+
+            container_name = self._resolve_container_for_path(file_path)
+            if not container_name:
+                continue
+
+            try:
+                content = file_path.read_text(encoding="utf-8", errors="ignore")
+            except Exception:
+                continue
+
+            refs = utils.extract_internal_service_refs(content)
+            for token in refs:
+                target_name = self._resolve_container_by_token(token)
+                if not target_name or target_name == container_name:
+                    continue
+                self.containers[container_name].setdefault("dependencies_internal", []).append(target_name)
+
+        for container in self.containers.values():
+            deps = container.get("dependencies_internal")
+            if deps:
+                container["dependencies_internal"] = sorted(set(deps))
+
+    def _resolve_container_by_token(self, token: str) -> Optional[str]:
+        """Resolve a token to a known container name by slug matching."""
+        token_slug = self._slugify(token)
+        if not token_slug:
+            return None
+
+        for name, container in self.containers.items():
+            if token_slug in self._get_container_slugs(container):
+                return name
+        return None
+
+    def _resolve_container_for_path(self, file_path: Path) -> Optional[str]:
+        """Find the owning container for a file based on its path."""
+        try:
+            rel_path = file_path.relative_to(self.repo_path)
+        except Exception:
+            return None
+
+        rel_path_str = str(rel_path)
+        for name, container in self.containers.items():
+            container_path = container.get("path")
+            if not container_path or container_path in {".", ""}:
+                continue
+            if rel_path_str.startswith(container_path):
+                return name
+
+        root_container = next(
+            (c['name'] for c in self.containers.values() if c.get('path') in {'.', ''}),
+            None
+        )
+        return root_container
     
     def build_container_relationships(self) -> list[dict[str, Any]]:
         """Build relationships between containers for C4 diagram.

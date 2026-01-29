@@ -7,6 +7,7 @@ import ReactFlow, {
   useNodesState,
   useEdgesState,
   BackgroundVariant,
+  MarkerType,
   Position,
   useReactFlow,
   ReactFlowProvider
@@ -17,6 +18,7 @@ import './CodeArchitectureViewer.scss';
 import { codeArchitectureAPI } from '../../../services/api';
 import CustomNode from './CustomNode';
 import ContainerNode from './ContainerNode';
+import C4Edge from './C4Edge';
 
 interface CodeEntity {
   id: string;
@@ -79,6 +81,53 @@ interface C4Architecture {
   code_level?: C4Level;
 }
 
+const edgeTypes = {
+  C4Edge,
+};
+
+const buildContainerId = (container: any, idx: number) => `container_${container.name || idx}`;
+
+const generateC4Edges = (containers: any[] = []): Edge[] => {
+  const nameToId = new Map<string, string>();
+
+  containers.forEach((container, idx) => {
+    if (container?.name) {
+      nameToId.set(container.name, buildContainerId(container, idx));
+    }
+  });
+
+  const edges: Edge[] = [];
+
+  containers.forEach((container, idx) => {
+    const sourceId = buildContainerId(container, idx);
+    const protocol = typeof container?.protocol === 'string' ? container.protocol.trim() : '';
+    const label = protocol ? protocol.toUpperCase() : undefined;
+    const dependencies = Array.isArray(container?.dependencies_internal)
+      ? container.dependencies_internal
+      : [];
+
+    dependencies.forEach((dependencyName, depIdx) => {
+      const targetId = nameToId.get(String(dependencyName));
+      if (!targetId) {
+        return;
+      }
+
+      edges.push({
+        id: `c4-edge-${sourceId}-${targetId}-${depIdx}`,
+        source: sourceId,
+        target: targetId,
+        label,
+        type: 'C4Edge',
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+        },
+      });
+    });
+  });
+
+  return edges;
+};
+
 const nodeTypes = {
   custom: CustomNode,
   container: ContainerNode,
@@ -94,34 +143,56 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => 
   // Layout child nodes within their parent containers
   if (containerNodes.length > 0) {
     // Position containers
-    const containerSpacing = 50;
+    const containerSpacing = 60;
     let currentX = 100;
-    
+
+    const childNodeWidth = 220;
+    const childNodeHeight = 100;
+    const childSpacing = 30;
+    const childStartX = 40;
+    const childStartY = 80;
+
     containerNodes.forEach(container => {
       container.position = { x: currentX, y: 100 };
-      
+
       // Get children of this container
       const children = childNodes.filter(n => n.parentNode === container.id);
-      
-      // Layout children in a grid inside the container
-      const childrenPerRow = 2;
-      const childSpacing = 30;
-      const childStartX = 40;
-      const childStartY = 80;
-      
+
+      // Layout children in a grid inside the container (more horizontal when possible)
+      const minColumns = 2;
+      const maxColumns = 4;
+      const childrenPerRow = Math.min(
+        maxColumns,
+        Math.max(minColumns, Math.ceil(children.length / 2))
+      );
+
       children.forEach((child, idx) => {
         const row = Math.floor(idx / childrenPerRow);
         const col = idx % childrenPerRow;
-        
+
         child.position = {
-          x: childStartX + (col * (220 + childSpacing)),
-          y: childStartY + (row * (120 + childSpacing)),
+          x: childStartX + (col * (childNodeWidth + childSpacing)),
+          y: childStartY + (row * (childNodeHeight + childSpacing)),
         };
+        child.sourcePosition = Position.Right;
+        child.targetPosition = Position.Left;
       });
-      
+
+      if (children.length > 0) {
+        const rows = Math.ceil(children.length / childrenPerRow);
+        const contentWidth = (childStartX * 2) + (childrenPerRow * childNodeWidth) + ((childrenPerRow - 1) * childSpacing);
+        const contentHeight = childStartY + (rows * childNodeHeight) + ((rows - 1) * childSpacing) + 50;
+
+        container.style = {
+          ...container.style,
+          width: Math.max(640, contentWidth),
+          height: Math.max(420, contentHeight),
+        };
+      }
+
       currentX += (container.style?.width as number || 700) + containerSpacing;
     });
-    
+
     return { 
       nodes: [...containerNodes, ...childNodes, ...standaloneNodes], 
       edges 
@@ -713,8 +784,10 @@ const CodeArchitectureViewerInner: React.FC = () => {
         const kubernetesContainers = containerEntities.filter(isKubernetesEntity);
 
         if (kubernetesContainers.length > 0) {
-          const rows = Math.ceil(kubernetesContainers.length / 2);
-          const clusterHeight = Math.max(520, rows * 150 + 140);
+          const columns = Math.min(4, Math.max(2, Math.ceil(kubernetesContainers.length / 2)));
+          const rows = Math.ceil(kubernetesContainers.length / columns);
+          const clusterWidth = Math.max(720, (columns * 240) + 200);
+          const clusterHeight = Math.max(420, (rows * 140) + 180);
           const clusterMeta = architecture?.metadata?.runtime?.cluster;
           clusterNodeId = 'cluster_kubernetes';
           rfNodes.push({
@@ -729,7 +802,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
               clusterMeta,
             },
             style: {
-              width: Math.max(900, kubernetesContainers.length * 240),
+              width: clusterWidth,
               height: clusterHeight,
               backgroundColor: 'rgba(148, 163, 184, 0.08)',
               border: '2px dashed #cbd5e1',
@@ -812,8 +885,14 @@ const CodeArchitectureViewerInner: React.FC = () => {
         // label: r.relationship_type,
       }));
 
+    const dependencyEdges = selectedLevel === 'container_level'
+      ? generateC4Edges(architecture?.containers || [])
+      : [];
+
+    const mergedEdges = [...rfEdges, ...dependencyEdges];
+
     // Apply layout
-    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(rfNodes, rfEdges);
+    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(rfNodes, mergedEdges);
     setNodes(layoutedNodes);
     setEdges(layoutedEdges);
     
@@ -966,6 +1045,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
               onEdgesChange={onEdgesChange}
               onNodeClick={onNodeClick}
               nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
               fitView
               attributionPosition="bottom-left"
               defaultViewport={{ x: 0, y: 0, zoom: 0.5 }}

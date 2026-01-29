@@ -12,6 +12,11 @@ import yaml
 logger = logging.getLogger(__name__)
 
 
+_URL_HOST_REGEX = re.compile(r"https?://([^/\s:]+)(?::\d+)?", re.IGNORECASE)
+_HOST_PORT_REGEX = re.compile(r"\b([a-zA-Z0-9][a-zA-Z0-9-]*)(?:\.[a-zA-Z0-9.-]+)?:(\d{2,5})\b")
+_HOSTNAME_REGEX = re.compile(r"\b([a-zA-Z0-9][a-zA-Z0-9-]{1,63})\b")
+
+
 def infer_container_type(project_dir: Path) -> str:
     """Infer what type of container this is."""
     # Check for indicators
@@ -515,46 +520,109 @@ def extract_health_from_compose(service_config: dict) -> str:
 
 def is_deployable_service(directory: Path) -> bool:
     """Check if a directory looks like a deployable service.
-    
-    A directory is considered a deployable service if it has:
-    - Dockerfile
-    - pyproject.toml or package.json (Python/Node projects)
-    - chart/Chart.yaml (Helm chart)
-    - docker-compose.yml
-    - Other framework manifests
-    
-    Args:
-        directory: Path to directory to check
-        
-    Returns:
-        True if directory appears to be a deployable service
+
+    Rules:
+    - Dockerfile always qualifies.
+    - Node.js must have package.json with scripts.start or bin field.
+    - Python must have __main__.py or Dockerfile.
+    - Helm/Kustomize/docker-compose qualify.
+    - Bare pom.xml or pyproject.toml without entry points are ignored.
     """
     if not directory.is_dir():
         return False
-    
-    # Check for deployment indicators
-    indicators = [
-        'Dockerfile',
-        'pyproject.toml',
-        'package.json',
-        'docker-compose.yml',
-        'docker-compose.yaml',
-        'pom.xml',
-        'build.gradle',
-        'go.mod',
-        'Cargo.toml',
-    ]
-    
-    for indicator in indicators:
-        if (directory / indicator).exists():
-            return True
-    
-    # Check for Helm chart
+
+    if (directory / 'Dockerfile').exists():
+        return True
+
     if (directory / 'chart' / 'Chart.yaml').exists():
         return True
-    
-    # Check for kustomize
+
     if (directory / 'kustomize' / 'kustomization.yaml').exists():
         return True
-    
+
+    if (directory / 'docker-compose.yml').exists() or (directory / 'docker-compose.yaml').exists():
+        return True
+
+    package_json = directory / 'package.json'
+    if package_json.exists():
+        if _has_node_entrypoint(package_json):
+            return True
+
+    pyproject = directory / 'pyproject.toml'
+    requirements = directory / 'requirements.txt'
+    if pyproject.exists() or requirements.exists():
+        if _has_python_entrypoint(directory):
+            return True
+        return False
+
+    pom = directory / 'pom.xml'
+    gradle = directory / 'build.gradle'
+    gradle_kts = directory / 'build.gradle.kts'
+    if pom.exists() or gradle.exists() or gradle_kts.exists():
+        return False
+
+    if (directory / 'go.mod').exists() or (directory / 'Cargo.toml').exists():
+        return (directory / 'Dockerfile').exists()
+
+    return False
+
+
+def extract_internal_service_refs(text: str) -> set[str]:
+    """Extract likely internal service hostnames from text.
+
+    Matches URLs, host:port patterns, and service-like hostnames.
+    Returns raw host tokens for further matching.
+    """
+    refs: set[str] = set()
+
+    for host in _URL_HOST_REGEX.findall(text):
+        refs.add(host)
+
+    for host, _port in _HOST_PORT_REGEX.findall(text):
+        refs.add(host)
+
+    for host in _HOSTNAME_REGEX.findall(text):
+        if host.isdigit():
+            continue
+        refs.add(host)
+
+    cleaned: set[str] = set()
+    for host in refs:
+        normalized = host.strip().strip('"\'').strip()
+        normalized = normalized.split("/")[0]
+        if not normalized:
+            continue
+        cleaned.add(normalized)
+
+    return cleaned
+
+
+def _has_node_entrypoint(package_json_path: Path) -> bool:
+    try:
+        with open(package_json_path, 'r', encoding='utf-8', errors='ignore') as f:
+            data = json.load(f)
+    except Exception:
+        return False
+
+    scripts = data.get('scripts') or {}
+    if isinstance(scripts, dict):
+        start_cmd = scripts.get('start')
+        if isinstance(start_cmd, str) and start_cmd.strip():
+            return True
+
+    bin_field = data.get('bin')
+    if isinstance(bin_field, str) and bin_field.strip():
+        return True
+    if isinstance(bin_field, dict) and any(v for v in bin_field.values() if isinstance(v, str) and v.strip()):
+        return True
+
+    return False
+
+
+def _has_python_entrypoint(directory: Path) -> bool:
+    excluded_dirs = {'node_modules', 'test', 'tests', '__tests__', '__pycache__', '.git', 'venv', '.venv'}
+    for main_file in directory.rglob('__main__.py'):
+        if any(excluded in main_file.parts for excluded in excluded_dirs):
+            continue
+        return True
     return False

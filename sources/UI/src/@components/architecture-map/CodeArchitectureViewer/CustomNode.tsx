@@ -21,11 +21,13 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data }) => {
     return formatted.length > 30 ? formatted.substring(0, 27) + '...' : formatted;
   };
 
+  const isContainer = data.type === 'container';
+
   return (
     <div className={`react-flow__node-custom node-type-${data.type}`}>
       <Handle
         type="target"
-        position={Position.Top}
+        position={isContainer ? Position.Left : Position.Top}
         className="custom-handle"
       />
       
@@ -47,7 +49,7 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data }) => {
 
       <Handle
         type="source"
-        position={Position.Bottom}
+        position={isContainer ? Position.Right : Position.Bottom}
         className="custom-handle"
       />
     </div>

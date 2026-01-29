@@ -1,6 +1,7 @@
 """Structure-based container detector."""
 
 import logging
+import os
 from pathlib import Path
 from typing import Any, Optional
 
@@ -71,39 +72,36 @@ class StructureDetector(BaseContainerDetector):
         containers = []
         registered_paths = set()
         
-        # Recursively search for framework manifests
-        for manifest_file in self.repo_path.rglob("*"):
-            if not manifest_file.is_file():
-                continue
-            
-            # Check if this is a framework manifest
-            if manifest_file.name not in self.framework_manifests:
-                continue
-            
-            # Get the directory containing this manifest
-            service_dir = manifest_file.parent
+        # Recursively search for framework manifests with pruning
+        for root, dirs, files in os.walk(self.repo_path, topdown=True):
+            dirs[:] = [d for d in dirs if d not in self.excluded_dirs]
 
-            # Normalize Helm chart/kustomize layouts (chart folder -> parent service)
-            if manifest_file.name == 'Chart.yaml' and service_dir.name in {'chart', 'charts'}:
-                service_dir = service_dir.parent
-            if manifest_file.name == 'kustomization.yaml' and service_dir.name in {'kustomize', 'kustomization'}:
-                service_dir = service_dir.parent
-            
-            # Skip if in excluded directory
-            if any(excluded in service_dir.parts for excluded in self.excluded_dirs):
-                continue
-            
-            # Skip if already registered
-            rel_path = service_dir.relative_to(self.repo_path)
-            if str(rel_path) in registered_paths:
-                continue
-            
-            # Check if this directory looks like a deployable service
-            if self._is_deployable_service(service_dir):
-                container = self._create_container(service_dir)
-                if container:  # Only add if not None
-                    containers.append(container)
-                    registered_paths.add(str(rel_path))
+            for file_name in files:
+                if file_name not in self.framework_manifests:
+                    continue
+
+                manifest_file = Path(root) / file_name
+
+                # Get the directory containing this manifest
+                service_dir = manifest_file.parent
+
+                # Normalize Helm chart/kustomize layouts (chart folder -> parent service)
+                if manifest_file.name == 'Chart.yaml' and service_dir.name in {'chart', 'charts'}:
+                    service_dir = service_dir.parent
+                if manifest_file.name == 'kustomization.yaml' and service_dir.name in {'kustomize', 'kustomization'}:
+                    service_dir = service_dir.parent
+
+                # Skip if already registered
+                rel_path = service_dir.relative_to(self.repo_path)
+                if str(rel_path) in registered_paths:
+                    continue
+
+                # Check if this directory looks like a deployable service
+                if self._is_deployable_service(service_dir):
+                    container = self._create_container(service_dir)
+                    if container:  # Only add if not None
+                        containers.append(container)
+                        registered_paths.add(str(rel_path))
         
         # Fallback: If no containers found, check if root is a service
         if not containers:
@@ -119,21 +117,7 @@ class StructureDetector(BaseContainerDetector):
         
         Checks for framework manifest files that indicate a deployable unit.
         """
-        # Check for any framework manifest
-        for manifest in self.framework_manifests:
-            manifest_path = directory / manifest
-            if manifest_path.exists():
-                return True
-        
-        # Also check for chart subdirectory (Helm)
-        if (directory / "chart" / "Chart.yaml").exists():
-            return True
-
-        # Check for kustomize subdirectory
-        if (directory / "kustomize" / "kustomization.yaml").exists():
-            return True
-        
-        return False
+        return utils.is_deployable_service(directory)
     
     def _create_container(self, project_dir: Path) -> Optional[dict[str, Any]]:
         """Create container dictionary from project directory.
