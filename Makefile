@@ -1,7 +1,7 @@
 # KnowledgeForge - Unified Project Management
 # This Makefile provides commands to manage the entire KnowledgeForge stack
 
-.PHONY: help up down clean logs status install test tests e2e api ui dev prod build build-docker fix validate
+.PHONY: help up down clean logs status install test tests e2e api ui dev prod build build-docker fix validate restart restart-full restart-dev restart-api restart-api-dev restart-ui restart-ui-dev
 
 # Default target
 help:
@@ -9,8 +9,9 @@ help:
 	@echo ""
 	@echo "  make up         - Start all services (UI, API, and infrastructure)"
 	@echo "  make down       - Stop all services"
-	@echo "  make restart    - Restart all services with latest code (rebuilds Docker images)"
-	@echo "  make restart-dev - Restart all services (uses volume-mounted code - no rebuild)"
+	@echo "  make restart    - Rebuild and restart all services (fast - uses cache)"
+	@echo "  make restart-full - Full rebuild and restart (no cache - slower)"
+	@echo "  make restart-dev - Quick restart (no rebuild - uses volume-mounted code)"
 	@echo "  make dev        - Start development environment"
 	@echo "  make prod       - Start production environment"
 	@echo "  make clean      - Stop and clean all containers and volumes"
@@ -28,8 +29,10 @@ help:
 	@echo "Individual Services:"
 	@echo "  make api-only   - Start API only (local development)"
 	@echo "  make ui-only    - Start UI only (local development)"
-	@echo "  make restart-api - Restart API service with latest code (rebuilds Docker image)"
-	@echo "  make restart-api-dev - Restart API service (uses volume-mounted code - no rebuild)"
+	@echo "  make restart-api - Rebuild and restart API service"
+	@echo "  make restart-api-dev - Quick restart API (no rebuild)"
+	@echo "  make restart-ui - Rebuild and restart UI service"
+	@echo "  make restart-ui-dev - Quick restart UI (no rebuild)"
 	@echo ""
 	@echo "Infrastructure:"
 	@echo "  make infra      - Start infrastructure services only"
@@ -204,26 +207,41 @@ portainer:
 # Development helpers
 restart:
 	@echo "🔄 Restarting all services with latest code..."
-	make down
+	docker-compose down
+	docker-compose up -d --build
+	@echo "✅ All services restarted!"
+
+restart-full:
+	@echo "🔄 Full rebuild and restart (no cache)..."
+	docker-compose down
 	docker-compose build --no-cache
-	make up
+	docker-compose up -d
+	@echo "✅ Full rebuild complete!"
 
 restart-dev:
 	@echo "🔄 Restarting all services (using volume-mounted code - no rebuild)..."
 	docker-compose restart
+	@echo "✅ Services restarted!"
 
 restart-api:
 	@echo "🔄 Restarting API service with latest code..."
-	docker-compose build --no-cache api
-	docker-compose up -d api
+	docker-compose up -d --build api
+	@echo "✅ API service restarted!"
 
 restart-api-dev:
 	@echo "🔄 Restarting API service (using volume-mounted code - no rebuild)..."
 	docker-compose restart api
+	@echo "✅ API service restarted!"
 
 restart-ui:
-	@echo "🔄 Restarting UI service..."
+	@echo "🔄 Restarting UI service with latest code..."
+	docker-compose up -d --build ui
+	@echo "✅ UI service restarted!"
+
+restart-ui-dev:
+	@echo "🔄 Restarting UI service (no rebuild)..."
 	docker-compose restart ui
+	@echo "✅ UI service restarted!"
 
 # Health check
 health:

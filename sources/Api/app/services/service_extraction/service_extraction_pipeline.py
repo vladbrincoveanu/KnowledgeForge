@@ -8,7 +8,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Optional
 
-from app.domain.models.services import Service, ServiceStatus, ServiceTier
+from app.domain.models.services import Service, ServiceStatus, ServiceTier, ContextNode
 from app.services.service_extraction.dependency_extractor import DependencyExtractor
 from app.services.service_extraction.domain_extractor import DomainExtractor
 from app.services.service_extraction.extraction_config import ExtractionConfig
@@ -18,6 +18,7 @@ from app.services.service_extraction.llm_service_enricher import ServiceLLMEnric
 from app.services.service_extraction.service_discoverer import ServiceDiscoverer
 from app.services.service_extraction.smart_llm_enricher import SmartLLMEnricher
 from app.services.service_extraction.description_generator import ServiceDescriptionGenerator
+from app.services.service_extraction.context_node_extractor import ContextNodeExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,7 @@ class ServiceExtractionPipeline:
         self.discoverer = ServiceDiscoverer(self.repo_root)
         self.git_analyzer = GitFullAnalyzer(self.repo_root)
         self.domain_extractor = DomainExtractor(self.repo_root)
+        self.context_node_extractor = ContextNodeExtractor(self.repo_root)
         self.llm_label_enricher = ServiceLLMEnricher(
             llm_manager=llm_manager,
             max_tokens=ExtractionConfig.LLM_MAX_TOKENS,
@@ -99,8 +101,8 @@ class ServiceExtractionPipeline:
             budget=self.llm_budget,
         )
 
-    def extract_services(self) -> list[Service]:
-        """Run the full extraction pipeline."""
+    def extract_services(self) -> tuple[list[Service], list[ContextNode]]:
+        """Run the full extraction pipeline and return services + context nodes."""
         logger.info("=" * 60)
         logger.info("STARTING SERVICE EXTRACTION PIPELINE")
         logger.info("=" * 60)
@@ -276,11 +278,14 @@ class ServiceExtractionPipeline:
                     service.description = description
                     logger.info(f"  {service.name}: description generated")
 
-        # Phase 7: Final fallbacks for missing fields
+        # Phase 7: Final fallbacks for missing fields + Risk calculations
         logger.info("-" * 40)
-        logger.info("Phase 7: Applying final fallbacks")
+        logger.info("Phase 7: Applying final fallbacks and calculating risk metrics")
         for service in services:
             self._apply_missing_field_fallbacks(service)
+
+            # Calculate compliance risk (architectural compliance)
+            service.compliance = self._calculate_compliance_risk(service)
 
         # Log final state
         logger.info("=" * 60)
@@ -294,11 +299,42 @@ class ServiceExtractionPipeline:
             logger.info(f"  status={service.status.value} (inferred={inferred.get('status', {}).get('source', 'N/A')})")
             logger.info(f"  tier={service.tier.value}")
             logger.info(f"  data_class={service.data_class}")
+            logger.info(f"  active_experts={service.active_experts}, compliance={service.compliance}, incidents={service.incident_count}")
             logger.info(f"  language={service.language}, framework={service.framework}")
             logger.info(f"  notes={service.notes[:80] if service.notes else None}...")
             logger.info(f"  inferred_fields={list(inferred.keys())}")
 
-        return services
+        # Phase 6: Extract context nodes for architecture visualization
+        logger.info("-" * 40)
+        logger.info("Phase 6: Context node extraction")
+        context_nodes: list[ContextNode] = []
+        
+        # Extract repo-level context nodes (README, Dockerfile, etc. at root)
+        repo_nodes = self.context_node_extractor.extract_context_nodes(
+            service_path=None,  # Use repo root
+            service_id=None,
+        )
+        context_nodes.extend(repo_nodes)
+        logger.info(f"  Found {len(repo_nodes)} repository-level context nodes")
+        
+        # Extract service-level context nodes
+        for service in services:
+            service_path = self._resolve_service_path(service)
+            if service_path:
+                service_nodes = self.context_node_extractor.extract_context_nodes(
+                    service_path=service_path,
+                    service_id=service.id,
+                )
+                context_nodes.extend(service_nodes)
+                if service_nodes:
+                    logger.info(f"  {service.name}: found {len(service_nodes)} context nodes")
+        
+        logger.info(f"Total context nodes extracted: {len(context_nodes)}")
+        logger.info("=" * 60)
+        logger.info("EXTRACTION COMPLETE")
+        logger.info("=" * 60)
+
+        return services, context_nodes
 
     def _needs_llm_labels(self, service: Service) -> bool:
         """Return True if any core field or notes are missing."""
@@ -507,6 +543,61 @@ class ServiceExtractionPipeline:
             else:
                 service.tier = ServiceTier.UNKNOWN
                 inferred["tier"] = {"confidence": "low", "source": "fallback"}
+
+    def _calculate_compliance_risk(self, service: Service) -> str:
+        """
+        Determine architectural compliance risk based on data sensitivity vs. service treatment.
+
+        This checks if services handling sensitive data are properly prioritized and maintained.
+        NOT about legal compliance (GDPR/SOC2) - about architectural best practices.
+
+        Logic:
+        - Sensitive data (PII/CC) + Low priority (Tier 3) → AT_RISK
+        - Sensitive data (PII/CC) + Deprecated status → AT_RISK
+        - Sensitive data (PII/CC) + No owner → NON_COMPLIANT
+        - Sensitive data (PII/CC) + Tier 1/2 + Active + Has owner → COMPLIANT
+        - Non-sensitive data → COMPLIANT (no risk)
+        - Unknown data_class or tier → UNKNOWN
+
+        Returns:
+            "COMPLIANT" | "AT_RISK" | "NON_COMPLIANT" | "UNKNOWN"
+        """
+        data_class = service.data_class
+        tier = service.tier
+        status = service.status
+        owner = service.owner
+
+        # Unknown data classification or tier
+        if not data_class or data_class == "Unknown" or tier == ServiceTier.UNKNOWN:
+            return "UNKNOWN"
+
+        # Check if service handles sensitive data
+        is_sensitive = data_class in ["PII", "Credit-Card", "Secret"]
+
+        if not is_sensitive:
+            # Non-sensitive data is always compliant
+            return "COMPLIANT"
+
+        # Sensitive data checks
+        # CRITICAL: No owner for sensitive data
+        if not owner or owner == "Unassigned":
+            logger.warning(f"Service {service.name} handles {data_class} but has no owner - NON_COMPLIANT")
+            return "NON_COMPLIANT"
+
+        # AT_RISK: Low priority for sensitive data
+        if tier == ServiceTier.TIER_3:
+            logger.warning(f"Service {service.name} handles {data_class} but is Tier 3 - AT_RISK")
+            return "AT_RISK"
+
+        # AT_RISK: Deprecated/frozen service with sensitive data
+        if status in [ServiceStatus.DEPRECATED, ServiceStatus.UNKNOWN]:
+            logger.warning(f"Service {service.name} handles {data_class} but status is {status.value} - AT_RISK")
+            return "AT_RISK"
+
+        # COMPLIANT: Sensitive data properly handled
+        # (Tier 1/2, Active/Maintenance, Has owner)
+        logger.debug(f"Service {service.name} handles {data_class} and is properly managed - COMPLIANT")
+        return "COMPLIANT"
 
     def _read_readme_text(self, service_path: Optional[Path]) -> str:
         """Read README content from service path or repo root."""

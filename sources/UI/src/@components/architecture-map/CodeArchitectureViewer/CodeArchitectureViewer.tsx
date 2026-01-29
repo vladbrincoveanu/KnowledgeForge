@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import ReactFlow, { 
   Node, 
   Edge, 
@@ -84,8 +84,14 @@ const nodeTypes = {
   container: ContainerNode,
 };
 
+const AVAILABLE_LEVELS = ['context_level', 'container_level', 'component_level', 'code_level'];
+
 // Layout function - grid layout for components in containers
 const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => {
+  if (nodes.length === 0) {
+    return { nodes: [], edges };
+  }
+  
   // Separate parent containers and child nodes
   const containerNodes = nodes.filter(n => n.type === 'container');
   const childNodes = nodes.filter(n => n.parentNode);
@@ -175,40 +181,70 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => 
   }
   
   // Hierarchical layout with dagre for connected graphs
-  const dagreGraph = new dagre.graphlib.Graph();
-  dagreGraph.setDefaultEdgeLabel(() => ({}));
-  
-  dagreGraph.setGraph({ 
-    rankdir: direction,
-    align: 'UL',
-    ranksep: 250,
-    nodesep: 80,
-    edgesep: 20,
-    marginx: 50,
-    marginy: 50,
-    ranker: 'network-simplex',
-  });
+  // If we have edges, use dagre for layout
+  if (edges.length > 0) {
+    const dagreGraph = new dagre.graphlib.Graph();
+    dagreGraph.setDefaultEdgeLabel(() => ({}));
 
-  nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { 
-      width: 220, 
-      height: 100,
+    dagreGraph.setGraph({ 
+      rankdir: direction,
+      align: 'UL',
+      ranksep: 250,
+      nodesep: 80,
+      edgesep: 20,
+      marginx: 50,
+      marginy: 50,
+      ranker: 'network-simplex',
     });
-  });
 
-  edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target);
-  });
+    nodes.forEach((node) => {
+      dagreGraph.setNode(node.id, { 
+        width: 220, 
+        height: 100,
+      });
+    });
 
-  dagre.layout(dagreGraph);
+    edges.forEach((edge) => {
+      dagreGraph.setEdge(edge.source, edge.target);
+    });
 
-  const layoutedNodes = nodes.map((node) => {
-    const nodeWithPosition = dagreGraph.node(node.id);
+    dagre.layout(dagreGraph);
+
+    const layoutedNodes = nodes.map((node) => {
+      const nodeWithPosition = dagreGraph.node(node.id);
+      if (nodeWithPosition && nodeWithPosition.x !== undefined && nodeWithPosition.y !== undefined) {
+        return {
+          ...node,
+          position: {
+            x: nodeWithPosition.x - 110,
+            y: nodeWithPosition.y - 50,
+          },
+          sourcePosition: Position.Right,
+          targetPosition: Position.Left,
+        };
+      }
+      // Fallback if dagre didn't position this node
+      return node;
+    });
+
+    return { nodes: layoutedNodes, edges };
+  }
+  
+  // If no edges, use a simple grid layout
+  const nodesPerRow = Math.ceil(Math.sqrt(nodes.length));
+  const nodeWidth = 220;
+  const nodeHeight = 100;
+  const spacing = 50;
+  
+  const layoutedNodes = nodes.map((node, index) => {
+    const row = Math.floor(index / nodesPerRow);
+    const col = index % nodesPerRow;
+    
     return {
       ...node,
       position: {
-        x: nodeWithPosition.x - 110,
-        y: nodeWithPosition.y - 50,
+        x: col * (nodeWidth + spacing) + 100,
+        y: row * (nodeHeight + spacing) + 100,
       },
       sourcePosition: Position.Right,
       targetPosition: Position.Left,
@@ -235,15 +271,300 @@ const CodeArchitectureViewerInner: React.FC = () => {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const { fitView } = useReactFlow();
   
-  // Filters - default to showing only component level (components auto-connect)
-  const [selectedLevel, setSelectedLevel] = useState<string>('component_level');
+  // Filters - focus on context-level for manager view
+  const [selectedLevel, setSelectedLevel] = useState<string>('context_level');
   const [selectedEntityTypes, setSelectedEntityTypes] = useState<string[]>([]);
   const [selectedRelationshipTypes, setSelectedRelationshipTypes] = useState<string[]>([]);
-  const [showExternal, setShowExternal] = useState(false);
+  const [showExternal, setShowExternal] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedNode, setSelectedNode] = useState<any>(null);
   
   const [relationshipTypes, setRelationshipTypes] = useState<string[]>([]);
+  const [githubUrl, setGithubUrl] = useState('');
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractionStatus, setExtractionStatus] = useState<string | null>(null);
+  const [extractionError, setExtractionError] = useState<string | null>(null);
+  const pollIntervalRef = useRef<number | null>(null);
+
+  const applyArchitecture = useCallback((data: any) => {
+    // Ensure c4_model_version exists (API might not include it)
+    if (!data.c4_model_version) {
+      data.c4_model_version = '1.0';
+    }
+    
+    console.log('[CodeArchitectureViewer] Applying cumulative architecture data:', {
+      hasSystemContext: !!data.system_context,
+      containersCount: data.containers?.length || 0,
+      componentsCount: data.components?.length || 0,
+      hasRelationships: !!data.relationships,
+      extractionMode: data.metadata?.extraction_mode || 'unknown',
+    });
+    
+    // Transform containers array into container_level structure
+    if (data.containers && Array.isArray(data.containers)) {
+      const containerEntities: CodeEntity[] = data.containers.map((container: any, idx: number) => ({
+        id: `container_${container.name || idx}`,
+        name: container.name,
+        entity_type: 'container',
+        language: container.technology || 'Unknown',
+        file_path: container.path,
+        attributes: {
+          container_type: container.container_type,
+          protocol: container.protocol,
+          runtime_info: container.runtime_info,
+          runtime_environment: container.runtime_environment,
+          deployment: container.deployment,
+        },
+      }));
+      
+      // Create relationships from containers to their code entities
+      const containerRelationships: CodeRelationship[] = [];
+      if (data.code_level?.entities) {
+        containerEntities.forEach(container => {
+          const containerPath = container.file_path || '';
+          // Find code entities that belong to this container
+          data.code_level.entities
+            .filter((entity: CodeEntity) => {
+              const entityPath = entity.file_path || '';
+              return entityPath.startsWith(containerPath);
+            })
+            .forEach((entity: CodeEntity) => {
+              containerRelationships.push({
+                id: `rel_${container.id}_${entity.id}`,
+                source_entity_id: container.id,
+                target_entity_id: entity.id,
+                relationship_type: 'contains',
+                attributes: {},
+              });
+            });
+        });
+      }
+
+      // Merge container-level relationships from C4 JSON
+      if (data.relationships?.containers?.length) {
+        const containerIdByName = new Map(
+          containerEntities.map(c => [c.name, c.id])
+        );
+
+        data.relationships.containers.forEach((rel: C4DiagramRelationship, idx: number) => {
+          const sourceId = containerIdByName.get(rel.source);
+          const targetId = containerIdByName.get(rel.destination);
+
+          if (sourceId && targetId) {
+            containerRelationships.push({
+              id: `rel_container_${idx}`,
+              source_entity_id: sourceId,
+              target_entity_id: targetId,
+              relationship_type: rel.relationship_type || 'depends_on',
+              attributes: { description: rel.description },
+            });
+          }
+        });
+      }
+      
+      data.container_level = {
+        entities: containerEntities,
+        relationships: containerRelationships,
+      };
+    }
+
+    // Transform context data into context_level structure
+    if (data.system_context && !data.context_level) {
+      const contextEntities: CodeEntity[] = [];
+      const contextRelationships: CodeRelationship[] = [];
+
+      const systemName = data.system_context?.name || 'System';
+      const systemId = `context_system_${systemName}`;
+
+      contextEntities.push({
+        id: systemId,
+        name: systemName,
+        entity_type: 'system',
+        language: 'Unknown',
+        file_path: '',
+        attributes: {
+          owner_team: data.system_context?.owner_team,
+          business_domain: data.system_context?.business_domain,
+          criticality: data.system_context?.criticality,
+          purpose: data.system_context?.purpose,
+          languages: data.system_context?.languages,
+          frameworks: data.system_context?.frameworks,
+          repository_url: data.system_context?.repository_url,
+          git: data.system_context?.git,
+          context_sources: data.system_context?.context_sources,
+        },
+      });
+
+      const actorEntities = (data.system_context?.actors || []).map((actor: any, idx: number) => ({
+        id: `context_actor_${idx}`,
+        name: actor.name || `Actor ${idx + 1}`,
+        entity_type: actor.type || 'person',
+        language: 'Unknown',
+        file_path: '',
+        attributes: {},
+      }));
+
+      const externalEntities = (data.system_context?.external_dependencies || []).map((dep: any, idx: number) => ({
+        id: `context_external_${idx}`,
+        name: dep.name || dep.url || `External ${idx + 1}`,
+        entity_type: dep.type || 'external_system',
+        language: 'Unknown',
+        file_path: dep.detected_from || '',
+        attributes: {
+          url: dep.url,
+          detected_from: dep.detected_from,
+          is_external: true,
+        },
+      }));
+
+      contextEntities.push(...actorEntities, ...externalEntities);
+
+      const contextIdByName = new Map(
+        contextEntities.map(entity => [entity.name, entity.id])
+      );
+
+      if (data.relationships?.context?.length) {
+        data.relationships.context.forEach((rel: C4DiagramRelationship, idx: number) => {
+          const sourceId = contextIdByName.get(rel.source);
+          const targetId = contextIdByName.get(rel.destination);
+
+          if (sourceId && targetId) {
+            contextRelationships.push({
+              id: `rel_context_${idx}`,
+              source_entity_id: sourceId,
+              target_entity_id: targetId,
+              relationship_type: rel.relationship_type || 'uses',
+              attributes: { description: rel.description },
+            });
+          }
+        });
+      }
+
+      data.context_level = {
+        entities: contextEntities,
+        relationships: contextRelationships,
+      };
+    }
+    
+    // Transform components array into component_level structure
+    if (data.components && Array.isArray(data.components)) {
+      const componentEntities: CodeEntity[] = [];
+      const componentRelationships: CodeRelationship[] = [];
+      
+      data.components.forEach((component: any, groupIdx: number) => {
+        // Check if this is a component group
+        if (component.type === 'component_group' && component.components && Array.isArray(component.components)) {
+          // Expand the grouped components
+          component.components.forEach((compName: string, idx: number) => {
+            const compId = `component_${groupIdx}_${idx}`;
+            componentEntities.push({
+              id: compId,
+              name: compName,
+              entity_type: 'component',
+              language: 'Unknown',
+              file_path: component.name, // Use group name as path/module
+              attributes: {
+                component_type: component.component_type || 'Component',
+                group: component.name,
+                container: component.container,
+              },
+            });
+            
+            // Create relationship to container
+            if (component.container && data.container_level?.entities) {
+              const containerEntity = data.container_level.entities.find(
+                (c: CodeEntity) => c.name === component.container
+              );
+              if (containerEntity) {
+                componentRelationships.push({
+                  id: `rel_comp_${compId}_${containerEntity.id}`,
+                  source_entity_id: containerEntity.id,
+                  target_entity_id: compId,
+                  relationship_type: 'contains',
+                  attributes: {},
+                });
+              }
+            }
+          });
+        } else {
+          // Single component (not grouped)
+          const compId = `component_${groupIdx}`;
+          componentEntities.push({
+            id: compId,
+            name: component.name || `Component ${groupIdx}`,
+            entity_type: 'component',
+            language: component.technology || 'Unknown',
+            file_path: component.path || component.file,
+            attributes: {
+              ...component.attributes,
+              component_type: component.component_type,
+              container: component.container,
+              endpoint_path: component.endpoint_path,
+              endpoint_method: component.endpoint_method,
+            },
+          });
+          
+          // Create relationship to container
+          if (component.container && data.container_level?.entities) {
+            const containerEntity = data.container_level.entities.find(
+              (c: CodeEntity) => c.name === component.container
+            );
+            if (containerEntity) {
+              componentRelationships.push({
+                id: `rel_comp_${compId}_${containerEntity.id}`,
+                source_entity_id: containerEntity.id,
+                target_entity_id: compId,
+                relationship_type: 'contains',
+                attributes: {},
+              });
+            }
+          }
+        }
+      });
+      
+      // Components don't need relationships - they're independent endpoints
+      // No inter-component relationships needed
+      
+      data.component_level = {
+        entities: componentEntities,
+        relationships: componentRelationships,
+      };
+    }
+    
+    setArchitecture(data);
+    setSelectedNode(null);
+    
+    console.log('[CodeArchitectureViewer] Architecture state set:', {
+      contextLevel: data.context_level?.entities?.length || 0,
+      containerLevel: data.container_level?.entities?.length || 0,
+      componentLevel: data.component_level?.entities?.length || 0,
+      codeLevel: data.code_level?.entities?.length || 0,
+      hasSystemContext: !!data.system_context,
+      containersCount: data.containers?.length || 0,
+      componentsCount: data.components?.length || 0,
+    });
+    
+    // Extract unique entity and relationship types
+    const allEntities: CodeEntity[] = [];
+    const allRelationships: CodeRelationship[] = [];
+    const levelsForFilters = ['context_level', 'container_level', 'component_level', 'code_level'];
+    
+    levelsForFilters.forEach(level => {
+      if (data[level as keyof C4Architecture]) {
+        const levelData = data[level as keyof C4Architecture] as C4Level;
+        if (levelData.entities) allEntities.push(...levelData.entities);
+        if (levelData.relationships) allRelationships.push(...levelData.relationships);
+      }
+    });
+    
+    const uniqueEntityTypes = Array.from(new Set(allEntities.map(e => e.entity_type)));
+    const uniqueRelTypes = Array.from(new Set(allRelationships.map(r => r.relationship_type)));
+    
+    setRelationshipTypes(uniqueRelTypes.sort());
+    setSelectedEntityTypes(uniqueEntityTypes);
+    setSelectedRelationshipTypes(uniqueRelTypes);
+    setError(null);
+  }, []);
 
   // Load architecture data
   useEffect(() => {
@@ -251,254 +572,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
       try {
         setLoading(true);
         const data = await codeArchitectureAPI.getArchitecture();
-        
-        // Transform containers array into container_level structure
-        if (data.containers && Array.isArray(data.containers)) {
-          const containerEntities: CodeEntity[] = data.containers.map((container: any, idx: number) => ({
-            id: `container_${container.name || idx}`,
-            name: container.name,
-            entity_type: 'container',
-            language: container.technology || 'Unknown',
-            file_path: container.path,
-            attributes: {
-              container_type: container.container_type,
-              protocol: container.protocol,
-              runtime_info: container.runtime_info,
-              runtime_environment: container.runtime_environment,
-              deployment: container.deployment,
-            },
-          }));
-          
-          // Create relationships from containers to their code entities
-          const containerRelationships: CodeRelationship[] = [];
-          if (data.code_level?.entities) {
-            containerEntities.forEach(container => {
-              const containerPath = container.file_path || '';
-              // Find code entities that belong to this container
-              data.code_level.entities
-                .filter((entity: CodeEntity) => {
-                  const entityPath = entity.file_path || '';
-                  return entityPath.startsWith(containerPath);
-                })
-                .forEach((entity: CodeEntity) => {
-                  containerRelationships.push({
-                    id: `rel_${container.id}_${entity.id}`,
-                    source_entity_id: container.id,
-                    target_entity_id: entity.id,
-                    relationship_type: 'contains',
-                    attributes: {},
-                  });
-                });
-            });
-          }
-
-          // Merge container-level relationships from C4 JSON
-          if (data.relationships?.containers?.length) {
-            const containerIdByName = new Map(
-              containerEntities.map(c => [c.name, c.id])
-            );
-
-            data.relationships.containers.forEach((rel: C4DiagramRelationship, idx: number) => {
-              const sourceId = containerIdByName.get(rel.source);
-              const targetId = containerIdByName.get(rel.destination);
-
-              if (sourceId && targetId) {
-                containerRelationships.push({
-                  id: `rel_container_${idx}`,
-                  source_entity_id: sourceId,
-                  target_entity_id: targetId,
-                  relationship_type: rel.relationship_type || 'depends_on',
-                  attributes: { description: rel.description },
-                });
-              }
-            });
-          }
-          
-          data.container_level = {
-            entities: containerEntities,
-            relationships: containerRelationships,
-          };
-        }
-
-        // Transform context data into context_level structure
-        if (data.system_context && !data.context_level) {
-          const contextEntities: CodeEntity[] = [];
-          const contextRelationships: CodeRelationship[] = [];
-
-          const systemName = data.system_context?.name || 'System';
-          const systemId = `context_system_${systemName}`;
-
-          contextEntities.push({
-            id: systemId,
-            name: systemName,
-            entity_type: 'system',
-            language: 'Unknown',
-            file_path: '',
-            attributes: {
-              owner_team: data.system_context?.owner_team,
-              business_domain: data.system_context?.business_domain,
-              criticality: data.system_context?.criticality,
-              purpose: data.system_context?.purpose,
-            },
-          });
-
-          const actorEntities = (data.system_context?.actors || []).map((actor: any, idx: number) => ({
-            id: `context_actor_${idx}`,
-            name: actor.name || `Actor ${idx + 1}`,
-            entity_type: actor.type || 'person',
-            language: 'Unknown',
-            file_path: '',
-            attributes: {},
-          }));
-
-          const externalEntities = (data.system_context?.external_dependencies || []).map((dep: any, idx: number) => ({
-            id: `context_external_${idx}`,
-            name: dep.name || dep.url || `External ${idx + 1}`,
-            entity_type: dep.type || 'external_system',
-            language: 'Unknown',
-            file_path: dep.detected_from || '',
-            attributes: {
-              url: dep.url,
-              detected_from: dep.detected_from,
-            },
-          }));
-
-          contextEntities.push(...actorEntities, ...externalEntities);
-
-          const contextIdByName = new Map(
-            contextEntities.map(entity => [entity.name, entity.id])
-          );
-
-          if (data.relationships?.context?.length) {
-            data.relationships.context.forEach((rel: C4DiagramRelationship, idx: number) => {
-              const sourceId = contextIdByName.get(rel.source);
-              const targetId = contextIdByName.get(rel.destination);
-
-              if (sourceId && targetId) {
-                contextRelationships.push({
-                  id: `rel_context_${idx}`,
-                  source_entity_id: sourceId,
-                  target_entity_id: targetId,
-                  relationship_type: rel.relationship_type || 'uses',
-                  attributes: { description: rel.description },
-                });
-              }
-            });
-          }
-
-          data.context_level = {
-            entities: contextEntities,
-            relationships: contextRelationships,
-          };
-        }
-        
-        // Transform components array into component_level structure
-        if (data.components && Array.isArray(data.components)) {
-          const componentEntities: CodeEntity[] = [];
-          const componentRelationships: CodeRelationship[] = [];
-          
-          data.components.forEach((component: any, groupIdx: number) => {
-            // Check if this is a component group
-            if (component.type === 'component_group' && component.components && Array.isArray(component.components)) {
-              // Expand the grouped components
-              component.components.forEach((compName: string, idx: number) => {
-                const compId = `component_${groupIdx}_${idx}`;
-                componentEntities.push({
-                  id: compId,
-                  name: compName,
-                  entity_type: 'component',
-                  language: 'Unknown',
-                  file_path: component.name, // Use group name as path/module
-                  attributes: {
-                    component_type: component.component_type || 'Component',
-                    group: component.name,
-                    container: component.container,
-                  },
-                });
-                
-                // Create relationship to container
-                if (component.container && data.container_level?.entities) {
-                  const containerEntity = data.container_level.entities.find(
-                    (c: CodeEntity) => c.name === component.container
-                  );
-                  if (containerEntity) {
-                    componentRelationships.push({
-                      id: `rel_comp_${compId}_${containerEntity.id}`,
-                      source_entity_id: containerEntity.id,
-                      target_entity_id: compId,
-                      relationship_type: 'contains',
-                      attributes: {},
-                    });
-                  }
-                }
-              });
-            } else {
-              // Single component (not grouped)
-              const compId = `component_${groupIdx}`;
-              componentEntities.push({
-                id: compId,
-                name: component.name || `Component ${groupIdx}`,
-                entity_type: 'component',
-                language: component.technology || 'Unknown',
-                file_path: component.path || component.file,
-                attributes: {
-                  ...component.attributes,
-                  component_type: component.component_type,
-                  container: component.container,
-                  endpoint_path: component.endpoint_path,
-                  endpoint_method: component.endpoint_method,
-                },
-              });
-              
-              // Create relationship to container
-              if (component.container && data.container_level?.entities) {
-                const containerEntity = data.container_level.entities.find(
-                  (c: CodeEntity) => c.name === component.container
-                );
-                if (containerEntity) {
-                  componentRelationships.push({
-                    id: `rel_comp_${compId}_${containerEntity.id}`,
-                    source_entity_id: containerEntity.id,
-                    target_entity_id: compId,
-                    relationship_type: 'contains',
-                    attributes: {},
-                  });
-                }
-              }
-            }
-          });
-          
-          // Components don't need relationships - they're independent endpoints
-          // No inter-component relationships needed
-          
-          data.component_level = {
-            entities: componentEntities,
-            relationships: componentRelationships,
-          };
-        }
-        
-        setArchitecture(data);
-        
-        // Extract unique entity and relationship types
-        const allEntities: CodeEntity[] = [];
-        const allRelationships: CodeRelationship[] = [];
-        
-        ['context_level', 'container_level', 'component_level', 'code_level'].forEach(level => {
-          if (data[level as keyof C4Architecture]) {
-            const levelData = data[level as keyof C4Architecture] as C4Level;
-            if (levelData.entities) allEntities.push(...levelData.entities);
-            if (levelData.relationships) allRelationships.push(...levelData.relationships);
-          }
-        });
-        
-        const uniqueEntityTypes = Array.from(new Set(allEntities.map(e => e.entity_type)));
-        const uniqueRelTypes = Array.from(new Set(allRelationships.map(r => r.relationship_type)));
-        
-        setRelationshipTypes(uniqueRelTypes.sort());
-        setSelectedEntityTypes(uniqueEntityTypes);
-        setSelectedRelationshipTypes(uniqueRelTypes);
-        
-        setError(null);
+        applyArchitecture(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load architecture');
       } finally {
@@ -507,11 +581,99 @@ const CodeArchitectureViewerInner: React.FC = () => {
     };
     
     loadArchitecture();
+  }, [applyArchitecture]);
+
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
   }, []);
+
+  const handleExtractFromGithub = useCallback(async () => {
+    if (!githubUrl.trim()) {
+      setExtractionError('Please enter a GitHub URL');
+      return;
+    }
+
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+
+    setExtractionError(null);
+    setExtractionStatus('Starting extraction...');
+    setIsExtracting(true);
+
+    try {
+      const response = await codeArchitectureAPI.extractFromGitHub(githubUrl.trim(), true);
+      const taskId = response.task_id;
+
+      if (!taskId) {
+        throw new Error('No task id returned from extraction');
+      }
+
+      pollIntervalRef.current = window.setInterval(async () => {
+        try {
+          const status = await codeArchitectureAPI.getExtractionStatus(taskId);
+          const progress = typeof status.progress === 'number'
+            ? Math.round(status.progress * 100)
+            : null;
+          const statusLabel = status.message || status.status;
+          setExtractionStatus(progress !== null ? `${statusLabel} (${progress}%)` : statusLabel);
+
+          if (status.status === 'completed') {
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
+              pollIntervalRef.current = null;
+            }
+            setIsExtracting(false);
+            setExtractionStatus('Extraction completed');
+
+            const results = await codeArchitectureAPI.getExtractionResults(taskId);
+            if (results) {
+              console.log('[CodeArchitectureViewer] Extraction results received:', results);
+              applyArchitecture(results);
+              setSelectedLevel('context_level');
+            }
+          } else if (status.status === 'failed') {
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
+              pollIntervalRef.current = null;
+            }
+            setIsExtracting(false);
+            setExtractionError(status.message || 'Extraction failed');
+          }
+        } catch (pollError) {
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
+          setIsExtracting(false);
+          setExtractionError('Failed to poll extraction status');
+        }
+      }, 2000);
+    } catch (err) {
+      setIsExtracting(false);
+      setExtractionError(err instanceof Error ? err.message : 'Failed to start extraction');
+    }
+  }, [githubUrl, applyArchitecture]);
 
   // Process architecture data into graph format
   useEffect(() => {
-    if (!architecture) return;
+    if (!architecture) {
+      console.log('[CodeArchitectureViewer] No architecture data available');
+      return;
+    }
+
+    console.log('[CodeArchitectureViewer] Processing graph for level:', selectedLevel, {
+      hasContextLevel: !!architecture.context_level,
+      hasContainerLevel: !!architecture.container_level,
+      hasComponentLevel: !!architecture.component_level,
+      hasCodeLevel: !!architecture.code_level,
+    });
 
     const allEntities: CodeEntity[] = [];
     const allRelationships: CodeRelationship[] = [];
@@ -519,6 +681,10 @@ const CodeArchitectureViewerInner: React.FC = () => {
     // Collect entities and relationships from the selected level
     if (architecture[selectedLevel as keyof C4Architecture]) {
       const levelData = architecture[selectedLevel as keyof C4Architecture] as C4Level;
+      console.log('[CodeArchitectureViewer] Level data found:', {
+        entitiesCount: levelData.entities?.length || 0,
+        relationshipsCount: levelData.relationships?.length || 0,
+      });
       if (levelData.entities) {
         // Add level metadata to each entity
         allEntities.push(...levelData.entities.map(e => ({ ...e, level: selectedLevel })));
@@ -526,6 +692,8 @@ const CodeArchitectureViewerInner: React.FC = () => {
       if (levelData.relationships) {
         allRelationships.push(...levelData.relationships);
       }
+    } else {
+      console.warn('[CodeArchitectureViewer] No data found for selected level:', selectedLevel);
     }
 
     // Filter entities
@@ -642,6 +810,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
               isExternal: e.attributes?.is_external,
               decorators: e.attributes?.decorators,
               level: e.level,
+              attributes: e.attributes,
             },
           };
           rfNodes.push(node);
@@ -681,6 +850,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
             isExternal: e.attributes?.is_external,
             decorators: e.attributes?.decorators,
             level: e.level,
+            attributes: e.attributes,
           },
         });
       });
@@ -774,6 +944,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
             isExternal: e.attributes?.is_external,
             decorators: e.attributes?.decorators,
             level: e.level,
+            attributes: e.attributes,
             containerMeta: containerInfo ? {
               container_type: containerInfo.container_type,
               technology: containerInfo.technology,
@@ -814,21 +985,79 @@ const CodeArchitectureViewerInner: React.FC = () => {
 
     // Apply layout
     const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(rfNodes, rfEdges);
-    setNodes(layoutedNodes);
+    
+    // Ensure all nodes have valid positions (not all at 0,0)
+    const nodesWithValidPositions = layoutedNodes.map((node, idx) => {
+      // If node is at origin and there are multiple nodes, it likely wasn't positioned correctly
+      if (node.position.x === 0 && node.position.y === 0 && layoutedNodes.length > 1) {
+        // Use a simple grid fallback
+        const nodesPerRow = Math.ceil(Math.sqrt(layoutedNodes.length));
+        const row = Math.floor(idx / nodesPerRow);
+        const col = idx % nodesPerRow;
+        return {
+          ...node,
+          position: {
+            x: col * 280 + 100,
+            y: row * 150 + 100,
+          },
+        };
+      }
+      return node;
+    });
+    
+    console.log('[CodeArchitectureViewer] Graph nodes/edges created:', {
+      nodesCount: nodesWithValidPositions.length,
+      edgesCount: layoutedEdges.length,
+      selectedLevel,
+      filteredEntitiesCount: filteredEntities.length,
+      filteredRelationshipsCount: filteredRelationships.length,
+      sampleNodePositions: nodesWithValidPositions.slice(0, 5).map(n => ({ 
+        id: n.id, 
+        type: n.type,
+        pos: n.position,
+        hasData: !!n.data,
+        label: n.data?.label 
+      })),
+      allNodesAtOrigin: nodesWithValidPositions.every(n => n.position.x === 0 && n.position.y === 0),
+    });
+    
+    setNodes(nodesWithValidPositions);
     setEdges(layoutedEdges);
     
     // Fit view after layout to show entire graph
-    window.requestAnimationFrame(() => {
-      setTimeout(() => {
-        fitView({ 
-          padding: 0.1,
-          includeHiddenNodes: false,
-          duration: 500,
-          maxZoom: 0.9,
-          minZoom: 0.05,
-        });
-      }, 100);
-    });
+    // Use multiple attempts to ensure fitView works
+    if (layoutedNodes.length > 0) {
+      window.requestAnimationFrame(() => {
+        setTimeout(() => {
+          try {
+            fitView({
+              padding: 50,
+              includeHiddenNodes: false,
+              duration: 500,
+              maxZoom: 1.5,
+              minZoom: 0.1,
+            });
+          } catch (e) {
+            console.warn('[CodeArchitectureViewer] fitView error:', e);
+          }
+        }, 200);
+        
+        // Try again after a longer delay to ensure nodes are rendered
+        setTimeout(() => {
+          try {
+            fitView({
+              padding: 50,
+              includeHiddenNodes: false,
+              duration: 300,
+              maxZoom: 1.5,
+              minZoom: 0.1,
+            });
+          } catch (e) {
+            console.warn('[CodeArchitectureViewer] fitView retry error:', e);
+          }
+        }, 500);
+      });
+    }
   }, [architecture, selectedLevel, selectedEntityTypes, selectedRelationshipTypes, showExternal, searchTerm, fitView]);
 
   const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
@@ -851,6 +1080,10 @@ const CodeArchitectureViewerInner: React.FC = () => {
     );
   };
 
+  const systemAttributes = selectedNode?.type === 'system'
+    ? (selectedNode.attributes || {})
+    : null;
+
   if (loading) {
     return (
       <div className="code-architecture-viewer">
@@ -865,7 +1098,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
         <div className="error">
           <h3>Error loading architecture</h3>
           <p>{error}</p>
-          <p className="hint">Make sure you've run the extraction: <code>python -m services.code_extraction.c4_extractor</code></p>
+          <p className="hint">Run extraction above or execute <code>python -m services.code_extraction.c4_extractor</code></p>
         </div>
       </div>
     );
@@ -874,12 +1107,65 @@ const CodeArchitectureViewerInner: React.FC = () => {
   return (
     <div className="code-architecture-viewer">
       <div className="viewer-header">
-        <h2>Code Architecture Map</h2>
-        <p>Hierarchical visualization from high-level modules to detailed code dependencies</p>
+        <h2>Architecture Context (Multi-Repository)</h2>
+        <p>Cumulative view of all added repositories - add multiple projects to see complete landscape</p>
       </div>
 
       <div className="viewer-layout">
         <aside className="filters-sidebar">
+          <div className="filter-section">
+            <h3>Extract Context</h3>
+            <input
+              type="text"
+              placeholder="https://github.com/owner/repo"
+              value={githubUrl}
+              onChange={e => setGithubUrl(e.target.value)}
+              className="search-input"
+            />
+            <div className="button-group">
+              <button
+                className="fit-button"
+                onClick={handleExtractFromGithub}
+                disabled={isExtracting}
+              >
+                {isExtracting ? 'Extracting...' : 'Add Repository'}
+              </button>
+              <button
+                className="reset-button"
+                onClick={async () => {
+                  if (confirm('⚠️ Clear ALL repositories and start fresh? This will remove all accumulated architecture data.')) {
+                    try {
+                      await codeArchitectureAPI.clearArchitecture();
+                      setArchitecture(null);
+                      setNodes([]);
+                      setEdges([]);
+                      setGithubUrl('');
+                      setExtractionStatus('All repositories cleared - ready for fresh extraction');
+                      setExtractionError('');
+                    } catch (err) {
+                      setExtractionError('Failed to clear data');
+                    }
+                  }
+                }}
+                disabled={isExtracting}
+                title="Clear all repositories and start fresh"
+              >
+                Clear All
+              </button>
+            </div>
+            {extractionStatus && (
+              <div className="extract-status">{extractionStatus}</div>
+            )}
+            {extractionError && (
+              <div className="extract-error">{extractionError}</div>
+            )}
+            {architecture && (
+              <div className="extract-info">
+                <small>💡 Data accumulates - add multiple repos to build complete architecture view</small>
+              </div>
+            )}
+          </div>
+
           <div className="filter-section">
             <h3>Statistics</h3>
             <div className="stats">
@@ -911,7 +1197,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
 
           <div className="filter-section">
             <h3>C4 Levels</h3>
-            {['context_level', 'container_level', 'component_level', 'code_level'].map(level => (
+            {AVAILABLE_LEVELS.map(level => (
               <label key={level} className="checkbox-label">
                 <input
                   type="radio"
@@ -959,152 +1245,114 @@ const CodeArchitectureViewerInner: React.FC = () => {
               <p>No entities match the current filters</p>
             </div>
           ) : (
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              onNodeClick={onNodeClick}
-              nodeTypes={nodeTypes}
-              fitView
-              attributionPosition="bottom-left"
-              defaultViewport={{ x: 0, y: 0, zoom: 0.5 }}
-              minZoom={0.05}
-              maxZoom={1.5}
-            >
-              <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#e0e0e0" />
-              <Controls />
-            </ReactFlow>
+            <div style={{ width: '100%', height: '100%' }}>
+              <ReactFlow
+                key={`${selectedLevel}-${nodes.length}-${edges.length}`}
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onNodeClick={onNodeClick}
+                nodeTypes={nodeTypes}
+                fitView
+                attributionPosition="bottom-left"
+                defaultViewport={{ x: 0, y: 0, zoom: 1.5 }}
+                minZoom={0.2}
+                maxZoom={5.0}
+              >
+                <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#e0e0e0" />
+                <Controls />
+              </ReactFlow>
+            </div>
           )}
         </main>
 
         {selectedNode && (
           <aside className="node-details-panel">
             <div className="panel-header">
-              <h3>Node Details</h3>
+              <h3>{selectedNode.fullName || selectedNode.label}</h3>
               <button className="close-btn" onClick={() => setSelectedNode(null)}>×</button>
             </div>
             <div className="panel-content">
-              <div className="detail-row">
-                <span className="detail-label">Type:</span>
-                <span className="detail-value">{selectedNode.type}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Name:</span>
-                <span className="detail-value">{selectedNode.fullName || selectedNode.label}</span>
-              </div>
-              {selectedNode.type === 'container' && selectedNode.containerMeta && (
-                <>
-                  {selectedNode.containerMeta.description && (
-                    <div className="detail-row">
-                      <span className="detail-label">Description:</span>
-                      <span className="detail-value">{selectedNode.containerMeta.description}</span>
-                    </div>
-                  )}
-                  <div className="detail-row">
-                    <span className="detail-label">Container Type:</span>
-                    <span className="detail-value">{selectedNode.containerMeta.container_type || 'Unknown'}</span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="detail-label">Technology:</span>
-                    <span className="detail-value">{selectedNode.containerMeta.technology || 'Unknown'}</span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="detail-label">Runtime:</span>
-                    <span className="detail-value">{selectedNode.containerMeta.runtime_environment || 'Unknown'}</span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="detail-label">Deployment:</span>
-                    <span className="detail-value">{selectedNode.containerMeta.deployment || 'Unknown'}</span>
-                  </div>
-                  {selectedNode.containerMeta.protocol && (
-                    <div className="detail-row">
-                      <span className="detail-label">Protocol:</span>
-                      <span className="detail-value">{selectedNode.containerMeta.protocol}</span>
-                    </div>
-                  )}
-                  {selectedNode.containerMeta.health_endpoint && (
-                    <div className="detail-row">
-                      <span className="detail-label">Health Endpoint:</span>
-                      <span className="detail-value">{selectedNode.containerMeta.health_endpoint}</span>
-                    </div>
-                  )}
-                  {selectedNode.containerMeta.repository_url && (
-                    <div className="detail-row">
-                      <span className="detail-label">Repository:</span>
-                      <span className="detail-value">{selectedNode.containerMeta.repository_url}</span>
-                    </div>
-                  )}
-                </>
+              {/* One-sentence description (LLM-generated purpose or description) */}
+              {(systemAttributes?.purpose || selectedNode.containerMeta?.description || selectedNode.documentation) && (
+                <div className="detail-row description-row">
+                  <span className="detail-value description-text">
+                    {systemAttributes?.purpose || selectedNode.containerMeta?.description || selectedNode.documentation || 'No description available'}
+                  </span>
+                </div>
               )}
-              {selectedNode.label === 'Kubernetes Cluster' && selectedNode.clusterMeta && (
-                <>
-                  {selectedNode.clusterMeta.summary && (
-                    <div className="detail-row">
-                      <span className="detail-label">Summary:</span>
-                      <span className="detail-value">
-                        {selectedNode.clusterMeta.summary
-                          .replace(/<think>.*?<\/think>/gis, '')
-                          .replace(/<think>/gi, '')
-                          .replace(/\s+/g, ' ')
-                          .trim()}
-                      </span>
-                    </div>
-                  )}
-                  {selectedNode.clusterMeta.namespaces?.length > 0 && (
-                    <div className="detail-row">
-                      <span className="detail-label">Namespaces:</span>
-                      <span className="detail-value">
-                        {selectedNode.clusterMeta.namespaces.slice(0, 8).join(', ')}
-                        {selectedNode.clusterMeta.namespaces.length > 8 ? '…' : ''}
-                      </span>
-                    </div>
-                  )}
-                  {selectedNode.clusterMeta.servers?.length > 0 && (
-                    <div className="detail-row">
-                      <span className="detail-label">Servers:</span>
-                      <span className="detail-value">
-                        {selectedNode.clusterMeta.servers.slice(0, 5).join(', ')}
-                        {selectedNode.clusterMeta.servers.length > 5 ? '…' : ''}
-                      </span>
-                    </div>
-                  )}
-                  {selectedNode.clusterMeta.gitops_files?.length > 0 && (
-                    <div className="detail-row">
-                      <span className="detail-label">GitOps Files:</span>
-                      <span className="detail-value">
-                        {selectedNode.clusterMeta.gitops_files.slice(0, 6).join(', ')}
-                        {selectedNode.clusterMeta.gitops_files.length > 6 ? '…' : ''}
-                      </span>
-                    </div>
-                  )}
-                </>
-              )}
-              {selectedNode.file && (
+
+              {/* Domain field (from image: business bucket) */}
+              {systemAttributes?.business_domain && (
                 <div className="detail-row">
+                  <span className="detail-label">domain</span>
+                  <span className="detail-value">{systemAttributes.business_domain}</span>
+                </div>
+              )}
+
+              {/* Owner field */}
+              {(systemAttributes?.owner_team || selectedNode.containerMeta?.owner) && (
+                <div className="detail-row">
+                  <span className="detail-label">owner</span>
+                  <span className="detail-value">{systemAttributes?.owner_team || selectedNode.containerMeta?.owner || 'No owner listed'}</span>
+                </div>
+              )}
+
+              {/* Status field (maps to tier/criticality) */}
+              {systemAttributes?.criticality && (
+                <div className="detail-row">
+                  <span className="detail-label">status</span>
+                  <span className="detail-value status-badge">{systemAttributes.criticality}</span>
+                </div>
+              )}
+
+              {/* Data class field (sensitivity) */}
+              {(systemAttributes?.data_class || selectedNode.attributes?.data_class) && (
+                <div className="detail-row">
+                  <span className="detail-label">data_class</span>
+                  <span className="detail-value">{systemAttributes?.data_class || selectedNode.attributes?.data_class}</span>
+                </div>
+              )}
+
+              {/* Additional metadata for context */}
+              {selectedNode.type && (
+                <div className="detail-row metadata-row">
+                  <span className="detail-label">Type:</span>
+                  <span className="detail-value">{selectedNode.type}</span>
+                </div>
+              )}
+              
+              {selectedNode.containerMeta?.technology && (
+                <div className="detail-row metadata-row">
+                  <span className="detail-label">Technology:</span>
+                  <span className="detail-value">{selectedNode.containerMeta.technology}</span>
+                </div>
+              )}
+
+              {selectedNode.file && (
+                <div className="detail-row metadata-row">
                   <span className="detail-label">File:</span>
                   <span className="detail-value file-path">{selectedNode.file}</span>
                 </div>
               )}
-              {selectedNode.line && (
+
+              {/* Show URL for external services */}
+              {selectedNode.attributes?.url && (
                 <div className="detail-row">
-                  <span className="detail-label">Line:</span>
-                  <span className="detail-value">{selectedNode.line}</span>
+                  <span className="detail-label">url</span>
+                  <span className="detail-value">
+                    <a href={selectedNode.attributes.url} target="_blank" rel="noopener noreferrer" className="external-link">
+                      {selectedNode.attributes.url}
+                    </a>
+                  </span>
                 </div>
               )}
-              {selectedNode.decorators && selectedNode.decorators.length > 0 && (
-                <div className="detail-row">
-                  <span className="detail-label">Decorators:</span>
-                  <div className="decorator-list">
-                    {selectedNode.decorators.map((dec: string, idx: number) => (
-                      <span key={idx} className="decorator-badge">{dec}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {selectedNode.isExternal && (
-                <div className="detail-row">
-                  <span className="external-badge">External Dependency</span>
+
+              {selectedNode.attributes?.detected_from && (
+                <div className="detail-row metadata-row">
+                  <span className="detail-label">Detected from:</span>
+                  <span className="detail-value">{selectedNode.attributes.detected_from}</span>
                 </div>
               )}
             </div>

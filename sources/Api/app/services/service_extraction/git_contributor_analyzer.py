@@ -109,9 +109,18 @@ class GitContributorAnalyzer:
             if result.returncode != 0:
                 logger.warning(f"Git log failed: {result.stderr}")
                 return None
-            
+
+            # If no commits found for service_path, fall back to entire repo
+            if not result.stdout.strip() and service_path:
+                logger.debug(f"No git history found for {service_path}, analyzing entire repo")
+                return self.analyze_service_contributors(
+                    service_path=None,  # Analyze entire repo
+                    service_name=service_name,
+                    max_contributors=max_contributors
+                )
+
             if not result.stdout.strip():
-                logger.debug(f"No git history found for {service_path}")
+                logger.debug(f"No git history found in repository")
                 return None
             
             # Parse commits
@@ -246,7 +255,84 @@ class GitContributorAnalyzer:
         except Exception as e:
             logger.error(f"Error analyzing git contributors for {service_path}: {e}", exc_info=True)
             return None
-    
+
+    def calculate_active_experts(
+        self,
+        service_path: Optional[Path] = None,
+        days: int = 90,
+        min_commits: int = 3
+    ) -> int:
+        """
+        Calculate number of active experts (contributors with 3+ commits in last N days).
+
+        This is the "bus factor" metric - how many people actively understand this code.
+        A low number (0-1) indicates knowledge concentration risk.
+
+        Algorithm:
+        1. Run: git log --since="90 days ago" --format="%ae" {service_path}
+        2. Count commits per unique email
+        3. Return count of contributors with >= min_commits
+
+        Args:
+            service_path: Path to service directory/file (relative to repo root)
+            days: Time window in days (default: 90)
+            min_commits: Minimum commits to be considered an expert (default: 3)
+
+        Returns:
+            Number of active experts (0 if no git history)
+        """
+        if not self.is_git_repo:
+            logger.debug("Not a git repository, cannot calculate active experts")
+            return 0
+
+        try:
+            # Construct git log command
+            cmd = [
+                'git', 'log',
+                f'--since={days} days ago',
+                '--format=%ae'  # Author email
+            ]
+
+            # Add path filter if specified
+            if service_path:
+                rel_path = self._get_relative_path(service_path)
+                if rel_path:
+                    cmd.extend(['--', str(rel_path)])
+
+            # Run git log and parse output
+            result = subprocess.run(
+                cmd,
+                cwd=self.repo_root,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=True
+            )
+
+            # Parse emails from output
+            emails = [line.strip() for line in result.stdout.strip().split('\n') if line.strip()]
+
+            if not emails:
+                return 0
+
+            # Count commits per contributor
+            contributor_commits = Counter(emails)
+
+            # Count experts (contributors with >= min_commits)
+            experts = sum(1 for count in contributor_commits.values() if count >= min_commits)
+
+            logger.debug(f"Found {experts} active experts for {service_path} "
+                        f"({len(contributor_commits)} total contributors in last {days} days)")
+
+            return experts
+
+        except subprocess.CalledProcessError as e:
+            logger.warning(f"Failed to calculate active experts for {service_path}: {e}")
+            return 0
+        except Exception as e:
+            logger.error(f"Error calculating active experts for {service_path}: {e}", exc_info=True)
+            return 0
+
     def extract_owner(
         self,
         service_path: Optional[Path] = None,

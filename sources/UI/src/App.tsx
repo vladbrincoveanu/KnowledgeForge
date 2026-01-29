@@ -106,11 +106,6 @@ interface GraphData {
   links: GraphLink[];
 }
 
-interface FileHeader {
-  name: string;
-  headers: string[];
-}
-
 interface WebSocketMessage {
   task_id?: string;
   status?: string;
@@ -290,7 +285,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, isCollapsed, onToggl
 const MainContent: React.FC = () => {
   const location = useLocation();
   const [files, setFiles] = useState<UploadedFile[]>([]);
-  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const isProcessing = false;
   const [extractionTasks, setExtractionTasks] = useState<
     Record<string, ExtractionTask>
   >({});

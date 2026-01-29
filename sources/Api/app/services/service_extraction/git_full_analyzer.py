@@ -69,9 +69,21 @@ class GitFullAnalyzer:
         if contributor_stats:
             top_contributors = contributor_stats.top_contributors
             if top_contributors:
-                if not service.owner:
-                    top_contributor = top_contributors[0]
-                    service.owner = top_contributor.name or top_contributor.email
+                # ALWAYS calculate owner from git contributions (top contributor)
+                # This ensures owner is dynamically determined by actual code ownership
+                top_contributor = top_contributors[0]
+                calculated_owner = top_contributor.name or top_contributor.email
+                
+                # Mark as inferred if we're overwriting or setting owner
+                if not service.owner or service.owner != calculated_owner:
+                    service.owner = calculated_owner
+                    service.attributes.setdefault("inferred_fields", {})["owner"] = {
+                        "confidence": "high",
+                        "source": "git_contributions",
+                        "commit_count": top_contributor.commit_count,
+                    }
+                    logger.debug(f"Owner set to {calculated_owner} ({top_contributor.commit_count} commits)")
+                
                 service.owner_contributors = [c.email for c in top_contributors]
                 service.owner_contributor_stats = [
                     {"email": c.email, "name": c.name, "commit_count": c.commit_count}
@@ -83,6 +95,14 @@ class GitFullAnalyzer:
             service.commit_count_30d = contributor_stats.commits_30d
             service.commit_count_90d = contributor_stats.commits_90d
             service.commit_count_180d = contributor_stats.commits_180d
+
+            # Calculate active experts (bus factor)
+            service.active_experts = self.contributor_analyzer.calculate_active_experts(
+                service_path=service_path,
+                days=90,
+                min_commits=3
+            )
+            logger.debug(f"Service {service.name} has {service.active_experts} active experts")
 
             # Get extended stats
             extended = self._get_extended_stats(service_path)

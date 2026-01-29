@@ -14,7 +14,7 @@ import re
 import subprocess
 from pathlib import Path
 from typing import Any, Optional
-from collections import defaultdict
+from collections import Counter, defaultdict
 from abc import ABC, abstractmethod
 
 from app.services.code_extraction.python_ast_extractor import PythonASTExtractor
@@ -25,6 +25,45 @@ import yaml
 import tomli
 
 logger = logging.getLogger(__name__)
+
+LANGUAGE_EXTENSIONS: dict[str, str] = {
+    ".py": "Python",
+    ".js": "JavaScript",
+    ".ts": "TypeScript",
+    ".tsx": "TypeScript",
+    ".jsx": "JavaScript",
+    ".go": "Go",
+    ".rs": "Rust",
+    ".java": "Java",
+    ".kt": "Kotlin",
+    ".rb": "Ruby",
+    ".php": "PHP",
+    ".cs": "C#",
+    ".cpp": "C++",
+    ".c": "C",
+    ".swift": "Swift",
+    ".scala": "Scala",
+    ".ex": "Elixir",
+    ".exs": "Elixir",
+}
+
+FRAMEWORK_INDICATORS: dict[str, tuple[str, str]] = {
+    "fastapi": ("Python", "FastAPI"),
+    "flask": ("Python", "Flask"),
+    "django": ("Python", "Django"),
+    "starlette": ("Python", "Starlette"),
+    "express": ("JavaScript", "Express"),
+    "next": ("TypeScript", "Next.js"),
+    "react": ("TypeScript", "React"),
+    "vue": ("JavaScript", "Vue.js"),
+    "nestjs": ("TypeScript", "NestJS"),
+    "@nestjs": ("TypeScript", "NestJS"),
+    "gin-gonic": ("Go", "Gin"),
+    "echo": ("Go", "Echo"),
+    "actix-web": ("Rust", "Actix"),
+    "axum": ("Rust", "Axum"),
+    "spring": ("Java", "Spring"),
+}
 
 
 # ============================================================================
@@ -402,6 +441,15 @@ class C4ArchitectureExtractor:
         
         # Find external dependencies
         external_deps = self._detect_external_dependencies()
+
+        # Detect languages and frameworks
+        languages = self._detect_languages()
+        frameworks = self._detect_frameworks()
+
+        # Git and repository context
+        git_metadata = self._extract_git_metadata()
+        repository_url = self._get_repository_root_url()
+        context_sources = self._collect_context_sources(frameworks)
         
         # Generate system purpose with LLM (if available)
         system_purpose = self._generate_system_purpose()
@@ -419,12 +467,97 @@ class C4ArchitectureExtractor:
             "purpose": system_purpose,
             "external_dependencies": external_deps,
             "actors": actors,
+            "languages": languages,
+            "frameworks": frameworks,
+            "repository_url": repository_url,
+            "git": git_metadata,
+            "context_sources": context_sources,
             
             # IT Landscape fields
             "owner_team": owner_team,
             "business_domain": business_domain,
             "criticality": criticality,
+            "data_class": self._infer_data_classification(),  # Data sensitivity classification
         }
+
+    def _detect_languages(self) -> list[dict[str, Any]]:
+        """Detect primary languages by file extension frequency."""
+        ext_counts: Counter[str] = Counter()
+        skip_dirs = {
+            ".git", "node_modules", "__pycache__", ".venv", "venv",
+            "dist", "build", ".tox", ".pytest_cache",
+        }
+
+        for file_path in self.repo_path.rglob("*"):
+            if any(part in skip_dirs for part in file_path.parts):
+                continue
+            if file_path.is_file():
+                ext = file_path.suffix.lower()
+                if ext in LANGUAGE_EXTENSIONS:
+                    ext_counts[ext] += 1
+
+        languages = []
+        for ext, count in ext_counts.most_common():
+            languages.append({
+                "language": LANGUAGE_EXTENSIONS[ext],
+                "file_count": count,
+            })
+
+        return languages
+
+    def _detect_frameworks(self) -> list[dict[str, Any]]:
+        """Detect frameworks from manifest files."""
+        frameworks: list[dict[str, Any]] = []
+        seen: set[tuple[str, str]] = set()
+
+        def add_framework(language: str, framework: str, source: str):
+            key = (language, framework)
+            if key in seen:
+                return
+            frameworks.append({
+                "language": language,
+                "framework": framework,
+                "detected_from": source,
+            })
+            seen.add(key)
+
+        manifest_names = {
+            "package.json",
+            "requirements.txt",
+            "pyproject.toml",
+            "Pipfile",
+            "setup.py",
+            "pom.xml",
+            "build.gradle",
+            "build.gradle.kts",
+            "go.mod",
+            "Cargo.toml",
+        }
+
+        for manifest in self.repo_path.rglob("*"):
+            if not manifest.is_file():
+                continue
+            if manifest.name not in manifest_names:
+                continue
+
+            rel_path = str(manifest.relative_to(self.repo_path))
+            try:
+                if manifest.name == "package.json":
+                    data = json.loads(manifest.read_text(encoding="utf-8", errors="ignore"))
+                    deps = {**data.get("dependencies", {}), **data.get("devDependencies", {})}
+                    dep_text = " ".join(deps.keys()).lower()
+                    for indicator, (lang, fw) in FRAMEWORK_INDICATORS.items():
+                        if indicator in dep_text:
+                            add_framework(lang, fw, rel_path)
+                else:
+                    content = manifest.read_text(encoding="utf-8", errors="ignore").lower()
+                    for indicator, (lang, fw) in FRAMEWORK_INDICATORS.items():
+                        if indicator in content:
+                            add_framework(lang, fw, rel_path)
+            except Exception:
+                continue
+
+        return frameworks
 
     def _detect_context_actors(self) -> list[dict[str, Any]]:
         """Detect human/system actors for Context diagram.
@@ -503,7 +636,7 @@ class C4ArchitectureExtractor:
         return relationships
     
     def _detect_system_name(self) -> str:
-        """Detect system name from project files."""
+        """Detect system name from project files or use LLM."""
         # Try package.json
         package_json = self.repo_path / "package.json"
         if package_json.exists():
@@ -531,18 +664,224 @@ class C4ArchitectureExtractor:
         
         # Try README.md
         readme = self.repo_path / "README.md"
+        readme_title = None
+        readme_content = None
         if readme.exists():
             try:
-                with open(readme) as f:
-                    first_line = f.readline().strip()
+                with open(readme, 'r', encoding='utf-8') as f:
+                    readme_content = f.read(500)  # First 500 chars
+                    lines = readme_content.split('\n')
+                    first_line = lines[0].strip() if lines else ''
                     # Extract from # Title
                     if first_line.startswith('#'):
-                        return first_line.lstrip('#').strip()
+                        readme_title = first_line.lstrip('#').strip()
+                        if readme_title and not any(word in readme_title.lower() for word in ['readme', 'documentation', 'docs']):
+                            return readme_title
             except Exception:
                 pass
         
-        # Fallback to directory name
-        return self.repo_path.name
+        # Use LLM to generate a better project name if available
+        if self.llm_manager and readme_content:
+            try:
+                repo_url = self._get_repository_root_url()
+                dir_name = self.repo_path.name
+                
+                prompt = f"""Based on this README excerpt, suggest a short, descriptive project name (2-4 words max).
+
+README:
+{readme_content[:300]}
+
+Repository name: {dir_name}
+{f"Repository URL: {repo_url}" if repo_url else ""}
+
+Respond with ONLY the project name, nothing else.
+Example good names: "Payment Processing Service", "User Auth API", "ML Training Pipeline"
+
+Your answer:"""
+                
+                response = self.llm_manager.generate_text(
+                    prompt,
+                    max_tokens=20,
+                    temperature=0.3,
+                    use_cache=True
+                )
+                
+                if response:
+                    # Clean up LLM response
+                    project_name = response.strip()
+                    project_name = re.sub(r'<[^>]+>', '', project_name)  # Remove XML tags
+                    project_name = project_name.strip('"\'')  # Remove quotes
+                    
+                    # Validate: should be reasonable length and not contain weird chars
+                    if 5 <= len(project_name) <= 60 and not any(char in project_name for char in ['<', '>', '{', '}', '[', ']']):
+                        return project_name
+            except Exception as e:
+                logger.debug(f"Failed to generate project name with LLM: {e}")
+        
+        # Fallback: clean up directory name
+        dir_name = self.repo_path.name
+        # Convert common patterns: my-project -> My Project
+        cleaned_name = dir_name.replace('-', ' ').replace('_', ' ').title()
+        return cleaned_name if len(cleaned_name) > 3 else dir_name
+
+    def _get_repository_root_url(self) -> str:
+        """Get repository URL from git remote origin."""
+        try:
+            result = subprocess.run(
+                ["git", "config", "--get", "remote.origin.url"],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode != 0:
+                return ""
+
+            remote_url = result.stdout.strip()
+            if not remote_url:
+                return ""
+
+            if remote_url.startswith("git@"):
+                remote_url = remote_url.replace("git@", "https://").replace(".com:", ".com/")
+            remote_url = remote_url.rstrip(".git")
+            return remote_url
+        except Exception:
+            return ""
+
+    def _extract_git_metadata(self) -> dict[str, Any]:
+        """Extract git metadata for manager-level context."""
+        if not (self.repo_path / ".git").exists():
+            return {}
+
+        def run_git(args: list[str]) -> str:
+            try:
+                result = subprocess.run(
+                    args,
+                    cwd=self.repo_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                if result.returncode == 0:
+                    return result.stdout.strip()
+            except Exception:
+                return ""
+            return ""
+
+        metadata: dict[str, Any] = {}
+
+        branch = run_git(["git", "rev-parse", "--abbrev-ref", "HEAD"])
+        if branch:
+            metadata["branch"] = branch
+
+        commit_hash = run_git(["git", "rev-parse", "HEAD"])
+        if commit_hash:
+            metadata["commit_hash"] = commit_hash
+
+        last_commit_date = run_git(["git", "log", "-1", "--format=%cI"])
+        if last_commit_date:
+            metadata["last_commit_date"] = last_commit_date
+
+        first_commit_date = run_git(["git", "log", "--reverse", "--format=%cI", "-n", "1"])
+        if first_commit_date:
+            metadata["first_commit_date"] = first_commit_date
+
+        total_commits = run_git(["git", "rev-list", "--count", "HEAD"])
+        if total_commits.isdigit():
+            metadata["total_commits"] = int(total_commits)
+
+        def count_since(days: int) -> int:
+            log = run_git(["git", "log", f"--since={days}.days", "--oneline"])
+            if not log:
+                return 0
+            return sum(1 for line in log.splitlines() if line.strip())
+
+        metadata["commits_30d"] = count_since(30)
+        metadata["commits_90d"] = count_since(90)
+        metadata["commits_180d"] = count_since(180)
+
+        tags = run_git(["git", "tag", "--sort=-creatordate"])
+        if tags:
+            tag_list = [tag for tag in tags.splitlines() if tag.strip()]
+            metadata["tag_count"] = len(tag_list)
+            metadata["latest_tag"] = tag_list[0] if tag_list else None
+
+        shortlog = run_git(["git", "shortlog", "-sn", "--all"])
+        contributors = []
+        if shortlog:
+            for line in shortlog.splitlines()[:5]:
+                match = re.match(r"\s*(\d+)\s+(.+?)\s+<([^>]+)>", line)
+                if match:
+                    contributors.append({
+                        "name": match.group(2).strip(),
+                        "email": match.group(3).strip(),
+                        "commit_count": int(match.group(1)),
+                    })
+                else:
+                    parts = line.strip().split(None, 1)
+                    if len(parts) == 2 and parts[0].isdigit():
+                        contributors.append({
+                            "name": parts[1].strip(),
+                            "email": "",
+                            "commit_count": int(parts[0]),
+                        })
+
+        if contributors:
+            metadata["top_contributors"] = contributors
+
+        return metadata
+
+    def _collect_context_sources(self, frameworks: list[dict[str, Any]]) -> dict[str, Any]:
+        """Collect key files used for context extraction."""
+        sources: dict[str, Any] = {}
+
+        readme_files = []
+        for name in ["README.md", "README.rst", "README.txt"]:
+            path = self.repo_path / name
+            if path.exists():
+                readme_files.append(str(path.relative_to(self.repo_path)))
+
+        for doc in list(self.repo_path.rglob("docs/*.md"))[:5]:
+            readme_files.append(str(doc.relative_to(self.repo_path)))
+        for doc in list(self.repo_path.rglob("documentation/*.md"))[:5]:
+            readme_files.append(str(doc.relative_to(self.repo_path)))
+
+        if readme_files:
+            sources["readme_files"] = readme_files[:8]
+
+        deployment_files = []
+        for dockerfile in self.repo_path.rglob("Dockerfile"):
+            deployment_files.append(str(dockerfile.relative_to(self.repo_path)))
+        for compose_file in self.repo_path.rglob("docker-compose*.y*ml"):
+            deployment_files.append(str(compose_file.relative_to(self.repo_path)))
+        deployment_files.extend(self._find_k8s_manifest_files(limit=8))
+
+        if deployment_files:
+            sources["deployment_files"] = deployment_files[:10]
+
+        framework_files = sorted({
+            fw.get("detected_from")
+            for fw in frameworks
+            if fw.get("detected_from")
+        })
+        if framework_files:
+            sources["framework_files"] = framework_files[:10]
+
+        return sources
+
+    def _find_k8s_manifest_files(self, limit: int = 10) -> list[str]:
+        """Find Kubernetes manifest files for context sources."""
+        matches = []
+        for manifest in self.repo_path.rglob("*.y*ml"):
+            try:
+                content = manifest.read_text(encoding="utf-8", errors="ignore").lower()
+                if "apiversion" in content and "kind" in content:
+                    matches.append(str(manifest.relative_to(self.repo_path)))
+            except Exception:
+                continue
+            if len(matches) >= limit:
+                break
+        return matches
     
     def _detect_external_dependencies(self) -> list[dict[str, Any]]:
         """Detect external service dependencies.
@@ -564,9 +903,21 @@ class C4ArchitectureExtractor:
         
         # Detect from .env files
         deps_from_env = self._parse_env_files()
+
+        # Detect from deployment files (docker-compose, k8s manifests, Dockerfiles)
+        deps_from_deployment = self._parse_deployment_files()
+
+        # Detect from README/docs
+        deps_from_readme = self._parse_readme_dependencies()
         
         # Combine and deduplicate
-        all_deps = deps_from_configs + deps_from_helm + deps_from_env
+        all_deps = (
+            deps_from_configs
+            + deps_from_helm
+            + deps_from_env
+            + deps_from_deployment
+            + deps_from_readme
+        )
         
         # Deduplicate by name
         seen = set()
@@ -577,30 +928,37 @@ class C4ArchitectureExtractor:
                 seen.add(name)
         
         return external_deps
-    
+
+    def _external_dependency_patterns(self) -> dict[str, tuple[str, str]]:
+        """Return known external dependency patterns."""
+        return {
+            "stripe": ("Stripe", "payment"),
+            "aws": ("AWS", "cloud"),
+            "s3": ("AWS S3", "storage"),
+            "postgres": ("PostgreSQL", "database"),
+            "postgresql": ("PostgreSQL", "database"),
+            "mysql": ("MySQL", "database"),
+            "mariadb": ("MariaDB", "database"),
+            "mongodb": ("MongoDB", "database"),
+            "redis": ("Redis", "cache"),
+            "kafka": ("Kafka", "messaging"),
+            "rabbitmq": ("RabbitMQ", "messaging"),
+            "elasticsearch": ("Elasticsearch", "search"),
+            "opensearch": ("OpenSearch", "search"),
+            "auth0": ("Auth0", "authentication"),
+            "okta": ("Okta", "authentication"),
+            "sendgrid": ("SendGrid", "email"),
+            "twilio": ("Twilio", "sms"),
+            "slack": ("Slack", "notifications"),
+            "datadog": ("Datadog", "monitoring"),
+            "sentry": ("Sentry", "error-tracking"),
+        }
+
     def _parse_dependency_files(self) -> list[dict[str, Any]]:
         """Parse package manifests for external dependencies."""
         deps = []
         
-        # Known external services patterns
-        external_patterns = {
-            'stripe': ('Stripe', 'payment'),
-            'aws': ('AWS', 'cloud'),
-            's3': ('AWS S3', 'storage'),
-            'postgres': ('PostgreSQL', 'database'),
-            'mongodb': ('MongoDB', 'database'),
-            'redis': ('Redis', 'cache'),
-            'kafka': ('Kafka', 'messaging'),
-            'rabbitmq': ('RabbitMQ', 'messaging'),
-            'elasticsearch': ('Elasticsearch', 'search'),
-            'auth0': ('Auth0', 'authentication'),
-            'okta': ('Okta', 'authentication'),
-            'sendgrid': ('SendGrid', 'email'),
-            'twilio': ('Twilio', 'sms'),
-            'slack': ('Slack', 'notifications'),
-            'datadog': ('Datadog', 'monitoring'),
-            'sentry': ('Sentry', 'error-tracking'),
-        }
+        external_patterns = self._external_dependency_patterns()
         
         # Scan pyproject.toml
         pyproject = self.repo_path / "pyproject.toml"
@@ -646,6 +1004,135 @@ class C4ArchitectureExtractor:
                 logger.debug(f"Error parsing package.json: {e}")
         
         return deps
+
+    def _parse_readme_dependencies(self) -> list[dict[str, Any]]:
+        """Parse README/docs for external service references."""
+        deps: list[dict[str, Any]] = []
+        external_patterns = self._external_dependency_patterns()
+
+        candidate_files = []
+        for name in ["README.md", "README.rst", "README.txt"]:
+            path = self.repo_path / name
+            if path.exists():
+                candidate_files.append(path)
+
+        candidate_files.extend(self.repo_path.rglob("docs/*.md"))
+        candidate_files.extend(self.repo_path.rglob("documentation/*.md"))
+
+        for doc in candidate_files:
+            try:
+                content = doc.read_text(encoding="utf-8", errors="ignore").lower()
+                for pattern, (name, dep_type) in external_patterns.items():
+                    if pattern in content:
+                        deps.append({
+                            "name": name,
+                            "type": dep_type,
+                            "detected_from": str(doc.relative_to(self.repo_path)),
+                        })
+            except Exception:
+                continue
+
+        return deps
+
+    def _parse_deployment_files(self) -> list[dict[str, Any]]:
+        """Parse deployment files (docker-compose, k8s manifests, Dockerfiles) for dependencies."""
+        deps: list[dict[str, Any]] = []
+        external_patterns = self._external_dependency_patterns()
+
+        def add_from_text(text: str, detected_from: str):
+            lowered = text.lower()
+            for pattern, (name, dep_type) in external_patterns.items():
+                if pattern in lowered:
+                    deps.append({
+                        "name": name,
+                        "type": dep_type,
+                        "detected_from": detected_from,
+                    })
+
+        def add_from_url(url: str, detected_from: str):
+            deps.append({
+                "name": self._extract_service_name_from_url(url),
+                "type": "external_service",
+                "url": url,
+                "detected_from": detected_from,
+            })
+
+        # Dockerfiles
+        for dockerfile in self.repo_path.rglob("Dockerfile"):
+            try:
+                content = dockerfile.read_text(encoding="utf-8", errors="ignore")
+                add_from_text(content, str(dockerfile.relative_to(self.repo_path)))
+                for url in re.findall(r'https?://[^\s"\']+', content):
+                    add_from_url(url, str(dockerfile.relative_to(self.repo_path)))
+            except Exception:
+                continue
+
+        # docker-compose files
+        compose_files = list(self.repo_path.rglob("docker-compose*.y*ml"))
+        for compose_file in compose_files:
+            try:
+                data = yaml.safe_load(compose_file.read_text(encoding="utf-8", errors="ignore"))
+                if not isinstance(data, dict):
+                    continue
+                services = data.get("services", {}) or {}
+                for service in services.values():
+                    if not isinstance(service, dict):
+                        continue
+                    image = service.get("image")
+                    if isinstance(image, str):
+                        add_from_text(image, str(compose_file.relative_to(self.repo_path)))
+                    env = service.get("environment")
+                    env_values = []
+                    if isinstance(env, dict):
+                        env_values.extend(str(v) for v in env.values())
+                    elif isinstance(env, list):
+                        for item in env:
+                            if isinstance(item, str) and "=" in item:
+                                env_values.append(item.split("=", 1)[1])
+                            elif isinstance(item, str):
+                                env_values.append(item)
+                    for value in env_values:
+                        add_from_text(value, str(compose_file.relative_to(self.repo_path)))
+                        for url in re.findall(r'https?://[^\s"\']+', value):
+                            add_from_url(url, str(compose_file.relative_to(self.repo_path)))
+            except Exception:
+                continue
+
+        # Kubernetes manifests (light scan)
+        for manifest in self.repo_path.rglob("*.y*ml"):
+            try:
+                content = manifest.read_text(encoding="utf-8", errors="ignore")
+                snippet = content[:4000].lower()
+                if "apiversion" not in snippet or "kind" not in snippet:
+                    continue
+
+                docs = list(yaml.safe_load_all(content))
+                for doc in docs:
+                    if not isinstance(doc, dict):
+                        continue
+                    images = self._find_manifest_images(doc)
+                    for image in images:
+                        add_from_text(image, str(manifest.relative_to(self.repo_path)))
+                    for url in self._find_external_urls(doc):
+                        add_from_url(url, str(manifest.relative_to(self.repo_path)))
+            except Exception:
+                continue
+
+        return deps
+
+    def _find_manifest_images(self, data: Any) -> list[str]:
+        """Recursively collect image references from k8s manifests."""
+        images = []
+        if isinstance(data, dict):
+            for key, value in data.items():
+                if key == "image" and isinstance(value, str):
+                    images.append(value)
+                else:
+                    images.extend(self._find_manifest_images(value))
+        elif isinstance(data, list):
+            for item in data:
+                images.extend(self._find_manifest_images(item))
+        return images
     
     def _parse_helm_values(self) -> list[dict[str, Any]]:
         """Extract external services from Helm values."""
@@ -739,28 +1226,63 @@ class C4ArchitectureExtractor:
         return domain
     
     def _generate_system_purpose(self) -> str:
-        """Generate 1-sentence system purpose using LLM."""
-        llm = self.llm_manager
-        if llm is None:
-            return "Purpose not available (LLM not configured)"
-        
-        # Read README for context
+        """Generate 1-sentence system purpose using LLM or README extraction."""
+        # First try to extract from README without LLM
         readme = self.repo_path / "README.md"
-        context = ""
         
         if readme.exists():
             try:
-                with open(readme) as f:
-                    context = f.read(1000)  # First 1000 chars
-            except Exception:
-                pass
+                with open(readme, 'r', encoding='utf-8') as f:
+                    content = f.read(3000)  # First 3000 chars
+                    
+                # Look for common description patterns in README
+                # Pattern 1: First paragraph after title
+                lines = [l.strip() for l in content.split('\n') if l.strip()]
+                description = None
+                
+                for i, line in enumerate(lines):
+                    # Skip title lines
+                    if line.startswith('#'):
+                        continue
+                    # Skip badges, images, links at start
+                    if line.startswith('[![') or line.startswith('![') or line.startswith('<'):
+                        continue
+                    # Found first substantial content line
+                    if len(line) > 30 and not line.startswith('|'):
+                        description = line
+                        break
+                
+                # Clean up the description
+                if description:
+                    # Remove markdown formatting
+                    description = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', description)  # Remove links
+                    description = re.sub(r'[*_`]', '', description)  # Remove formatting
+                    description = description.strip()
+                    
+                    # Ensure it's one sentence
+                    sentences = re.split(r'[.!?]', description)
+                    if sentences and len(sentences[0]) > 20:
+                        first_sentence = sentences[0].strip()
+                        if not first_sentence.endswith('.'):
+                            first_sentence += '.'
+                        return first_sentence
+                    
+                    # If no sentence boundary, take first 150 chars
+                    if len(description) > 150:
+                        description = description[:150].rsplit(' ', 1)[0] + '...'
+                    return description
+                        
+            except Exception as e:
+                logger.debug(f"Failed to read README: {e}")
         
-        # Fallback: use directory structure
-        if not context:
+        # Try with LLM if available
+        llm = self.llm_manager
+        if llm is not None:
+            # Fallback: use directory structure
             dirs = [d.name for d in self.repo_path.iterdir() if d.is_dir() and not d.name.startswith('.')]
             context = f"Repository structure: {', '.join(dirs[:10])}"
-        
-        prompt = f"""Describe the system purpose in ONE sentence.
+            
+            prompt = f"""Describe the system purpose in ONE sentence.
 
 Repository info:
 {context}
@@ -768,40 +1290,40 @@ Repository info:
 Answer format: "This system [does something]."
 
 Your answer:"""
-        
-        try:
-            response = llm.generate_text(
-                prompt,
-                max_tokens=40,
-                temperature=0.2,
-                use_cache=True
-            )
             
-            if response:
-                # Clean and validate - remove thinking tokens and extra text
-                sentence = response.strip()
+            try:
+                response = llm.generate_text(
+                    prompt,
+                    max_tokens=40,
+                    temperature=0.2,
+                    use_cache=True
+                )
                 
-                # Remove common LLM artifacts
-                sentence = re.sub(r'<think>.*?</think>', '', sentence, flags=re.DOTALL)
-                sentence = re.sub(r'<.*?>', '', sentence)
-                sentence = sentence.strip()
-                
-                # Find the first actual sentence
-                sentences = re.split(r'[.!?]', sentence)
-                for s in sentences:
-                    s = s.strip()
-                    if len(s) > 20 and ('system' in s.lower() or 'is' in s.lower()):
-                        # Ensure it ends with period
-                        return s + '.' if not s.endswith('.') else s
-                
-                # Fallback: take first sentence
-                if sentences and len(sentences[0]) > 10:
-                    return sentences[0].strip() + '.'
-                
-                return sentence[:200] + '.' if sentence else "Purpose not available"
-        
-        except Exception as e:
-            logger.debug(f"Failed to generate system purpose: {e}")
+                if response:
+                    # Clean and validate - remove thinking tokens and extra text
+                    sentence = response.strip()
+                    
+                    # Remove common LLM artifacts
+                    sentence = re.sub(r'<think>.*?</think>', '', sentence, flags=re.DOTALL)
+                    sentence = re.sub(r'<.*?>', '', sentence)
+                    sentence = sentence.strip()
+                    
+                    # Find the first actual sentence
+                    sentences = re.split(r'[.!?]', sentence)
+                    for s in sentences:
+                        s = s.strip()
+                        if len(s) > 20 and ('system' in s.lower() or 'is' in s.lower()):
+                            # Ensure it ends with period
+                            return s + '.' if not s.endswith('.') else s
+                    
+                    # Fallback: take first sentence
+                    if sentences and len(sentences[0]) > 10:
+                        return sentences[0].strip() + '.'
+                    
+                    return sentence[:200] + '.' if sentence else "Purpose not available"
+            
+            except Exception as e:
+                logger.debug(f"Failed to generate system purpose with LLM: {e}")
         
         return "Purpose not available"
     
@@ -872,21 +1394,46 @@ Your answer:"""
                     pass
         
         # Fallback: Get top contributors from git and ask LLM to suggest team name
-        top_contributors = self._get_top_git_contributors(max_contributors=3)
+        top_contributors = self._get_top_git_contributors(max_contributors=5)
+        
+        # Try LLM enrichment first if available
         if top_contributors and self.llm_manager:
             suggested_team = self._suggest_team_name_from_contributors(top_contributors)
-            if suggested_team:
+            if suggested_team and suggested_team != "Unknown":
                 return suggested_team
         
-        # If git contributors found but no LLM, return first contributor email domain
+        # If git contributors found but no LLM or LLM failed, use top contributor name/email
         if top_contributors:
-            first_email = top_contributors[0][0]
+            first_contributor = top_contributors[0]
+            first_email = first_contributor[0]
+            
+            # Try to extract name from git log with author name
+            try:
+                result = subprocess.run(
+                    ['git', 'log', '--format=%an', f'--author={first_email}', '-1'],
+                    cwd=self.repo_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    author_name = result.stdout.strip()
+                    return author_name
+            except Exception:
+                pass
+            
             # Extract domain from email (e.g., john@team-name.com -> team-name)
             email_match = re.search(r'@([^.]+)', first_email)
             if email_match:
-                return email_match.group(1)
+                domain = email_match.group(1)
+                # Clean up common patterns
+                domain = domain.replace('-', ' ').replace('_', ' ').title()
+                return domain
+            
+            # Last resort: use the email itself
+            return first_email
         
-        return "Unknown"
+        return "Unassigned"
     
     def _get_top_git_contributors(self, max_contributors: int = 3) -> list[tuple[str, int]]:
         """Get top contributors from git history.
@@ -898,9 +1445,9 @@ Your answer:"""
             return []
         
         try:
-            # Run git shortlog to get contributor stats
+            # Run git shortlog to get contributor stats (with email addresses)
             result = subprocess.run(
-                ['git', 'shortlog', '-sn', '--all'],
+                ['git', 'shortlog', '-sne', '--all'],
                 cwd=self.repo_path,
                 capture_output=True,
                 text=True,
@@ -915,12 +1462,13 @@ Your answer:"""
             for line in result.stdout.strip().split('\n'):
                 if not line.strip():
                     continue
-                
-                # Extract commit count and email
-                match = re.search(r'\s+(\d+)\s+.+<([^>]+)>', line)
+
+                # Extract commit count and email (or name if no email)
+                match = re.search(r'\s+(\d+)\s+(.+?)(?:\s+<([^>]+)>)?$', line)
                 if match:
                     commit_count = int(match.group(1))
-                    email = match.group(2)
+                    name = match.group(2).strip()
+                    email = match.group(3) if match.group(3) else name
                     contributors.append((email, commit_count))
             
             # Sort by commit count (descending) and return top N
@@ -1174,6 +1722,70 @@ Team name:"""
             return "Tier 2 - Production Standard"
         else:
             return "Tier 3 - Development/Internal"
+    
+    def _infer_data_classification(self) -> str:
+        """Infer data classification based on data handling patterns.
+        
+        Classifications (from image):
+        - PII: Personal Identifiable Information
+        - Credit-Card: Payment/financial data
+        - Legal/Security: Compliance-related data
+        - General: No sensitive data
+        """
+        data_indicators = {
+            'pii': 0,
+            'financial': 0,
+            'legal': 0,
+        }
+        
+        # Check for common sensitive data patterns in code
+        sensitive_keywords = {
+            'pii': ['email', 'phone', 'address', 'name', 'user', 'customer', 'profile', 'gdpr', 'ccpa'],
+            'financial': ['payment', 'credit', 'card', 'invoice', 'transaction', 'billing', 'stripe', 'paypal'],
+            'legal': ['compliance', 'audit', 'legal', 'security', 'encryption', 'auth', 'permission'],
+        }
+        
+        # Scan Python files for sensitive data handling
+        for py_file in self.repo_path.rglob("*.py"):
+            if any(part in str(py_file) for part in ['.git', 'node_modules', '__pycache__', 'test']):
+                continue
+            
+            try:
+                with open(py_file, 'r', encoding='utf-8') as f:
+                    content = f.read(5000).lower()  # First 5000 chars
+                    
+                for category, keywords in sensitive_keywords.items():
+                    for keyword in keywords:
+                        if keyword in content:
+                            data_indicators[category] += 1
+            except Exception:
+                continue
+        
+        # Check environment variables and config files
+        env_files = ['.env.example', '.env.template', 'config.yaml', 'docker-compose.yml']
+        for env_file in env_files:
+            file_path = self.repo_path / env_file
+            if file_path.exists():
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read().lower()
+                        
+                    for category, keywords in sensitive_keywords.items():
+                        for keyword in keywords:
+                            if keyword in content:
+                                data_indicators[category] += 1
+                except Exception:
+                    continue
+        
+        # Determine classification
+        if data_indicators['financial'] >= 3:
+            return "Credit-Card"
+        elif data_indicators['pii'] >= 5:
+            return "PII"
+        elif data_indicators['legal'] >= 3:
+            return "Legal/Security"
+        else:
+            return "General"
     
     def _extract_level2_containers(self):
         """Extract Level 2: Containers (Deployable Units).
@@ -3235,4 +3847,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -1,5 +1,6 @@
 """Code extraction endpoints for repository scanning."""
 
+import json
 import logging
 import shutil
 import tempfile
@@ -17,6 +18,7 @@ from infrastructure.graph.neo4j_manager import Neo4jGraphManager
 from infrastructure.storage.metadata_store import MetadataStore
 from infrastructure.llm.llm_manager import LLMManager
 from services.code_extraction.c4_extractor import C4ArchitectureExtractor
+from services.service_extraction.github_downloader import GitHubDownloader
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +28,60 @@ router = APIRouter(tags=["code-extraction"])
 scan_tasks: dict[str, dict[str, Any]] = {}
 
 
+def _save_c4_to_json(task_id: str, c4_architecture: dict) -> None:
+    """Save C4 architecture to JSON file for easy debugging."""
+    try:
+        api_root = Path(__file__).resolve().parents[4]
+        output_dir = api_root / "sources" / "data" / "c4_extractions"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_file = output_dir / f"{task_id}.json"
+
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(c4_architecture, f, indent=2, default=str, ensure_ascii=False)
+
+        logger.info(f"Saved C4 architecture to {output_file}")
+    except Exception as e:
+        logger.error(f"Failed to save C4 architecture to JSON: {e}", exc_info=True)
+
+
+def _load_latest_c4_from_json() -> dict:
+    """Load the most recent C4 architecture from JSON file."""
+    try:
+        api_root = Path(__file__).resolve().parents[4]
+        output_dir = api_root / "sources" / "data" / "c4_extractions"
+
+        if not output_dir.exists():
+            logger.warning(f"C4 extractions directory does not exist: {output_dir}")
+            return {}
+
+        json_files = sorted(output_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+
+        if not json_files:
+            logger.warning("No C4 extraction JSON files found")
+            return {}
+
+        latest_file = json_files[0]
+        logger.info(f"Loading C4 architecture from {latest_file}")
+
+        with open(latest_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"Failed to load C4 architecture from JSON: {e}", exc_info=True)
+        return {}
+
+
 class ScanRequest(BaseModel):
     """Request model for repository scan."""
     repo_path: Optional[str] = Field(None, description="Local path to repository")
     use_c4_model: bool = Field(default=True, description="Use C4 Model (recommended) vs detailed extraction")
     max_components_per_domain: int = Field(default=10, description="Group components if more than this")
+
+class GitHubScanRequest(BaseModel):
+    """Request model for GitHub-based C4 scan."""
+    github_url: str = Field(..., description="GitHub repository URL")
+    use_git: bool = Field(default=True, description="Use git clone if available")
+    max_components_per_domain: int = Field(default=10, description="Group components if more than this")
+    append_mode: bool = Field(default=True, description="Append to existing data (True) or clear first (False)")
 
 
 class ScanResponse(BaseModel):
@@ -58,11 +109,16 @@ class ScanStatusResponse(BaseModel):
 
 def get_neo4j_manager():
     """Get Neo4j manager instance."""
+    from utils.config import get_config
+    config = get_config()
     manager = Neo4jGraphManager(
-        uri="bolt://localhost:7687",
-        username="neo4j",
-        password="password",
-        encrypted=False,
+        uri=config.neo4j.uri,
+        username=config.neo4j.username,
+        password=config.neo4j.password,
+        encrypted=config.neo4j.encrypted,
+        database=config.neo4j.database,
+        max_connection_pool_size=config.neo4j.max_connection_pool_size,
+        connection_timeout=config.neo4j.connection_timeout,
     )
     manager.connect()
     return manager
@@ -147,6 +203,68 @@ async def upload_repository(
         raise HTTPException(status_code=500, detail=f"Failed to upload repository: {str(e)}")
 
 
+@router.post("/extract-from-github", response_model=ScanResponse)
+async def extract_from_github(
+    request: GitHubScanRequest,
+    background_tasks: BackgroundTasks,
+):
+    """
+    Download a GitHub repository and run C4 extraction.
+    """
+    if not request.github_url:
+        raise HTTPException(status_code=400, detail="github_url is required")
+
+    if not GitHubDownloader.is_github_url(request.github_url):
+        raise HTTPException(status_code=400, detail="Invalid GitHub URL")
+
+    task_id = str(uuid.uuid4())
+    scan_tasks[task_id] = {
+        'task_id': task_id,
+        'status': 'pending',
+        'progress': 0.0,
+        'message': 'Repository download queued',
+        'created_at': datetime.now(),
+        'github_url': request.github_url,
+        'errors': [],
+    }
+
+    try:
+        temp_dir = Path(tempfile.mkdtemp(prefix=f"code_arch_{task_id}_"))
+        repo_path = GitHubDownloader.download_repository(
+            request.github_url,
+            output_dir=temp_dir,
+            use_git=request.use_git,
+        )
+
+        scan_tasks[task_id].update({
+            'repo_path': str(repo_path),
+            'temp_dir': str(temp_dir),
+            'message': 'Repository downloaded, scan queued',
+        })
+
+        background_tasks.add_task(
+            run_c4_extraction,
+            task_id,
+            repo_path,
+            max_components=request.max_components_per_domain,
+            append_mode=request.append_mode,
+        )
+
+        return ScanResponse(
+            task_id=task_id,
+            status='pending',
+            message='Repository downloaded and scan queued',
+            created_at=datetime.now(),
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to download repository: {e}")
+        scan_tasks[task_id]['status'] = 'failed'
+        scan_tasks[task_id]['message'] = f'Failed to download repository: {str(e)}'
+        scan_tasks[task_id].setdefault('errors', []).append(str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to download repository: {str(e)}")
+
+
 @router.post("/scan", response_model=ScanResponse)
 async def scan_repository(
     request: ScanRequest,
@@ -198,6 +316,7 @@ async def run_c4_extraction(
     task_id: str,
     repo_path: Path,
     max_components: int = 10,
+    append_mode: bool = True,
 ):
     """Run C4 Model architecture extraction in background."""
     task = scan_tasks.get(task_id)
@@ -229,15 +348,18 @@ async def run_c4_extraction(
         task['components_count'] = len(c4_architecture['components'])
         task['external_deps_count'] = len(c4_architecture['system_context'].get('external_dependencies', []))
         task['c4_architecture'] = c4_architecture
-        
+
+        # Save to JSON file for easy debugging
+        _save_c4_to_json(task_id, c4_architecture)
+
         logger.info(f"{task['message']} (progress: {int(task['progress'] * 100)}%)")
-        
+
         # Store in Neo4j (simplified for C4 model)
         task['progress'] = 0.8
         task['message'] = 'Storing architecture in graph database'
         logger.info(f"{task['message']} (progress: {int(task['progress'] * 100)}%)")
         
-        await store_c4_in_neo4j(task_id, c4_architecture)
+        await store_c4_in_neo4j(task_id, c4_architecture, append_mode=append_mode)
         
         task['progress'] = 1.0
         task['status'] = 'completed'
@@ -269,13 +391,31 @@ async def run_c4_extraction(
 async def store_c4_in_neo4j(
     task_id: str,
     c4_architecture: dict[str, Any],
+    append_mode: bool = True,
 ):
-    """Store C4 architecture in Neo4j (simplified, clean structure)."""
+    """Store C4 architecture in Neo4j (simplified, clean structure).
+    
+    Args:
+        task_id: Task identifier
+        c4_architecture: C4 architecture data
+        append_mode: If True, append to existing data. If False, clear first.
+    """
     try:
         neo4j_manager = get_neo4j_manager()
         
         if not neo4j_manager.is_connected():
             neo4j_manager.connect()
+        
+        # Clear existing data if not in append mode
+        if not append_mode:
+            logger.info("Clearing existing C4 architecture data from Neo4j")
+            neo4j_manager.execute_query(
+                """
+                MATCH (n)
+                WHERE n:System OR n:Container OR n:Component OR n:ExternalService
+                DETACH DELETE n
+                """
+            )
         
         # Store system context (Level 1)
         system = c4_architecture['system_context']
@@ -310,7 +450,8 @@ async def store_c4_in_neo4j(
                 detected_from=dep.get('detected_from', '')
             )
         
-        # Store containers (Level 2)
+        # Store containers (Level 2) - inherit system-level fields for each container
+        system_ctx = c4_architecture['system_context']
         for container in c4_architecture['containers']:
             neo4j_manager.execute_query(
                 """
@@ -319,7 +460,12 @@ async def store_c4_in_neo4j(
                     c.technology = $technology,
                     c.protocol = $protocol,
                     c.c4_level = $c4_level,
-                    c.path = $path
+                    c.path = $path,
+                    c.owner = $owner,
+                    c.domain = $domain,
+                    c.status = $status,
+                    c.tier = $tier,
+                    c.data_class = $data_class
                 WITH c
                 MATCH (s:System {name: $system_name})
                 MERGE (s)-[:CONTAINS]->(c)
@@ -330,10 +476,16 @@ async def store_c4_in_neo4j(
                 protocol=container['protocol'],
                 c4_level=container['c4_level'],
                 path=container['path'],
+                # Inherit from system context
+                owner=system_ctx.get('owner_team', 'Unassigned'),
+                domain=system_ctx.get('business_domain', 'Unclassified'),
+                status='Active',  # Default for containers
+                tier=system_ctx.get('criticality', 'Unknown'),
+                data_class=system_ctx.get('data_class', 'Unknown'),
                 system_name=system['name']
             )
         
-        # Store components (Level 3)
+        # Store components (Level 3) - inherit system-level fields
         for component in c4_architecture['components']:
             neo4j_manager.execute_query(
                 """
@@ -343,7 +495,12 @@ async def store_c4_in_neo4j(
                     comp.endpoint_path = $endpoint_path,
                     comp.endpoint_method = $endpoint_method,
                     comp.function_name = $function_name,
-                    comp.file = $file
+                    comp.file = $file,
+                    comp.owner = $owner,
+                    comp.domain = $domain,
+                    comp.status = $status,
+                    comp.tier = $tier,
+                    comp.data_class = $data_class
                 WITH comp
                 MATCH (c:Container {name: $container_name})
                 MERGE (c)-[:EXPOSES]->(comp)
@@ -355,7 +512,13 @@ async def store_c4_in_neo4j(
                 endpoint_method=component.get('endpoint_method', ''),
                 function_name=component.get('function_name', ''),
                 file=component.get('file', ''),
-                container_name=component['container']
+                container_name=component['container'],
+                # Inherit from system context
+                owner=system_ctx.get('owner_team', 'Unassigned'),
+                domain=system_ctx.get('business_domain', 'Unclassified'),
+                status='Active',
+                tier=system_ctx.get('criticality', 'Unknown'),
+                data_class=system_ctx.get('data_class', 'Unknown'),
             )
         
         logger.info(
@@ -409,6 +572,7 @@ async def get_scan_results(task_id: str):
         'system_context': c4_architecture['system_context'],
         'containers': c4_architecture['containers'],
         'components': c4_architecture['components'],
+        'relationships': c4_architecture.get('relationships', {}),
         'statistics': {
             'total_containers': len(c4_architecture['containers']),
             'total_components': len(c4_architecture['components']),
@@ -438,31 +602,82 @@ async def delete_scan_task(task_id: str):
     return {"message": "Task deleted successfully"}
 
 
+@router.post("/clear")
+async def clear_architecture():
+    """Clear all architecture data from Neo4j."""
+    try:
+        neo4j_manager = get_neo4j_manager()
+        
+        if not neo4j_manager.is_connected():
+            neo4j_manager.connect()
+        
+        # Clear all nodes and relationships
+        result = neo4j_manager.execute_query(
+            """
+            MATCH (n)
+            WHERE n:System OR n:Container OR n:Component OR n:ExternalService
+            WITH n
+            DETACH DELETE n
+            RETURN count(n) as deleted_count
+            """
+        )
+        
+        deleted_count = result[0]['deleted_count'] if result else 0
+        logger.info(f"Cleared {deleted_count} nodes from Neo4j")
+        
+        return {
+            "status": "success",
+            "message": f"Cleared {deleted_count} nodes from database",
+            "deleted_count": deleted_count
+        }
+    
+    except Exception as e:
+        logger.error(f"Failed to clear architecture: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to clear architecture: {str(e)}")
+
+
 @router.get("/architecture")
 async def get_code_architecture():
     """
-    Get the C4 architecture data from the latest extraction.
-    
-    Serves the c4_architecture.json file if it exists.
-    """
-    import json
-    
-    # Look for c4_architecture.json in the Api root
-    api_root = Path(__file__).resolve().parents[4]
-    arch_file = api_root / "c4_architecture.json"
-    
-    if not arch_file.exists():
-        raise HTTPException(
-            status_code=404,
-            detail="Architecture file not found. Please run extraction first."
-        )
-    
-    try:
-        with open(arch_file, 'r') as f:
-            architecture_data = json.load(f)
-        
-        return architecture_data
-    except Exception as e:
-        logger.error(f"Failed to read architecture file: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to read architecture file: {str(e)}")
+    Get the C4 architecture data from JSON file.
 
+    Returns the most recently extracted C4 architecture.
+    This replaces Neo4j querying with simple JSON file reading for easier debugging.
+    """
+    try:
+        # Load from JSON file
+        c4_data = _load_latest_c4_from_json()
+
+        if not c4_data:
+            # Return empty structure if no data
+            return {
+                "c4_model_version": "1.0",
+                "system_context": {
+                    "name": "No Architecture Data",
+                    "purpose": "No repository has been extracted yet",
+                    "c4_level": "L1:Context",
+                    "business_domain": "Unknown",
+                    "owner_team": "Unassigned",
+                    "criticality": "Unknown",
+                    "languages": [],
+                    "frameworks": [],
+                    "external_dependencies": [],
+                },
+                "containers": [],
+                "components": [],
+                "relationships": {},
+                "metadata": {
+                    "extraction_mode": "json_file",
+                    "total_systems": 0,
+                },
+            }
+
+        # Return the loaded data directly
+        return c4_data
+
+    except Exception as e:
+        logger.error(f"Failed to get architecture from JSON: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get architecture: {str(e)}"
+        )
