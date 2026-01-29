@@ -76,6 +76,22 @@
 - Implement proper retry logic for failed requests
 - Handle different HTTP status codes appropriately
 
+## Service Extraction Data Format
+- **Service extraction API returns services with THE 5 PRIMARY FIELDS**:
+  1. `domain`: Business domain (e.g., "ai", "docs", "api", "data")
+  2. `owner`: Service owner from git contributors (top contributor's name, NOT "Unassigned" when git exists)
+  3. `status`: Service status ("Active-Dev", "Maintenance-Only", "Deprecated / Frozen")
+  4. `tier`: Criticality tier ("Tier 1", "Tier 2", "Tier 3", "Unknown")
+  5. `data_class`: Data sensitivity ("PII", "Credit-Card", "Internal", "Public", "Unknown")
+- Services also include git enrichment data:
+  - `owner_contributors`: Array of contributor emails
+  - `owner_contributor_stats`: Array with email, name, commit_count for each contributor
+  - `commit_count_30d`, `commit_count_90d`, `commit_count_180d`: Commit activity metrics
+  - `status_evidence`: Detailed git statistics that justify the status
+- Owner is ALWAYS extracted from git history - "Unassigned" only if git unavailable
+- API responses follow Pydantic model structure with proper type safety
+- Handle null/undefined values gracefully in UI with fallback displays
+
 ## Code Organization
 - All components must be placed inside the @components/ folder structure
 - Group related components in feature-based folders within @components/

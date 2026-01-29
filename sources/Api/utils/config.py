@@ -97,9 +97,14 @@ def get_config() -> ConfigNamespace:
     merged = _deep_merge(defaults, data)
 
     neo4j = merged.get("neo4j", {})
-    neo4j["password"] = os.getenv("NEO4J_PASSWORD", neo4j.get("password", ""))
-    neo4j["uri"] = os.getenv("NEO4J_URI", neo4j.get("uri", ""))
-    neo4j["username"] = os.getenv("NEO4J_USERNAME", neo4j.get("username", ""))
+    # Support both NEO4J_* and KF_NEO4J__* environment variables
+    neo4j["password"] = os.getenv("NEO4J_PASSWORD") or os.getenv("KF_NEO4J__PASSWORD") or neo4j.get("password", "")
+    neo4j["uri"] = os.getenv("NEO4J_URI") or os.getenv("KF_NEO4J__URI") or neo4j.get("uri", "")
+    neo4j["username"] = os.getenv("NEO4J_USERNAME") or os.getenv("KF_NEO4J__USERNAME") or neo4j.get("username", "")
+    # Also check for encrypted setting
+    encrypted_env = os.getenv("NEO4J_ENCRYPTED") or os.getenv("KF_NEO4J__ENCRYPTED")
+    if encrypted_env is not None:
+        neo4j["encrypted"] = encrypted_env.lower() in ("true", "1", "yes")
     merged["neo4j"] = neo4j
 
     database = merged.get("database", {})

@@ -72,6 +72,24 @@
 - Neo4j is used for: entity nodes, relationship edges, and graph operations
 - Always use pandas for CSV data analysis instead of database-specific query engines
 
+## Service Extraction JSON Storage
+- **Extraction results are stored in JSON files** at `sources/data/extractions/{task_id}/`
+- Each extraction creates 4 JSON files:
+  - `metadata.json`: Task status, repository info, timestamps, errors, warnings
+  - `services.json`: Extracted services with THE 5 PRIMARY FIELDS (domain, owner, status, tier, data_class)
+  - `connections.json`: Service dependencies and relationships
+  - `summary.json`: High-level extraction summary
+- **THE 5 PRIMARY FIELDS** are ALWAYS extracted and stored for each service:
+  1. `domain`: Business domain (e.g., "ai", "docs", "api", "data")
+  2. `owner`: Service owner from git contributors (top contributor's name)
+  3. `status`: Service status ("Active-Dev", "Maintenance-Only", "Deprecated / Frozen")
+  4. `tier`: Criticality tier ("Tier 1", "Tier 2", "Tier 3", "Unknown")
+  5. `data_class`: Data sensitivity ("PII", "Credit-Card", "Internal", "Public", "Unknown")
+- Git enrichment provides: `owner`, `owner_contributors`, `owner_contributor_stats`, `commit_count_*`, `status_evidence`
+- Owner is extracted from git history (top contributor) with fallback to entire repo if service path has no commits
+- All services get owner from git - "Unassigned" only appears if git history is completely unavailable
+- Services JSON structure includes: identity, technical details, dependencies, git metrics, and attributes
+
 ## LLM & AI Integration
 - Handle LLM API failures gracefully with retries and fallbacks
 - Implement proper rate limiting for external AI services

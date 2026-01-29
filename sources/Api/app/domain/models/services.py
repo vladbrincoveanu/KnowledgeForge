@@ -21,6 +21,22 @@ class ServiceStatus(str, Enum):
     UNKNOWN = "unknown"
 
 
+class ContextNodeType(str, Enum):
+    """Types of context nodes for architecture visualization."""
+    REPOSITORY = "repository"
+    README = "readme"
+    DOCKERFILE = "dockerfile"
+    DOCKER_COMPOSE = "docker_compose"
+    REQUIREMENTS = "requirements"  # Python
+    PACKAGE_JSON = "package_json"  # Node.js
+    CSPROJ = "csproj"  # .NET
+    GEMFILE = "gemfile"  # Ruby
+    GO_MOD = "go_mod"  # Go
+    CARGO_TOML = "cargo_toml"  # Rust
+    BUILD_GRADLE = "build_gradle"  # Java/Gradle
+    POM_XML = "pom_xml"  # Java/Maven
+
+
 class ServiceTier(str, Enum):
     """
     Criticality tier - how bad is it if this service breaks?
@@ -149,10 +165,44 @@ class Service(BaseModel):
     commit_count_30d: int = Field(default=0, description="Commits in last 30 days")
     commit_count_90d: int = Field(default=0, description="Commits in last 90 days")
     commit_count_180d: int = Field(default=0, description="Commits in last 180 days")
-    
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # RISK & VULNERABILITY TRACKING (Manager-first view)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    # Field 6: Active Experts (Bus Factor)
+    active_experts: int = Field(
+        default=0,
+        description="Number of active contributors (3+ commits in last 90 days). Bus factor indicator."
+    )
+
+    # Field 7: Compliance Risk Level (Architectural compliance, not legal/regulatory)
+    compliance: Optional[str] = Field(
+        default=None,
+        description="Architectural compliance risk level: COMPLIANT, AT_RISK, NON_COMPLIANT, UNKNOWN. "
+                    "Checks if sensitive data is properly prioritized and owned."
+    )
+
     # Provenance
     extracted_at: datetime = Field(default_factory=datetime.utcnow)
     source: str = Field(default="code_extraction", description="Source of extraction")
+
+
+class ContextNode(BaseModel):
+    """
+    Represents a context node in the architecture graph.
+    Context nodes provide additional context for managers (README, Dockerfile, etc.)
+    """
+    id: str = Field(..., description="Unique context node identifier")
+    name: str = Field(..., description="Node name (e.g., 'README.md', 'Dockerfile')")
+    type: ContextNodeType = Field(..., description="Type of context node")
+    file_path: Optional[str] = Field(None, description="Path to the file")
+    content_preview: Optional[str] = Field(None, description="Preview of file content (first 500 chars)")
+    service_id: Optional[str] = Field(None, description="Associated service ID if applicable")
+    
+    # Metadata
+    attributes: dict[str, Any] = Field(default_factory=dict, description="Additional attributes")
+    extracted_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class ServiceConnection(BaseModel):
@@ -189,6 +239,7 @@ class ServiceGraph(BaseModel):
     """Complete service graph with services and connections."""
     services: list[Service] = Field(default_factory=list, description="All services in the graph")
     connections: list[ServiceConnection] = Field(default_factory=list, description="All connections between services")
+    context_nodes: list[ContextNode] = Field(default_factory=list, description="Context nodes (README, Dockerfile, etc.)")
     
     # Metadata
     extracted_at: datetime = Field(default_factory=datetime.utcnow)

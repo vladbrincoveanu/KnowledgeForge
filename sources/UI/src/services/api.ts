@@ -1,5 +1,5 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
-import { IncrementalSummary } from '@/types';
+import { IncrementalSummary, TaskStatus } from '@/types';
 
 // TypeScript interfaces
 interface ExtractConfig {
@@ -730,15 +730,31 @@ export const codeArchitectureAPI = {
     }
   },
 
-  // Trigger code extraction
-  extractArchitecture: async (repositoryPath: string): Promise<{ task_id: string }> => {
+  // Trigger code extraction from GitHub
+  extractFromGitHub: async (githubUrl: string, useGit: boolean = true, appendMode: boolean = true): Promise<ExtractResponse> => {
     try {
-      const response: AxiosResponse = await api.post('/api/code-architecture/extract', {
-        repository_path: repositoryPath,
-      });
+      const response: AxiosResponse<ExtractResponse> = await api.post(
+        '/api/v1/code/extract-from-github',
+        {
+          github_url: githubUrl,
+          use_git: useGit,
+          append_mode: appendMode,
+        }
+      );
       return response.data;
     } catch (error) {
-      console.error('Failed to extract code architecture:', error);
+      console.error('Failed to extract code architecture from GitHub:', error);
+      throw error;
+    }
+  },
+
+  // Clear all architecture data
+  clearArchitecture: async (): Promise<{ status: string; message: string; deleted_count: number }> => {
+    try {
+      const response = await api.post('/api/v1/code/clear');
+      return response.data;
+    } catch (error) {
+      console.error('Failed to clear architecture:', error);
       throw error;
     }
   },
@@ -746,10 +762,21 @@ export const codeArchitectureAPI = {
   // Get extraction status
   getExtractionStatus: async (taskId: string): Promise<TaskStatus> => {
     try {
-      const response: AxiosResponse = await api.get(`/api/code-architecture/status/${taskId}`);
+      const response: AxiosResponse<TaskStatus> = await api.get(`/api/v1/code/scan/${taskId}`);
       return response.data;
     } catch (error) {
       console.error('Failed to get extraction status:', error);
+      throw error;
+    }
+  },
+
+  // Get extraction results
+  getExtractionResults: async (taskId: string): Promise<any> => {
+    try {
+      const response: AxiosResponse = await api.get(`/api/v1/code/scan/${taskId}/results`);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to get code architecture results:', error);
       throw error;
     }
   },

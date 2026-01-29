@@ -276,7 +276,7 @@ const VisualQueryBuilder: React.FC = () => {
     }
   };
 
-  const _connectNodes = () => {
+  const connectNodes = () => {
     if (selectedNode && selectedEdge) {
       const edge = edges.find(e => e.id === selectedEdge);
       if (edge) {

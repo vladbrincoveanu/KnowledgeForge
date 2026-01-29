@@ -40,7 +40,7 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
   showNotification,
 }) => {
   const [entities, setEntities] = useState<Entity[]>([]);
-  const [relationships, setRelationships] = useState<Relationship[]>([]);T
+  const [relationships, setRelationships] = useState<Relationship[]>([]);
 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);

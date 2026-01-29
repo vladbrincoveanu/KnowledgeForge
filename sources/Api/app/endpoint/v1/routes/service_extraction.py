@@ -100,7 +100,6 @@ class ServiceExtractionStatusResponse(BaseModel):
     errors: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 
-
 def get_neo4j_manager():
     """Get Neo4j manager instance."""
     config = get_config()
@@ -490,8 +489,8 @@ async def _run_service_extraction_async(
         logger.info(f"Creating ServiceExtractionPipeline for path: {repo_path}")
         pipeline = ServiceExtractionPipeline(repo_path, llm_manager=llm_manager)
         logger.info("Calling extract_services()...")
-        services = pipeline.extract_services()
-        logger.info(f"extract_services() completed, found {len(services)} services")
+        services, context_nodes = pipeline.extract_services()
+        logger.info(f"extract_services() completed, found {len(services)} services and {len(context_nodes)} context nodes")
         
         task['progress'] = 0.6
         task['message'] = f'Found {len(services)} services, discovering connections'
@@ -527,6 +526,7 @@ async def _run_service_extraction_async(
         service_graph = ServiceGraph(
             services=services,
             connections=connections,
+            context_nodes=context_nodes,
             repository_url=github_url,
             repository_name=repo_path.name,
         )
@@ -784,10 +784,28 @@ async def store_service_graph_to_json(
         
         json_store.save_connections(connections_data)
         
+        # Convert context nodes to dicts
+        context_nodes_data = []
+        for node in service_graph.context_nodes:
+            node_dict = {
+                "id": node.id,
+                "name": node.name,
+                "type": node.type.value if hasattr(node.type, 'value') else str(node.type),
+                "file_path": node.file_path,
+                "content_preview": node.content_preview,
+                "service_id": node.service_id,
+                "attributes": node.attributes,
+                "extracted_at": node.extracted_at.isoformat() if node.extracted_at else None,
+            }
+            context_nodes_data.append(node_dict)
+        
+        json_store.save_context_nodes(context_nodes_data)
+        
         # Save summary (human-readable)
         json_store.save_summary(
             services=services_data,
             connections=connections_data,
+            context_nodes=context_nodes_data,
             repository_name=service_graph.repository_name,
         )
         
@@ -952,5 +970,5 @@ async def delete_extraction_task(task_id: str):
             logger.warning(f"Failed to cleanup temp directory: {e}")
     
     del extraction_tasks[task_id]
-    
+
     return {"message": "Task deleted successfully"}

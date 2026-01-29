@@ -3,7 +3,6 @@ import ForceGraph2D from 'react-force-graph-2d';
 import {
   AlertTriangle,
   Plus,
-  RefreshCw,
   Sparkles,
   Wand2,
   Github,
@@ -21,6 +20,12 @@ interface ServiceMetadata {
   domain: string;
   owner: string;
   status: ServiceStatus;
+  tier?: string;  // Criticality level
+  data_class?: string;  // Data sensitivity (PII, Credit-Card, etc.)
+  active_experts?: number;  // NEW: Bus factor metric
+  compliance?: string;  // NEW: COMPLIANT, AT_RISK, NON_COMPLIANT, UNKNOWN
+  incident_count?: number;  // NEW: Number of incidents in last 90 days
+  last_incident_date?: string;  // NEW: ISO date string
   description?: string;
   source?: string;
   risk?: string;
@@ -35,90 +40,12 @@ interface ServiceMetadata {
   };
 }
 
-interface ChecklistItem {
-  field: string;
-  meaning: string;
-  question: string;
-  redFlag: string;
-}
-
 const statusPalette: Record<ServiceStatus | 'project', string> = {
   'Active-Dev': '#16a34a',
   'Maintenance-Only': '#f59e0b',
   'Deprecated / Frozen': '#ef4444',
   project: '#2563eb',
 };
-
-const checklist: ChecklistItem[] = [
-  {
-    field: 'domain',
-    meaning:
-      'Business area this service belongs to (e.g., Revenue Core, Checkout, User Profile)',
-    question: 'Is this the right business bucket for my new feature?',
-    redFlag: 'Feature work that does not match the tagged domain',
-  },
-  {
-    field: 'owner',
-    meaning: 'Squad or pod that owns and supports the service',
-    question: 'Who do I need to book time with right now?',
-    redFlag: 'No owner listed or routed to a generic mailbox',
-  },
-  {
-    field: 'status',
-    meaning:
-      'Lifecycle stage: Active-Dev, Maintenance-Only, Deprecated / Frozen',
-    question: 'Will engineers push back on work in this service?',
-    redFlag: 'Status is Deprecated / Frozen or Maintenance-Only',
-  },
-];
-
-const sampleRawInput = `checkout-api:
-  domain: Revenue Core
-  owner: Growth Squad
-  status: active-dev
-  notes: handles cart and payment sessions
-
-user-profiles:
-  domain: Identity
-  owner: Profile Platform
-  status: maintenance-only
-  notes: merges identity from legacy stack
-
-internal-telemetry:
-  domain: Internal Tooling
-  owner: Observability Guild
-  status: deprecated
-  notes: forwarding to new data mesh
-`;
-
-const defaultServices: ServiceMetadata[] = [
-  {
-    id: 'svc-checkout',
-    name: 'Checkout API',
-    domain: 'Revenue Core',
-    owner: 'Growth Squad',
-    status: 'Active-Dev',
-    description: 'Cart orchestration and payment session handling.',
-  },
-  {
-    id: 'svc-identity',
-    name: 'User Profiles',
-    domain: 'Identity',
-    owner: 'Profile Platform',
-    status: 'Maintenance-Only',
-    description: 'Customer identity merge layer for legacy + new stack.',
-    risk: 'Maintenance only',
-  },
-  {
-    id: 'svc-telemetry',
-    name: 'Internal Telemetry',
-    domain: 'Internal Tooling',
-    owner: 'Observability Guild',
-    status: 'Deprecated / Frozen',
-    description: 'Legacy metrics forwarder scheduled for shutdown.',
-    risk: 'Status flagged',
-  },
-];
 
 const normalizeStatus = (rawStatus?: string): ServiceStatus => {
   if (!rawStatus) return 'Active-Dev';
@@ -204,6 +131,74 @@ const ArchitectureGraph: React.FC<{ data: GraphData }> = ({ data }) => {
   const canvasWidth = dimensions.width;
   const canvasHeight = dimensions.height;
 
+  // Helper function to get risk indicators for a service
+  const getRiskIndicators = (metadata: ServiceMetadata): Array<{
+    emoji: string;
+    tooltip: string;
+    priority: number;
+  }> => {
+    const indicators = [];
+
+    // Priority 1: No active experts (critical)
+    if (metadata.active_experts === 0) {
+      indicators.push({
+        emoji: '🚨',
+        tooltip: 'No active experts',
+        priority: 1
+      });
+    }
+
+    // Priority 2: High incident count
+    if (metadata.incident_count && metadata.incident_count >= 5) {
+      indicators.push({
+        emoji: '🔴',
+        tooltip: `${metadata.incident_count} incidents`,
+        priority: 2
+      });
+    }
+
+    // Priority 3: Non-compliant
+    if (metadata.compliance === 'NON_COMPLIANT') {
+      indicators.push({
+        emoji: '🛑',
+        tooltip: 'Non-compliant',
+        priority: 3
+      });
+    }
+
+    // Priority 4: Sensitive data indicator
+    if (metadata.data_class && ['PII', 'Credit-Card'].includes(metadata.data_class)) {
+      indicators.push({
+        emoji: '🔒',
+        tooltip: `Sensitive: ${metadata.data_class}`,
+        priority: 5
+      });
+    }
+
+    // Priority 5: Bus factor = 1
+    if (metadata.active_experts === 1) {
+      indicators.push({
+        emoji: '⚠️',
+        tooltip: 'Bus factor: 1 expert',
+        priority: 4
+      });
+    }
+
+    // Priority 6: Compliance at risk
+    if (metadata.compliance === 'AT_RISK') {
+      indicators.push({
+        emoji: '⚠️',
+        tooltip: 'Compliance risk',
+        priority: 6
+      });
+    }
+
+    // Sort by priority and return max 3
+    return indicators
+      .sort((a, b) => a.priority - b.priority)
+      .slice(0, 3);
+  };
+
   const nodeCanvasObject = (node: any, ctx: CanvasRenderingContext2D) => {
     const metadata = node.metadata || {};
     const status: ServiceStatus | 'project' =
@@ -211,6 +206,7 @@ const ArchitectureGraph: React.FC<{ data: GraphData }> = ({ data }) => {
     const color = statusPalette[status] || '#2563eb';
     const radius = node.type === 'project' ? 14 : 10;
 
+    // Draw main node circle
     ctx.beginPath();
     ctx.fillStyle = color;
     ctx.strokeStyle = '#0f172a';
@@ -219,11 +215,48 @@ const ArchitectureGraph: React.FC<{ data: GraphData }> = ({ data }) => {
     ctx.fill();
     ctx.stroke();
 
+    // Draw risk indicator badges (only for non-project nodes)
+    if (node.type !== 'project') {
+      const indicators = getRiskIndicators(metadata);
+      if (indicators.length > 0) {
+        const badgeRadius = 7;
+        const badgeSpacing = 16;
+        const startX = node.x + radius + 2;
+        const startY = node.y - radius + 2;
+
+        indicators.forEach((indicator, index) => {
+          const badgeX = startX + (index * badgeSpacing);
+          const badgeY = startY;
+
+          // Badge background circle
+          ctx.beginPath();
+          ctx.fillStyle = '#ef4444'; // Red background for risk indicators
+          ctx.arc(badgeX, badgeY, badgeRadius, 0, 2 * Math.PI);
+          ctx.fill();
+
+          // Badge border
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          // Badge emoji/icon
+          ctx.font = '10px Arial';
+          ctx.fillStyle = '#ffffff';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(indicator.emoji, badgeX, badgeY);
+        });
+      }
+    }
+
+    // Draw node label
     ctx.font = 'bold 12px "Inter", "Helvetica Neue", Arial, sans-serif';
     ctx.fillStyle = '#0f172a';
+    ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillText(node.label, node.x + radius + 8, node.y - 6);
 
+    // Draw subtitle (domain • owner)
     const subtitle = [metadata.domain, metadata.owner]
       .filter(Boolean)
       .join(' • ');
@@ -266,20 +299,31 @@ const ArchitectureGraph: React.FC<{ data: GraphData }> = ({ data }) => {
         width={canvasWidth}
         height={canvasHeight}
         backgroundColor="#ffffff"
+        d3VelocityDecay={0.3}
+        d3AlphaDecay={0.02}
+        cooldownTime={3000}
+        warmupTicks={100}
+        nodeRelSize={8}
+        linkDirectionalParticles={2}
+        linkDirectionalParticleSpeed={0.005}
+        minZoom={0.5}
+        maxZoom={8}
+        enableNodeDrag={true}
+        enableZoomInteraction={true}
+        enablePanInteraction={true}
       />
     </div>
   );
 };
 
 const ArchitectureMap: React.FC = () => {
-  const [projectName, setProjectName] = useState('Architecture Blueprint');
-  const [projectOwner, setProjectOwner] = useState('Architecture Guild');
+  const projectName = 'Architecture Blueprint';
+  const projectOwner = 'Architecture Guild';
   const [services, setServices] = useState<ServiceMetadata[]>([]);
   const [rawInput, setRawInput] = useState('');
   const [githubUrl, setGithubUrl] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionError, setExtractionError] = useState<string | null>(null);
-  const [hasExtractedData, setHasExtractedData] = useState(false);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const servicesListRef = useRef<HTMLDivElement>(null);
 
@@ -333,7 +377,6 @@ const ArchitectureMap: React.FC = () => {
         description: 'Describe the capability and lifecycle notes.',
       },
     ]);
-    setHasExtractedData(true); // Show graph when service is added
   };
 
   const updateService = (
@@ -355,7 +398,6 @@ const ArchitectureMap: React.FC = () => {
     const extracted = extractServicesFromText(rawInput);
     if (extracted.length === 0) return;
     setServices(extracted);
-    setHasExtractedData(true); // Show graph after extraction
   };
 
   const handleExtractFromGithub = async () => {
@@ -412,7 +454,7 @@ const ArchitectureMap: React.FC = () => {
             
             // Detect stuck extraction (progress hasn't changed)
             const currentProgress = status.progress ?? 0;
-            if (currentProgress === lastProgress && (status.status === 'extracting' || status.status === 'running')) {
+            if (currentProgress === lastProgress && status.status === 'running') {
               stuckProgressAttempts++;
             } else {
               stuckProgressAttempts = 0;
@@ -432,7 +474,7 @@ const ArchitectureMap: React.FC = () => {
             
             // Detect if extraction is stuck (no progress for too long) - but only if still extracting
             // Don't show stuck error if it eventually completes
-            if (stuckProgressAttempts >= maxStuckAttempts && (status.status === 'extracting' || status.status === 'running')) {
+            if (stuckProgressAttempts >= maxStuckAttempts && status.status === 'running') {
               // #region agent log
               fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ArchitectureMap.tsx:370',message:'Extraction appears stuck, clearing interval',data:{attempts,stuckAttempts:stuckProgressAttempts,progress:status.progress},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
               // #endregion
@@ -533,14 +575,13 @@ const ArchitectureMap: React.FC = () => {
                 
                 setServices(extractedServices);
                 setGithubUrl(''); // Clear input on success
-                setHasExtractedData(true); // Show graph after extraction
               } else {
                 // #region agent log
                 fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ArchitectureMap.tsx:451',message:'No services in results',data:{resultsKeys:Object.keys(results),services:results.services},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
                 // #endregion
                 setExtractionError('No services found in the repository');
               }
-            } else if (status.status === 'failed' || status.status === 'error') {
+            } else if (status.status === 'failed') {
               // #region agent log
               fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ArchitectureMap.tsx:383',message:'Status is failed/error, clearing interval',data:{attempts,status:status.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
               // #endregion
@@ -601,13 +642,6 @@ const ArchitectureMap: React.FC = () => {
     };
   }, []);
 
-  const resetView = () => {
-    setServices([]);
-    setProjectName('Architecture Blueprint');
-    setProjectOwner('Architecture Guild');
-    setRawInput('');
-    setHasExtractedData(false);
-  };
 
   return (
     <div className="architecture-map">
