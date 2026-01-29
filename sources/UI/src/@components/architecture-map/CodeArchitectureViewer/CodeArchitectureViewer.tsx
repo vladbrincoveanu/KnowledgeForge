@@ -102,11 +102,11 @@ const generateC4Edges = (containers: any[] = []): Edge[] => {
     const sourceId = buildContainerId(container, idx);
     const protocol = typeof container?.protocol === 'string' ? container.protocol.trim() : '';
     const label = protocol ? protocol.toUpperCase() : undefined;
-    const dependencies = Array.isArray(container?.dependencies_internal)
-      ? container.dependencies_internal
+    const dependencies: string[] = Array.isArray(container?.dependencies_internal)
+      ? container.dependencies_internal.map((dependency: unknown) => String(dependency))
       : [];
 
-    dependencies.forEach((dependencyName, depIdx) => {
+    dependencies.forEach((dependencyName: string, depIdx: number) => {
       const targetId = nameToId.get(String(dependencyName));
       if (!targetId) {
         return;
