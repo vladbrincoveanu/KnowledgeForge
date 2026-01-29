@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import ReactFlow, { 
-  Node, 
-  Edge, 
-  Controls, 
+import ReactFlow, {
+  Node,
+  Edge,
+  Controls,
   Background,
   useNodesState,
   useEdgesState,
@@ -10,7 +10,7 @@ import ReactFlow, {
   MarkerType,
   Position,
   useReactFlow,
-  ReactFlowProvider
+  ReactFlowProvider,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import dagre from 'dagre';
@@ -373,6 +373,16 @@ const CodeArchitectureViewerInner: React.FC = () => {
     
     // Transform containers array into container_level structure
     if (data.containers && Array.isArray(data.containers)) {
+      const sysCtx = data.system_context || {};
+      const inheritedAttrs = {
+        owner: sysCtx.owner_team || sysCtx.owner,
+        domain: sysCtx.business_domain || sysCtx.domain,
+        status: sysCtx.status,
+        tier: sysCtx.criticality || sysCtx.tier,
+        data_class: sysCtx.data_class,
+        active_experts: sysCtx.active_experts,
+        compliance: sysCtx.compliance,
+      };
       const containerEntities: CodeEntity[] = data.containers.map((container: any, idx: number) => ({
         id: `container_${container.name || idx}`,
         name: container.name,
@@ -385,6 +395,11 @@ const CodeArchitectureViewerInner: React.FC = () => {
           runtime_info: container.runtime_info,
           runtime_environment: container.runtime_environment,
           deployment: container.deployment,
+          description: container.description,
+          technology: container.technology,
+          repository_url: container.repository_url,
+          health_endpoint: container.health_endpoint,
+          ...inheritedAttrs,
         },
       }));
       
@@ -455,8 +470,17 @@ const CodeArchitectureViewerInner: React.FC = () => {
         file_path: '',
         attributes: {
           owner_team: data.system_context?.owner_team,
+          owner: data.system_context?.owner,
+          owner_contributors: data.system_context?.owner_contributors,
+          owner_contributor_stats: data.system_context?.owner_contributor_stats,
           business_domain: data.system_context?.business_domain,
+          domain: data.system_context?.domain,
           criticality: data.system_context?.criticality,
+          tier: data.system_context?.tier,
+          status: data.system_context?.status,
+          data_class: data.system_context?.data_class,
+          active_experts: data.system_context?.active_experts,
+          compliance: data.system_context?.compliance,
           purpose: data.system_context?.purpose,
           languages: data.system_context?.languages,
           frameworks: data.system_context?.frameworks,
@@ -522,6 +546,16 @@ const CodeArchitectureViewerInner: React.FC = () => {
       const componentEntities: CodeEntity[] = [];
       const componentRelationships: CodeRelationship[] = [];
       
+      const sysCtxForComponents = data.system_context || {};
+      const inheritedForComponents = {
+        owner: sysCtxForComponents.owner_team || sysCtxForComponents.owner,
+        domain: sysCtxForComponents.business_domain || sysCtxForComponents.domain,
+        status: sysCtxForComponents.status,
+        tier: sysCtxForComponents.criticality || sysCtxForComponents.tier,
+        data_class: sysCtxForComponents.data_class,
+        active_experts: sysCtxForComponents.active_experts,
+        compliance: sysCtxForComponents.compliance,
+      };
       data.components.forEach((component: any, groupIdx: number) => {
         // Check if this is a component group
         if (component.type === 'component_group' && component.components && Array.isArray(component.components)) {
@@ -538,6 +572,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
                 component_type: component.component_type || 'Component',
                 group: component.name,
                 container: component.container,
+                ...inheritedForComponents,
               },
             });
             
@@ -572,6 +607,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
               container: component.container,
               endpoint_path: component.endpoint_path,
               endpoint_method: component.endpoint_method,
+              ...inheritedForComponents,
             },
           });
           
@@ -1092,11 +1128,11 @@ const CodeArchitectureViewerInner: React.FC = () => {
         setTimeout(() => {
           try {
             fitView({
-              padding: 50,
+              padding: 20,
               includeHiddenNodes: false,
               duration: 500,
-              maxZoom: 1.5,
-              minZoom: 0.1,
+              maxZoom: 2.5,
+              minZoom: 0.3,
             });
           } catch (e) {
             console.warn('[CodeArchitectureViewer] fitView error:', e);
@@ -1107,11 +1143,11 @@ const CodeArchitectureViewerInner: React.FC = () => {
         setTimeout(() => {
           try {
             fitView({
-              padding: 50,
+              padding: 20,
               includeHiddenNodes: false,
               duration: 300,
-              maxZoom: 1.5,
-              minZoom: 0.1,
+              maxZoom: 2.5,
+              minZoom: 0.3,
             });
           } catch (e) {
             console.warn('[CodeArchitectureViewer] fitView retry error:', e);
@@ -1318,9 +1354,9 @@ const CodeArchitectureViewerInner: React.FC = () => {
                 edgeTypes={edgeTypes}
                 fitView
                 attributionPosition="bottom-left"
-                defaultViewport={{ x: 0, y: 0, zoom: 1.2 }}
-                minZoom={0.05}
-                maxZoom={2.5}
+                defaultViewport={{ x: 0, y: 0, zoom: 1.5 }}
+                minZoom={0.1}
+                maxZoom={4.0}
               >
                 <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#e0e0e0" />
                 <Controls />
@@ -1346,34 +1382,119 @@ const CodeArchitectureViewerInner: React.FC = () => {
               )}
 
               {/* Domain field (from image: business bucket) */}
-              {systemAttributes?.business_domain && (
+              {(systemAttributes?.business_domain || systemAttributes?.domain || selectedNode.attributes?.domain) && (
                 <div className="detail-row">
-                  <span className="detail-label">domain</span>
-                  <span className="detail-value">{systemAttributes.business_domain}</span>
+                  <span className="detail-label">
+                    domain
+                    <span className="tooltip-hint">
+                      ⓘ
+                      <span className="tooltip-content">Business area this service belongs to (e.g. Infrastructure, AI/ML, Data, User Management).</span>
+                    </span>
+                  </span>
+                  <span className="detail-value">{systemAttributes?.business_domain || systemAttributes?.domain || selectedNode.attributes?.domain}</span>
                 </div>
               )}
 
-              {/* Owner field */}
-              {(systemAttributes?.owner_team || selectedNode.containerMeta?.owner) && (
+              {/* Owner field - always show when we have system/container context (even Unassigned) */}
+              {(systemAttributes ||
+                selectedNode.attributes?.owner != null ||
+                selectedNode.attributes?.owner_contributors != null ||
+                selectedNode.containerMeta?.owner) && (
                 <div className="detail-row">
-                  <span className="detail-label">owner</span>
-                  <span className="detail-value">{systemAttributes?.owner_team || selectedNode.containerMeta?.owner || 'No owner listed'}</span>
+                  <span className="detail-label">
+                    Owner Team
+                    <span className="tooltip-hint">
+                      ⓘ
+                      <span className="tooltip-content">The team or individual responsible for this system. If unassigned, add a CODEOWNERS file or specify the team in the README to assign ownership.</span>
+                    </span>
+                  </span>
+                  <span className="detail-value">
+                    {systemAttributes?.owner_team || systemAttributes?.owner || selectedNode.containerMeta?.owner || selectedNode.attributes?.owner || 'Unassigned'}
+                  </span>
+                  {((systemAttributes?.owner_contributors || selectedNode.attributes?.owner_contributors) ?? []).length > 0 && (
+                    <div className="detail-sub">
+                      Contributors: {(systemAttributes?.owner_contributors || selectedNode.attributes?.owner_contributors || []).slice(0, 3).join(', ')}
+                      {(systemAttributes?.owner_contributors || selectedNode.attributes?.owner_contributors || []).length > 3 && '…'}
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Status field (maps to tier/criticality) */}
-              {systemAttributes?.criticality && (
+              {/* Status field (lifecycle: Active-Dev, Maintenance-Only, Deprecated) */}
+              {(systemAttributes?.status || selectedNode.attributes?.status) && (
                 <div className="detail-row">
-                  <span className="detail-label">status</span>
-                  <span className="detail-value status-badge">{systemAttributes.criticality}</span>
+                  <span className="detail-label">
+                    Lifecycle Status
+                    <span className="tooltip-hint">
+                      ⓘ
+                      <span className="tooltip-content">Lifecycle stage: Active-Dev = new features being developed. Maintenance-Only = bugfixes only, no new features. Deprecated = scheduled for shutdown.</span>
+                    </span>
+                  </span>
+                  <span className="detail-value status-badge">{systemAttributes?.status || selectedNode.attributes?.status}</span>
+                </div>
+              )}
+
+              {/* Tier field (criticality: Tier 1/2/3) */}
+              {(systemAttributes?.criticality || systemAttributes?.tier || selectedNode.attributes?.tier) && (
+                <div className="detail-row">
+                  <span className="detail-label">
+                    Criticality Tier
+                    <span className="tooltip-hint">
+                      ⓘ
+                      <span className="tooltip-content">Tier 1 = Production Critical (site-wide outage if down). Tier 2 = Standard (specific journey broken). Tier 3 = Internal/Development (minor impact).</span>
+                    </span>
+                  </span>
+                  <span className="detail-value">{systemAttributes?.criticality || systemAttributes?.tier || selectedNode.attributes?.tier}</span>
                 </div>
               )}
 
               {/* Data class field (sensitivity) */}
               {(systemAttributes?.data_class || selectedNode.attributes?.data_class) && (
                 <div className="detail-row">
-                  <span className="detail-label">data_class</span>
+                  <span className="detail-label">
+                    Data Sensitivity
+                    <span className="tooltip-hint">
+                      ⓘ
+                      <span className="tooltip-content">Personally Identifiable Information (PII) = names, emails, addresses. Credit-Card = Payment data. Legal/Security = Compliance, audit, encryption. General = Non-sensitive data.</span>
+                    </span>
+                  </span>
                   <span className="detail-value">{systemAttributes?.data_class || selectedNode.attributes?.data_class}</span>
+                </div>
+              )}
+
+              {/* Active experts (bus factor) - warning when 0 */}
+              {(systemAttributes?.active_experts != null || selectedNode.attributes?.active_experts != null) && (
+                <div className="detail-row">
+                  <span className="detail-label">
+                    Active Experts (Bus Factor)
+                    <span className="tooltip-hint">
+                      ⓘ
+                      <span className="tooltip-content">Bus factor: contributors with 3+ commits in last 90 days. 0 = high risk (no active maintainers). 1 = single point of failure. Higher is better.</span>
+                    </span>
+                  </span>
+                  <span
+                    className={`detail-value active-experts-value ${
+                      (systemAttributes?.active_experts ?? selectedNode.attributes?.active_experts ?? 0) === 0
+                        ? 'active-experts-zero'
+                        : ''
+                    }`}
+                  >
+                    {systemAttributes?.active_experts ?? selectedNode.attributes?.active_experts ?? 0}
+                  </span>
+                </div>
+              )}
+
+              {/* Compliance (architectural risk) */}
+              {(systemAttributes?.compliance || selectedNode.attributes?.compliance) && (
+                <div className="detail-row">
+                  <span className="detail-label">
+                    Architectural Compliance
+                    <span className="tooltip-hint">
+                      ⓘ
+                      <span className="tooltip-content">Architectural compliance status: COMPLIANT = well-owned, appropriate tier. AT_RISK = sensitive data or no owner. NON_COMPLIANT = critical gaps in governance.</span>
+                    </span>
+                  </span>
+                  <span className="detail-value status-badge">{systemAttributes?.compliance || selectedNode.attributes?.compliance}</span>
                 </div>
               )}
 
@@ -1402,11 +1523,29 @@ const CodeArchitectureViewerInner: React.FC = () => {
               {/* Show URL for external services */}
               {selectedNode.attributes?.url && (
                 <div className="detail-row">
-                  <span className="detail-label">url</span>
+                  <span className="detail-label">Service URL</span>
                   <span className="detail-value">
                     <a href={selectedNode.attributes.url} target="_blank" rel="noopener noreferrer" className="external-link">
                       {selectedNode.attributes.url}
                     </a>
+                  </span>
+                </div>
+              )}
+
+              {/* Show endpoint/access path for services */}
+              {(selectedNode.containerMeta?.endpoint || selectedNode.attributes?.endpoint || selectedNode.attributes?.access_path) && (
+                <div className="detail-row">
+                  <span className="detail-label">
+                    Access Endpoint
+                    <span className="tooltip-hint">
+                      ⓘ
+                      <span className="tooltip-content">The URL path or endpoint used to access this service or UI directly. This could be an API endpoint, web interface path, or service access URL.</span>
+                    </span>
+                  </span>
+                  <span className="detail-value">
+                    <code className="endpoint-path">
+                      {selectedNode.containerMeta?.endpoint || selectedNode.attributes?.endpoint || selectedNode.attributes?.access_path}
+                    </code>
                   </span>
                 </div>
               )}

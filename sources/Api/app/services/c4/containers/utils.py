@@ -427,6 +427,103 @@ def extract_health_endpoint(project_dir: Path) -> str:
     return ""
 
 
+def extract_service_endpoint(project_dir: Path) -> str:
+    """Extract main service endpoint/access path.
+    
+    Looks in:
+    - values.yaml (ingress path, service port)
+    - ingress.yaml (path rules)
+    - README.md (documented endpoints)
+    """
+    # Check values.yaml for ingress config
+    values_file = project_dir / "chart" / "values.yaml"
+    if values_file.exists():
+        try:
+            with open(values_file) as f:
+                data = yaml.safe_load(f)
+            
+            # Look for ingress configuration
+            if 'ingress' in data:
+                ingress = data['ingress']
+                host = None
+                path = "/"
+                
+                # Extract host
+                if 'host' in ingress:
+                    host = ingress['host']
+                elif 'hosts' in ingress and ingress['hosts']:
+                    host = ingress['hosts'][0] if isinstance(ingress['hosts'], list) else ingress['hosts'].get('host')
+                
+                # Extract path
+                if 'path' in ingress:
+                    path = ingress['path']
+                elif 'paths' in ingress and ingress['paths']:
+                    path = ingress['paths'][0] if isinstance(ingress['paths'], list) else "/"
+                
+                if host:
+                    return f"https://{host}{path}"
+                elif path and path != "/":
+                    return path
+        
+        except Exception:
+            pass
+    
+    # Check ingress.yaml for path configuration
+    for ingress_file in project_dir.rglob("ingress.yaml"):
+        try:
+            with open(ingress_file) as f:
+                content = f.read()
+                data = yaml.safe_load(content)
+            
+            if data and isinstance(data, dict) and 'spec' in data:
+                spec = data['spec']
+                if 'rules' in spec and spec['rules']:
+                    rule = spec['rules'][0]
+                    host = rule.get('host', '')
+                    
+                    if 'http' in rule and 'paths' in rule['http']:
+                        paths = rule['http']['paths']
+                        if paths:
+                            path = paths[0].get('path', '/')
+                            if host:
+                                return f"https://{host}{path}"
+                            else:
+                                return path
+        
+        except Exception:
+            pass
+    
+    # Check README.md for documented endpoints
+    readme_file = project_dir / "README.md"
+    if readme_file.exists():
+        try:
+            with open(readme_file) as f:
+                content = f.read()
+            
+            # Look for endpoint patterns like "Access at: http://..." or "URL: http://..."
+            url_patterns = [
+                r'(?:Access|URL|Endpoint|Available)(?:\s+at)?:\s*(https?://[^\s\)]+)',
+                r'`(https?://[^\s`]+)`',
+                r'\[(https?://[^\]]+)\]',
+            ]
+            
+            for pattern in url_patterns:
+                match = re.search(pattern, content, re.IGNORECASE)
+                if match:
+                    return match.group(1)
+            
+            # Look for path patterns like "API: /api/v1"
+            path_pattern = r'(?:API|Endpoint|Path):\s*(/[a-zA-Z0-9/_-]+)'
+            match = re.search(path_pattern, content, re.IGNORECASE)
+            if match:
+                return match.group(1)
+        
+        except Exception:
+            pass
+    
+    return ""
+
+
 def infer_type_from_image(image: str) -> str:
     """Infer container type from Docker image name."""
     image_lower = image.lower()

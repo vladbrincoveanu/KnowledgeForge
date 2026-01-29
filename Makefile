@@ -1,7 +1,7 @@
 # KnowledgeForge - Unified Project Management
 # This Makefile provides commands to manage the entire KnowledgeForge stack
 
-.PHONY: help up down clean logs status install test tests e2e api ui dev prod build build-docker fix validate restart restart-full restart-dev restart-api restart-api-dev restart-ui restart-ui-dev sync pull
+.PHONY: help up down clean logs status install test tests e2e api ui dev prod build build-docker fix validate restart restart-full restart-dev restart-api restart-api-dev restart-ui restart-ui-dev sync pull clean-worktrees
 
 # Default target
 help:
@@ -18,7 +18,13 @@ help:
 	@echo "  make logs       - View logs from all services"
 	@echo "  make status     - Show status of all services"
 	@echo "  make install    - Install dependencies for API and UI"
-	@echo "  make test-api   - Run API tests only (unit + pipeline)"
+	@echo "  make test       - Run API tests only (unit + pipeline)"
+	@echo "  make test-e2e   - Run E2E extraction tests (GitHub → JSON → UI)"
+	@echo "  make test-e2e-verbose - Run E2E tests with detailed output"
+	@echo "  make test-owner - Test owner detection specifically"
+	@echo "  make test-containers - Test container detection specifically"
+	@echo "  make test-endpoints - Test endpoint extraction specifically"
+	@echo "  make test-coverage - Run tests with coverage report"
 	@echo "  make e2e        - Run end-to-end tests"
 	@echo "  make tests      - Run all tests (API unit + pipeline + UI + E2E)"
 	@echo "  make build      - Build all projects with quality checks (format, lint, compile)"
@@ -29,6 +35,7 @@ help:
 	@echo "Git Commands:"
 	@echo "  make pull       - Pull latest changes from remote (git pull)"
 	@echo "  make sync       - Sync: pull, clean temp files, restart services"
+	@echo "  make clean-worktrees - Remove Cursor IDE worktrees (parallel agent sessions)"
 	@echo ""
 	@echo "Individual Services:"
 	@echo "  make api-only   - Start API only (local development)"
@@ -146,6 +153,35 @@ test:
 	@echo "📋 Running API pipeline integration test..."
 	cd sources && source venv/bin/activate && cd api && python tests/test_pipeline.py
 	@echo "✅ API tests completed!"
+
+# Run E2E extraction tests in Docker
+test-e2e:
+	@echo "🧪 Running E2E extraction tests..."
+	docker compose exec api python -m pytest test_e2e_extraction.py -v
+	@echo "✅ E2E tests completed!"
+
+# Run E2E tests with verbose output
+test-e2e-verbose:
+	@echo "🧪 Running E2E tests with detailed output..."
+	docker compose exec api python -m pytest test_e2e_extraction.py -v -s
+
+# Run specific E2E tests
+test-owner:
+	@echo "🧪 Testing owner detection..."
+	docker compose exec api python -m pytest test_e2e_extraction.py::TestE2EExtraction::test_03_owner_detection -v -s
+
+test-containers:
+	@echo "🧪 Testing container detection..."
+	docker compose exec api python -m pytest test_e2e_extraction.py::TestE2EExtraction::test_04_containers_detection -v -s
+
+test-endpoints:
+	@echo "🧪 Testing endpoint extraction..."
+	docker compose exec api python -m pytest test_e2e_extraction.py::TestE2EExtraction::test_06_container_endpoints -v -s
+
+# Run tests with coverage
+test-coverage:
+	@echo "📊 Running tests with coverage..."
+	docker compose exec api python -m pytest test_e2e_extraction.py --cov=app --cov-report=html --cov-report=term
 
 # Run end-to-end tests
 e2e:
@@ -317,3 +353,12 @@ sync:
 	docker-compose restart api
 	@echo ""
 	@echo "✅ Sync complete! Ready for fresh extraction."
+
+clean-worktrees:
+	@echo "🧹 Cleaning up Cursor IDE worktrees..."
+	@for worktree in $$(git worktree list --porcelain | grep "worktree.*\.cursor" | awk '{print $$2}'); do \
+		echo "  Removing $$worktree"; \
+		git worktree remove "$$worktree" --force 2>/dev/null || true; \
+	done
+	@git worktree prune
+	@echo "✅ Worktrees cleaned!"

@@ -88,8 +88,8 @@ services:
       - KF_NEO4J__PASSWORD=password
       - KF_NEO4J__ENCRYPTED=false
       # LM Studio Configuration (connects to host machine)
-      - ONTOLOGY_LMSTUDIO__BASE_URL=http://localhost:1234
-      - ONTOLOGY_LMSTUDIO__MODEL_NAME=llama2
+      - ONTOLOGY_LMSTUDIO__BASE_URL=http://host.docker.internal:1234/v1
+      - ONTOLOGY_LMSTUDIO__MODEL_NAME=qwen/qwen2.5-vl-7b
       # LLM provider for service extraction
       - KF_LLM_PROVIDER=lmstudio
       - KF_ENABLE_LLM_LABELS=true

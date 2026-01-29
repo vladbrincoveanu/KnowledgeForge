@@ -1,4 +1,5 @@
 import React from 'react';
+// Use reactflow (v11) - not @xyflow/react
 import { Handle, Position } from 'reactflow';
 
 interface ContainerNodeProps {

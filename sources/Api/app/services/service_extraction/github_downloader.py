@@ -93,8 +93,9 @@ class GitHubDownloader:
                 clone_url = f"https://github.com/{owner}/{repo}.git"
                 
                 clone_cmd = ['git', 'clone']
+                # Default to full history for proper owner/contributor detection
                 if full_history is None:
-                    full_history = False
+                    full_history = True
                 if not full_history:
                     clone_cmd.extend(['--depth', '1'])
                 if branch:

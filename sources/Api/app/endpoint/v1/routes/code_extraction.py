@@ -127,7 +127,10 @@ def get_neo4j_manager():
 def get_llm_manager():
     """Get LLM manager instance."""
     try:
-        return LLMManager(lmstudio_url="http://127.0.0.1:1234")
+        import os
+        base_url = os.getenv("LMSTUDIO_BASE_URL", "http://localhost:1234/v1")
+        model = os.getenv("LMSTUDIO_MODEL_NAME", "qwen/qwen2.5-vl-7b")
+        return LLMManager(lmstudio_url=base_url, default_model=model)
     except Exception as e:
         logger.warning(f"LLM not available: {e}")
         return None
@@ -419,16 +422,31 @@ async def store_c4_in_neo4j(
         
         # Store system context (Level 1)
         system = c4_architecture['system_context']
+        system_ctx = system  # alias for clarity
         neo4j_manager.execute_query(
             """
             MERGE (s:System {name: $name})
             SET s.purpose = $purpose,
                 s.c4_level = $c4_level,
+                s.domain = $domain,
+                s.owner = $owner,
+                s.status = $status,
+                s.tier = $tier,
+                s.data_class = $data_class,
+                s.active_experts = $active_experts,
+                s.compliance = $compliance,
                 s.updated_at = datetime()
             """,
             name=system['name'],
             purpose=system['purpose'],
-            c4_level=system['c4_level']
+            c4_level=system['c4_level'],
+            domain=system_ctx.get('business_domain', system_ctx.get('domain', 'Unclassified')),
+            owner=system_ctx.get('owner_team', system_ctx.get('owner', 'Unassigned')),
+            status=system_ctx.get('status', 'Unknown'),
+            tier=system_ctx.get('criticality', system_ctx.get('tier', 'Unknown')),
+            data_class=system_ctx.get('data_class', 'Unknown'),
+            active_experts=system_ctx.get('active_experts', 0),
+            compliance=system_ctx.get('compliance', 'UNKNOWN'),
         )
         
         # Store external dependencies
@@ -451,7 +469,6 @@ async def store_c4_in_neo4j(
             )
         
         # Store containers (Level 2) - inherit system-level fields for each container
-        system_ctx = c4_architecture['system_context']
         for container in c4_architecture['containers']:
             neo4j_manager.execute_query(
                 """
@@ -465,7 +482,9 @@ async def store_c4_in_neo4j(
                     c.domain = $domain,
                     c.status = $status,
                     c.tier = $tier,
-                    c.data_class = $data_class
+                    c.data_class = $data_class,
+                    c.active_experts = $active_experts,
+                    c.compliance = $compliance
                 WITH c
                 MATCH (s:System {name: $system_name})
                 MERGE (s)-[:CONTAINS]->(c)
@@ -477,11 +496,13 @@ async def store_c4_in_neo4j(
                 c4_level=container['c4_level'],
                 path=container['path'],
                 # Inherit from system context
-                owner=system_ctx.get('owner_team', 'Unassigned'),
-                domain=system_ctx.get('business_domain', 'Unclassified'),
-                status='Active',  # Default for containers
-                tier=system_ctx.get('criticality', 'Unknown'),
+                owner=system_ctx.get('owner_team', system_ctx.get('owner', 'Unassigned')),
+                domain=system_ctx.get('business_domain', system_ctx.get('domain', 'Unclassified')),
+                status=system_ctx.get('status', 'Unknown'),
+                tier=system_ctx.get('criticality', system_ctx.get('tier', 'Unknown')),
                 data_class=system_ctx.get('data_class', 'Unknown'),
+                active_experts=system_ctx.get('active_experts', 0),
+                compliance=system_ctx.get('compliance', 'UNKNOWN'),
                 system_name=system['name']
             )
         
@@ -500,7 +521,9 @@ async def store_c4_in_neo4j(
                     comp.domain = $domain,
                     comp.status = $status,
                     comp.tier = $tier,
-                    comp.data_class = $data_class
+                    comp.data_class = $data_class,
+                    comp.active_experts = $active_experts,
+                    comp.compliance = $compliance
                 WITH comp
                 MATCH (c:Container {name: $container_name})
                 MERGE (c)-[:EXPOSES]->(comp)
@@ -514,11 +537,13 @@ async def store_c4_in_neo4j(
                 file=component.get('file', ''),
                 container_name=component['container'],
                 # Inherit from system context
-                owner=system_ctx.get('owner_team', 'Unassigned'),
-                domain=system_ctx.get('business_domain', 'Unclassified'),
-                status='Active',
-                tier=system_ctx.get('criticality', 'Unknown'),
+                owner=system_ctx.get('owner_team', system_ctx.get('owner', 'Unassigned')),
+                domain=system_ctx.get('business_domain', system_ctx.get('domain', 'Unclassified')),
+                status=system_ctx.get('status', 'Unknown'),
+                tier=system_ctx.get('criticality', system_ctx.get('tier', 'Unknown')),
                 data_class=system_ctx.get('data_class', 'Unknown'),
+                active_experts=system_ctx.get('active_experts', 0),
+                compliance=system_ctx.get('compliance', 'UNKNOWN'),
             )
         
         logger.info(

@@ -20,6 +20,7 @@ from abc import ABC, abstractmethod
 from app.services.code_extraction.python_ast_extractor import PythonASTExtractor
 from app.domain.models.code_entities import CodeEntityType, CodeEntity
 from app.services.c4.containers import ContainerManager, is_deployable_service
+from app.services.c4.context import ContextManager
 
 import yaml
 import tomli
@@ -331,13 +332,15 @@ class C4ArchitectureExtractor:
         logger.info("-"*80)
         self._extract_level1_context()
         logger.info(f"✓ System: {self.system_context.get('name', 'Unknown')}")
-        logger.info(f"✓ Owner: {self.system_context.get('owner_team', 'Unknown')}")
-        logger.info(f"✓ Domain: {self.system_context.get('business_domain', 'Unknown')}")
-        logger.info(f"✓ Criticality: {self.system_context.get('criticality', 'Unknown')}")
+        logger.info(f"✓ Owner: {self.system_context.get('owner_team', self.system_context.get('owner', 'Unknown'))}")
+        logger.info(f"✓ Domain: {self.system_context.get('business_domain', self.system_context.get('domain', 'Unknown'))}")
+        logger.info(f"✓ Status: {self.system_context.get('status', 'Unknown')}")
+        logger.info(f"✓ Criticality: {self.system_context.get('criticality', self.system_context.get('tier', 'Unknown'))}")
+        logger.info(f"✓ Active Experts: {self.system_context.get('active_experts', 'N/A')}")
+        logger.info(f"✓ Compliance: {self.system_context.get('compliance', 'Unknown')}")
         logger.info(f"✓ External dependencies: {len(self.system_context.get('external_dependencies', []))}")
 
-        # Build context/container relationships (C4 links)
-        self.context_relationships = self._build_context_relationships()
+        # Build container relationships (context relationships built in _extract_level1_context)
         self.container_relationships = self.container_manager.build_container_relationships()
         self.cluster_metadata = self.container_manager.detect_cluster_metadata()
         
@@ -402,59 +405,23 @@ class C4ArchitectureExtractor:
         return c4_architecture
     
     def _extract_level1_context(self):
-        """Extract Level 1: System Context.
+        """Extract Level 1: System Context using ContextManager.
         
-        Identifies:
-        - System name (from README, pyproject.toml, package.json)
-        - System purpose (LLM-generated summary)
-        - External dependencies (Stripe, AWS, databases)
-        - Owner team (from CODEOWNERS, README)
-        - Business domain (Infrastructure, AI Processing, etc.)
-        - Criticality (Tier 1, 2, 3)
+        Uses c4/context module for full Service model field extraction:
+        - System name, purpose, external dependencies, actors
+        - All 7 primary fields: domain, owner, status, tier, data_class,
+          active_experts, compliance
+        - Git metrics: commit counts, contributor stats
         """
-        # Find system name
-        system_name = self._detect_system_name()
-        
-        # Find external dependencies
-        external_deps = self._detect_external_dependencies()
-
-        # Detect languages and frameworks
-        languages = self._detect_languages()
-        frameworks = self._detect_frameworks()
-
-        # Git and repository context
-        git_metadata = self._extract_git_metadata()
-        repository_url = self._get_repository_root_url()
-        context_sources = self._collect_context_sources(frameworks)
-        
-        # Generate system purpose with LLM (if available)
-        system_purpose = self._generate_system_purpose()
-        
-        # IT Landscape metadata
-        owner_team = self._detect_owner_team()
-        business_domain = self._infer_business_domain()
-        criticality = self._determine_criticality()
-        actors = self._detect_context_actors()
-        
-        self.system_context = {
-            "c4_level": 1,
-            "type": "system",
-            "name": system_name,
-            "purpose": system_purpose,
-            "external_dependencies": external_deps,
-            "actors": actors,
-            "languages": languages,
-            "frameworks": frameworks,
-            "repository_url": repository_url,
-            "git": git_metadata,
-            "context_sources": context_sources,
-            
-            # IT Landscape fields
-            "owner_team": owner_team,
-            "business_domain": business_domain,
-            "criticality": criticality,
-            "data_class": self._infer_data_classification(),  # Data sensitivity classification
-        }
+        context_manager = ContextManager(
+            self.repo_path,
+            self.llm_manager,
+            self.containers,
+        )
+        self.system_context = context_manager.extract_context()
+        self.context_relationships = context_manager.build_context_relationships(
+            self.system_context
+        )
 
     def _detect_languages(self) -> list[dict[str, Any]]:
         """Detect primary languages by file extension frequency."""
@@ -2695,7 +2662,10 @@ def main():
     
     # Initialize LLM (optional)
     try:
-        llm = LLMManager(lmstudio_url="http://127.0.0.1:1234")
+        import os
+        base_url = os.getenv("LMSTUDIO_BASE_URL", "http://localhost:1234/v1")
+        model = os.getenv("LMSTUDIO_MODEL_NAME", "qwen/qwen2.5-vl-7b")
+        llm = LLMManager(lmstudio_url=base_url, default_model=model)
     except Exception:
         llm = None
         print("⚠️  LLM not available, proceeding without system purpose generation")

@@ -183,6 +183,7 @@ class StructureDetector(BaseContainerDetector):
             "runtime_info": utils.extract_runtime_version(project_dir),
             "dependencies_internal": [],  # Will be populated later
             "health_endpoint": utils.extract_health_endpoint(project_dir),
+            "endpoint": utils.extract_service_endpoint(project_dir),
         }
 
         if not container.get("description") and runtime_environment:

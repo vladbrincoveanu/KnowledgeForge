@@ -137,6 +137,8 @@ uploads/
 # Service extraction artifacts
 sources/Api/data/extractions/
 sources/data/extractions/
+sources/Api/sources/data/c4_extractions/
+sources/data/c4_extractions/
 
 # Secrets and sensitive configuration
 .env

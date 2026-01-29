@@ -306,8 +306,8 @@ const ArchitectureGraph: React.FC<{ data: GraphData }> = ({ data }) => {
         nodeRelSize={8}
         linkDirectionalParticles={2}
         linkDirectionalParticleSpeed={0.005}
-        minZoom={0.5}
-        maxZoom={8}
+        minZoom={0.8}
+        maxZoom={12}
         enableNodeDrag={true}
         enableZoomInteraction={true}
         enablePanInteraction={true}
