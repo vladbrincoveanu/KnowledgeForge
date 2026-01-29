@@ -1,7 +1,7 @@
 # KnowledgeForge - Unified Project Management
 # This Makefile provides commands to manage the entire KnowledgeForge stack
 
-.PHONY: help up down clean logs status install test tests e2e api ui dev prod build build-docker fix validate restart restart-full restart-dev restart-api restart-api-dev restart-ui restart-ui-dev
+.PHONY: help up down clean logs status install test tests e2e api ui dev prod build build-docker fix validate restart restart-full restart-dev restart-api restart-api-dev restart-ui restart-ui-dev sync pull
 
 # Default target
 help:
@@ -25,6 +25,10 @@ help:
 	@echo "  make build-docker - Build Docker images only"
 	@echo "  make fix        - Fix code formatting and linting issues (API: black, UI: fix-all)"
 	@echo "  make validate   - Run comprehensive validation (type-check, lint, format, tests)"
+	@echo ""
+	@echo "Git Commands:"
+	@echo "  make pull       - Pull latest changes from remote (git pull)"
+	@echo "  make sync       - Sync: pull, clean temp files, restart services"
 	@echo ""
 	@echo "Individual Services:"
 	@echo "  make api-only   - Start API only (local development)"
@@ -286,3 +290,30 @@ validate:
 	@echo "  ✅ UI validation passed!"
 	@echo ""
 	@echo "✅ All validation checks passed!"
+
+# Git commands
+pull:
+	@echo "📥 Pulling latest changes from remote..."
+	git fetch --all
+	git pull
+	@echo "✅ Pull complete!"
+
+sync:
+	@echo "🔄 Syncing repository and cleaning up..."
+	@echo ""
+	@echo "📥 Step 1: Pull latest changes..."
+	git fetch --all
+	@echo "Current branch status:"
+	@git status --short --branch
+	@echo ""
+	@echo "Attempting to merge remote changes..."
+	git pull --no-rebase || (echo "⚠️  Manual merge needed. Run 'git pull' manually to resolve." && exit 0)
+	@echo ""
+	@echo "🧹 Step 2: Clean temporary files..."
+	rm -rf /tmp/github_* 2>/dev/null || true
+	rm -rf sources/data/c4_extractions/* 2>/dev/null || true
+	@echo ""
+	@echo "🔄 Step 3: Restart services..."
+	docker-compose restart api
+	@echo ""
+	@echo "✅ Sync complete! Ready for fresh extraction."
