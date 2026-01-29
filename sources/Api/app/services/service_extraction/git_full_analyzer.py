@@ -7,7 +7,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional, Tuple, Union
 
 from app.domain.models.services import Service, ServiceStatus
 from app.services.service_extraction.domain_extractor import DOMAIN_KEYWORDS
@@ -298,7 +298,7 @@ class GitFullAnalyzer:
         """Split a string into lowercase tokens."""
         return [token.lower() for token in re.split(r"[^A-Za-z0-9]+", text) if token]
 
-    def _tokenize_parts(self, parts: tuple[str, ...] | list[str]) -> list[str]:
+    def _tokenize_parts(self, parts: Union[Tuple[str, ...], List[str]]) -> List[str]:
         tokens: list[str] = []
         for part in parts:
             tokens.extend(self._tokenize_text(part))

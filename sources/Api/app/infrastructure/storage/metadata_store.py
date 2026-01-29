@@ -74,7 +74,7 @@ class PostgreSQLMetadataStore:
         self._mock_extraction_runs: dict[str, dict[str, Any]] = {}
 
     def create_extraction_run(
-        self, task_id: str, status: str = "pending", metadata: Dict[str, Any] | None = None
+        self, task_id: str, status: str = "pending", metadata: Optional[Dict[str, Any]] = None
     ) -> None:
         """Create or update an extraction run entry."""
         payload = metadata or {}
