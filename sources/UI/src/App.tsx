@@ -24,6 +24,8 @@ import {
   Brain,
   Network,
   Code,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import './App.scss';
 import Notification from './@components/notification/Notification';
@@ -120,10 +122,19 @@ interface WebSocketMessage {
 
 interface NavigationProps {
   activeTab: string;
+  isCollapsed: boolean;
+  onToggle: () => void;
 }
 
 // Navigation component
-const Navigation: React.FC<NavigationProps> = ({ activeTab }) => {
+const Navigation: React.FC<NavigationProps> = ({ activeTab, isCollapsed, onToggle }) => {
+  // #region agent log
+  React.useEffect(() => {
+    console.log('[DEBUG] Navigation rendered with props:', { activeTab, isCollapsed, hasOnToggle: !!onToggle });
+    fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:Navigation',message:'Navigation component rendered',data:{activeTab,isCollapsed,hasOnToggle:!!onToggle},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'E'})}).catch(()=>{});
+  }, [activeTab, isCollapsed, onToggle]);
+  // #endregion
+
   const navItems: NavItem[] = [
     {
       id: 'upload',
@@ -170,24 +181,107 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab }) => {
   ];
 
   return (
-    <nav className="main-navigation">
+    <nav className={`main-navigation ${isCollapsed ? 'collapsed' : ''}`}>
       <div className="nav-header">
-        <Brain size={24} />
-        <h2>KnowledgeForge</h2>
+        <div className="nav-header-content">
+          {isCollapsed ? (
+            <Brain size={24} />
+          ) : (
+            <>
+              <Brain size={24} />
+              <h2>KnowledgeForge</h2>
+            </>
+          )}
+        </div>
+        <button
+          className="nav-toggle"
+          onClick={onToggle}
+          aria-label={isCollapsed ? 'Show navigation' : 'Hide navigation'}
+          ref={(el) => {
+            // #region agent log
+            if (el) {
+              setTimeout(() => {
+                const rect = el.getBoundingClientRect();
+                const styles = window.getComputedStyle(el);
+                const parent = el.parentElement;
+                const parentStyles = parent ? window.getComputedStyle(parent) : null;
+                const data = {
+                  buttonExists: true,
+                  display: styles.display,
+                  visibility: styles.visibility,
+                  opacity: styles.opacity,
+                  width: rect.width,
+                  height: rect.height,
+                  top: rect.top,
+                  left: rect.left,
+                  right: rect.right,
+                  bottom: rect.bottom,
+                  zIndex: styles.zIndex,
+                  position: styles.position,
+                  parentDisplay: parentStyles?.display,
+                  parentOverflow: parentStyles?.overflow,
+                  parentWidth: parent ? parent.getBoundingClientRect().width : 0,
+                  inViewport: rect.width > 0 && rect.height > 0 && rect.top >= 0
+                };
+                console.log('[DEBUG] Button ref - DOM element details:', data);
+                fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:nav-toggle-ref',message:'Button DOM element details',data,timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'A,B,C,D,F'})}).catch(()=>{});
+              }, 100);
+            } else {
+              console.log('[DEBUG] Button ref - element is NULL!');
+              fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:nav-toggle-ref',message:'Button element is NULL',data:{buttonExists:false},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'A'})}).catch(()=>{});
+            }
+            // #endregion
+          }}
+          style={{
+            background: '#007bff',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '6px',
+            padding: '0.5rem 0.75rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            fontSize: '0.875rem',
+            fontWeight: 600,
+            flexShrink: 0
+          }}
+        >
+          {isCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+          {!isCollapsed && <span>Hide</span>}
+        </button>
       </div>
-      <ul className="nav-list">
-        {navItems.map(item => (
-          <li key={item.id}>
-            <Link
-              to={item.path}
-              className={`nav-link ${activeTab === item.id ? 'active' : ''}`}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      {!isCollapsed && (
+        <ul className="nav-list">
+          {navItems.map(item => (
+            <li key={item.id}>
+              <Link
+                to={item.path}
+                className={`nav-link ${activeTab === item.id ? 'active' : ''}`}
+              >
+                {item.icon}
+                <span>{item.label}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+      {isCollapsed && (
+        <ul className="nav-list">
+          {navItems.map(item => (
+            <li key={item.id}>
+              <Link
+                to={item.path}
+                className={`nav-link ${activeTab === item.id ? 'active' : ''}`}
+                title={item.label}
+              >
+                {item.icon}
+                <span>{item.label}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
     </nav>
   );
 };
@@ -206,6 +300,7 @@ const MainContent: React.FC = () => {
     links: [],
   });
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [isNavCollapsed, setIsNavCollapsed] = useState<boolean>(false);
 
   const showNotification = (message: string, type: 'success' | 'error' | 'info') => {
     setNotification({ message, type });
@@ -659,7 +754,16 @@ const MainContent: React.FC = () => {
         />
       )}
       <div className="app-container">
-        <Navigation activeTab={activeTab} />
+        <Navigation 
+          activeTab={activeTab} 
+          isCollapsed={isNavCollapsed}
+          onToggle={() => {
+            // #region agent log
+            fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:MainContent-onToggle',message:'Toggle function called',data:{currentState:isNavCollapsed,newState:!isNavCollapsed},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+            // #endregion
+            setIsNavCollapsed(!isNavCollapsed);
+          }}
+        />
 
         <main className="main-content">
           <Routes>
