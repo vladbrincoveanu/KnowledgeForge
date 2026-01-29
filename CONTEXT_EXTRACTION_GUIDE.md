@@ -1,36 +1,23 @@
-# C4 Context Level - Extraction Guide
+# Context Metadata Extraction Guide
 
-## What We Extract
-
-The C4 Context level captures the **system boundary** and its **external relationships**. This includes:
-
-1. **System Identity** - Name, purpose, type
-2. **IT Landscape Metadata** - 7 operational fields
-3. **External Dependencies** - Third-party services with URLs
-4. **Actors** - Users and external systems interacting with the system
+## Summary
+This guide explains how KnowledgeForge extracts business and operations metadata from source code repositories.
 
 ---
 
-## System Identity
-
-| Field | Source | Logic |
-|-------|--------|-------|
-| **name** | Repository name | Clean and format repo name |
-| **purpose** | README.md | Extract description, first paragraph, or summary |
-| **type** | Repository structure | Detect: application, library, infrastructure, documentation |
+## 🛠️ Verification
+Run **`make quick-check`** from the root directory after any modification to verify these extraction rules still work against the test bench.
 
 ---
 
-## IT Landscape Metadata (7 Fields)
-
-### 1. Domain 🏢
+## 1. Domain Extraction 🏢
 **Business area or technical category**
 
 Sources: Repository name, README.md, directory structure  
 Patterns: `e-commerce`, `payment`, `infrastructure`, `data-platform`  
 Default: `Infrastructure`
 
-### 2. Owner Team 👥
+## 2. Owner Team 👥
 **Team responsible for the codebase**
 
 Priority chain:
@@ -40,7 +27,7 @@ Priority chain:
 
 **Critical:** Requires full Git history (`--depth=999999`)
 
-### 3. Lifecycle Status 🔄
+## 3. Lifecycle Status 🔄
 **Current software lifecycle stage**
 
 Logic:
@@ -51,7 +38,7 @@ Logic:
   - 18-36 months = `Legacy`
   - >36 months = `Deprecated / Frozen`
 
-### 4. Criticality Tier ⚡
+## 4. Criticality Tier ⚡
 **Business impact and SLA requirements**
 
 Sources: README.md keywords, directory structure  
@@ -60,7 +47,7 @@ Logic:
 - `/staging/` → `Tier 2 - Business Important`
 - `/dev/`, `/test/`, "demo", "sample" → `Tier 3 - Development/Internal`
 
-### 5. Data Sensitivity 🔒
+## 5. Data Sensitivity 🔒
 **Data classification and compliance**
 
 Pattern matching:
@@ -68,7 +55,7 @@ Pattern matching:
 - Compliance: `GDPR`, `HIPAA`, `PCI`, `SOC2`
 - Classification: `PII` if sensitive patterns found, else `Internal`
 
-### 6. Active Experts (Bus Factor) 🚌
+## 6. Active Experts (Bus Factor) 🚌
 **Number of engineers with deep knowledge**
 
 Calculate from `git shortlog -sn --all`:
@@ -77,7 +64,7 @@ Calculate from `git shortlog -sn --all`:
 - Distributed contributions → Bus Factor: 3+
 - No commits in last year → Bus Factor: 0 (frozen repo)
 
-### 7. Architectural Compliance ✅
+## 7. Architectural Compliance ✅
 **How well code follows standards**
 
 Checklist:

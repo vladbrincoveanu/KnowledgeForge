@@ -1,0 +1,20 @@
+# KnowledgeForge Root Rules for Claude
+
+## 🚀 Critical Automation
+- **MANDATORY**: Run `make quick-check` from the root directory after any logical change.
+- **MOTHER COMMAND**: For infrastructure, Docker, or deep environment changes, use `make full-check`.
+- **PURPOSE**: Ensure 11/11 E2E tests pass in `sources/Api/test_e2e_extraction.py`.
+
+## 🏗️ Architecture Standards
+- **C4 EXTRACTION**: All extraction logic resides in `sources/Api/app/services/c4/`.
+- **METADATA**: Ensure Domain, Owner, Lifecycle, Tier, Data Class, Experts, and Compliance are always extracted.
+- **ENDPOINTS**: Service URLs and access paths must be extracted from Helm/Ingress/READMEs.
+
+## 🛠️ Code Quality
+- **BACKEND**: Python 3.11, FastAPI, Pydantic V2 (strict typing).
+- **FRONTEND**: React, TypeScript, ReactFlow.
+- **TESTING**: Use `pytest` for all backend logic. Validated via Mother Makefile.
+
+## 📖 Documentation
+- Always consult `C4_EXTRACTION_LOGIC.md` and `CONTEXT_EXTRACTION_GUIDE.md` before modifying pipeline logic.
+- Keep `IMPLEMENTATION_STATUS.md` updated.

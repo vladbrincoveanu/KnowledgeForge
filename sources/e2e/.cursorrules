@@ -1,5 +1,14 @@
 # KnowledgeForge E2E Testing - Pytest/Testing Project Rules
 
+## 🚀 MANDATORY REGRESSION CHECK
+- **IMPORTANT**: After any change to tests or extraction, run `make quick-check` from the project root.
+- Maintain the 11/11 passing status of the extraction benchmark.
+
+## 🧪 E2E Objectives
+- Validate C4 metadata extraction (Owner, Tier, Status, etc.).
+- Validate Service URL/Endpoint extraction.
+- Validate ReactFlow-compatible JSON structure.
+
 ## Core Principles
 - Write comprehensive end-to-end tests that validate the complete user workflow
 - Test real integrations between UI, API, and databases (Neo4j, metadata store)

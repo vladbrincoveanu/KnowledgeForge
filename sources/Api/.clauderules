@@ -1,0 +1,18 @@
+# KnowledgeForge API Rules for Claude
+
+## 🚀 Mandatory Regression Check
+- **ALWAYS** run `make quick-check` from the root after modifying API or extraction logic.
+- Ensure all 11 E2E tests in `test_e2e_extraction.py` pass.
+
+## 🐍 Python & FastAPI Standards
+- Use Python 3.11+, Pydantic V2, and strict type hints.
+- Logic for C4 extraction belongs in `app/services/c4/`.
+- Metadata extraction (Domain, Owner, Tier, etc.) must handle missing data gracefully but log extensively.
+- Git history extraction requires `full_history=True` in `github_downloader.py`.
+
+## 📦 Data Models
+- Use Pydantic models for all API responses.
+- JSON serialization must handle complex types (dictionaries/lists) correctly for the UI.
+
+## 🧪 Testing
+- All new extraction logic must have a corresponding test case in `test_e2e_extraction.py`.

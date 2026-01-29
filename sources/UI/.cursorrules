@@ -1,5 +1,14 @@
 # KnowledgeForge UI - React/Vite Project Rules
 
+## 🚀 MANDATORY REGRESSION CHECK
+- **IMPORTANT**: After any change, run `make quick-check` from the project root.
+- Verify that UI changes don't break the graph visualization or tooltip positioning.
+
+## 🎨 Visualization Standards
+- ReactFlow zoom range: `0.1` to `2.0`.
+- Key labels must be human-readable (Tier, Status, Compliance, etc.).
+- Tooltip CSS must use `fixed` positioning.
+
 ## Core Principles
 - Write modern, performant React code using functional components and hooks
 - Prioritize accessibility (a11y) in all UI components

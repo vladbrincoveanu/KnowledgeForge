@@ -15,6 +15,16 @@ GitHub Repository → Clone (full history) → Parse Files → Pattern Matching 
 
 ---
 
+## 🛠️ Maintenance & Regression
+To ensure the extraction logic stays accurate across changes:
+- **`make quick-check`**: Restarts the API and runs 11 E2E extraction tests.
+- **`make full-check`**: Rebuilds the entire stack from scratch and runs all tests.
+- **`make test-e2e`**: Runs the standalone regression suite.
+
+All tests must pass (11/11) before committing extraction changes.
+
+---
+
 ## 🎯 Context Level - System Metadata
 
 ### 1. Domain 🏢

@@ -1,5 +1,14 @@
 # KnowledgeForge API - Python/FastAPI Project Rules
 
+## 🚀 MANDATORY REGRESSION CHECK
+- **IMPORTANT**: After any change, run `make quick-check` from the project root.
+- All 11 E2E tests in `sources/Api/test_e2e_extraction.py` MUST pass.
+
+## 🏗️ Architecture & Extraction
+- Extraction logic is in `app/services/c4/`.
+- Ensure `github_downloader.py` uses full git history for owner detection.
+- Extract service endpoints from Helm `values.yaml` and Kubernetes `ingress.yaml`.
+
 ## Core Principles
 - Always use Pydantic models for data validation and serialization instead of dataclasses
 - Follow strict type hints for all function parameters and return values
