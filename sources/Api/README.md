@@ -109,7 +109,11 @@ api/
    - Enhances status field when not found in config files
    - Overrides config-based status if git history suggests different status
 
-4. **Service Relationship Discoverer** (`app/services/service_extraction/service_relationship_discoverer.py`):
+4. **Git Contributor Analyzer** (`app/services/service_extraction/git_contributor_analyzer.py`):
+   - Extracts top contributors per service path (email + commit counts)
+   - Builds owner candidate lists and unique contributor counts
+
+5. **Service Relationship Discoverer** (`app/services/service_extraction/service_relationship_discoverer.py`):
    - Discovers connections between services from:
      - Docker Compose `depends_on` relationships
      - HTTP client calls in code (fetch, axios, requests, etc.)
@@ -119,13 +123,13 @@ api/
      - Service discovery configs (Consul, Eureka)
    - Creates `ServiceConnection` objects with connection types, protocols, endpoints
 
-5. **GitHub Downloader** (`app/services/service_extraction/github_downloader.py`):
+6. **GitHub Downloader** (`app/services/service_extraction/github_downloader.py`):
    - Downloads repositories from GitHub URLs
    - Supports git clone (preferred) or ZIP download fallback
    - Handles branch/tag specifications
    - Extracts and prepares repository for analysis
 
-6. **API Endpoints** (`app/endpoint/v1/routes/service_extraction.py`):
+7. **API Endpoints** (`app/endpoint/v1/routes/service_extraction.py`):
    - `POST /api/v1/services/extract-from-github`: Extract from GitHub URL
    - `POST /api/v1/services/extract-from-zip`: Extract from uploaded ZIP file
    - `POST /api/v1/services/extract-from-path`: Extract from local path
@@ -173,6 +177,7 @@ curl "http://localhost:8000/api/v1/services/extraction/{task_id}/results"
   - Analyzes commit frequency, recency, and deprecation keywords
   - Enhances status field when not found in config files
   - Overrides config-based status if git history suggests different
+  - Captures top contributors per service for owner candidate lists
 
 #### Recent Updates:
 

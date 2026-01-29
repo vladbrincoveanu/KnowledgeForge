@@ -156,7 +156,7 @@ async def broadcast_task_update(
     extra: Optional[dict[str, Any]] = None,
 ) -> None:
     """Broadcast task update to all connected clients."""
-    update_message = {
+    update_message: dict[str, Any] = {
         "type": "task_update",
         "task_id": task_id,
         "status": status,
