@@ -1952,7 +1952,7 @@ Return only the group numbers (1, 2, or 3), one per line, matching the endpoint 
         # Look for return type annotation
         # Pattern: -> ResponseModel
         return_pattern = r'->\s*(\w+(?:Response|Output|Result|Schema|Model))'
-        match = re.search(return_pattern, func_code)
+        match = re.search(return_patetern, func_code)
         
         if match:
             model_name = match.group(1)

@@ -79,8 +79,6 @@ class LLMManager:
         max_retries: int = 3,
         rate_limit_requests: int = 10,
         rate_limit_window: int = 60,
-        openai_api_key: Optional[str] = None,
-        openai_base_url: str = "https://api.openai.com/v1",
     ):
         """Initialize the LLM manager.
 
@@ -92,21 +90,9 @@ class LLMManager:
             max_retries: Maximum retry attempts
             rate_limit_requests: Maximum requests per time window
             rate_limit_window: Time window in seconds for rate limiting
-            openai_api_key: OpenAI API key (if provided, uses OpenAI instead of LM Studio)
-            openai_base_url: OpenAI API base URL
         """
-        # Determine which LLM provider to use
-        self.openai_api_key = openai_api_key
-        self.use_openai = bool(openai_api_key)
-        
-        if self.use_openai:
-            self.base_url = openai_base_url.rstrip("/")
-            logger.info(f"LLM Manager initialized with OpenAI API (model: {default_model})")
-        else:
-            self.base_url = lmstudio_url.rstrip("/")
-            logger.info(f"LLM Manager initialized with LM Studio (url: {lmstudio_url})")
-        
-        self.lmstudio_url = lmstudio_url.rstrip("/")  # Keep for compatibility
+        self.lmstudio_url = lmstudio_url.rstrip("/")
+        self.base_url = self.lmstudio_url  # Alias for compatibility
         self.default_model = default_model
         self.model_name = default_model  # Alias for compatibility
         self.use_embeddings = use_embeddings
@@ -236,44 +222,30 @@ Create ontology mappings in JSON format:
     def _test_connection(self) -> bool:
         """Test connection to LM Studio service."""
         try:
-            provider = "OpenAI" if self.use_openai else "LM Studio"
-            logger.info(f"Testing connection to {provider} at {self.base_url}")
-            headers = {}
-            if self.use_openai and self.openai_api_key:
-                headers["Authorization"] = f"Bearer {self.openai_api_key}"
-            response = self.session.get(self._build_url("/models"), headers=headers, timeout=5)
+            logger.info(f"Testing connection to LM Studio at {self.lmstudio_url}")
+            response = self.session.get(f"{self.lmstudio_url}/v1/models", timeout=5)
             if response.status_code == 200:
                 models = response.json().get("data", [])
                 model_names = [m.get("id", "unknown") for m in models[:3]]
                 logger.info(
-                    f"✓ Successfully connected to {provider} at {self.base_url}"
+                    f"✓ Successfully connected to LM Studio at {self.lmstudio_url}"
                 )
                 logger.info(f"✓ Available models: {', '.join(model_names) if model_names else 'None'}")
                 logger.info(f"✓ Using model: {self.default_model}")
                 return True
             else:
                 logger.warning(
-                    f"✗ {provider} service responded with status {response.status_code}"
+                    f"✗ LM Studio service responded with status {response.status_code}"
                 )
                 return False
         except requests.exceptions.ConnectionError as e:
-            logger.error(f"✗ Cannot connect to {provider} at {self.base_url}")
-            if not self.use_openai:
-                logger.error("  Make sure LM Studio is running and accessible")
+            logger.error(f"✗ Cannot connect to LM Studio at {self.lmstudio_url}")
+            logger.error(f"  Make sure LM Studio is running and accessible")
             logger.error(f"  Error: {e}")
             return False
         except requests.exceptions.RequestException as e:
-            provider = "OpenAI" if self.use_openai else "LM Studio"
-            logger.warning(f"✗ Failed to connect to {provider} service: {e}")
+            logger.warning(f"✗ Failed to connect to LM Studio service: {e}")
             return False
-    
-    def _build_url(self, path: str) -> str:
-        """Build provider URL that works with or without a /v1 base."""
-        base = self.base_url.rstrip("/")
-        suffix = path.lstrip("/")
-        if base.endswith("/v1"):
-            return f"{base}/{suffix}"
-        return f"{base}/v1/{suffix}"
 
     def _check_rate_limit(self) -> bool:
         """Check if request is within rate limits."""
@@ -390,16 +362,9 @@ Create ontology mappings in JSON format:
                 # Check rate limit
                 self._wait_for_rate_limit()
 
-                # Make request (use base_url which is either OpenAI or LM Studio)
-                headers = {}
-                if self.use_openai:
-                    headers["Authorization"] = f"Bearer {self.openai_api_key}"
-                
+                # Make request
                 response = self.session.post(
-                    self._build_url("/chat/completions"),
-                    json=payload,
-                    headers=headers,
-                    timeout=self.timeout,
+                    f"{self.lmstudio_url}/v1/chat/completions", json=payload, timeout=30
                 )
 
                 if response.status_code == 200:
@@ -410,15 +375,8 @@ Create ontology mappings in JSON format:
                         .get("content", "")
                         .strip()
                     )
-                elif response.status_code == 429:
-                    # Rate limit - wait longer before retry
-                    retry_after = int(response.headers.get("Retry-After", 60))
-                    logger.warning(f"Rate limited (429), waiting {retry_after} seconds before retry")
-                    if attempt < self.max_retries:
-                        time.sleep(retry_after)
-                        continue
                 else:
-                    logger.warning(f"Request failed with status {response.status_code}: {response.text[:200]}")
+                    logger.warning(f"Request failed with status {response.status_code}")
 
             except Exception as e:
                 logger.warning(f"Request attempt {attempt + 1} failed: {e}")
@@ -459,7 +417,7 @@ Create ontology mappings in JSON format:
     def _is_model_available(self, model: str) -> bool:
         """Check if a specific model is available."""
         try:
-            response = self.session.get(self._build_url("/models"), timeout=5)
+            response = self.session.get(f"{self.lmstudio_url}/v1/models", timeout=5)
             if response.status_code == 200:
                 models = response.json().get("data", [])
                 return any(m.get("id", "").startswith(model) for m in models)

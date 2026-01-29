@@ -9,7 +9,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-import requests
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -20,10 +19,7 @@ from app.infrastructure.storage.metadata_store import (
     PostgreSQLMetadataStore as MetadataStore,
 )
 from app.infrastructure.llm.llm_manager import LLMManager
-from app.services.service_extraction import (
-    ServiceExtractionPipeline,
-    ServiceRelationshipDiscoverer,
-)
+from app.services.service_extraction import ServiceExtractor, ServiceRelationshipDiscoverer
 from app.services.service_extraction.github_downloader import GitHubDownloader
 from app.services.service_extraction.extraction_config import (
     ExtractionConfig,
@@ -38,38 +34,6 @@ router = APIRouter(tags=["service-extraction"])
 
 # In-memory storage for extraction tasks (use Redis in production)
 extraction_tasks: dict[str, dict[str, Any]] = {}
-
-
-def _generate_task_id() -> str:
-    """Human-readable task id with timestamp prefix for easier debugging."""
-    now = datetime.now().strftime("%Y%m%d-%H%M")
-    short = uuid.uuid4().hex[:6]
-    return f"{now}-{short}"
-
-
-def _build_llm_url(base_url: str, path: str) -> str:
-    """Build LLM URL that works with or without /v1 in base_url."""
-    base = base_url.rstrip("/")
-    suffix = path.lstrip("/")
-    if base.endswith("/v1"):
-        return f"{base}/{suffix}"
-    return f"{base}/v1/{suffix}"
-
-
-def _probe_llm_models(base_url: str, headers: Optional[dict[str, str]] = None) -> bool:
-    """Check if the LLM service responds to the models endpoint."""
-    try:
-        response = requests.get(
-            _build_llm_url(base_url, "/models"),
-            headers=headers,
-            timeout=3,
-        )
-        if headers:
-            return response.status_code == 200
-        return response.status_code in {200, 401, 403}
-    except Exception as exc:
-        logger.warning(f"LLM probe failed for {base_url}: {exc}")
-        return False
 
 
 class ServiceExtractionRequest(BaseModel):
@@ -138,7 +102,7 @@ async def extract_from_github(
         raise HTTPException(status_code=400, detail="Invalid GitHub URL")
     
     # Create task
-    task_id = _generate_task_id()
+    task_id = str(uuid.uuid4())
     
     extraction_tasks[task_id] = {
         'task_id': task_id,
@@ -151,29 +115,20 @@ async def extract_from_github(
         'warnings': [],
     }
     
-    try:
-        # Start background extraction
-        background_tasks.add_task(
-            run_service_extraction,
-            task_id,
-            github_url=request.github_url,
-            use_git=request.use_git,
-        )
-        
-        return ServiceExtractionResponse(
-            task_id=task_id,
-            status='pending',
-            message='Service extraction queued',
-            created_at=datetime.now(),
-        )
-    except Exception as e:
-        # Mark task as failed if background task creation fails
-        if task_id in extraction_tasks:
-            extraction_tasks[task_id]['status'] = 'failed'
-            extraction_tasks[task_id]['message'] = f'Failed to start extraction: {str(e)}'
-            extraction_tasks[task_id]['errors'].append(str(e))
-        logger.error(f"Error in extract_from_github: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to start extraction: {str(e)}")
+    # Start background extraction
+    background_tasks.add_task(
+        run_service_extraction,
+        task_id,
+        github_url=request.github_url,
+        use_git=request.use_git,
+    )
+    
+    return ServiceExtractionResponse(
+        task_id=task_id,
+        status='pending',
+        message='Service extraction queued',
+        created_at=datetime.now(),
+    )
 
 
 @router.post("/extract-from-zip", response_model=ServiceExtractionResponse)
@@ -191,7 +146,7 @@ async def extract_from_zip(
     
     try:
         # Create task
-        task_id = _generate_task_id()
+        task_id = str(uuid.uuid4())
         
         # Save uploaded file
         temp_dir = Path(tempfile.mkdtemp(prefix=f"service_extract_{task_id}_"))
@@ -264,7 +219,7 @@ async def extract_from_path(
         raise HTTPException(status_code=400, detail=f"Repository not found: {request.repo_path}")
     
     # Create task
-    task_id = _generate_task_id()
+    task_id = str(uuid.uuid4())
     
     extraction_tasks[task_id] = {
         'task_id': task_id,
@@ -353,8 +308,7 @@ async def _run_service_extraction_async(
             repo_path = GitHubDownloader.download_repository(
                 github_url,
                 output_dir=temp_dir,
-                use_git=use_git,
-                full_history=ExtractionConfig.GIT_CLONE_FOR_ANALYSIS,
+                use_git=use_git
             )
             task['repo_path'] = str(repo_path)
             task['temp_dir'] = str(temp_dir)
@@ -376,128 +330,28 @@ async def _run_service_extraction_async(
         # Extract services
         llm_manager = None
         enable_llm = getattr(ExtractionConfig, 'ENABLE_LLM_DESCRIPTIONS', False)
-        enable_llm_labels = getattr(ExtractionConfig, 'ENABLE_LLM_LABELS', False)
-        if enable_llm or enable_llm_labels:
+        if enable_llm:
             try:
-                import os
-                
-                provider_pref = os.getenv("KF_LLM_PROVIDER", "lmstudio").strip().lower()
-                # Check for OpenAI API key first
-                openai_api_key = os.getenv('OPENAI_API_KEY', '').strip()
-                openai_model = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
-                openai_base_url = os.getenv('OPENAI_BASE_URL', 'https://api.openai.com/v1')
-                
                 config = get_config()
                 llm_cfg = config.lmstudio
-                # Get base URL - if it doesn't end with /v1, add it for local LLM compatibility
-                base_url_raw = os.getenv("LMSTUDIO_BASE_URL", llm_cfg.base_url)
-                if base_url_raw.endswith("/v1"):
-                    lmstudio_url = base_url_raw
-                elif base_url_raw.endswith("/"):
-                    lmstudio_url = base_url_raw.rstrip("/") + "/v1"
-                else:
-                    lmstudio_url = base_url_raw.rstrip("/") + "/v1"
-                
-                lmstudio_model = (
-                    os.getenv("LMSTUDIO_MODEL")
-                    or os.getenv("LMSTUDIO_MODEL_NAME")
-                    or os.getenv("KF_LMSTUDIO_MODEL")
-                    or llm_cfg.model_name
+                llm_manager = LLMManager(
+                    lmstudio_url=llm_cfg.base_url,
+                    default_model=llm_cfg.model_name,
+                    use_embeddings=llm_cfg.use_embeddings,
                 )
-                
-                logger.info(f"LLM configuration: base_url={lmstudio_url}, model={lmstudio_model}")
-
-                openai_ready = False
-                if openai_api_key:
-                    openai_headers = {"Authorization": f"Bearer {openai_api_key}"}
-                    openai_ready = _probe_llm_models(openai_base_url, openai_headers)
-
-                lmstudio_ready = _probe_llm_models(lmstudio_url)
-
-                logger.info(
-                    "LLM provider preference=%s, openai_ready=%s, lmstudio_ready=%s, lmstudio_url=%s, lmstudio_model=%s",
-                    provider_pref,
-                    openai_ready,
-                    lmstudio_ready,
-                    lmstudio_url,
-                    lmstudio_model,
-                )
-
-                def use_openai():
-                    logger.info(f"Using OpenAI API with model: {openai_model}")
-                    return LLMManager(
-                        default_model=openai_model,
-                        use_embeddings=False,  # OpenAI doesn't need local embeddings
-                        rate_limit_requests=100,  # Higher rate limit for OpenAI
-                        rate_limit_window=60,
-                        openai_api_key=openai_api_key,
-                        openai_base_url=openai_base_url,
-                    )
-
-                def use_lmstudio():
-                    logger.info(f"Using LM Studio at {lmstudio_url} (model: {lmstudio_model})")
-                    manager = LLMManager(
-                        lmstudio_url=lmstudio_url,
-                        default_model=lmstudio_model,
-                        use_embeddings=llm_cfg.use_embeddings,
-                        rate_limit_requests=60,  # Local LM Studio rate limit
-                        rate_limit_window=60,
-                    )
-                    manager.timeout = llm_cfg.timeout
-                    return manager
-
-                # Try to use LLM even if probe fails - the actual call might work
-                if provider_pref in {"lmstudio", "local"}:
-                    if lmstudio_ready:
-                        llm_manager = use_lmstudio()
-                    else:
-                        logger.warning(f"LM Studio probe failed for {lmstudio_url}, but attempting to use it anyway (probe may be too strict)")
-                        try:
-                            llm_manager = use_lmstudio()
-                        except Exception as e:
-                            logger.warning(f"Failed to initialize LM Studio: {e}")
-                            if openai_ready:
-                                logger.warning("Falling back to OpenAI")
-                                llm_manager = use_openai()
-                            else:
-                                llm_manager = None
-                elif provider_pref == "openai":
-                    if openai_ready:
-                        llm_manager = use_openai()
-                    elif lmstudio_ready:
-                        logger.warning("OpenAI not reachable, falling back to LM Studio")
-                        llm_manager = use_lmstudio()
-                    else:
-                        logger.warning("Neither OpenAI nor LM Studio are reachable")
-                        llm_manager = None
-                else:
-                    # Default: try LM Studio first, then OpenAI
-                    if lmstudio_ready:
-                        llm_manager = use_lmstudio()
-                    elif openai_ready:
-                        llm_manager = use_openai()
-                    else:
-                        logger.warning(f"Both LLM providers failed probe, but attempting LM Studio anyway at {lmstudio_url}")
-                        try:
-                            llm_manager = use_lmstudio()
-                        except Exception as e:
-                            logger.warning(f"Failed to initialize LM Studio: {e}")
-                            llm_manager = None
+                llm_manager.timeout = llm_cfg.timeout
             except Exception as e:
                 logger.warning(f"LLM manager initialization failed, using heuristic descriptions only: {e}")
                 llm_manager = None
         
-        logger.info(f"Creating ServiceExtractionPipeline for path: {repo_path}")
-        pipeline = ServiceExtractionPipeline(repo_path, llm_manager=llm_manager)
-        logger.info("Calling extract_services()...")
-        services = pipeline.extract_services()
-        logger.info(f"extract_services() completed, found {len(services)} services")
+        service_extractor = ServiceExtractor(repo_path, llm_manager=llm_manager)
+        services = service_extractor.extract_services()
         
         task['progress'] = 0.6
         task['message'] = f'Found {len(services)} services, discovering connections'
         task['services_count'] = len(services)
-        task['errors'].extend(pipeline.errors)
-        task['warnings'].extend(pipeline.warnings)
+        task['errors'].extend(service_extractor.errors)
+        task['warnings'].extend(service_extractor.warnings)
         
         await broadcast_task_update(
             task_id,
@@ -726,8 +580,6 @@ async def store_service_graph_to_json(
                 "domain": service.domain,
                 "owner": service.owner,
                 "owner_contributors": service.owner_contributors,
-                "owner_contributor_stats": service.owner_contributor_stats,
-                "contributor_count": service.contributor_count,
                 "status": service.status.value if hasattr(service.status, 'value') else str(service.status),
                 "status_evidence": service.status_evidence,
                 "tier": service.tier.value if hasattr(service.tier, 'value') else str(service.tier),
@@ -738,7 +590,6 @@ async def store_service_graph_to_json(
                 "name": service.name,
                 "display_name": service.display_name,
                 "description": service.description,
-                "notes": service.notes or service.description,
                 # ═══════════════════════════════════════════════════════════
                 # Technical details
                 "language": service.language,
@@ -759,7 +610,6 @@ async def store_service_graph_to_json(
                 "commit_count_180d": service.commit_count_180d,
                 # ═══════════════════════════════════════════════════════════
                 # Additional
-                "attributes": service.attributes,
                 "confidence": service.confidence,
             }
             services_data.append(svc_dict)

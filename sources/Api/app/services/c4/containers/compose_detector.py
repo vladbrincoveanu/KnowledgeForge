@@ -23,15 +23,15 @@ class ComposeDetector(BaseContainerDetector):
         """Check if docker-compose files exist."""
         compose_patterns = ["docker-compose*.yaml", "docker-compose*.yml"]
         for pattern in compose_patterns:
-            if list(self.repo_path.glob(pattern)):
+            if list(self.repo_path.rglob(pattern)):
                 return True
         return False
     
     def detect(self) -> list[dict[str, Any]]:
         """Detect containers from docker-compose files."""
         containers = []
-        compose_files = list(self.repo_path.glob("docker-compose*.yaml")) + \
-                       list(self.repo_path.glob("docker-compose*.yml"))
+        compose_files = list(self.repo_path.rglob("docker-compose*.yaml")) + \
+                       list(self.repo_path.rglob("docker-compose*.yml"))
         
         for compose_file in compose_files:
             try:

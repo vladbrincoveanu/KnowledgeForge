@@ -16,7 +16,6 @@ import dagre from 'dagre';
 import './CodeArchitectureViewer.scss';
 import { codeArchitectureAPI } from '../../../services/api';
 import CustomNode from './CustomNode';
-import ContainerNode from './ContainerNode';
 
 interface CodeEntity {
   id: string;
@@ -49,30 +48,11 @@ interface C4Level {
   relationships: CodeRelationship[];
 }
 
-interface C4DiagramRelationship {
-  source: string;
-  destination: string;
-  description?: string;
-  relationship_type?: string;
-}
-
-interface C4Relationships {
-  context?: C4DiagramRelationship[];
-  containers?: C4DiagramRelationship[];
-}
-
 interface C4Architecture {
   c4_model_version: string;
   system_context: any;
   containers?: any[];  // Array format from backend
   components?: any[];  // Array format from backend
-  relationships?: C4Relationships;
-  metadata?: {
-    runtime?: {
-      platform?: string;
-      cluster?: any;
-    };
-  };
   context_level?: C4Level;
   container_level?: C4Level;  // Transformed format
   component_level?: C4Level;  // Transformed format
@@ -81,114 +61,26 @@ interface C4Architecture {
 
 const nodeTypes = {
   custom: CustomNode,
-  container: ContainerNode,
 };
 
-// Layout function - grid layout for components in containers
+// Layout function using dagre with hierarchical structure
 const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => {
-  // Separate parent containers and child nodes
-  const containerNodes = nodes.filter(n => n.type === 'container');
-  const childNodes = nodes.filter(n => n.parentNode);
-  const standaloneNodes = nodes.filter(n => !n.type?.includes('container') && !n.parentNode);
-  
-  // Layout child nodes within their parent containers
-  if (containerNodes.length > 0) {
-    // Position containers
-    const containerSpacing = 50;
-    let currentX = 100;
-    
-    containerNodes.forEach(container => {
-      container.position = { x: currentX, y: 100 };
-      
-      // Get children of this container
-      const children = childNodes.filter(n => n.parentNode === container.id);
-      
-      // Layout children in a grid inside the container
-      const childrenPerRow = 2;
-      const childSpacing = 30;
-      const childStartX = 40;
-      const childStartY = 80;
-      
-      children.forEach((child, idx) => {
-        const row = Math.floor(idx / childrenPerRow);
-        const col = idx % childrenPerRow;
-        
-        child.position = {
-          x: childStartX + (col * (220 + childSpacing)),
-          y: childStartY + (row * (120 + childSpacing)),
-        };
-      });
-      
-      currentX += (container.style?.width as number || 700) + containerSpacing;
-    });
-    
-    return { 
-      nodes: [...containerNodes, ...childNodes, ...standaloneNodes], 
-      edges 
-    };
-  }
-  
-  // Check if we have components without relationships (independent endpoints)
-  const hasRelationships = edges.length > 0;
-  
-  if (!hasRelationships && nodes.length > 0) {
-    // Grid layout for independent components
-    const methodGroups = new Map<string, Node[]>();
-    nodes.forEach(node => {
-      const method = node.data.type === 'component' 
-        ? (node.data.fullName?.split(' ')[0] || 'OTHER')
-        : 'OTHER';
-      
-      if (!methodGroups.has(method)) {
-        methodGroups.set(method, []);
-      }
-      methodGroups.get(method)!.push(node);
-    });
-    
-    // Layout in columns by method
-    const methodOrder = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OTHER'];
-    let columnX = 100;
-    const columnWidth = 280;
-    const rowHeight = 150;
-    
-    const layoutedNodes = nodes.map((node) => {
-      const method = node.data.type === 'component' 
-        ? (node.data.fullName?.split(' ')[0] || 'OTHER')
-        : 'OTHER';
-      
-      const methodIndex = methodOrder.indexOf(method);
-      const groupNodes = methodGroups.get(method) || [];
-      const nodeIndex = groupNodes.indexOf(node);
-      
-      return {
-        ...node,
-        position: {
-          x: columnX + (methodIndex * columnWidth),
-          y: 100 + (nodeIndex * rowHeight),
-        },
-        sourcePosition: Position.Right,
-        targetPosition: Position.Left,
-      };
-    });
-    
-    return { nodes: layoutedNodes, edges };
-  }
-  
-  // Hierarchical layout with dagre for connected graphs
   const dagreGraph = new dagre.graphlib.Graph();
   dagreGraph.setDefaultEdgeLabel(() => ({}));
   
+  // Configure layout for LEFT-TO-RIGHT flow with better spacing
   dagreGraph.setGraph({ 
-    rankdir: direction,
+    rankdir: direction,      // LR = Left to Right for clearer hierarchy
     align: 'UL',
-    ranksep: 250,
-    nodesep: 80,
+    ranksep: 250,            // Large spacing between hierarchy levels
+    nodesep: 80,             // Vertical spacing between nodes at same level
     edgesep: 20,
     marginx: 50,
     marginy: 50,
-    ranker: 'network-simplex',
+    ranker: 'network-simplex', // Better for hierarchical layouts
   });
 
+  // Add nodes to graph
   nodes.forEach((node) => {
     dagreGraph.setNode(node.id, { 
       width: 220, 
@@ -210,8 +102,8 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => 
         x: nodeWithPosition.x - 110,
         y: nodeWithPosition.y - 50,
       },
-      sourcePosition: Position.Right,
-      targetPosition: Position.Left,
+      sourcePosition: Position.Right,  // Changed for LR layout
+      targetPosition: Position.Left,   // Changed for LR layout
     };
   });
 
@@ -235,14 +127,15 @@ const CodeArchitectureViewerInner: React.FC = () => {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const { fitView } = useReactFlow();
   
-  // Filters - default to showing only component level (components auto-connect)
-  const [selectedLevel, setSelectedLevel] = useState<string>('component_level');
+  // Filters - default to showing container and code levels for better hierarchy
+  const [selectedLevels, setSelectedLevels] = useState<string[]>(['container_level', 'code_level']);
   const [selectedEntityTypes, setSelectedEntityTypes] = useState<string[]>([]);
   const [selectedRelationshipTypes, setSelectedRelationshipTypes] = useState<string[]>([]);
   const [showExternal, setShowExternal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedNode, setSelectedNode] = useState<any>(null);
   
+  const [entityTypes, setEntityTypes] = useState<string[]>([]);
   const [relationshipTypes, setRelationshipTypes] = useState<string[]>([]);
 
   // Load architecture data
@@ -264,8 +157,6 @@ const CodeArchitectureViewerInner: React.FC = () => {
               container_type: container.container_type,
               protocol: container.protocol,
               runtime_info: container.runtime_info,
-              runtime_environment: container.runtime_environment,
-              deployment: container.deployment,
             },
           }));
           
@@ -291,120 +182,24 @@ const CodeArchitectureViewerInner: React.FC = () => {
                 });
             });
           }
-
-          // Merge container-level relationships from C4 JSON
-          if (data.relationships?.containers?.length) {
-            const containerIdByName = new Map(
-              containerEntities.map(c => [c.name, c.id])
-            );
-
-            data.relationships.containers.forEach((rel: C4DiagramRelationship, idx: number) => {
-              const sourceId = containerIdByName.get(rel.source);
-              const targetId = containerIdByName.get(rel.destination);
-
-              if (sourceId && targetId) {
-                containerRelationships.push({
-                  id: `rel_container_${idx}`,
-                  source_entity_id: sourceId,
-                  target_entity_id: targetId,
-                  relationship_type: rel.relationship_type || 'depends_on',
-                  attributes: { description: rel.description },
-                });
-              }
-            });
-          }
           
           data.container_level = {
             entities: containerEntities,
             relationships: containerRelationships,
           };
         }
-
-        // Transform context data into context_level structure
-        if (data.system_context && !data.context_level) {
-          const contextEntities: CodeEntity[] = [];
-          const contextRelationships: CodeRelationship[] = [];
-
-          const systemName = data.system_context?.name || 'System';
-          const systemId = `context_system_${systemName}`;
-
-          contextEntities.push({
-            id: systemId,
-            name: systemName,
-            entity_type: 'system',
-            language: 'Unknown',
-            file_path: '',
-            attributes: {
-              owner_team: data.system_context?.owner_team,
-              business_domain: data.system_context?.business_domain,
-              criticality: data.system_context?.criticality,
-              purpose: data.system_context?.purpose,
-            },
-          });
-
-          const actorEntities = (data.system_context?.actors || []).map((actor: any, idx: number) => ({
-            id: `context_actor_${idx}`,
-            name: actor.name || `Actor ${idx + 1}`,
-            entity_type: actor.type || 'person',
-            language: 'Unknown',
-            file_path: '',
-            attributes: {},
-          }));
-
-          const externalEntities = (data.system_context?.external_dependencies || []).map((dep: any, idx: number) => ({
-            id: `context_external_${idx}`,
-            name: dep.name || dep.url || `External ${idx + 1}`,
-            entity_type: dep.type || 'external_system',
-            language: 'Unknown',
-            file_path: dep.detected_from || '',
-            attributes: {
-              url: dep.url,
-              detected_from: dep.detected_from,
-            },
-          }));
-
-          contextEntities.push(...actorEntities, ...externalEntities);
-
-          const contextIdByName = new Map(
-            contextEntities.map(entity => [entity.name, entity.id])
-          );
-
-          if (data.relationships?.context?.length) {
-            data.relationships.context.forEach((rel: C4DiagramRelationship, idx: number) => {
-              const sourceId = contextIdByName.get(rel.source);
-              const targetId = contextIdByName.get(rel.destination);
-
-              if (sourceId && targetId) {
-                contextRelationships.push({
-                  id: `rel_context_${idx}`,
-                  source_entity_id: sourceId,
-                  target_entity_id: targetId,
-                  relationship_type: rel.relationship_type || 'uses',
-                  attributes: { description: rel.description },
-                });
-              }
-            });
-          }
-
-          data.context_level = {
-            entities: contextEntities,
-            relationships: contextRelationships,
-          };
-        }
         
         // Transform components array into component_level structure
         if (data.components && Array.isArray(data.components)) {
           const componentEntities: CodeEntity[] = [];
-          const componentRelationships: CodeRelationship[] = [];
           
           data.components.forEach((component: any, groupIdx: number) => {
             // Check if this is a component group
             if (component.type === 'component_group' && component.components && Array.isArray(component.components)) {
               // Expand the grouped components
               component.components.forEach((compName: string, idx: number) => {
-                const compId = `component_${groupIdx}_${idx}`;
                 componentEntities.push({
-                  id: compId,
+                  id: `component_${groupIdx}_${idx}`,
                   name: compName,
                   entity_type: 'component',
                   language: 'Unknown',
@@ -412,68 +207,25 @@ const CodeArchitectureViewerInner: React.FC = () => {
                   attributes: {
                     component_type: component.component_type || 'Component',
                     group: component.name,
-                    container: component.container,
                   },
                 });
-                
-                // Create relationship to container
-                if (component.container && data.container_level?.entities) {
-                  const containerEntity = data.container_level.entities.find(
-                    (c: CodeEntity) => c.name === component.container
-                  );
-                  if (containerEntity) {
-                    componentRelationships.push({
-                      id: `rel_comp_${compId}_${containerEntity.id}`,
-                      source_entity_id: containerEntity.id,
-                      target_entity_id: compId,
-                      relationship_type: 'contains',
-                      attributes: {},
-                    });
-                  }
-                }
               });
             } else {
               // Single component (not grouped)
-              const compId = `component_${groupIdx}`;
               componentEntities.push({
-                id: compId,
+                id: `component_${groupIdx}`,
                 name: component.name || `Component ${groupIdx}`,
                 entity_type: 'component',
                 language: component.technology || 'Unknown',
                 file_path: component.path || component.file,
-                attributes: {
-                  ...component.attributes,
-                  component_type: component.component_type,
-                  container: component.container,
-                  endpoint_path: component.endpoint_path,
-                  endpoint_method: component.endpoint_method,
-                },
+                attributes: component.attributes || {},
               });
-              
-              // Create relationship to container
-              if (component.container && data.container_level?.entities) {
-                const containerEntity = data.container_level.entities.find(
-                  (c: CodeEntity) => c.name === component.container
-                );
-                if (containerEntity) {
-                  componentRelationships.push({
-                    id: `rel_comp_${compId}_${containerEntity.id}`,
-                    source_entity_id: containerEntity.id,
-                    target_entity_id: compId,
-                    relationship_type: 'contains',
-                    attributes: {},
-                  });
-                }
-              }
             }
           });
           
-          // Components don't need relationships - they're independent endpoints
-          // No inter-component relationships needed
-          
           data.component_level = {
             entities: componentEntities,
-            relationships: componentRelationships,
+            relationships: [],
           };
         }
         
@@ -494,6 +246,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
         const uniqueEntityTypes = Array.from(new Set(allEntities.map(e => e.entity_type)));
         const uniqueRelTypes = Array.from(new Set(allRelationships.map(r => r.relationship_type)));
         
+        setEntityTypes(uniqueEntityTypes.sort());
         setRelationshipTypes(uniqueRelTypes.sort());
         setSelectedEntityTypes(uniqueEntityTypes);
         setSelectedRelationshipTypes(uniqueRelTypes);
@@ -516,17 +269,19 @@ const CodeArchitectureViewerInner: React.FC = () => {
     const allEntities: CodeEntity[] = [];
     const allRelationships: CodeRelationship[] = [];
 
-    // Collect entities and relationships from the selected level
-    if (architecture[selectedLevel as keyof C4Architecture]) {
-      const levelData = architecture[selectedLevel as keyof C4Architecture] as C4Level;
-      if (levelData.entities) {
-        // Add level metadata to each entity
-        allEntities.push(...levelData.entities.map(e => ({ ...e, level: selectedLevel })));
+    // Collect entities and relationships from selected levels
+    selectedLevels.forEach(level => {
+      if (architecture[level as keyof C4Architecture]) {
+        const levelData = architecture[level as keyof C4Architecture] as C4Level;
+        if (levelData.entities) {
+          // Add level metadata to each entity
+          allEntities.push(...levelData.entities.map(e => ({ ...e, level })));
+        }
+        if (levelData.relationships) {
+          allRelationships.push(...levelData.relationships);
+        }
       }
-      if (levelData.relationships) {
-        allRelationships.push(...levelData.relationships);
-      }
-    }
+    });
 
     // Filter entities
     let filteredEntities = allEntities.filter(e => {
@@ -552,249 +307,43 @@ const CodeArchitectureViewerInner: React.FC = () => {
     });
 
     // Convert to React Flow format
-    const rfNodes: Node[] = [];
-    
-    // If we're showing components, create container frames based on their actual container assignment
-    if (selectedLevel === 'component_level' && filteredEntities.some(e => e.entity_type === 'component')) {
-      const componentEntities = filteredEntities.filter(e => e.entity_type === 'component');
+    const rfNodes: Node[] = filteredEntities.map(e => {
+      // Shorten the label - take last part of dotted name and remove common suffixes
+      let shortName = e.name.includes('.') 
+        ? e.name.split('.').pop() || e.name
+        : e.name;
       
-      // Group components by their actual container attribute
-      const containerGroups = new Map<string, typeof componentEntities>();
-      componentEntities.forEach(comp => {
-        const containerName = (comp.attributes?.container as string) || 'Unknown';
-        
-        if (!containerGroups.has(containerName)) {
-          containerGroups.set(containerName, []);
+      // Remove redundant type suffixes (e.g., "SlurmJobSpec.Class" -> "SlurmJobSpec")
+      const typeSuffixes = ['Class', 'Function', 'Method', 'Module', 'File', 'Variable', 'Constant'];
+      typeSuffixes.forEach(suffix => {
+        if (shortName.endsWith(suffix) && shortName !== suffix) {
+          shortName = shortName.slice(0, -suffix.length);
         }
-        containerGroups.get(containerName)!.push(comp);
       });
       
-      // Create container frames for each group
-      let currentX = 100;
-      containerGroups.forEach((components, containerName) => {
-        // Find the actual container info from architecture data
-        const containerInfo = architecture?.containers?.find((c: any) => c.name === containerName);
-        const displayName = containerInfo?.name || containerName;
-        const containerType = containerInfo?.container_type || 'Service';
-        const technology = containerInfo?.technology || 'Unknown';
-        
-        // Create container parent node
-        const containerNode: Node = {
-          id: `container_frame_${containerName}`,
-          type: 'container',
-          position: { x: currentX, y: 100 },
-          data: {
-            label: displayName,
-            containerType: containerType,
-            technology: technology,
-          },
-          style: {
-            width: 700,
-            height: Math.max(500, Math.ceil(components.length / 2) * 150 + 150),
-            backgroundColor: 'rgba(99, 102, 241, 0.05)',
-            border: '2px solid #6366f1',
-            borderRadius: '12px',
-            padding: '20px',
-          },
-        };
-        rfNodes.push(containerNode);
-        
-        // Add component nodes as children
-        components.forEach((e, idx) => {
-          let shortName = e.name.includes('.') 
-            ? e.name.split('.').pop() || e.name
-            : e.name;
-          
-          const typeSuffixes = ['Class', 'Function', 'Method', 'Module', 'File', 'Variable', 'Constant'];
-          typeSuffixes.forEach(suffix => {
-            if (shortName.endsWith(suffix) && shortName !== suffix) {
-              shortName = shortName.slice(0, -suffix.length);
-            }
-          });
-          
-          shortName = shortName.replace(/[._]+$/, '');
-          const displayType = e.entity_type.charAt(0).toUpperCase() + e.entity_type.slice(1);
-          
-          // Layout children in a 2-column grid
-          const childrenPerRow = 2;
-          const childSpacing = 30;
-          const childStartX = 40;
-          const childStartY = 80;
-          const row = Math.floor(idx / childrenPerRow);
-          const col = idx % childrenPerRow;
-          
-          const node: Node = {
-            id: e.id,
-            type: 'custom',
-            position: {
-              x: childStartX + (col * (220 + childSpacing)),
-              y: childStartY + (row * (120 + childSpacing)),
-            },
-            parentNode: containerNode.id,
-            extent: 'parent',
-            data: {
-              label: shortName,
-              fullName: e.name,
-              type: e.entity_type,
-              displayType: displayType,
-              file: e.file_path,
-              line: e.line_start || undefined,
-              isExternal: e.attributes?.is_external,
-              decorators: e.attributes?.decorators,
-              level: e.level,
-            },
-          };
-          rfNodes.push(node);
-        });
-        
-        currentX += 750; // Space between containers
-      });
+      // Clean up any trailing underscores or dots
+      shortName = shortName.replace(/[._]+$/, '');
       
-      // Add any non-component entities
-      const nonComponents = filteredEntities.filter(e => e.entity_type !== 'component');
-      nonComponents.forEach(e => {
-        let shortName = e.name.includes('.') 
-          ? e.name.split('.').pop() || e.name
-          : e.name;
-        
-        const typeSuffixes = ['Class', 'Function', 'Method', 'Module', 'File', 'Variable', 'Constant'];
-        typeSuffixes.forEach(suffix => {
-          if (shortName.endsWith(suffix) && shortName !== suffix) {
-            shortName = shortName.slice(0, -suffix.length);
-          }
-        });
-        
-        shortName = shortName.replace(/[._]+$/, '');
-        const displayType = e.entity_type.charAt(0).toUpperCase() + e.entity_type.slice(1);
-        
-        rfNodes.push({
-          id: e.id,
-          type: 'custom',
-          position: { x: 0, y: 0 },
-          data: {
-            label: shortName,
-            fullName: e.name,
-            type: e.entity_type,
-            displayType: displayType,
-            file: e.file_path,
-            line: e.line_start || undefined,
-            isExternal: e.attributes?.is_external,
-            decorators: e.attributes?.decorators,
-            level: e.level,
-          },
-        });
-      });
-    } else {
-      // Container-level framing for Kubernetes
-      const hasContainerLevel = selectedLevel === 'container_level';
-      const containerEntities = filteredEntities.filter(e => e.entity_type === 'container');
-      const containerInfoByName = new Map(
-        (architecture?.containers || []).map((container: any) => [container.name, container])
-      );
-
-      const isKubernetesEntity = (entity: CodeEntity) => {
-        const tech = String(entity.language || '').toLowerCase();
-        const containerType = String(entity.attributes?.container_type || '').toLowerCase();
-        const runtimeEnv = String(entity.attributes?.runtime_environment || '').toLowerCase();
-        const deployment = String(entity.attributes?.deployment || '').toLowerCase();
-
-        return tech.includes('kubernetes') ||
-          containerType.includes('helm') ||
-          containerType.includes('kubernetes') ||
-          runtimeEnv.includes('kubernetes') ||
-          deployment.includes('helm') ||
-          deployment.includes('kustomize') ||
-          deployment.includes('manifest');
+      // Get display type
+      const displayType = e.entity_type.charAt(0).toUpperCase() + e.entity_type.slice(1);
+      
+      return {
+        id: e.id,
+        type: 'custom',
+        position: { x: 0, y: 0 }, // Will be set by layout
+        data: {
+          label: shortName,
+          fullName: e.name,
+          type: e.entity_type,
+          displayType: displayType,
+          file: e.file_path,
+          line: e.line_start || undefined,
+          isExternal: e.attributes?.is_external,
+          decorators: e.attributes?.decorators,
+          level: e.level,  // Store level for layout grouping
+        },
       };
-
-      let clusterNodeId: string | null = null;
-
-      if (hasContainerLevel && containerEntities.length > 0) {
-        const kubernetesContainers = containerEntities.filter(isKubernetesEntity);
-
-        if (kubernetesContainers.length > 0) {
-          const rows = Math.ceil(kubernetesContainers.length / 2);
-          const clusterHeight = Math.max(520, rows * 150 + 140);
-          const clusterMeta = architecture?.metadata?.runtime?.cluster;
-          clusterNodeId = 'cluster_kubernetes';
-          rfNodes.push({
-            id: clusterNodeId,
-            type: 'container',
-            position: { x: 80, y: 80 },
-            className: 'cluster-frame',
-            data: {
-              label: 'Kubernetes Cluster',
-              containerType: 'Runtime Environment',
-              technology: 'Kubernetes',
-              clusterMeta,
-            },
-            style: {
-              width: Math.max(900, kubernetesContainers.length * 240),
-              height: clusterHeight,
-              backgroundColor: 'rgba(148, 163, 184, 0.08)',
-              border: '2px dashed #cbd5e1',
-              borderRadius: '16px',
-              padding: '20px',
-            },
-          });
-        }
-      }
-
-      // Original logic for non-component entities
-      filteredEntities.forEach(e => {
-        let shortName = e.name.includes('.') 
-          ? e.name.split('.').pop() || e.name
-          : e.name;
-        
-        const typeSuffixes = ['Class', 'Function', 'Method', 'Module', 'File', 'Variable', 'Constant'];
-        typeSuffixes.forEach(suffix => {
-          if (shortName.endsWith(suffix) && shortName !== suffix) {
-            shortName = shortName.slice(0, -suffix.length);
-          }
-        });
-        
-        shortName = shortName.replace(/[._]+$/, '');
-        const displayType = e.entity_type.charAt(0).toUpperCase() + e.entity_type.slice(1);
-        
-        const containerInfo = e.entity_type === 'container'
-          ? containerInfoByName.get(e.name)
-          : null;
-
-        const node: Node = {
-          id: e.id,
-          type: 'custom',
-          position: { x: 0, y: 0 },
-          data: {
-            label: shortName,
-            fullName: e.name,
-            type: e.entity_type,
-            displayType: displayType,
-            file: e.file_path,
-            line: e.line_start || undefined,
-            isExternal: e.attributes?.is_external,
-            decorators: e.attributes?.decorators,
-            level: e.level,
-            containerMeta: containerInfo ? {
-              container_type: containerInfo.container_type,
-              technology: containerInfo.technology,
-              protocol: containerInfo.protocol,
-              runtime_environment: containerInfo.runtime_environment,
-              deployment: containerInfo.deployment,
-              description: containerInfo.description,
-              health_endpoint: containerInfo.health_endpoint,
-              repository_url: containerInfo.repository_url,
-            } : undefined,
-          },
-        };
-
-        if (clusterNodeId && e.entity_type === 'container' && isKubernetesEntity(e)) {
-          node.parentNode = clusterNodeId;
-          node.extent = 'parent';
-        }
-
-        rfNodes.push(node);
-      });
-    }
+    });
 
     const rfEdges: Edge[] = filteredRelationships
       .filter(r => r.target_entity_id)
@@ -829,7 +378,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
         });
       }, 100);
     });
-  }, [architecture, selectedLevel, selectedEntityTypes, selectedRelationshipTypes, showExternal, searchTerm, fitView]);
+  }, [architecture, selectedLevels, selectedEntityTypes, selectedRelationshipTypes, showExternal, searchTerm, fitView]);
 
   const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
     setSelectedNode(node.data);
@@ -840,7 +389,19 @@ const CodeArchitectureViewerInner: React.FC = () => {
     : '0';
 
   const toggleLevel = (level: string) => {
-    setSelectedLevel(level);
+    setSelectedLevels(prev =>
+      prev.includes(level)
+        ? prev.filter(l => l !== level)
+        : [...prev, level]
+    );
+  };
+
+  const toggleEntityType = (type: string) => {
+    setSelectedEntityTypes(prev =>
+      prev.includes(type)
+        ? prev.filter(t => t !== type)
+        : [...prev, type]
+    );
   };
 
   const toggleRelationshipType = (type: string) => {
@@ -874,7 +435,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
   return (
     <div className="code-architecture-viewer">
       <div className="viewer-header">
-        <h2>Code Architecture Map</h2>
+        <h2>🏗️ Code Architecture Map</h2>
         <p>Hierarchical visualization from high-level modules to detailed code dependencies</p>
       </div>
 
@@ -914,9 +475,8 @@ const CodeArchitectureViewerInner: React.FC = () => {
             {['context_level', 'container_level', 'component_level', 'code_level'].map(level => (
               <label key={level} className="checkbox-label">
                 <input
-                  type="radio"
-                  name="c4-level"
-                  checked={selectedLevel === level}
+                  type="checkbox"
+                  checked={selectedLevels.includes(level)}
                   onChange={() => toggleLevel(level)}
                 />
                 <span>{level.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
@@ -924,6 +484,39 @@ const CodeArchitectureViewerInner: React.FC = () => {
             ))}
           </div>
 
+          <div className="filter-section">
+            <h3>Entity Types</h3>
+            <div className="entity-legend">
+              <div className="legend-item">
+                <div className="shape-indicator shape-rounded-rect" style={{backgroundColor: '#e3f2fd', borderColor: '#1976d2'}}></div>
+                <span>Class</span>
+              </div>
+              <div className="legend-item">
+                <div className="shape-indicator shape-rounded-rect" style={{backgroundColor: '#fff3e0', borderColor: '#f57c00'}}></div>
+                <span>Function</span>
+              </div>
+              <div className="legend-item">
+                <div className="shape-indicator shape-rect" style={{backgroundColor: '#f3e5f5', borderColor: '#7b1fa2'}}></div>
+                <span>Module</span>
+              </div>
+              <div className="legend-item">
+                <div className="shape-indicator shape-circle" style={{backgroundColor: '#e8f5e9', borderColor: '#388e3c'}}></div>
+                <span>Variable</span>
+              </div>
+            </div>
+            <div className="checkbox-group">
+              {entityTypes.map(type => (
+                <label key={type} className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={selectedEntityTypes.includes(type)}
+                    onChange={() => toggleEntityType(type)}
+                  />
+                  <span>{type}</span>
+                </label>
+              ))}
+            </div>
+          </div>
 
           <div className="filter-section">
             <h3>Relationship Types</h3>
@@ -993,93 +586,6 @@ const CodeArchitectureViewerInner: React.FC = () => {
                 <span className="detail-label">Name:</span>
                 <span className="detail-value">{selectedNode.fullName || selectedNode.label}</span>
               </div>
-              {selectedNode.type === 'container' && selectedNode.containerMeta && (
-                <>
-                  {selectedNode.containerMeta.description && (
-                    <div className="detail-row">
-                      <span className="detail-label">Description:</span>
-                      <span className="detail-value">{selectedNode.containerMeta.description}</span>
-                    </div>
-                  )}
-                  <div className="detail-row">
-                    <span className="detail-label">Container Type:</span>
-                    <span className="detail-value">{selectedNode.containerMeta.container_type || 'Unknown'}</span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="detail-label">Technology:</span>
-                    <span className="detail-value">{selectedNode.containerMeta.technology || 'Unknown'}</span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="detail-label">Runtime:</span>
-                    <span className="detail-value">{selectedNode.containerMeta.runtime_environment || 'Unknown'}</span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="detail-label">Deployment:</span>
-                    <span className="detail-value">{selectedNode.containerMeta.deployment || 'Unknown'}</span>
-                  </div>
-                  {selectedNode.containerMeta.protocol && (
-                    <div className="detail-row">
-                      <span className="detail-label">Protocol:</span>
-                      <span className="detail-value">{selectedNode.containerMeta.protocol}</span>
-                    </div>
-                  )}
-                  {selectedNode.containerMeta.health_endpoint && (
-                    <div className="detail-row">
-                      <span className="detail-label">Health Endpoint:</span>
-                      <span className="detail-value">{selectedNode.containerMeta.health_endpoint}</span>
-                    </div>
-                  )}
-                  {selectedNode.containerMeta.repository_url && (
-                    <div className="detail-row">
-                      <span className="detail-label">Repository:</span>
-                      <span className="detail-value">{selectedNode.containerMeta.repository_url}</span>
-                    </div>
-                  )}
-                </>
-              )}
-              {selectedNode.label === 'Kubernetes Cluster' && selectedNode.clusterMeta && (
-                <>
-                  {selectedNode.clusterMeta.summary && (
-                    <div className="detail-row">
-                      <span className="detail-label">Summary:</span>
-                      <span className="detail-value">
-                        {selectedNode.clusterMeta.summary
-                          .replace(/<think>.*?<\/think>/gis, '')
-                          .replace(/<think>/gi, '')
-                          .replace(/\s+/g, ' ')
-                          .trim()}
-                      </span>
-                    </div>
-                  )}
-                  {selectedNode.clusterMeta.namespaces?.length > 0 && (
-                    <div className="detail-row">
-                      <span className="detail-label">Namespaces:</span>
-                      <span className="detail-value">
-                        {selectedNode.clusterMeta.namespaces.slice(0, 8).join(', ')}
-                        {selectedNode.clusterMeta.namespaces.length > 8 ? '…' : ''}
-                      </span>
-                    </div>
-                  )}
-                  {selectedNode.clusterMeta.servers?.length > 0 && (
-                    <div className="detail-row">
-                      <span className="detail-label">Servers:</span>
-                      <span className="detail-value">
-                        {selectedNode.clusterMeta.servers.slice(0, 5).join(', ')}
-                        {selectedNode.clusterMeta.servers.length > 5 ? '…' : ''}
-                      </span>
-                    </div>
-                  )}
-                  {selectedNode.clusterMeta.gitops_files?.length > 0 && (
-                    <div className="detail-row">
-                      <span className="detail-label">GitOps Files:</span>
-                      <span className="detail-value">
-                        {selectedNode.clusterMeta.gitops_files.slice(0, 6).join(', ')}
-                        {selectedNode.clusterMeta.gitops_files.length > 6 ? '…' : ''}
-                      </span>
-                    </div>
-                  )}
-                </>
-              )}
               {selectedNode.file && (
                 <div className="detail-row">
                   <span className="detail-label">File:</span>
@@ -1104,7 +610,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
               )}
               {selectedNode.isExternal && (
                 <div className="detail-row">
-                  <span className="external-badge">External Dependency</span>
+                  <span className="external-badge">🌐 External Dependency</span>
                 </div>
               )}
             </div>

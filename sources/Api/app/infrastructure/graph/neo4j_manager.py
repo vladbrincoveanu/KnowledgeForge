@@ -1231,18 +1231,6 @@ class Neo4jGraphManager:
             return True
         except Exception:
             return False
-
-    def execute_query(self, query: str, **params: Any) -> list[dict[str, Any]]:
-        """Execute a Cypher query and return result records as dicts."""
-        if not self.is_connected():
-            self.connect()
-
-        if not self.driver:
-            return []
-
-        with self.driver.session(database=self.database) as session:
-            result = session.run(query, params)
-            return [record.data() for record in result]
     
     def create_entity(self, entity: 'Entity') -> bool:
         """Create an entity node in the graph database."""
