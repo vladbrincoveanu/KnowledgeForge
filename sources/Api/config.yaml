@@ -5,15 +5,13 @@ environment: "development"
 debug: true
 
 # Database configuration
-# Note: Password must be set in .env file as POSTGRES_PASSWORD
-# The docker-compose.yml will automatically pass it to the API service
 database:
   type: "postgresql"
   host: "knowledgeforge-postgres"
   port: 5432
   name: "knowledgeforge"
   username: "knowledgeforge"
-  password: ""  # Set in .env file as POSTGRES_PASSWORD
+  password: "knowledgeforge123"
   connection_pool:
     min_connections: 1
     max_connections: 20
@@ -23,12 +21,10 @@ database:
   application_name: "KnowledgeForge-API"
 
 # Neo4j database configuration
-# Note: Password must be set in .env file as NEO4J_PASSWORD
-# The docker-compose.yml will automatically pass it to the API service
 neo4j:
   uri: "bolt://knowledgeforge-neo4j:7687"  # Use service name when running in Docker
   username: "neo4j"
-  password: ""  # Set in .env file as NEO4J_PASSWORD
+  password: "password"
   database: "neo4j"
   max_connection_pool_size: 50
   connection_timeout: 30
@@ -36,8 +32,8 @@ neo4j:
 
 # LM Studio LLM service configuration
 lmstudio:
-  base_url: "http://localhost:1234/v1"  # Include /v1 for OpenAI-compatible API
-  model_name: "qwen/qwen2.5-vl-7b"  # User's local model
+  base_url: "http://localhost:1234"
+  model_name: "deepseek/deepseek-r1-0528-qwen3-8b"  # Changed from llama2 to available model
   temperature: 0.7
   max_tokens: 100
   timeout: 30
