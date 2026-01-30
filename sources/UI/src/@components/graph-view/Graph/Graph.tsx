@@ -13,7 +13,12 @@ interface GraphProps {
   onGraphUpdate: () => void;
 }
 
-const Graph: React.FC<GraphProps> = ({ data, onEdgeClick, activeTaskId, onGraphUpdate }) => {
+const Graph: React.FC<GraphProps> = ({
+  data,
+  onEdgeClick,
+  activeTaskId,
+  onGraphUpdate,
+}) => {
   const graphRef = useRef<any>();
   const [selectedEdge, setSelectedEdge] = useState<GraphLink | null>(null);
   const [showEdgeModal, setShowEdgeModal] = useState(false);

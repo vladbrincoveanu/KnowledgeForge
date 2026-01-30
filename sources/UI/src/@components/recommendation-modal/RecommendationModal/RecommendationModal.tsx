@@ -21,7 +21,10 @@ interface RecommendationModalProps {
   onApprove: (approvedItems: any) => void;
   onReject: () => void;
   taskId: string;
-  showNotification: (message: string, type: 'success' | 'error' | 'info') => void;
+  showNotification: (
+    message: string,
+    type: 'success' | 'error' | 'info'
+  ) => void;
 }
 
 const RecommendationModal: React.FC<RecommendationModalProps> = ({
@@ -42,9 +45,9 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
     Record<string, EdgeSelectionState>
   >({});
   const [reviewNotes, setReviewNotes] = useState('');
-  const [currentPhase, setCurrentPhase] = useState<'nodes' | 'edges' | 'completed'>(
-    'nodes'
-  );
+  const [currentPhase, setCurrentPhase] = useState<
+    'nodes' | 'edges' | 'completed'
+  >('nodes');
   const [readyForEdges, setReadyForEdges] = useState(false);
 
   useEffect(() => {
@@ -282,34 +285,43 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
       if (response.ready_for_edges) {
         setReadyForEdges(true);
         setCurrentPhase('nodes_completed');
-        showNotification('Nodes approved! Generating edge recommendations...', 'info');
+        showNotification(
+          'Nodes approved! Generating edge recommendations...',
+          'info'
+        );
         // If edge recommendations are already available, switch to edge phase
-        if (response.edge_recommendations && response.edge_recommendations.length > 0) {
-            setRecommendations(prev => ({
-                ...prev,
-                node_recommendations: prev?.node_recommendations || [],
-                edge_recommendations: response.edge_recommendations,
-            }));
-            setCurrentPhase('edges');
+        if (
+          response.edge_recommendations &&
+          response.edge_recommendations.length > 0
+        ) {
+          setRecommendations(prev => ({
+            ...prev,
+            node_recommendations: prev?.node_recommendations || [],
+            edge_recommendations: response.edge_recommendations,
+          }));
+          setCurrentPhase('edges');
         } else {
-            // Otherwise, show loading and poll for edge recommendations
-            setLoading(true);
-            const interval = setInterval(async () => {
-                try {
-                    const data = await recommendationAPI.getRecommendations(taskId);
-                    if (data.phase === 'edges' && data.edge_recommendations.length > 0) {
-                        setRecommendations(data);
-                        setCurrentPhase('edges');
-                        setLoading(false);
-                        clearInterval(interval);
-                        showNotification('Edge recommendations are ready!', 'success');
-                    }
-                } catch (error) {
-                    console.error('Polling for edge recommendations failed:', error);
-                    setLoading(false);
-                    clearInterval(interval);
-                }
-            }, 3000); // Poll every 3 seconds
+          // Otherwise, show loading and poll for edge recommendations
+          setLoading(true);
+          const interval = setInterval(async () => {
+            try {
+              const data = await recommendationAPI.getRecommendations(taskId);
+              if (
+                data.phase === 'edges' &&
+                data.edge_recommendations.length > 0
+              ) {
+                setRecommendations(data);
+                setCurrentPhase('edges');
+                setLoading(false);
+                clearInterval(interval);
+                showNotification('Edge recommendations are ready!', 'success');
+              }
+            } catch (error) {
+              console.error('Polling for edge recommendations failed:', error);
+              setLoading(false);
+              clearInterval(interval);
+            }
+          }, 3000); // Poll every 3 seconds
         }
       } else {
         onApprove(payload.items);
@@ -331,7 +343,10 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
       showNotification('Recommendations rejected.', 'info');
     } catch (error) {
       console.error('Failed to reject recommendations:', error);
-      showNotification('Failed to reject recommendations. Please try again.', 'error');
+      showNotification(
+        'Failed to reject recommendations. Please try again.',
+        'error'
+      );
     }
   };
 
@@ -383,7 +398,9 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
                 )}
                 {currentPhase === 'nodes_completed' && (
                   <div className="phase-transition">
-                    <p>Nodes approved. Generating relationships, please wait...</p>
+                    <p>
+                      Nodes approved. Generating relationships, please wait...
+                    </p>
                   </div>
                 )}
                 {currentPhase === 'edges' && (

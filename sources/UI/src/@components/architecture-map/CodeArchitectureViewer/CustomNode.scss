@@ -1,13 +1,17 @@
 .custom-node {
-  min-width: 200px;
+  min-width: 180px;
+  max-width: 350px;
   min-height: 100px;
   background: white;
   border: 3px solid;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   transition: all 0.2s ease;
-  font-family: system-ui, -apple-system, sans-serif;
-  
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
+
   &:hover {
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
     transform: translateY(-2px);
@@ -18,7 +22,7 @@
     border-bottom: 1px solid rgba(0, 0, 0, 0.08);
     background: inherit;
     border-radius: 5px 5px 0 0;
-    
+
     .node-type {
       font-size: 10px;
       font-weight: 700;
@@ -30,7 +34,7 @@
 
   .node-content {
     padding: 16px 12px;
-    
+
     .node-label {
       font-size: 14px;
       font-weight: 600;
@@ -45,11 +49,11 @@
     height: 10px;
     background: #667eea;
     border: 2px solid white;
-    
+
     &.react-flow__handle-top {
       top: -5px;
     }
-    
+
     &.react-flow__handle-bottom {
       bottom: -5px;
     }

@@ -87,6 +87,10 @@
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;
   gap: 1rem;
+
+  @media (max-width: 1280px) {
+    grid-template-columns: 1fr;
+  }
 }
 
 .main-grid {
@@ -96,6 +100,10 @@
   flex: 1;
   min-height: 0;
   height: 100%;
+
+  @media (max-width: 1024px) {
+    grid-template-columns: 1fr;
+  }
 }
 
 .card {
@@ -256,20 +264,20 @@
   flex: 1;
   min-height: 0;
   padding-right: 0.25rem;
-  
+
   &::-webkit-scrollbar {
     width: 6px;
   }
-  
+
   &::-webkit-scrollbar-track {
     background: #f1f5f9;
     border-radius: 3px;
   }
-  
+
   &::-webkit-scrollbar-thumb {
     background: #cbd5e1;
     border-radius: 3px;
-    
+
     &:hover {
       background: #94a3b8;
     }
@@ -284,7 +292,7 @@
   text-align: center;
   color: #64748b;
   font-size: 0.9rem;
-  
+
   p {
     margin: 0;
   }
@@ -451,9 +459,8 @@
   .intro-grid,
   .main-grid {
     grid-template-columns: 1fr;
-    min-height: 50vh;
   }
-  
+
   .architecture-map {
     min-height: auto;
   }

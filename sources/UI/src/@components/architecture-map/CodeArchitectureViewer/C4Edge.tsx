@@ -1,4 +1,9 @@
-import { BaseEdge, EdgeLabelRenderer, EdgeProps, getBezierPath } from 'reactflow';
+import {
+  BaseEdge,
+  EdgeLabelRenderer,
+  EdgeProps,
+  getBezierPath,
+} from 'reactflow';
 
 const C4Edge = ({
   id,
@@ -22,7 +27,12 @@ const C4Edge = ({
 
   return (
     <>
-      <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} style={{ stroke: '#1168bd', strokeWidth: 2.8 }} />
+      <BaseEdge
+        id={id}
+        path={edgePath}
+        markerEnd={markerEnd}
+        style={{ stroke: '#1168bd', strokeWidth: 2.8 }}
+      />
       {label ? (
         <EdgeLabelRenderer>
           <div

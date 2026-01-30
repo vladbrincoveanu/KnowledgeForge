@@ -145,7 +145,19 @@ const envDebugInfo = {
   windowLocation: typeof window !== 'undefined' ? window.location.href : 'N/A',
 };
 console.log('[DEBUG] API Config:', envDebugInfo);
-fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.ts:127',message:'API configuration loaded',data:envDebugInfo,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    location: 'api.ts:127',
+    message: 'API configuration loaded',
+    data: envDebugInfo,
+    timestamp: Date.now(),
+    sessionId: 'debug-session',
+    runId: 'run1',
+    hypothesisId: 'A',
+  }),
+}).catch(() => {});
 // #endregion
 
 // Create axios instance with default configuration
@@ -174,15 +186,51 @@ api.interceptors.request.use(
     config.headers.Authorization = `Bearer ${API_KEY}`;
     // #region agent log
     if (config.url?.includes('extract-from-github')) {
-      const fullUrl = config.baseURL ? `${config.baseURL}${config.url}` : config.url;
-      fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.ts:157',message:'Request interceptor - constructing request',data:{url:config.url,baseURL:config.baseURL,fullUrl,method:config.method,hasHeaders:!!config.headers,timeout:config.timeout},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      const fullUrl = config.baseURL
+        ? `${config.baseURL}${config.url}`
+        : config.url;
+      fetch(
+        'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            location: 'api.ts:157',
+            message: 'Request interceptor - constructing request',
+            data: {
+              url: config.url,
+              baseURL: config.baseURL,
+              fullUrl,
+              method: config.method,
+              hasHeaders: !!config.headers,
+              timeout: config.timeout,
+            },
+            timestamp: Date.now(),
+            sessionId: 'debug-session',
+            runId: 'run1',
+            hypothesisId: 'D',
+          }),
+        }
+      ).catch(() => {});
     }
     // #endregion
     return config;
   },
   error => {
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.ts:165',message:'Request interceptor error',data:{errorMessage:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        location: 'api.ts:165',
+        message: 'Request interceptor error',
+        data: { errorMessage: error?.message },
+        timestamp: Date.now(),
+        sessionId: 'debug-session',
+        runId: 'run1',
+        hypothesisId: 'E',
+      }),
+    }).catch(() => {});
     // #endregion
     return Promise.reject(error);
   }
@@ -204,7 +252,10 @@ api.interceptors.response.use(
   response => {
     // #region agent log
     if (response.config.url?.includes('extract-from-github')) {
-      console.log('[DEBUG] Response interceptor - success:', { url: response.config.url, status: response.status });
+      console.log('[DEBUG] Response interceptor - success:', {
+        url: response.config.url,
+        status: response.status,
+      });
     }
     // #endregion
     return response;
@@ -217,7 +268,7 @@ api.interceptors.response.use(
       status: error?.response?.status,
       url: error?.config?.url,
       baseURL: error?.config?.baseURL,
-      responseData: error?.response?.data
+      responseData: error?.response?.data,
     });
     // #endregion
     if (error.response?.status === 401) {
@@ -245,7 +296,7 @@ export const ontologyAPI = {
     filePath: string,
     extractionConfig: ExtractConfig = {}
   ): Promise<ExtractResponse> => {
-      const response: AxiosResponse<ExtractResponse> = await api.post(
+    const response: AxiosResponse<ExtractResponse> = await api.post(
       '/api/v1/extract/',
       {
         file_path: filePath,
@@ -330,44 +381,90 @@ export const ontologyAPI = {
 
   // Get system metrics
   getMetrics: async (): Promise<SystemMetrics> => {
-    const response: AxiosResponse<SystemMetrics> =
-      await api.get('/api/v1/health/metrics');
+    const response: AxiosResponse<SystemMetrics> = await api.get(
+      '/api/v1/health/metrics'
+    );
     return response.data;
   },
 
   // Health check
   healthCheck: async (): Promise<HealthStatus> => {
-    const response: AxiosResponse<HealthStatus> = await api.get('/api/v1/health/');
+    const response: AxiosResponse<HealthStatus> =
+      await api.get('/api/v1/health/');
     return response.data;
   },
 
   // Readiness check
   readinessCheck: async (): Promise<HealthStatus> => {
-    const response: AxiosResponse<HealthStatus> =
-      await api.get('/api/v1/health/ready');
+    const response: AxiosResponse<HealthStatus> = await api.get(
+      '/api/v1/health/ready'
+    );
     return response.data;
   },
-
 };
 
 // Service Extraction API
 export const serviceExtractionAPI = {
   // Extract services from GitHub repository
-  extractFromGitHub: async (githubUrl: string, useGit: boolean = true): Promise<ExtractResponse> => {
+  extractFromGitHub: async (
+    githubUrl: string,
+    useGit: boolean = true
+  ): Promise<ExtractResponse> => {
     // #region agent log
     // Runtime fix: Force empty baseURL if it contains Docker service name
     const currentBaseURL = api.defaults.baseURL || '';
-    const fixedBaseURL = (currentBaseURL.includes('api:') || currentBaseURL.includes('://api')) ? '' : currentBaseURL;
+    const fixedBaseURL =
+      currentBaseURL.includes('api:') || currentBaseURL.includes('://api')
+        ? ''
+        : currentBaseURL;
     if (fixedBaseURL !== currentBaseURL) {
       api.defaults.baseURL = fixedBaseURL;
       fileUploadApi.defaults.baseURL = fixedBaseURL;
     }
-    fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.ts:311',message:'extractFromGitHub API call starting',data:{apiBaseURL:API_BASE_URL,currentBaseURL,fixedBaseURL,githubUrl,useGit,requestUrl:'/api/v1/services/extract-from-github'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        location: 'api.ts:311',
+        message: 'extractFromGitHub API call starting',
+        data: {
+          apiBaseURL: API_BASE_URL,
+          currentBaseURL,
+          fixedBaseURL,
+          githubUrl,
+          useGit,
+          requestUrl: '/api/v1/services/extract-from-github',
+        },
+        timestamp: Date.now(),
+        sessionId: 'debug-session',
+        runId: 'run1',
+        hypothesisId: 'A',
+      }),
+    }).catch(() => {});
     // #endregion
-    
+
     try {
       // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.ts:313',message:'About to make axios.post request',data:{url:'/api/v1/services/extract-from-github',baseURL:api.defaults.baseURL,timeout:api.defaults.timeout},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      fetch(
+        'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            location: 'api.ts:313',
+            message: 'About to make axios.post request',
+            data: {
+              url: '/api/v1/services/extract-from-github',
+              baseURL: api.defaults.baseURL,
+              timeout: api.defaults.timeout,
+            },
+            timestamp: Date.now(),
+            sessionId: 'debug-session',
+            runId: 'run1',
+            hypothesisId: 'B',
+          }),
+        }
+      ).catch(() => {});
       // #endregion
       const response: AxiosResponse<ExtractResponse> = await api.post(
         '/api/v1/services/extract-from-github',
@@ -377,7 +474,27 @@ export const serviceExtractionAPI = {
         }
       );
       // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.ts:320',message:'axios.post request succeeded',data:{status:response.status,statusText:response.statusText,hasData:!!response.data,taskId:response.data?.task_id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      fetch(
+        'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            location: 'api.ts:320',
+            message: 'axios.post request succeeded',
+            data: {
+              status: response.status,
+              statusText: response.statusText,
+              hasData: !!response.data,
+              taskId: response.data?.task_id,
+            },
+            timestamp: Date.now(),
+            sessionId: 'debug-session',
+            runId: 'run1',
+            hypothesisId: 'B',
+          }),
+        }
+      ).catch(() => {});
       // #endregion
       return response.data;
     } catch (error: any) {
@@ -396,7 +513,22 @@ export const serviceExtractionAPI = {
         isTimeout: error?.code === 'ECONNABORTED',
       };
       console.error('[DEBUG] extractFromGitHub error:', axiosErrorDetails);
-      fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.ts:322',message:'axios.post request failed',data:axiosErrorDetails,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      fetch(
+        'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            location: 'api.ts:322',
+            message: 'axios.post request failed',
+            data: axiosErrorDetails,
+            timestamp: Date.now(),
+            sessionId: 'debug-session',
+            runId: 'run1',
+            hypothesisId: 'C',
+          }),
+        }
+      ).catch(() => {});
       // #endregion
       throw error;
     }
@@ -427,8 +559,28 @@ export const serviceExtractionAPI = {
   // Get extraction status
   getExtractionStatus: async (taskId: string): Promise<ExtractionStatus> => {
     // #region agent log
-    console.log('[DEBUG] getExtractionStatus called', { taskId, baseURL: api.defaults.baseURL, url: `/api/v1/services/extraction/${taskId}` });
-    fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.ts:345',message:'getExtractionStatus called',data:{taskId,baseURL:api.defaults.baseURL,requestUrl:`/api/v1/services/extraction/${taskId}`},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'F'})}).catch(()=>{});
+    console.log('[DEBUG] getExtractionStatus called', {
+      taskId,
+      baseURL: api.defaults.baseURL,
+      url: `/api/v1/services/extraction/${taskId}`,
+    });
+    fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        location: 'api.ts:345',
+        message: 'getExtractionStatus called',
+        data: {
+          taskId,
+          baseURL: api.defaults.baseURL,
+          requestUrl: `/api/v1/services/extraction/${taskId}`,
+        },
+        timestamp: Date.now(),
+        sessionId: 'debug-session',
+        runId: 'run2',
+        hypothesisId: 'F',
+      }),
+    }).catch(() => {});
     // #endregion
     try {
       const response: AxiosResponse<ExtractionStatus> = await api.get(
@@ -436,7 +588,22 @@ export const serviceExtractionAPI = {
       );
       // #region agent log
       console.log('[DEBUG] getExtractionStatus response', response.data);
-      fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.ts:350',message:'getExtractionStatus response received',data:{status:response.data.status,statusCode:response.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'F'})}).catch(()=>{});
+      fetch(
+        'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            location: 'api.ts:350',
+            message: 'getExtractionStatus response received',
+            data: { status: response.data.status, statusCode: response.status },
+            timestamp: Date.now(),
+            sessionId: 'debug-session',
+            runId: 'run2',
+            hypothesisId: 'F',
+          }),
+        }
+      ).catch(() => {});
       // #endregion
       return response.data;
     } catch (error: any) {
@@ -448,14 +615,31 @@ export const serviceExtractionAPI = {
         statusText: error?.response?.statusText,
         data: error?.response?.data,
       };
-      fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.ts:357',message:'getExtractionStatus error',data:errorDetails,timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'F'})}).catch(()=>{});
+      fetch(
+        'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            location: 'api.ts:357',
+            message: 'getExtractionStatus error',
+            data: errorDetails,
+            timestamp: Date.now(),
+            sessionId: 'debug-session',
+            runId: 'run2',
+            hypothesisId: 'F',
+          }),
+        }
+      ).catch(() => {});
       // #endregion
       throw error;
     }
   },
 
   // Get extraction results
-  getExtractionResults: async (taskId: string): Promise<{
+  getExtractionResults: async (
+    taskId: string
+  ): Promise<{
     task_id: string;
     repository: { url?: string; name?: string };
     statistics: { total_services: number; total_connections: number };
@@ -464,7 +648,9 @@ export const serviceExtractionAPI = {
     errors: string[];
     warnings: string[];
   }> => {
-    const response = await api.get(`/api/v1/services/extraction/${taskId}/results`);
+    const response = await api.get(
+      `/api/v1/services/extraction/${taskId}/results`
+    );
     return response.data;
   },
 };
@@ -722,7 +908,9 @@ export const codeArchitectureAPI = {
   // Get C4 architecture data
   getArchitecture: async (): Promise<any> => {
     try {
-      const response: AxiosResponse = await api.get('/api/v1/code/architecture');
+      const response: AxiosResponse = await api.get(
+        '/api/v1/code/architecture'
+      );
       return response.data;
     } catch (error) {
       console.error('Failed to fetch code architecture:', error);
@@ -731,7 +919,11 @@ export const codeArchitectureAPI = {
   },
 
   // Trigger code extraction from GitHub
-  extractFromGitHub: async (githubUrl: string, useGit: boolean = true, appendMode: boolean = true): Promise<ExtractResponse> => {
+  extractFromGitHub: async (
+    githubUrl: string,
+    useGit: boolean = true,
+    appendMode: boolean = true
+  ): Promise<ExtractResponse> => {
     try {
       const response: AxiosResponse<ExtractResponse> = await api.post(
         '/api/v1/code/extract-from-github',
@@ -748,8 +940,36 @@ export const codeArchitectureAPI = {
     }
   },
 
+  // Extract from GitHub organization/user
+  extractFromGitHubOrg: async (
+    username: string,
+    includeForks: boolean = false,
+    maxRepos: number = 10,
+    appendMode: boolean = true
+  ): Promise<ExtractResponse> => {
+    try {
+      const response: AxiosResponse<ExtractResponse> = await api.post(
+        '/api/v1/code/extract-from-github-org',
+        {
+          github_username: username,
+          include_forks: includeForks,
+          max_repos: maxRepos,
+          append_mode: appendMode,
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Failed to scan GitHub org:', error);
+      throw error;
+    }
+  },
+
   // Clear all architecture data
-  clearArchitecture: async (): Promise<{ status: string; message: string; deleted_count: number }> => {
+  clearArchitecture: async (): Promise<{
+    status: string;
+    message: string;
+    deleted_count: number;
+  }> => {
     try {
       const response = await api.post('/api/v1/code/clear');
       return response.data;
@@ -762,7 +982,9 @@ export const codeArchitectureAPI = {
   // Get extraction status
   getExtractionStatus: async (taskId: string): Promise<TaskStatus> => {
     try {
-      const response: AxiosResponse<TaskStatus> = await api.get(`/api/v1/code/scan/${taskId}`);
+      const response: AxiosResponse<TaskStatus> = await api.get(
+        `/api/v1/code/scan/${taskId}`
+      );
       return response.data;
     } catch (error) {
       console.error('Failed to get extraction status:', error);
@@ -773,7 +995,9 @@ export const codeArchitectureAPI = {
   // Get extraction results
   getExtractionResults: async (taskId: string): Promise<any> => {
     try {
-      const response: AxiosResponse = await api.get(`/api/v1/code/scan/${taskId}/results`);
+      const response: AxiosResponse = await api.get(
+        `/api/v1/code/scan/${taskId}/results`
+      );
       return response.data;
     } catch (error) {
       console.error('Failed to get code architecture results:', error);

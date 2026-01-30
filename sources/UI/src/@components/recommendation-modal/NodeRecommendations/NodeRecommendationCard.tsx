@@ -1,5 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Check, X, Edit3, Save, RefreshCw, Key, BarChart3, Hash, Calendar, Type, HelpCircle } from 'lucide-react';
+import {
+  Check,
+  X,
+  Edit3,
+  Save,
+  RefreshCw,
+  Key,
+  BarChart3,
+  Hash,
+  Calendar,
+  Type,
+  HelpCircle,
+} from 'lucide-react';
 import './NodeRecommendationCard.scss';
 
 export interface NodeRecommendation {
@@ -147,7 +159,7 @@ const NodeRecommendationCard: React.FC<NodeRecommendationCardProps> = ({
           ) : (
             <span className="entity-name-text">{selection.finalName}</span>
           )}
-          
+
           <div className="entity-type-badge">
             {editMode ? (
               <select
@@ -173,22 +185,21 @@ const NodeRecommendationCard: React.FC<NodeRecommendationCardProps> = ({
           </div>
         </div>
 
-        <div className="entity-description">
-          {recommendation.reasoning}
-        </div>
+        <div className="entity-description">{recommendation.reasoning}</div>
 
-        {recommendation.sourceColumns && recommendation.sourceColumns.length > 0 && (
-          <div className="source-columns">
-            <strong>SOURCE COLUMNS:</strong>
-            <div className="column-chips">
-              {recommendation.sourceColumns.map((column, index) => (
-                <span key={index} className="column-chip">
-                  {column}
-                </span>
-              ))}
+        {recommendation.sourceColumns &&
+          recommendation.sourceColumns.length > 0 && (
+            <div className="source-columns">
+              <strong>SOURCE COLUMNS:</strong>
+              <div className="column-chips">
+                {recommendation.sourceColumns.map((column, index) => (
+                  <span key={index} className="column-chip">
+                    {column}
+                  </span>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
       </div>
 
       {/* Confidence Indicator */}
@@ -208,11 +219,11 @@ const NodeRecommendationCard: React.FC<NodeRecommendationCardProps> = ({
         <button
           className="action-btn"
           onClick={editMode ? handleSaveEdit : handleStartEdit}
-          title={editMode ? "Save changes" : "Edit name and type"}
+          title={editMode ? 'Save changes' : 'Edit name and type'}
         >
           {editMode ? <Save size={14} /> : <Edit3 size={14} />}
         </button>
-        
+
         {editMode && (
           <button
             className="action-btn"
@@ -226,7 +237,9 @@ const NodeRecommendationCard: React.FC<NodeRecommendationCardProps> = ({
         <button
           className="action-btn"
           onClick={() => setShowAdvanced(!showAdvanced)}
-          title={showAdvanced ? "Hide advanced details" : "Show advanced details"}
+          title={
+            showAdvanced ? 'Hide advanced details' : 'Show advanced details'
+          }
         >
           <RefreshCw size={14} className={showAdvanced ? 'rotated' : ''} />
         </button>

@@ -31,7 +31,10 @@ import './OntologyResults.scss';
 interface OntologyResultsProps {
   taskId: string;
   onFeedbackSubmitted: (feedback: FeedbackResponse) => void;
-  showNotification: (message: string, type: 'success' | 'error' | 'info') => void;
+  showNotification: (
+    message: string,
+    type: 'success' | 'error' | 'info'
+  ) => void;
 }
 
 const OntologyResults: React.FC<OntologyResultsProps> = ({
@@ -65,9 +68,9 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
   } | null>(null);
   const [recommendationsLoading, setRecommendationsLoading] =
     useState<boolean>(false);
-  const [recommendationsError, setRecommendationsError] = useState<string | null>(
-    null
-  );
+  const [recommendationsError, setRecommendationsError] = useState<
+    string | null
+  >(null);
   const [nodeSelections, setNodeSelections] = useState<
     Record<string, NodeSelectionState>
   >({});
@@ -77,9 +80,9 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
   const [reviewNotes, setReviewNotes] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [submittingDecision, setSubmittingDecision] = useState(false);
-  const [currentPhase, setCurrentPhase] = useState<'nodes' | 'edges' | 'completed'>(
-    'nodes'
-  );
+  const [currentPhase, setCurrentPhase] = useState<
+    'nodes' | 'edges' | 'completed'
+  >('nodes');
   const [readyForEdges, setReadyForEdges] = useState(false);
 
   const loadData = useCallback(
@@ -168,12 +171,17 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
       setEdgeSelections(edgeState);
       setReviewNotes('');
     } catch (err: unknown) {
-      const maybeError = err as { response?: { status?: number }; message?: string };
+      const maybeError = err as {
+        response?: { status?: number };
+        message?: string;
+      };
       if (maybeError?.response?.status === 404) {
         setRecommendationSession(null);
         setNodeSelections({});
         setEdgeSelections({});
-        setRecommendationsError('Recommendations are still being generated. Check back shortly.');
+        setRecommendationsError(
+          'Recommendations are still being generated. Check back shortly.'
+        );
       } else {
         setRecommendationsError(
           maybeError?.message || 'Failed to load recommendations'
@@ -188,7 +196,8 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
     if (!taskId) return;
     setRecommendationsLoading(true);
     try {
-      const session = await recommendationAPI.generateEdgeRecommendations(taskId);
+      const session =
+        await recommendationAPI.generateEdgeRecommendations(taskId);
       setRecommendationSession(session);
       setCurrentPhase('edges');
     } catch (err) {
@@ -216,13 +225,15 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
 
   const selectedNodeCount = useMemo(
     () =>
-      Object.values(nodeSelections).filter(selection => selection?.approved).length,
+      Object.values(nodeSelections).filter(selection => selection?.approved)
+        .length,
     [nodeSelections]
   );
 
   const selectedEdgeCount = useMemo(
     () =>
-      Object.values(edgeSelections).filter(selection => selection?.approved).length,
+      Object.values(edgeSelections).filter(selection => selection?.approved)
+        .length,
     [edgeSelections]
   );
 
@@ -395,10 +406,9 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
             typeof appliedSelection.confidence === 'number'
               ? appliedSelection.confidence
               : entity.confidence,
-          source_columns:
-            appliedSelection.sourceColumns?.length
-              ? appliedSelection.sourceColumns
-              : entity.source_columns,
+          source_columns: appliedSelection.sourceColumns?.length
+            ? appliedSelection.sourceColumns
+            : entity.source_columns,
           attributes: {
             ...(entity.attributes || {}),
             ...(appliedSelection.metadata?.attributes || {}),
@@ -438,7 +448,7 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
           confidence:
             typeof selection.confidence === 'number'
               ? selection.confidence
-              : edgeInfo.confidence ?? 0.7,
+              : (edgeInfo.confidence ?? 0.7),
           source_entity_id: edgeInfo.sourceNodeId,
           target_entity_id: edgeInfo.targetNodeId,
           attributes: {
@@ -468,7 +478,9 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
       return next;
     });
 
-    setFeedbackMessage('Applied selected edge recommendations to the preview list.');
+    setFeedbackMessage(
+      'Applied selected edge recommendations to the preview list.'
+    );
   }, [edgeLookup, edgeSelections, recommendationSession]);
 
   const buildApprovedNodesPayload = useCallback(() => {
@@ -533,7 +545,10 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
       }
 
       try {
-        const response = await recommendationAPI.submitRecommendationFeedback(taskId, payload);
+        const response = await recommendationAPI.submitRecommendationFeedback(
+          taskId,
+          payload
+        );
         setFeedbackMessage(
           approved
             ? 'Successfully approved recommendations.'
@@ -542,14 +557,21 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
         if (response.ready_for_edges) {
           setReadyForEdges(true);
           setCurrentPhase('nodes_completed');
-          showNotification('Nodes approved! Generating edge recommendations...', 'info');
+          showNotification(
+            'Nodes approved! Generating edge recommendations...',
+            'info'
+          );
         } else {
           showNotification('Feedback submitted successfully!', 'success');
         }
-        onFeedbackSubmitted({ success: true, message: 'recommendations-submitted' });
+        onFeedbackSubmitted({
+          success: true,
+          message: 'recommendations-submitted',
+        });
       } catch (err: unknown) {
         const maybeError = err as { message?: string };
-        const errorMessage = maybeError?.message || 'Failed to submit recommendation feedback.';
+        const errorMessage =
+          maybeError?.message || 'Failed to submit recommendation feedback.';
         setFeedbackMessage(errorMessage);
         showNotification(errorMessage, 'error');
       } finally {
@@ -767,34 +789,43 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
 
         {activeTab === 'entities' && (
           <div className="entities-section">
-            {(recommendationsLoading || recommendationSession || recommendationsError) && (
+            {(recommendationsLoading ||
+              recommendationSession ||
+              recommendationsError) && (
               <div className="recommendations-panel">
                 <div className="recommendations-header">
                   <div>
                     <h3>LLM Node Recommendations</h3>
                     <p className="recommendations-subtitle">
-                      Curate suggested node names and apply them directly to the extracted entities.
+                      Curate suggested node names and apply them directly to the
+                      extracted entities.
                     </p>
                   </div>
                   <div className="recommendations-actions">
                     <button
                       className="button-secondary"
                       onClick={handleSelectAllNodes}
-                      disabled={!recommendationSession || recommendationsLoading}
+                      disabled={
+                        !recommendationSession || recommendationsLoading
+                      }
                     >
                       Select All
                     </button>
                     <button
                       className="button-secondary"
                       onClick={handleDeselectAllNodes}
-                      disabled={!recommendationSession || recommendationsLoading}
+                      disabled={
+                        !recommendationSession || recommendationsLoading
+                      }
                     >
                       Clear
                     </button>
                     <button
                       className="button-muted"
                       onClick={applySelectedNodesToEntities}
-                      disabled={!recommendationSession || selectedNodeCount === 0}
+                      disabled={
+                        !recommendationSession || selectedNodeCount === 0
+                      }
                     >
                       Apply Selected Names
                     </button>
@@ -802,7 +833,9 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
                       className="button-primary"
                       onClick={() => submitRecommendationDecision(true)}
                       disabled={
-                        submittingDecision || !recommendationSession || selectedNodeCount === 0
+                        submittingDecision ||
+                        !recommendationSession ||
+                        selectedNodeCount === 0
                       }
                     >
                       <ThumbsUp size={16} /> Approve Selected
@@ -818,7 +851,9 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
                 </div>
 
                 {recommendationsLoading && (
-                  <div className="recommendations-status">Loading recommendations...</div>
+                  <div className="recommendations-status">
+                    Loading recommendations...
+                  </div>
                 )}
 
                 {recommendationsError && (
@@ -828,14 +863,18 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
                 )}
 
                 {feedbackMessage && (
-                  <div className="recommendations-status notice">{feedbackMessage}</div>
+                  <div className="recommendations-status notice">
+                    {feedbackMessage}
+                  </div>
                 )}
 
                 {recommendationSession && !recommendationsLoading && (
                   <>
                     <div className="recommendations-body">
                       <NodeRecommendationList
-                        recommendations={recommendationSession.node_recommendations}
+                        recommendations={
+                          recommendationSession.node_recommendations
+                        }
                         selections={nodeSelections}
                         onNodeToggle={handleNodeToggle}
                         onUpdateSelection={handleNodeSelectionUpdate}
@@ -865,7 +904,6 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
                 )}
               </div>
             )}
-
           </div>
         )}
 
@@ -879,28 +917,35 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
                   <div>
                     <h3>LLM Relationship Recommendations</h3>
                     <p className="recommendations-subtitle">
-                      Review suggested edges between the proposed nodes and incorporate them into the graph.
+                      Review suggested edges between the proposed nodes and
+                      incorporate them into the graph.
                     </p>
                   </div>
                   <div className="recommendations-actions">
                     <button
                       className="button-secondary"
                       onClick={handleSelectAllEdges}
-                      disabled={!recommendationSession || recommendationsLoading}
+                      disabled={
+                        !recommendationSession || recommendationsLoading
+                      }
                     >
                       Select All
                     </button>
                     <button
                       className="button-secondary"
                       onClick={handleDeselectAllEdges}
-                      disabled={!recommendationSession || recommendationsLoading}
+                      disabled={
+                        !recommendationSession || recommendationsLoading
+                      }
                     >
                       Clear
                     </button>
                     <button
                       className="button-muted"
                       onClick={applySelectedEdgesToRelationships}
-                      disabled={!recommendationSession || selectedEdgeCount === 0}
+                      disabled={
+                        !recommendationSession || selectedEdgeCount === 0
+                      }
                     >
                       Apply Selected Edges
                     </button>
@@ -908,7 +953,9 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
                       className="button-primary"
                       onClick={() => submitRecommendationDecision(true)}
                       disabled={
-                        submittingDecision || !recommendationSession || selectedEdgeCount === 0
+                        submittingDecision ||
+                        !recommendationSession ||
+                        selectedEdgeCount === 0
                       }
                     >
                       <ThumbsUp size={16} /> Approve Selected
@@ -924,7 +971,9 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
                 </div>
 
                 {recommendationsLoading && (
-                  <div className="recommendations-status">Loading recommendations...</div>
+                  <div className="recommendations-status">
+                    Loading recommendations...
+                  </div>
                 )}
 
                 {recommendationsError && (
@@ -934,14 +983,18 @@ const OntologyResults: React.FC<OntologyResultsProps> = ({
                 )}
 
                 {feedbackMessage && (
-                  <div className="recommendations-status notice">{feedbackMessage}</div>
+                  <div className="recommendations-status notice">
+                    {feedbackMessage}
+                  </div>
                 )}
 
                 {recommendationSession && !recommendationsLoading && (
                   <>
                     <div className="recommendations-body">
                       <EdgeRecommendationList
-                        recommendations={recommendationSession.edge_recommendations}
+                        recommendations={
+                          recommendationSession.edge_recommendations
+                        }
                         selections={edgeSelections}
                         onEdgeToggle={handleEdgeToggle}
                         onUpdateSelection={handleEdgeSelectionUpdate}

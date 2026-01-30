@@ -1,6 +1,6 @@
 declare module 'react-cytoscapejs' {
   import { ComponentType } from 'react';
-  
+
   interface CytoscapeComponentProps {
     elements: any[];
     style?: React.CSSProperties;

@@ -106,7 +106,10 @@ export const recommendationAPI = {
     taskId: string,
     feedback: any
   ): Promise<any> => {
-    const response = await api.post(`/v1/extract/${taskId}/recommendations/feedback`, feedback);
+    const response = await api.post(
+      `/v1/extract/${taskId}/recommendations/feedback`,
+      feedback
+    );
     return response.data;
   },
 
@@ -122,8 +125,12 @@ export const recommendationAPI = {
     await api.post(`/v1/extract/${taskId}/generate-recommendations`);
   },
 
-  generateEdgeRecommendations: async (taskId: string): Promise<RecommendationData> => {
-    const response = await api.post(`/v1/extract/${taskId}/generate-edge-recommendations`);
+  generateEdgeRecommendations: async (
+    taskId: string
+  ): Promise<RecommendationData> => {
+    const response = await api.post(
+      `/v1/extract/${taskId}/generate-edge-recommendations`
+    );
     return response.data;
   },
 };

@@ -19,6 +19,8 @@ import { codeArchitectureAPI } from '../../../services/api';
 import CustomNode from './CustomNode';
 import ContainerNode from './ContainerNode';
 import C4Edge from './C4Edge';
+import BatchUrlInput from './batchurlinput';
+import GitHubOrgScanner from './githuborgscanner';
 
 interface CodeEntity {
   id: string;
@@ -66,8 +68,8 @@ interface C4Relationships {
 interface C4Architecture {
   c4_model_version: string;
   system_context: any;
-  containers?: any[];  // Array format from backend
-  components?: any[];  // Array format from backend
+  containers?: any[]; // Array format from backend
+  components?: any[]; // Array format from backend
   relationships?: C4Relationships;
   metadata?: {
     runtime?: {
@@ -76,8 +78,8 @@ interface C4Architecture {
     };
   };
   context_level?: C4Level;
-  container_level?: C4Level;  // Transformed format
-  component_level?: C4Level;  // Transformed format
+  container_level?: C4Level; // Transformed format
+  component_level?: C4Level; // Transformed format
   code_level?: C4Level;
 }
 
@@ -85,7 +87,8 @@ const edgeTypes = {
   C4Edge,
 };
 
-const buildContainerId = (container: any, idx: number) => `container_${container.name || idx}`;
+const buildContainerId = (container: any, idx: number) =>
+  `container_${container.name || idx}`;
 
 const generateC4Edges = (containers: any[] = []): Edge[] => {
   const nameToId = new Map<string, string>();
@@ -100,10 +103,15 @@ const generateC4Edges = (containers: any[] = []): Edge[] => {
 
   containers.forEach((container, idx) => {
     const sourceId = buildContainerId(container, idx);
-    const protocol = typeof container?.protocol === 'string' ? container.protocol.trim() : '';
+    const protocol =
+      typeof container?.protocol === 'string' ? container.protocol.trim() : '';
     const label = protocol ? protocol.toUpperCase() : undefined;
-    const dependencies: string[] = Array.isArray(container?.dependencies_internal)
-      ? container.dependencies_internal.map((dependency: unknown) => String(dependency))
+    const dependencies: string[] = Array.isArray(
+      container?.dependencies_internal
+    )
+      ? container.dependencies_internal.map((dependency: unknown) =>
+          String(dependency)
+        )
       : [];
 
     dependencies.forEach((dependencyName: string, depIdx: number) => {
@@ -133,19 +141,30 @@ const nodeTypes = {
   container: ContainerNode,
 };
 
-const AVAILABLE_LEVELS = ['context_level', 'container_level', 'component_level', 'code_level'];
+const AVAILABLE_LEVELS = [
+  'context_level',
+  'container_level',
+  'component_level',
+  'code_level',
+];
 
 // Layout function - grid layout for components in containers
-const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => {
+const getLayoutedElements = (
+  nodes: Node[],
+  edges: Edge[],
+  direction = 'LR'
+) => {
   if (nodes.length === 0) {
     return { nodes: [], edges };
   }
-  
+
   // Separate parent containers and child nodes
   const containerNodes = nodes.filter(n => n.type === 'container');
   const childNodes = nodes.filter(n => n.parentNode);
-  const standaloneNodes = nodes.filter(n => !n.type?.includes('container') && !n.parentNode);
-  
+  const standaloneNodes = nodes.filter(
+    n => !n.type?.includes('container') && !n.parentNode
+  );
+
   // Layout child nodes within their parent containers
   if (containerNodes.length > 0) {
     // Position containers
@@ -177,8 +196,8 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => 
         const col = idx % childrenPerRow;
 
         child.position = {
-          x: childStartX + (col * (childNodeWidth + childSpacing)),
-          y: childStartY + (row * (childNodeHeight + childSpacing)),
+          x: childStartX + col * (childNodeWidth + childSpacing),
+          y: childStartY + row * (childNodeHeight + childSpacing),
         };
         child.sourcePosition = Position.Right;
         child.targetPosition = Position.Left;
@@ -186,8 +205,12 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => 
 
       if (children.length > 0) {
         const rows = Math.ceil(children.length / childrenPerRow);
-        const contentWidth = (childStartX * 2) + (childrenPerRow * childNodeWidth) + ((childrenPerRow - 1) * childSpacing);
-        const contentHeight = childStartY + (rows * childNodeHeight) + ((rows - 1) * childSpacing) + 50;
+        const contentWidth =
+          childStartX * 2 +
+          childrenPerRow * childNodeWidth +
+          (childrenPerRow - 1) * childSpacing;
+        const contentHeight =
+          childStartY + rows * childNodeHeight + (rows - 1) * childSpacing + 50;
 
         container.style = {
           ...container.style,
@@ -196,68 +219,71 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => 
         };
       }
 
-      currentX += (container.style?.width as number || 700) + containerSpacing;
+      currentX +=
+        ((container.style?.width as number) || 700) + containerSpacing;
     });
 
-    return { 
-      nodes: [...containerNodes, ...childNodes, ...standaloneNodes], 
-      edges 
+    return {
+      nodes: [...containerNodes, ...childNodes, ...standaloneNodes],
+      edges,
     };
   }
-  
+
   // Check if we have components without relationships (independent endpoints)
   const hasRelationships = edges.length > 0;
-  
+
   if (!hasRelationships && nodes.length > 0) {
     // Grid layout for independent components
     const methodGroups = new Map<string, Node[]>();
     nodes.forEach(node => {
-      const method = node.data.type === 'component' 
-        ? (node.data.fullName?.split(' ')[0] || 'OTHER')
-        : 'OTHER';
-      
+      const method =
+        node.data.type === 'component'
+          ? node.data.fullName?.split(' ')[0] || 'OTHER'
+          : 'OTHER';
+
       if (!methodGroups.has(method)) {
         methodGroups.set(method, []);
       }
       methodGroups.get(method)!.push(node);
     });
-    
+
     // Layout in columns by method
     const methodOrder = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OTHER'];
     let columnX = 100;
     const columnWidth = 280;
     const rowHeight = 150;
-    
-    const layoutedNodes = nodes.map((node) => {
-      const method = node.data.type === 'component' 
-        ? (node.data.fullName?.split(' ')[0] || 'OTHER')
-        : 'OTHER';
-      
+
+    const layoutedNodes = nodes.map(node => {
+      const method =
+        node.data.type === 'component'
+          ? node.data.fullName?.split(' ')[0] || 'OTHER'
+          : 'OTHER';
+
       const methodIndex = methodOrder.indexOf(method);
       const groupNodes = methodGroups.get(method) || [];
       const nodeIndex = groupNodes.indexOf(node);
-      
+
       return {
         ...node,
         position: {
-          x: columnX + (methodIndex * columnWidth),
-          y: 100 + (nodeIndex * rowHeight),
+          x: columnX + methodIndex * columnWidth,
+          y: 100 + nodeIndex * rowHeight,
         },
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
       };
     });
-    
+
     return { nodes: layoutedNodes, edges };
   }
-  
+
   // Hierarchical layout with dagre for connected graphs
   // If we have edges, use dagre for layout
   if (edges.length > 0) {
     const dagreGraph = new dagre.graphlib.Graph();
     dagreGraph.setDefaultEdgeLabel(() => ({}));
 
-    dagreGraph.setGraph({ 
+    dagreGraph.setGraph({
       rankdir: direction,
       align: 'UL',
       ranksep: 250,
@@ -268,22 +294,26 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => 
       ranker: 'network-simplex',
     });
 
-    nodes.forEach((node) => {
-      dagreGraph.setNode(node.id, { 
-        width: 220, 
+    nodes.forEach(node => {
+      dagreGraph.setNode(node.id, {
+        width: 220,
         height: 100,
       });
     });
 
-    edges.forEach((edge) => {
+    edges.forEach(edge => {
       dagreGraph.setEdge(edge.source, edge.target);
     });
 
     dagre.layout(dagreGraph);
 
-    const layoutedNodes = nodes.map((node) => {
+    const layoutedNodes = nodes.map(node => {
       const nodeWithPosition = dagreGraph.node(node.id);
-      if (nodeWithPosition && nodeWithPosition.x !== undefined && nodeWithPosition.y !== undefined) {
+      if (
+        nodeWithPosition &&
+        nodeWithPosition.x !== undefined &&
+        nodeWithPosition.y !== undefined
+      ) {
         return {
           ...node,
           position: {
@@ -300,17 +330,17 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => 
 
     return { nodes: layoutedNodes, edges };
   }
-  
+
   // If no edges, use a simple grid layout
   const nodesPerRow = Math.ceil(Math.sqrt(nodes.length));
   const nodeWidth = 220;
   const nodeHeight = 100;
   const spacing = 50;
-  
+
   const layoutedNodes = nodes.map((node, index) => {
     const row = Math.floor(index / nodesPerRow);
     const col = index % nodesPerRow;
-    
+
     return {
       ...node,
       position: {
@@ -337,19 +367,21 @@ const CodeArchitectureViewerInner: React.FC = () => {
   const [architecture, setArchitecture] = useState<C4Architecture | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const { fitView } = useReactFlow();
-  
+
   // Filters - focus on context-level for manager view
   const [selectedLevel, setSelectedLevel] = useState<string>('context_level');
   const [selectedEntityTypes, setSelectedEntityTypes] = useState<string[]>([]);
-  const [selectedRelationshipTypes, setSelectedRelationshipTypes] = useState<string[]>([]);
+  const [selectedRelationshipTypes, setSelectedRelationshipTypes] = useState<
+    string[]
+  >([]);
   const [showExternal, setShowExternal] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedNode, setSelectedNode] = useState<any>(null);
-  
+
   const [relationshipTypes, setRelationshipTypes] = useState<string[]>([]);
   const [githubUrl, setGithubUrl] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
@@ -362,15 +394,18 @@ const CodeArchitectureViewerInner: React.FC = () => {
     if (!data.c4_model_version) {
       data.c4_model_version = '1.0';
     }
-    
-    console.log('[CodeArchitectureViewer] Applying cumulative architecture data:', {
-      hasSystemContext: !!data.system_context,
-      containersCount: data.containers?.length || 0,
-      componentsCount: data.components?.length || 0,
-      hasRelationships: !!data.relationships,
-      extractionMode: data.metadata?.extraction_mode || 'unknown',
-    });
-    
+
+    console.log(
+      '[CodeArchitectureViewer] Applying cumulative architecture data:',
+      {
+        hasSystemContext: !!data.system_context,
+        containersCount: data.containers?.length || 0,
+        componentsCount: data.components?.length || 0,
+        hasRelationships: !!data.relationships,
+        extractionMode: data.metadata?.extraction_mode || 'unknown',
+      }
+    );
+
     // Transform containers array into container_level structure
     if (data.containers && Array.isArray(data.containers)) {
       const sysCtx = data.system_context || {};
@@ -383,26 +418,28 @@ const CodeArchitectureViewerInner: React.FC = () => {
         active_experts: sysCtx.active_experts,
         compliance: sysCtx.compliance,
       };
-      const containerEntities: CodeEntity[] = data.containers.map((container: any, idx: number) => ({
-        id: `container_${container.name || idx}`,
-        name: container.name,
-        entity_type: 'container',
-        language: container.technology || 'Unknown',
-        file_path: container.path,
-        attributes: {
-          container_type: container.container_type,
-          protocol: container.protocol,
-          runtime_info: container.runtime_info,
-          runtime_environment: container.runtime_environment,
-          deployment: container.deployment,
-          description: container.description,
-          technology: container.technology,
-          repository_url: container.repository_url,
-          health_endpoint: container.health_endpoint,
-          ...inheritedAttrs,
-        },
-      }));
-      
+      const containerEntities: CodeEntity[] = data.containers.map(
+        (container: any, idx: number) => ({
+          id: `container_${container.name || idx}`,
+          name: container.name,
+          entity_type: 'container',
+          language: container.technology || 'Unknown',
+          file_path: container.path,
+          attributes: {
+            container_type: container.container_type,
+            protocol: container.protocol,
+            runtime_info: container.runtime_info,
+            runtime_environment: container.runtime_environment,
+            deployment: container.deployment,
+            description: container.description,
+            technology: container.technology,
+            repository_url: container.repository_url,
+            health_endpoint: container.health_endpoint,
+            ...inheritedAttrs,
+          },
+        })
+      );
+
       // Create relationships from containers to their code entities
       const containerRelationships: CodeRelationship[] = [];
       if (data.code_level?.entities) {
@@ -432,22 +469,24 @@ const CodeArchitectureViewerInner: React.FC = () => {
           containerEntities.map(c => [c.name, c.id])
         );
 
-        data.relationships.containers.forEach((rel: C4DiagramRelationship, idx: number) => {
-          const sourceId = containerIdByName.get(rel.source);
-          const targetId = containerIdByName.get(rel.destination);
+        data.relationships.containers.forEach(
+          (rel: C4DiagramRelationship, idx: number) => {
+            const sourceId = containerIdByName.get(rel.source);
+            const targetId = containerIdByName.get(rel.destination);
 
-          if (sourceId && targetId) {
-            containerRelationships.push({
-              id: `rel_container_${idx}`,
-              source_entity_id: sourceId,
-              target_entity_id: targetId,
-              relationship_type: rel.relationship_type || 'depends_on',
-              attributes: { description: rel.description },
-            });
+            if (sourceId && targetId) {
+              containerRelationships.push({
+                id: `rel_container_${idx}`,
+                source_entity_id: sourceId,
+                target_entity_id: targetId,
+                relationship_type: rel.relationship_type || 'depends_on',
+                attributes: { description: rel.description },
+              });
+            }
           }
-        });
+        );
       }
-      
+
       data.container_level = {
         entities: containerEntities,
         relationships: containerRelationships,
@@ -490,16 +529,20 @@ const CodeArchitectureViewerInner: React.FC = () => {
         },
       });
 
-      const actorEntities = (data.system_context?.actors || []).map((actor: any, idx: number) => ({
-        id: `context_actor_${idx}`,
-        name: actor.name || `Actor ${idx + 1}`,
-        entity_type: actor.type || 'person',
-        language: 'Unknown',
-        file_path: '',
-        attributes: {},
-      }));
+      const actorEntities = (data.system_context?.actors || []).map(
+        (actor: any, idx: number) => ({
+          id: `context_actor_${idx}`,
+          name: actor.name || `Actor ${idx + 1}`,
+          entity_type: actor.type || 'person',
+          language: 'Unknown',
+          file_path: '',
+          attributes: {},
+        })
+      );
 
-      const externalEntities = (data.system_context?.external_dependencies || []).map((dep: any, idx: number) => ({
+      const externalEntities = (
+        data.system_context?.external_dependencies || []
+      ).map((dep: any, idx: number) => ({
         id: `context_external_${idx}`,
         name: dep.name || dep.url || `External ${idx + 1}`,
         entity_type: dep.type || 'external_system',
@@ -519,20 +562,22 @@ const CodeArchitectureViewerInner: React.FC = () => {
       );
 
       if (data.relationships?.context?.length) {
-        data.relationships.context.forEach((rel: C4DiagramRelationship, idx: number) => {
-          const sourceId = contextIdByName.get(rel.source);
-          const targetId = contextIdByName.get(rel.destination);
+        data.relationships.context.forEach(
+          (rel: C4DiagramRelationship, idx: number) => {
+            const sourceId = contextIdByName.get(rel.source);
+            const targetId = contextIdByName.get(rel.destination);
 
-          if (sourceId && targetId) {
-            contextRelationships.push({
-              id: `rel_context_${idx}`,
-              source_entity_id: sourceId,
-              target_entity_id: targetId,
-              relationship_type: rel.relationship_type || 'uses',
-              attributes: { description: rel.description },
-            });
+            if (sourceId && targetId) {
+              contextRelationships.push({
+                id: `rel_context_${idx}`,
+                source_entity_id: sourceId,
+                target_entity_id: targetId,
+                relationship_type: rel.relationship_type || 'uses',
+                attributes: { description: rel.description },
+              });
+            }
           }
-        });
+        );
       }
 
       data.context_level = {
@@ -540,16 +585,17 @@ const CodeArchitectureViewerInner: React.FC = () => {
         relationships: contextRelationships,
       };
     }
-    
+
     // Transform components array into component_level structure
     if (data.components && Array.isArray(data.components)) {
       const componentEntities: CodeEntity[] = [];
       const componentRelationships: CodeRelationship[] = [];
-      
+
       const sysCtxForComponents = data.system_context || {};
       const inheritedForComponents = {
         owner: sysCtxForComponents.owner_team || sysCtxForComponents.owner,
-        domain: sysCtxForComponents.business_domain || sysCtxForComponents.domain,
+        domain:
+          sysCtxForComponents.business_domain || sysCtxForComponents.domain,
         status: sysCtxForComponents.status,
         tier: sysCtxForComponents.criticality || sysCtxForComponents.tier,
         data_class: sysCtxForComponents.data_class,
@@ -558,7 +604,11 @@ const CodeArchitectureViewerInner: React.FC = () => {
       };
       data.components.forEach((component: any, groupIdx: number) => {
         // Check if this is a component group
-        if (component.type === 'component_group' && component.components && Array.isArray(component.components)) {
+        if (
+          component.type === 'component_group' &&
+          component.components &&
+          Array.isArray(component.components)
+        ) {
           // Expand the grouped components
           component.components.forEach((compName: string, idx: number) => {
             const compId = `component_${groupIdx}_${idx}`;
@@ -575,7 +625,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
                 ...inheritedForComponents,
               },
             });
-            
+
             // Create relationship to container
             if (component.container && data.container_level?.entities) {
               const containerEntity = data.container_level.entities.find(
@@ -610,7 +660,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
               ...inheritedForComponents,
             },
           });
-          
+
           // Create relationship to container
           if (component.container && data.container_level?.entities) {
             const containerEntity = data.container_level.entities.find(
@@ -628,19 +678,19 @@ const CodeArchitectureViewerInner: React.FC = () => {
           }
         }
       });
-      
+
       // Components don't need relationships - they're independent endpoints
       // No inter-component relationships needed
-      
+
       data.component_level = {
         entities: componentEntities,
         relationships: componentRelationships,
       };
     }
-    
+
     setArchitecture(data);
     setSelectedNode(null);
-    
+
     console.log('[CodeArchitectureViewer] Architecture state set:', {
       contextLevel: data.context_level?.entities?.length || 0,
       containerLevel: data.container_level?.entities?.length || 0,
@@ -650,23 +700,33 @@ const CodeArchitectureViewerInner: React.FC = () => {
       containersCount: data.containers?.length || 0,
       componentsCount: data.components?.length || 0,
     });
-    
+
     // Extract unique entity and relationship types
     const allEntities: CodeEntity[] = [];
     const allRelationships: CodeRelationship[] = [];
-    const levelsForFilters = ['context_level', 'container_level', 'component_level', 'code_level'];
-    
+    const levelsForFilters = [
+      'context_level',
+      'container_level',
+      'component_level',
+      'code_level',
+    ];
+
     levelsForFilters.forEach(level => {
       if (data[level as keyof C4Architecture]) {
         const levelData = data[level as keyof C4Architecture] as C4Level;
         if (levelData.entities) allEntities.push(...levelData.entities);
-        if (levelData.relationships) allRelationships.push(...levelData.relationships);
+        if (levelData.relationships)
+          allRelationships.push(...levelData.relationships);
       }
     });
-    
-    const uniqueEntityTypes = Array.from(new Set(allEntities.map(e => e.entity_type)));
-    const uniqueRelTypes = Array.from(new Set(allRelationships.map(r => r.relationship_type)));
-    
+
+    const uniqueEntityTypes = Array.from(
+      new Set(allEntities.map(e => e.entity_type))
+    );
+    const uniqueRelTypes = Array.from(
+      new Set(allRelationships.map(r => r.relationship_type))
+    );
+
     setRelationshipTypes(uniqueRelTypes.sort());
     setSelectedEntityTypes(uniqueEntityTypes);
     setSelectedRelationshipTypes(uniqueRelTypes);
@@ -681,12 +741,14 @@ const CodeArchitectureViewerInner: React.FC = () => {
         const data = await codeArchitectureAPI.getArchitecture();
         applyArchitecture(data);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load architecture');
+        setError(
+          err instanceof Error ? err.message : 'Failed to load architecture'
+        );
       } finally {
         setLoading(false);
       }
     };
-    
+
     loadArchitecture();
   }, [applyArchitecture]);
 
@@ -715,7 +777,10 @@ const CodeArchitectureViewerInner: React.FC = () => {
     setIsExtracting(true);
 
     try {
-      const response = await codeArchitectureAPI.extractFromGitHub(githubUrl.trim(), true);
+      const response = await codeArchitectureAPI.extractFromGitHub(
+        githubUrl.trim(),
+        true
+      );
       const taskId = response.task_id;
 
       if (!taskId) {
@@ -725,11 +790,14 @@ const CodeArchitectureViewerInner: React.FC = () => {
       pollIntervalRef.current = window.setInterval(async () => {
         try {
           const status = await codeArchitectureAPI.getExtractionStatus(taskId);
-          const progress = typeof status.progress === 'number'
-            ? Math.round(status.progress * 100)
-            : null;
+          const progress =
+            typeof status.progress === 'number'
+              ? Math.round(status.progress * 100)
+              : null;
           const statusLabel = status.message || status.status;
-          setExtractionStatus(progress !== null ? `${statusLabel} (${progress}%)` : statusLabel);
+          setExtractionStatus(
+            progress !== null ? `${statusLabel} (${progress}%)` : statusLabel
+          );
 
           if (status.status === 'completed') {
             if (pollIntervalRef.current) {
@@ -739,9 +807,13 @@ const CodeArchitectureViewerInner: React.FC = () => {
             setIsExtracting(false);
             setExtractionStatus('Extraction completed');
 
-            const results = await codeArchitectureAPI.getExtractionResults(taskId);
+            const results =
+              await codeArchitectureAPI.getExtractionResults(taskId);
             if (results) {
-              console.log('[CodeArchitectureViewer] Extraction results received:', results);
+              console.log(
+                '[CodeArchitectureViewer] Extraction results received:',
+                results
+              );
               applyArchitecture(results);
               setSelectedLevel('context_level');
             }
@@ -764,9 +836,154 @@ const CodeArchitectureViewerInner: React.FC = () => {
       }, 2000);
     } catch (err) {
       setIsExtracting(false);
-      setExtractionError(err instanceof Error ? err.message : 'Failed to start extraction');
+      setExtractionError(
+        err instanceof Error ? err.message : 'Failed to start extraction'
+      );
     }
   }, [githubUrl, applyArchitecture]);
+
+  // Batch extraction handler
+  const handleBatchExtract = useCallback(
+    async (urls: string[]) => {
+      if (urls.length === 0) return;
+
+      setIsExtracting(true);
+      setExtractionError(null);
+
+      // Sequential extraction to avoid overwhelming backend
+      for (let i = 0; i < urls.length; i++) {
+        const url = urls[i];
+        setExtractionStatus(
+          `Extracting ${i + 1}/${urls.length}: ${url.replace('https://github.com/', '')}`
+        );
+
+        try {
+          const response = await codeArchitectureAPI.extractFromGitHub(
+            url,
+            true,
+            true
+          );
+          const taskId = response.task_id;
+
+          // Poll for completion
+          let completed = false;
+          while (!completed) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            const status =
+              await codeArchitectureAPI.getExtractionStatus(taskId);
+
+            const progress =
+              typeof status.progress === 'number'
+                ? Math.round(status.progress * 100)
+                : null;
+
+            setExtractionStatus(
+              `Extracting ${i + 1}/${urls.length}: ${url.replace('https://github.com/', '')} ${progress !== null ? `(${progress}%)` : ''}`
+            );
+
+            if (status.status === 'completed') {
+              completed = true;
+            } else if (status.status === 'failed') {
+              throw new Error(status.message || 'Extraction failed');
+            }
+          }
+        } catch (err) {
+          console.error(`Failed on ${url}:`, err);
+          setExtractionError(
+            `Failed on ${url}: ${err instanceof Error ? err.message : 'Unknown error'}`
+          );
+          // Continue with remaining URLs
+        }
+      }
+
+      setIsExtracting(false);
+      setExtractionStatus(
+        `Batch extraction completed - ${urls.length} repositories analyzed`
+      );
+
+      // Reload architecture data
+      try {
+        const data = await codeArchitectureAPI.getArchitecture();
+        applyArchitecture(data);
+        setSelectedLevel('context_level');
+      } catch (err) {
+        console.error('Failed to reload architecture:', err);
+      }
+    },
+    [applyArchitecture]
+  );
+
+  // GitHub organization scan handler
+  const handleGitHubOrgScan = useCallback(
+    async (
+      username: string,
+      options: { includeForks: boolean; maxRepos: number }
+    ) => {
+      setIsExtracting(true);
+      setExtractionError(null);
+      setExtractionStatus(`Scanning ${username} for repositories...`);
+
+      try {
+        const response = await codeArchitectureAPI.extractFromGitHubOrg(
+          username,
+          options.includeForks,
+          options.maxRepos,
+          true // append_mode
+        );
+
+        const taskId = response.task_id;
+
+        // Poll for batch completion
+        const pollInterval = setInterval(async () => {
+          try {
+            const status =
+              await codeArchitectureAPI.getExtractionStatus(taskId);
+
+            const progress =
+              typeof status.progress === 'number'
+                ? Math.round(status.progress * 100)
+                : null;
+
+            const completed = (status as any).completed_repos || 0;
+            const total = (status as any).total_repos || options.maxRepos;
+
+            setExtractionStatus(
+              `Extracting ${completed}/${total} repositories... ${progress !== null ? `(${progress}%)` : ''}`
+            );
+
+            if (status.status === 'completed') {
+              clearInterval(pollInterval);
+              setIsExtracting(false);
+              setExtractionStatus(
+                `GitHub org scan completed - ${total} repositories analyzed`
+              );
+
+              // Reload architecture
+              const data = await codeArchitectureAPI.getArchitecture();
+              applyArchitecture(data);
+              setSelectedLevel('context_level');
+            } else if (status.status === 'failed') {
+              clearInterval(pollInterval);
+              setIsExtracting(false);
+              setExtractionError(status.message || 'GitHub org scan failed');
+            }
+          } catch (pollError) {
+            clearInterval(pollInterval);
+            setIsExtracting(false);
+            setExtractionError('Failed to poll extraction status');
+          }
+        }, 3000); // Poll every 3 seconds for batch operations
+      } catch (err) {
+        setIsExtracting(false);
+        const errorMessage =
+          err instanceof Error
+            ? err.message
+            : 'Failed to scan GitHub organization';
+        setExtractionError(errorMessage);
+      }
+    },
+    [applyArchitecture]
+  );
 
   // Process architecture data into graph format
   useEffect(() => {
@@ -775,42 +992,56 @@ const CodeArchitectureViewerInner: React.FC = () => {
       return;
     }
 
-    console.log('[CodeArchitectureViewer] Processing graph for level:', selectedLevel, {
-      hasContextLevel: !!architecture.context_level,
-      hasContainerLevel: !!architecture.container_level,
-      hasComponentLevel: !!architecture.component_level,
-      hasCodeLevel: !!architecture.code_level,
-    });
+    console.log(
+      '[CodeArchitectureViewer] Processing graph for level:',
+      selectedLevel,
+      {
+        hasContextLevel: !!architecture.context_level,
+        hasContainerLevel: !!architecture.container_level,
+        hasComponentLevel: !!architecture.component_level,
+        hasCodeLevel: !!architecture.code_level,
+      }
+    );
 
     const allEntities: CodeEntity[] = [];
     const allRelationships: CodeRelationship[] = [];
 
     // Collect entities and relationships from the selected level
     if (architecture[selectedLevel as keyof C4Architecture]) {
-      const levelData = architecture[selectedLevel as keyof C4Architecture] as C4Level;
+      const levelData = architecture[
+        selectedLevel as keyof C4Architecture
+      ] as C4Level;
       console.log('[CodeArchitectureViewer] Level data found:', {
         entitiesCount: levelData.entities?.length || 0,
         relationshipsCount: levelData.relationships?.length || 0,
       });
       if (levelData.entities) {
         // Add level metadata to each entity
-        allEntities.push(...levelData.entities.map(e => ({ ...e, level: selectedLevel })));
+        allEntities.push(
+          ...levelData.entities.map(e => ({ ...e, level: selectedLevel }))
+        );
       }
       if (levelData.relationships) {
         allRelationships.push(...levelData.relationships);
       }
     } else {
-      console.warn('[CodeArchitectureViewer] No data found for selected level:', selectedLevel);
+      console.warn(
+        '[CodeArchitectureViewer] No data found for selected level:',
+        selectedLevel
+      );
     }
 
     // Filter entities
     let filteredEntities = allEntities.filter(e => {
-      const typeMatch = selectedEntityTypes.length === 0 || selectedEntityTypes.includes(e.entity_type);
+      const typeMatch =
+        selectedEntityTypes.length === 0 ||
+        selectedEntityTypes.includes(e.entity_type);
       const externalMatch = showExternal || !e.attributes?.is_external;
-      const searchMatch = searchTerm === '' || 
+      const searchMatch =
+        searchTerm === '' ||
         e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         e.file_path?.toLowerCase().includes(searchTerm.toLowerCase());
-      
+
       return typeMatch && externalMatch && searchMatch;
     });
 
@@ -819,40 +1050,51 @@ const CodeArchitectureViewerInner: React.FC = () => {
 
     // Filter relationships
     const filteredRelationships = allRelationships.filter(r => {
-      const typeMatch = selectedRelationshipTypes.length === 0 || selectedRelationshipTypes.includes(r.relationship_type);
+      const typeMatch =
+        selectedRelationshipTypes.length === 0 ||
+        selectedRelationshipTypes.includes(r.relationship_type);
       const validSource = entityIds.has(r.source_entity_id);
-      const validTarget = r.target_entity_id && entityIds.has(r.target_entity_id);
-      
+      const validTarget =
+        r.target_entity_id && entityIds.has(r.target_entity_id);
+
       return typeMatch && validSource && validTarget;
     });
 
     // Convert to React Flow format
     const rfNodes: Node[] = [];
-    
+
     // If we're showing components, create container frames based on their actual container assignment
-    if (selectedLevel === 'component_level' && filteredEntities.some(e => e.entity_type === 'component')) {
-      const componentEntities = filteredEntities.filter(e => e.entity_type === 'component');
-      
+    if (
+      selectedLevel === 'component_level' &&
+      filteredEntities.some(e => e.entity_type === 'component')
+    ) {
+      const componentEntities = filteredEntities.filter(
+        e => e.entity_type === 'component'
+      );
+
       // Group components by their actual container attribute
       const containerGroups = new Map<string, typeof componentEntities>();
       componentEntities.forEach(comp => {
-        const containerName = (comp.attributes?.container as string) || 'Unknown';
-        
+        const containerName =
+          (comp.attributes?.container as string) || 'Unknown';
+
         if (!containerGroups.has(containerName)) {
           containerGroups.set(containerName, []);
         }
         containerGroups.get(containerName)!.push(comp);
       });
-      
+
       // Create container frames for each group
       let currentX = 100;
       containerGroups.forEach((components, containerName) => {
         // Find the actual container info from architecture data
-        const containerInfo = architecture?.containers?.find((c: any) => c.name === containerName);
+        const containerInfo = architecture?.containers?.find(
+          (c: any) => c.name === containerName
+        );
         const displayName = containerInfo?.name || containerName;
         const containerType = containerInfo?.container_type || 'Service';
         const technology = containerInfo?.technology || 'Unknown';
-        
+
         // Create container parent node
         const containerNode: Node = {
           id: `container_frame_${containerName}`,
@@ -873,23 +1115,32 @@ const CodeArchitectureViewerInner: React.FC = () => {
           },
         };
         rfNodes.push(containerNode);
-        
+
         // Add component nodes as children
         components.forEach((e, idx) => {
-          let shortName = e.name.includes('.') 
+          let shortName = e.name.includes('.')
             ? e.name.split('.').pop() || e.name
             : e.name;
-          
-          const typeSuffixes = ['Class', 'Function', 'Method', 'Module', 'File', 'Variable', 'Constant'];
+
+          const typeSuffixes = [
+            'Class',
+            'Function',
+            'Method',
+            'Module',
+            'File',
+            'Variable',
+            'Constant',
+          ];
           typeSuffixes.forEach(suffix => {
             if (shortName.endsWith(suffix) && shortName !== suffix) {
               shortName = shortName.slice(0, -suffix.length);
             }
           });
-          
+
           shortName = shortName.replace(/[._]+$/, '');
-          const displayType = e.entity_type.charAt(0).toUpperCase() + e.entity_type.slice(1);
-          
+          const displayType =
+            e.entity_type.charAt(0).toUpperCase() + e.entity_type.slice(1);
+
           // Layout children in a 2-column grid
           const childrenPerRow = 2;
           const childSpacing = 30;
@@ -897,13 +1148,13 @@ const CodeArchitectureViewerInner: React.FC = () => {
           const childStartY = 80;
           const row = Math.floor(idx / childrenPerRow);
           const col = idx % childrenPerRow;
-          
+
           const node: Node = {
             id: e.id,
             type: 'custom',
             position: {
-              x: childStartX + (col * (220 + childSpacing)),
-              y: childStartY + (row * (120 + childSpacing)),
+              x: childStartX + col * (220 + childSpacing),
+              y: childStartY + row * (120 + childSpacing),
             },
             parentNode: containerNode.id,
             extent: 'parent',
@@ -922,27 +1173,38 @@ const CodeArchitectureViewerInner: React.FC = () => {
           };
           rfNodes.push(node);
         });
-        
+
         currentX += 750; // Space between containers
       });
-      
+
       // Add any non-component entities
-      const nonComponents = filteredEntities.filter(e => e.entity_type !== 'component');
+      const nonComponents = filteredEntities.filter(
+        e => e.entity_type !== 'component'
+      );
       nonComponents.forEach(e => {
-        let shortName = e.name.includes('.') 
+        let shortName = e.name.includes('.')
           ? e.name.split('.').pop() || e.name
           : e.name;
-        
-        const typeSuffixes = ['Class', 'Function', 'Method', 'Module', 'File', 'Variable', 'Constant'];
+
+        const typeSuffixes = [
+          'Class',
+          'Function',
+          'Method',
+          'Module',
+          'File',
+          'Variable',
+          'Constant',
+        ];
         typeSuffixes.forEach(suffix => {
           if (shortName.endsWith(suffix) && shortName !== suffix) {
             shortName = shortName.slice(0, -suffix.length);
           }
         });
-        
+
         shortName = shortName.replace(/[._]+$/, '');
-        const displayType = e.entity_type.charAt(0).toUpperCase() + e.entity_type.slice(1);
-        
+        const displayType =
+          e.entity_type.charAt(0).toUpperCase() + e.entity_type.slice(1);
+
         rfNodes.push({
           id: e.id,
           type: 'custom',
@@ -964,36 +1226,53 @@ const CodeArchitectureViewerInner: React.FC = () => {
     } else {
       // Container-level framing for Kubernetes
       const hasContainerLevel = selectedLevel === 'container_level';
-      const containerEntities = filteredEntities.filter(e => e.entity_type === 'container');
+      const containerEntities = filteredEntities.filter(
+        e => e.entity_type === 'container'
+      );
       const containerInfoByName = new Map(
-        (architecture?.containers || []).map((container: any) => [container.name, container])
+        (architecture?.containers || []).map((container: any) => [
+          container.name,
+          container,
+        ])
       );
 
       const isKubernetesEntity = (entity: CodeEntity) => {
         const tech = String(entity.language || '').toLowerCase();
-        const containerType = String(entity.attributes?.container_type || '').toLowerCase();
-        const runtimeEnv = String(entity.attributes?.runtime_environment || '').toLowerCase();
-        const deployment = String(entity.attributes?.deployment || '').toLowerCase();
+        const containerType = String(
+          entity.attributes?.container_type || ''
+        ).toLowerCase();
+        const runtimeEnv = String(
+          entity.attributes?.runtime_environment || ''
+        ).toLowerCase();
+        const deployment = String(
+          entity.attributes?.deployment || ''
+        ).toLowerCase();
 
-        return tech.includes('kubernetes') ||
+        return (
+          tech.includes('kubernetes') ||
           containerType.includes('helm') ||
           containerType.includes('kubernetes') ||
           runtimeEnv.includes('kubernetes') ||
           deployment.includes('helm') ||
           deployment.includes('kustomize') ||
-          deployment.includes('manifest');
+          deployment.includes('manifest')
+        );
       };
 
       let clusterNodeId: string | null = null;
 
       if (hasContainerLevel && containerEntities.length > 0) {
-        const kubernetesContainers = containerEntities.filter(isKubernetesEntity);
+        const kubernetesContainers =
+          containerEntities.filter(isKubernetesEntity);
 
         if (kubernetesContainers.length > 0) {
-          const columns = Math.min(4, Math.max(2, Math.ceil(kubernetesContainers.length / 2)));
+          const columns = Math.min(
+            4,
+            Math.max(2, Math.ceil(kubernetesContainers.length / 2))
+          );
           const rows = Math.ceil(kubernetesContainers.length / columns);
-          const clusterWidth = Math.max(720, (columns * 240) + 200);
-          const clusterHeight = Math.max(420, (rows * 140) + 180);
+          const clusterWidth = Math.max(720, columns * 240 + 200);
+          const clusterHeight = Math.max(420, rows * 140 + 180);
           const clusterMeta = architecture?.metadata?.runtime?.cluster;
           clusterNodeId = 'cluster_kubernetes';
           rfNodes.push({
@@ -1021,23 +1300,33 @@ const CodeArchitectureViewerInner: React.FC = () => {
 
       // Original logic for non-component entities
       filteredEntities.forEach(e => {
-        let shortName = e.name.includes('.') 
+        let shortName = e.name.includes('.')
           ? e.name.split('.').pop() || e.name
           : e.name;
-        
-        const typeSuffixes = ['Class', 'Function', 'Method', 'Module', 'File', 'Variable', 'Constant'];
+
+        const typeSuffixes = [
+          'Class',
+          'Function',
+          'Method',
+          'Module',
+          'File',
+          'Variable',
+          'Constant',
+        ];
         typeSuffixes.forEach(suffix => {
           if (shortName.endsWith(suffix) && shortName !== suffix) {
             shortName = shortName.slice(0, -suffix.length);
           }
         });
-        
+
         shortName = shortName.replace(/[._]+$/, '');
-        const displayType = e.entity_type.charAt(0).toUpperCase() + e.entity_type.slice(1);
-        
-        const containerInfo = e.entity_type === 'container'
-          ? containerInfoByName.get(e.name)
-          : null;
+        const displayType =
+          e.entity_type.charAt(0).toUpperCase() + e.entity_type.slice(1);
+
+        const containerInfo =
+          e.entity_type === 'container'
+            ? containerInfoByName.get(e.name)
+            : null;
 
         const node: Node = {
           id: e.id,
@@ -1054,20 +1343,26 @@ const CodeArchitectureViewerInner: React.FC = () => {
             decorators: e.attributes?.decorators,
             level: e.level,
             attributes: e.attributes,
-            containerMeta: containerInfo ? {
-              container_type: containerInfo.container_type,
-              technology: containerInfo.technology,
-              protocol: containerInfo.protocol,
-              runtime_environment: containerInfo.runtime_environment,
-              deployment: containerInfo.deployment,
-              description: containerInfo.description,
-              health_endpoint: containerInfo.health_endpoint,
-              repository_url: containerInfo.repository_url,
-            } : undefined,
+            containerMeta: containerInfo
+              ? {
+                  container_type: containerInfo.container_type,
+                  technology: containerInfo.technology,
+                  protocol: containerInfo.protocol,
+                  runtime_environment: containerInfo.runtime_environment,
+                  deployment: containerInfo.deployment,
+                  description: containerInfo.description,
+                  health_endpoint: containerInfo.health_endpoint,
+                  repository_url: containerInfo.repository_url,
+                }
+              : undefined,
           },
         };
 
-        if (clusterNodeId && e.entity_type === 'container' && isKubernetesEntity(e)) {
+        if (
+          clusterNodeId &&
+          e.entity_type === 'container' &&
+          isKubernetesEntity(e)
+        ) {
           node.parentNode = clusterNodeId;
           node.extent = 'parent';
         }
@@ -1084,26 +1379,34 @@ const CodeArchitectureViewerInner: React.FC = () => {
         target: r.target_entity_id!,
         type: 'smoothstep',
         animated: false,
-        style: { 
-          stroke: '#b0bec5', 
+        style: {
+          stroke: '#b0bec5',
           strokeWidth: 2,
         },
         // Remove labels for cleaner look
         // label: r.relationship_type,
       }));
 
-    const dependencyEdges = selectedLevel === 'container_level'
-      ? generateC4Edges(architecture?.containers || [])
-      : [];
+    const dependencyEdges =
+      selectedLevel === 'container_level'
+        ? generateC4Edges(architecture?.containers || [])
+        : [];
 
     const mergedEdges = [...rfEdges, ...dependencyEdges];
 
     // Apply layout
-    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(rfNodes, mergedEdges);
+    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
+      rfNodes,
+      mergedEdges
+    );
 
     // Ensure all nodes have valid positions (not all at 0,0)
     const nodesWithValidPositions = layoutedNodes.map((node, idx) => {
-      if (node.position.x === 0 && node.position.y === 0 && layoutedNodes.length > 1) {
+      if (
+        node.position.x === 0 &&
+        node.position.y === 0 &&
+        layoutedNodes.length > 1
+      ) {
         const nodesPerRow = Math.ceil(Math.sqrt(layoutedNodes.length));
         const row = Math.floor(idx / nodesPerRow);
         const col = idx % nodesPerRow;
@@ -1120,50 +1423,50 @@ const CodeArchitectureViewerInner: React.FC = () => {
 
     setNodes(nodesWithValidPositions);
     setEdges(layoutedEdges);
-    
+
     // Fit view after layout to show entire graph
     // Use multiple attempts to ensure fitView works
     if (layoutedNodes.length > 0) {
       window.requestAnimationFrame(() => {
-        setTimeout(() => {
-          try {
-            fitView({
-              padding: 20,
-              includeHiddenNodes: false,
-              duration: 500,
-              maxZoom: 2.5,
-              minZoom: 0.3,
-            });
-          } catch (e) {
-            console.warn('[CodeArchitectureViewer] fitView error:', e);
-          }
-        }, 200);
-        
-        // Try again after a longer delay to ensure nodes are rendered
-        setTimeout(() => {
-          try {
-            fitView({
-              padding: 20,
-              includeHiddenNodes: false,
-              duration: 300,
-              maxZoom: 2.5,
-              minZoom: 0.3,
-            });
-          } catch (e) {
-            console.warn('[CodeArchitectureViewer] fitView retry error:', e);
-          }
-        }, 500);
+        // Progressive fitting for better rendering
+        const attemptFitView = (delay: number, attempt: number = 1) => {
+          setTimeout(() => {
+            try {
+              fitView({
+                padding: 25,
+                includeHiddenNodes: false,
+                duration: attempt === 1 ? 600 : 400,
+                maxZoom: 2.5,
+                minZoom: 0.3,
+              });
+            } catch (e) {
+              console.warn(`[CodeArchitectureViewer] fitView attempt ${attempt} error:`, e);
+            }
+          }, delay);
+        };
+
+        // Multiple attempts with increasing delays for large graphs
+        attemptFitView(300, 1);
+        attemptFitView(800, 2);
+        attemptFitView(1500, 3); // Final attempt for very large graphs
       });
     }
-  }, [architecture, selectedLevel, selectedEntityTypes, selectedRelationshipTypes, showExternal, searchTerm, fitView]);
+  }, [
+    architecture,
+    selectedLevel,
+    selectedEntityTypes,
+    selectedRelationshipTypes,
+    showExternal,
+    searchTerm,
+    fitView,
+  ]);
 
   const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
     setSelectedNode(node.data);
   }, []);
 
-  const avgConnections = nodes.length > 0 
-    ? (edges.length / nodes.length).toFixed(1)
-    : '0';
+  const avgConnections =
+    nodes.length > 0 ? (edges.length / nodes.length).toFixed(1) : '0';
 
   const toggleLevel = (level: string) => {
     setSelectedLevel(level);
@@ -1171,15 +1474,12 @@ const CodeArchitectureViewerInner: React.FC = () => {
 
   const toggleRelationshipType = (type: string) => {
     setSelectedRelationshipTypes(prev =>
-      prev.includes(type)
-        ? prev.filter(t => t !== type)
-        : [...prev, type]
+      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
     );
   };
 
-  const systemAttributes = selectedNode?.type === 'system'
-    ? (selectedNode.attributes || {})
-    : null;
+  const systemAttributes =
+    selectedNode?.type === 'system' ? selectedNode.attributes || {} : null;
 
   if (loading) {
     return (
@@ -1195,7 +1495,10 @@ const CodeArchitectureViewerInner: React.FC = () => {
         <div className="error">
           <h3>Error loading architecture</h3>
           <p>{error}</p>
-          <p className="hint">Run extraction above or execute <code>python -m services.code_extraction.c4_extractor</code></p>
+          <p className="hint">
+            Run extraction above or execute{' '}
+            <code>python -m services.code_extraction.c4_extractor</code>
+          </p>
         </div>
       </div>
     );
@@ -1205,21 +1508,27 @@ const CodeArchitectureViewerInner: React.FC = () => {
     <div className="code-architecture-viewer">
       <div className="viewer-header">
         <h2>Architecture Context (Multi-Repository)</h2>
-        <p>Cumulative view of all added repositories - add multiple projects to see complete landscape</p>
+        <p>
+          Cumulative view of all added repositories - add multiple projects to
+          see complete landscape
+        </p>
       </div>
 
       <div className="viewer-layout">
         <aside className="filters-sidebar">
           <div className="filter-section">
             <h3>Extract Context</h3>
-            <input
-              type="text"
-              placeholder="https://github.com/owner/repo"
-              value={githubUrl}
-              onChange={e => setGithubUrl(e.target.value)}
-              className="search-input"
-            />
-            <div className="button-group">
+
+            {/* Single URL Quick Add */}
+            <div className="quick-add-section">
+              <input
+                type="text"
+                placeholder="https://github.com/owner/repo"
+                value={githubUrl}
+                onChange={e => setGithubUrl(e.target.value)}
+                className="search-input"
+                onKeyPress={e => e.key === 'Enter' && handleExtractFromGithub()}
+              />
               <button
                 className="fit-button"
                 onClick={handleExtractFromGithub}
@@ -1227,29 +1536,57 @@ const CodeArchitectureViewerInner: React.FC = () => {
               >
                 {isExtracting ? 'Extracting...' : 'Add Repository'}
               </button>
-              <button
-                className="reset-button"
-                onClick={async () => {
-                  if (confirm('⚠️ Clear ALL repositories and start fresh? This will remove all accumulated architecture data.')) {
-                    try {
-                      await codeArchitectureAPI.clearArchitecture();
-                      setArchitecture(null);
-                      setNodes([]);
-                      setEdges([]);
-                      setGithubUrl('');
-                      setExtractionStatus('All repositories cleared - ready for fresh extraction');
-                      setExtractionError('');
-                    } catch (err) {
-                      setExtractionError('Failed to clear data');
-                    }
-                  }
-                }}
-                disabled={isExtracting}
-                title="Clear all repositories and start fresh"
-              >
-                Clear All
-              </button>
             </div>
+
+            {/* Batch URL Input */}
+            <div className="batch-section">
+              <h4 className="subsection-title">Batch Input</h4>
+              <BatchUrlInput
+                onBatchExtract={handleBatchExtract}
+                isExtracting={isExtracting}
+              />
+            </div>
+
+            {/* GitHub Organization Scanner */}
+            <div className="org-scan-section">
+              <h4 className="subsection-title">GitHub Account/Org</h4>
+              <GitHubOrgScanner
+                onScanStart={handleGitHubOrgScan}
+                isScanning={isExtracting}
+              />
+            </div>
+
+            {/* Clear All Button */}
+            <button
+              className="reset-button"
+              onClick={async () => {
+                if (
+                  confirm(
+                    '⚠️ Clear ALL repositories and start fresh? This will remove all accumulated architecture data.'
+                  )
+                ) {
+                  try {
+                    await codeArchitectureAPI.clearArchitecture();
+                    setArchitecture(null);
+                    setNodes([]);
+                    setEdges([]);
+                    setGithubUrl('');
+                    setExtractionStatus(
+                      'All repositories cleared - ready for fresh extraction'
+                    );
+                    setExtractionError('');
+                  } catch (err) {
+                    setExtractionError('Failed to clear data');
+                  }
+                }
+              }}
+              disabled={isExtracting}
+              title="Clear all repositories and start fresh"
+            >
+              Clear All
+            </button>
+
+            {/* Status messages */}
             {extractionStatus && (
               <div className="extract-status">{extractionStatus}</div>
             )}
@@ -1258,7 +1595,10 @@ const CodeArchitectureViewerInner: React.FC = () => {
             )}
             {architecture && (
               <div className="extract-info">
-                <small>💡 Data accumulates - add multiple repos to build complete architecture view</small>
+                <small>
+                  💡 Data accumulates - add multiple repos to build complete
+                  architecture view
+                </small>
               </div>
             )}
           </div>
@@ -1302,11 +1642,14 @@ const CodeArchitectureViewerInner: React.FC = () => {
                   checked={selectedLevel === level}
                   onChange={() => toggleLevel(level)}
                 />
-                <span>{level.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
+                <span>
+                  {level
+                    .replace('_', ' ')
+                    .replace(/\b\w/g, l => l.toUpperCase())}
+                </span>
               </label>
             ))}
           </div>
-
 
           <div className="filter-section">
             <h3>Relationship Types</h3>
@@ -1354,11 +1697,16 @@ const CodeArchitectureViewerInner: React.FC = () => {
                 edgeTypes={edgeTypes}
                 fitView
                 attributionPosition="bottom-left"
-                defaultViewport={{ x: 0, y: 0, zoom: 1.5 }}
+                defaultViewport={{ x: 0, y: 0, zoom: 1 }}
                 minZoom={0.1}
-                maxZoom={4.0}
+                maxZoom={3.5}
               >
-                <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#e0e0e0" />
+                <Background
+                  variant={BackgroundVariant.Dots}
+                  gap={20}
+                  size={1}
+                  color="#e0e0e0"
+                />
                 <Controls />
               </ReactFlow>
             </div>
@@ -1369,29 +1717,48 @@ const CodeArchitectureViewerInner: React.FC = () => {
           <aside className="node-details-panel">
             <div className="panel-header">
               <h3>{selectedNode.fullName || selectedNode.label}</h3>
-              <button className="close-btn" onClick={() => setSelectedNode(null)}>×</button>
+              <button
+                className="close-btn"
+                onClick={() => setSelectedNode(null)}
+              >
+                ×
+              </button>
             </div>
             <div className="panel-content">
               {/* One-sentence description (LLM-generated purpose or description) */}
-              {(systemAttributes?.purpose || selectedNode.containerMeta?.description || selectedNode.documentation) && (
+              {(systemAttributes?.purpose ||
+                selectedNode.containerMeta?.description ||
+                selectedNode.documentation) && (
                 <div className="detail-row description-row">
                   <span className="detail-value description-text">
-                    {systemAttributes?.purpose || selectedNode.containerMeta?.description || selectedNode.documentation || 'No description available'}
+                    {systemAttributes?.purpose ||
+                      selectedNode.containerMeta?.description ||
+                      selectedNode.documentation ||
+                      'No description available'}
                   </span>
                 </div>
               )}
 
               {/* Domain field (from image: business bucket) */}
-              {(systemAttributes?.business_domain || systemAttributes?.domain || selectedNode.attributes?.domain) && (
+              {(systemAttributes?.business_domain ||
+                systemAttributes?.domain ||
+                selectedNode.attributes?.domain) && (
                 <div className="detail-row">
                   <span className="detail-label">
                     domain
                     <span className="tooltip-hint">
                       ⓘ
-                      <span className="tooltip-content">Business area this service belongs to (e.g. Infrastructure, AI/ML, Data, User Management).</span>
+                      <span className="tooltip-content">
+                        Business area this service belongs to (e.g.
+                        Infrastructure, AI/ML, Data, User Management).
+                      </span>
                     </span>
                   </span>
-                  <span className="detail-value">{systemAttributes?.business_domain || systemAttributes?.domain || selectedNode.attributes?.domain}</span>
+                  <span className="detail-value">
+                    {systemAttributes?.business_domain ||
+                      systemAttributes?.domain ||
+                      selectedNode.attributes?.domain}
+                  </span>
                 </div>
               )}
 
@@ -1405,96 +1772,163 @@ const CodeArchitectureViewerInner: React.FC = () => {
                     Owner Team
                     <span className="tooltip-hint">
                       ⓘ
-                      <span className="tooltip-content">The team or individual responsible for this system. If unassigned, add a CODEOWNERS file or specify the team in the README to assign ownership.</span>
+                      <span className="tooltip-content">
+                        The team or individual responsible for this system. If
+                        unassigned, add a CODEOWNERS file or specify the team in
+                        the README to assign ownership.
+                      </span>
                     </span>
                   </span>
                   <span className="detail-value">
-                    {systemAttributes?.owner_team || systemAttributes?.owner || selectedNode.containerMeta?.owner || selectedNode.attributes?.owner || 'Unassigned'}
+                    {systemAttributes?.owner_team ||
+                      systemAttributes?.owner ||
+                      selectedNode.containerMeta?.owner ||
+                      selectedNode.attributes?.owner ||
+                      'Unassigned'}
                   </span>
-                  {((systemAttributes?.owner_contributors || selectedNode.attributes?.owner_contributors) ?? []).length > 0 && (
+                  {(
+                    (systemAttributes?.owner_contributors ||
+                      selectedNode.attributes?.owner_contributors) ??
+                    []
+                  ).length > 0 && (
                     <div className="detail-sub">
-                      Contributors: {(systemAttributes?.owner_contributors || selectedNode.attributes?.owner_contributors || []).slice(0, 3).join(', ')}
-                      {(systemAttributes?.owner_contributors || selectedNode.attributes?.owner_contributors || []).length > 3 && '…'}
+                      Contributors:{' '}
+                      {(
+                        systemAttributes?.owner_contributors ||
+                        selectedNode.attributes?.owner_contributors ||
+                        []
+                      )
+                        .slice(0, 3)
+                        .join(', ')}
+                      {(
+                        systemAttributes?.owner_contributors ||
+                        selectedNode.attributes?.owner_contributors ||
+                        []
+                      ).length > 3 && '…'}
                     </div>
                   )}
                 </div>
               )}
 
               {/* Status field (lifecycle: Active-Dev, Maintenance-Only, Deprecated) */}
-              {(systemAttributes?.status || selectedNode.attributes?.status) && (
+              {(systemAttributes?.status ||
+                selectedNode.attributes?.status) && (
                 <div className="detail-row">
                   <span className="detail-label">
                     Lifecycle Status
                     <span className="tooltip-hint">
                       ⓘ
-                      <span className="tooltip-content">Lifecycle stage: Active-Dev = new features being developed. Maintenance-Only = bugfixes only, no new features. Deprecated = scheduled for shutdown.</span>
+                      <span className="tooltip-content">
+                        Lifecycle stage: Active-Dev = new features being
+                        developed. Maintenance-Only = bugfixes only, no new
+                        features. Deprecated = scheduled for shutdown.
+                      </span>
                     </span>
                   </span>
-                  <span className="detail-value status-badge">{systemAttributes?.status || selectedNode.attributes?.status}</span>
+                  <span className="detail-value status-badge">
+                    {systemAttributes?.status ||
+                      selectedNode.attributes?.status}
+                  </span>
                 </div>
               )}
 
               {/* Tier field (criticality: Tier 1/2/3) */}
-              {(systemAttributes?.criticality || systemAttributes?.tier || selectedNode.attributes?.tier) && (
+              {(systemAttributes?.criticality ||
+                systemAttributes?.tier ||
+                selectedNode.attributes?.tier) && (
                 <div className="detail-row">
                   <span className="detail-label">
                     Criticality Tier
                     <span className="tooltip-hint">
                       ⓘ
-                      <span className="tooltip-content">Tier 1 = Production Critical (site-wide outage if down). Tier 2 = Standard (specific journey broken). Tier 3 = Internal/Development (minor impact).</span>
+                      <span className="tooltip-content">
+                        Tier 1 = Production Critical (site-wide outage if down).
+                        Tier 2 = Standard (specific journey broken). Tier 3 =
+                        Internal/Development (minor impact).
+                      </span>
                     </span>
                   </span>
-                  <span className="detail-value">{systemAttributes?.criticality || systemAttributes?.tier || selectedNode.attributes?.tier}</span>
+                  <span className="detail-value">
+                    {systemAttributes?.criticality ||
+                      systemAttributes?.tier ||
+                      selectedNode.attributes?.tier}
+                  </span>
                 </div>
               )}
 
               {/* Data class field (sensitivity) */}
-              {(systemAttributes?.data_class || selectedNode.attributes?.data_class) && (
+              {(systemAttributes?.data_class ||
+                selectedNode.attributes?.data_class) && (
                 <div className="detail-row">
                   <span className="detail-label">
                     Data Sensitivity
                     <span className="tooltip-hint">
                       ⓘ
-                      <span className="tooltip-content">Personally Identifiable Information (PII) = names, emails, addresses. Credit-Card = Payment data. Legal/Security = Compliance, audit, encryption. General = Non-sensitive data.</span>
+                      <span className="tooltip-content">
+                        Personally Identifiable Information (PII) = names,
+                        emails, addresses. Credit-Card = Payment data.
+                        Legal/Security = Compliance, audit, encryption. General
+                        = Non-sensitive data.
+                      </span>
                     </span>
                   </span>
-                  <span className="detail-value">{systemAttributes?.data_class || selectedNode.attributes?.data_class}</span>
+                  <span className="detail-value">
+                    {systemAttributes?.data_class ||
+                      selectedNode.attributes?.data_class}
+                  </span>
                 </div>
               )}
 
               {/* Active experts (bus factor) - warning when 0 */}
-              {(systemAttributes?.active_experts != null || selectedNode.attributes?.active_experts != null) && (
+              {(systemAttributes?.active_experts != null ||
+                selectedNode.attributes?.active_experts != null) && (
                 <div className="detail-row">
                   <span className="detail-label">
                     Active Experts (Bus Factor)
                     <span className="tooltip-hint">
                       ⓘ
-                      <span className="tooltip-content">Bus factor: contributors with 3+ commits in last 90 days. 0 = high risk (no active maintainers). 1 = single point of failure. Higher is better.</span>
+                      <span className="tooltip-content">
+                        Bus factor: contributors with 3+ commits in last 90
+                        days. 0 = high risk (no active maintainers). 1 = single
+                        point of failure. Higher is better.
+                      </span>
                     </span>
                   </span>
                   <span
                     className={`detail-value active-experts-value ${
-                      (systemAttributes?.active_experts ?? selectedNode.attributes?.active_experts ?? 0) === 0
+                      (systemAttributes?.active_experts ??
+                        selectedNode.attributes?.active_experts ??
+                        0) === 0
                         ? 'active-experts-zero'
                         : ''
                     }`}
                   >
-                    {systemAttributes?.active_experts ?? selectedNode.attributes?.active_experts ?? 0}
+                    {systemAttributes?.active_experts ??
+                      selectedNode.attributes?.active_experts ??
+                      0}
                   </span>
                 </div>
               )}
 
               {/* Compliance (architectural risk) */}
-              {(systemAttributes?.compliance || selectedNode.attributes?.compliance) && (
+              {(systemAttributes?.compliance ||
+                selectedNode.attributes?.compliance) && (
                 <div className="detail-row">
                   <span className="detail-label">
                     Architectural Compliance
                     <span className="tooltip-hint">
                       ⓘ
-                      <span className="tooltip-content">Architectural compliance status: COMPLIANT = well-owned, appropriate tier. AT_RISK = sensitive data or no owner. NON_COMPLIANT = critical gaps in governance.</span>
+                      <span className="tooltip-content">
+                        Architectural compliance status: COMPLIANT = well-owned,
+                        appropriate tier. AT_RISK = sensitive data or no owner.
+                        NON_COMPLIANT = critical gaps in governance.
+                      </span>
                     </span>
                   </span>
-                  <span className="detail-value status-badge">{systemAttributes?.compliance || selectedNode.attributes?.compliance}</span>
+                  <span className="detail-value status-badge">
+                    {systemAttributes?.compliance ||
+                      selectedNode.attributes?.compliance}
+                  </span>
                 </div>
               )}
 
@@ -1505,18 +1939,22 @@ const CodeArchitectureViewerInner: React.FC = () => {
                   <span className="detail-value">{selectedNode.type}</span>
                 </div>
               )}
-              
+
               {selectedNode.containerMeta?.technology && (
                 <div className="detail-row metadata-row">
                   <span className="detail-label">Technology:</span>
-                  <span className="detail-value">{selectedNode.containerMeta.technology}</span>
+                  <span className="detail-value">
+                    {selectedNode.containerMeta.technology}
+                  </span>
                 </div>
               )}
 
               {selectedNode.file && (
                 <div className="detail-row metadata-row">
                   <span className="detail-label">File:</span>
-                  <span className="detail-value file-path">{selectedNode.file}</span>
+                  <span className="detail-value file-path">
+                    {selectedNode.file}
+                  </span>
                 </div>
               )}
 
@@ -1525,7 +1963,12 @@ const CodeArchitectureViewerInner: React.FC = () => {
                 <div className="detail-row">
                   <span className="detail-label">Service URL</span>
                   <span className="detail-value">
-                    <a href={selectedNode.attributes.url} target="_blank" rel="noopener noreferrer" className="external-link">
+                    <a
+                      href={selectedNode.attributes.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="external-link"
+                    >
                       {selectedNode.attributes.url}
                     </a>
                   </span>
@@ -1533,18 +1976,26 @@ const CodeArchitectureViewerInner: React.FC = () => {
               )}
 
               {/* Show endpoint/access path for services */}
-              {(selectedNode.containerMeta?.endpoint || selectedNode.attributes?.endpoint || selectedNode.attributes?.access_path) && (
+              {(selectedNode.containerMeta?.endpoint ||
+                selectedNode.attributes?.endpoint ||
+                selectedNode.attributes?.access_path) && (
                 <div className="detail-row">
                   <span className="detail-label">
                     Access Endpoint
                     <span className="tooltip-hint">
                       ⓘ
-                      <span className="tooltip-content">The URL path or endpoint used to access this service or UI directly. This could be an API endpoint, web interface path, or service access URL.</span>
+                      <span className="tooltip-content">
+                        The URL path or endpoint used to access this service or
+                        UI directly. This could be an API endpoint, web
+                        interface path, or service access URL.
+                      </span>
                     </span>
                   </span>
                   <span className="detail-value">
                     <code className="endpoint-path">
-                      {selectedNode.containerMeta?.endpoint || selectedNode.attributes?.endpoint || selectedNode.attributes?.access_path}
+                      {selectedNode.containerMeta?.endpoint ||
+                        selectedNode.attributes?.endpoint ||
+                        selectedNode.attributes?.access_path}
                     </code>
                   </span>
                 </div>
@@ -1553,7 +2004,9 @@ const CodeArchitectureViewerInner: React.FC = () => {
               {selectedNode.attributes?.detected_from && (
                 <div className="detail-row metadata-row">
                   <span className="detail-label">Detected from:</span>
-                  <span className="detail-value">{selectedNode.attributes.detected_from}</span>
+                  <span className="detail-value">
+                    {selectedNode.attributes.detected_from}
+                  </span>
                 </div>
               )}
             </div>

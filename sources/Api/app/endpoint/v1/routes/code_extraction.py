@@ -268,6 +268,141 @@ async def extract_from_github(
         raise HTTPException(status_code=500, detail=f"Failed to download repository: {str(e)}")
 
 
+class GitHubOrgScanRequest(BaseModel):
+    """Request to scan all repositories from a GitHub user/organization."""
+    github_username: str = Field(..., description="GitHub username or organization name")
+    include_forks: bool = Field(default=False, description="Include forked repositories")
+    max_repos: int = Field(default=10, description="Maximum repositories to scan")
+    append_mode: bool = Field(default=True, description="Append to existing data")
+
+
+@router.post("/extract-from-github-org", response_model=ScanResponse)
+async def extract_from_github_org(
+    request: GitHubOrgScanRequest,
+    background_tasks: BackgroundTasks,
+):
+    """
+    Fetch all public repositories from a GitHub user/org and extract them.
+
+    Note: Unauthenticated GitHub API has 60 requests/hour limit.
+    """
+    import requests
+
+    # Fetch repos from GitHub API (unauthenticated)
+    repos_url = f'https://api.github.com/users/{request.github_username}/repos'
+    params = {
+        'type': 'all',
+        'sort': 'updated',
+        'per_page': min(request.max_repos, 100),
+    }
+
+    try:
+        response = requests.get(repos_url, params=params, timeout=10)
+        response.raise_for_status()
+        repos = response.json()
+
+        # Filter out forks if requested
+        if not request.include_forks:
+            repos = [r for r in repos if not r.get('fork', False)]
+
+        # Limit to max_repos
+        repos = repos[:request.max_repos]
+
+        if not repos:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No repositories found for '{request.github_username}'"
+            )
+
+        # Create batch task
+        task_id = str(uuid.uuid4())
+        repo_urls = [r['html_url'] for r in repos]
+
+        scan_tasks[task_id] = {
+            'task_id': task_id,
+            'status': 'pending',
+            'progress': 0.0,
+            'message': f'Found {len(repo_urls)} repositories',
+            'created_at': datetime.now(),
+            'total_repos': len(repo_urls),
+            'completed_repos': 0,
+            'repo_urls': repo_urls,
+            'errors': [],
+        }
+
+        # Queue batch extraction
+        background_tasks.add_task(
+            run_batch_extraction,
+            task_id,
+            repo_urls,
+            request.append_mode,
+        )
+
+        return ScanResponse(
+            task_id=task_id,
+            status='pending',
+            message=f'Queued {len(repo_urls)} repositories for extraction',
+            created_at=datetime.now(),
+        )
+
+    except requests.HTTPError as e:
+        if e.response.status_code == 404:
+            raise HTTPException(
+                status_code=404,
+                detail=f"GitHub user/org '{request.github_username}' not found"
+            )
+        elif e.response.status_code == 403:
+            raise HTTPException(
+                status_code=429,
+                detail="GitHub API rate limit exceeded (60/hour). Please try again later."
+            )
+        raise HTTPException(status_code=500, detail=f"GitHub API error: {str(e)}")
+    except requests.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch repositories: {str(e)}")
+
+
+async def run_batch_extraction(task_id: str, repo_urls: list[str], append_mode: bool):
+    """Background task to extract multiple repositories sequentially."""
+    total = len(repo_urls)
+
+    for idx, repo_url in enumerate(repo_urls):
+        try:
+            scan_tasks[task_id]['message'] = f'Extracting {idx + 1}/{total}: {repo_url}'
+            scan_tasks[task_id]['progress'] = idx / total
+            scan_tasks[task_id]['completed_repos'] = idx
+
+            # Download repository
+            temp_dir = Path(tempfile.mkdtemp(prefix=f"batch_{task_id}_{idx}_"))
+            repo_path = GitHubDownloader.download_repository(
+                repo_url,
+                output_dir=temp_dir,
+                use_git=True
+            )
+
+            # Run extraction
+            await run_c4_extraction(
+                task_id=f"{task_id}_repo_{idx}",
+                repo_path=repo_path,
+                append_mode=append_mode,
+            )
+
+            scan_tasks[task_id]['completed_repos'] = idx + 1
+
+            # Cleanup
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+        except Exception as e:
+            logger.error(f"Failed to extract {repo_url}: {e}")
+            scan_tasks[task_id].setdefault('errors', []).append({
+                'repo_url': repo_url,
+                'error': str(e),
+            })
+
+    scan_tasks[task_id]['status'] = 'completed'
+    scan_tasks[task_id]['progress'] = 1.0
+    scan_tasks[task_id]['message'] = f'Completed {total} repositories'
+
+
 @router.post("/scan", response_model=ScanResponse)
 async def scan_repository(
     request: ScanRequest,

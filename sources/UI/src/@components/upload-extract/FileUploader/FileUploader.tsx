@@ -17,7 +17,10 @@ interface FileUploaderProps {
   onFilesUploaded: (files: UploadedFile[]) => void;
   isProcessing: boolean;
   onExtractionStarted: (taskId: string, file: UploadedFile) => void;
-  showNotification: (message: string, type: 'success' | 'error' | 'info') => void;
+  showNotification: (
+    message: string,
+    type: 'success' | 'error' | 'info'
+  ) => void;
 }
 
 interface ExtractionTask {

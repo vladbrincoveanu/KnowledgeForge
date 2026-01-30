@@ -122,11 +122,31 @@ interface NavigationProps {
 }
 
 // Navigation component
-const Navigation: React.FC<NavigationProps> = ({ activeTab, isCollapsed, onToggle }) => {
+const Navigation: React.FC<NavigationProps> = ({
+  activeTab,
+  isCollapsed,
+  onToggle,
+}) => {
   // #region agent log
   React.useEffect(() => {
-    console.log('[DEBUG] Navigation rendered with props:', { activeTab, isCollapsed, hasOnToggle: !!onToggle });
-    fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:Navigation',message:'Navigation component rendered',data:{activeTab,isCollapsed,hasOnToggle:!!onToggle},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'E'})}).catch(()=>{});
+    console.log('[DEBUG] Navigation rendered with props:', {
+      activeTab,
+      isCollapsed,
+      hasOnToggle: !!onToggle,
+    });
+    fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        location: 'App.tsx:Navigation',
+        message: 'Navigation component rendered',
+        data: { activeTab, isCollapsed, hasOnToggle: !!onToggle },
+        timestamp: Date.now(),
+        sessionId: 'debug-session',
+        runId: 'run3',
+        hypothesisId: 'E',
+      }),
+    }).catch(() => {});
   }, [activeTab, isCollapsed, onToggle]);
   // #endregion
 
@@ -192,14 +212,16 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, isCollapsed, onToggl
           className="nav-toggle"
           onClick={onToggle}
           aria-label={isCollapsed ? 'Show navigation' : 'Hide navigation'}
-          ref={(el) => {
+          ref={el => {
             // #region agent log
             if (el) {
               setTimeout(() => {
                 const rect = el.getBoundingClientRect();
                 const styles = window.getComputedStyle(el);
                 const parent = el.parentElement;
-                const parentStyles = parent ? window.getComputedStyle(parent) : null;
+                const parentStyles = parent
+                  ? window.getComputedStyle(parent)
+                  : null;
                 const data = {
                   buttonExists: true,
                   display: styles.display,
@@ -215,15 +237,48 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, isCollapsed, onToggl
                   position: styles.position,
                   parentDisplay: parentStyles?.display,
                   parentOverflow: parentStyles?.overflow,
-                  parentWidth: parent ? parent.getBoundingClientRect().width : 0,
-                  inViewport: rect.width > 0 && rect.height > 0 && rect.top >= 0
+                  parentWidth: parent
+                    ? parent.getBoundingClientRect().width
+                    : 0,
+                  inViewport:
+                    rect.width > 0 && rect.height > 0 && rect.top >= 0,
                 };
                 console.log('[DEBUG] Button ref - DOM element details:', data);
-                fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:nav-toggle-ref',message:'Button DOM element details',data,timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'A,B,C,D,F'})}).catch(()=>{});
+                fetch(
+                  'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
+                  {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      location: 'App.tsx:nav-toggle-ref',
+                      message: 'Button DOM element details',
+                      data,
+                      timestamp: Date.now(),
+                      sessionId: 'debug-session',
+                      runId: 'run3',
+                      hypothesisId: 'A,B,C,D,F',
+                    }),
+                  }
+                ).catch(() => {});
               }, 100);
             } else {
               console.log('[DEBUG] Button ref - element is NULL!');
-              fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:nav-toggle-ref',message:'Button element is NULL',data:{buttonExists:false},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'A'})}).catch(()=>{});
+              fetch(
+                'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    location: 'App.tsx:nav-toggle-ref',
+                    message: 'Button element is NULL',
+                    data: { buttonExists: false },
+                    timestamp: Date.now(),
+                    sessionId: 'debug-session',
+                    runId: 'run3',
+                    hypothesisId: 'A',
+                  }),
+                }
+              ).catch(() => {});
             }
             // #endregion
           }}
@@ -239,7 +294,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, isCollapsed, onToggl
             gap: '0.5rem',
             fontSize: '0.875rem',
             fontWeight: 600,
-            flexShrink: 0
+            flexShrink: 0,
           }}
         >
           {isCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
@@ -294,10 +349,16 @@ const MainContent: React.FC = () => {
     nodes: [],
     links: [],
   });
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [notification, setNotification] = useState<{
+    message: string;
+    type: 'success' | 'error' | 'info';
+  } | null>(null);
   const [isNavCollapsed, setIsNavCollapsed] = useState<boolean>(false);
 
-  const showNotification = (message: string, type: 'success' | 'error' | 'info') => {
+  const showNotification = (
+    message: string,
+    type: 'success' | 'error' | 'info'
+  ) => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 5000);
   };
@@ -749,12 +810,30 @@ const MainContent: React.FC = () => {
         />
       )}
       <div className="app-container">
-        <Navigation 
-          activeTab={activeTab} 
+        <Navigation
+          activeTab={activeTab}
           isCollapsed={isNavCollapsed}
           onToggle={() => {
             // #region agent log
-            fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:MainContent-onToggle',message:'Toggle function called',data:{currentState:isNavCollapsed,newState:!isNavCollapsed},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+            fetch(
+              'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  location: 'App.tsx:MainContent-onToggle',
+                  message: 'Toggle function called',
+                  data: {
+                    currentState: isNavCollapsed,
+                    newState: !isNavCollapsed,
+                  },
+                  timestamp: Date.now(),
+                  sessionId: 'debug-session',
+                  runId: 'run1',
+                  hypothesisId: 'E',
+                }),
+              }
+            ).catch(() => {});
             // #endregion
             setIsNavCollapsed(!isNavCollapsed);
           }}
@@ -947,8 +1026,8 @@ const MainContent: React.FC = () => {
                               fontSize: '13px',
                             }}
                           >
-                            <strong>Incremental Summary:</strong>{' '}
-                            Entities +{activeTaskSummary.added_entities} · Δ
+                            <strong>Incremental Summary:</strong> Entities +
+                            {activeTaskSummary.added_entities} · Δ
                             {activeTaskSummary.modified_entities} · -
                             {activeTaskSummary.deleted_entities} | Relationships
                             +{activeTaskSummary.added_relationships} · -
@@ -1037,7 +1116,10 @@ const MainContent: React.FC = () => {
                     onGraphUpdate={() => {
                       if (activeTaskId) {
                         loadGraphData(activeTaskId);
-                        showNotification('Graph updated with the latest data!', 'info');
+                        showNotification(
+                          'Graph updated with the latest data!',
+                          'info'
+                        );
                       }
                     }}
                   />
@@ -1046,8 +1128,11 @@ const MainContent: React.FC = () => {
             />
 
             <Route path="/architecture" element={<ArchitectureMap />} />
-            
-            <Route path="/code-architecture" element={<CodeArchitectureViewer />} />
+
+            <Route
+              path="/code-architecture"
+              element={<CodeArchitectureViewer />}
+            />
 
             <Route
               path="/metrics"
