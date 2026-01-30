@@ -5,6 +5,15 @@ import {
   getBezierPath,
 } from 'reactflow';
 
+const getEdgeOffset = (id: string) => {
+  let hash = 0;
+  for (let i = 0; i < id.length; i += 1) {
+    hash = (hash * 31 + id.charCodeAt(i)) | 0;
+  }
+  const bucket = Math.abs(hash) % 5; // 0..4
+  return (bucket - 2) * 10; // -20..20 px
+};
+
 const C4Edge = ({
   id,
   sourceX,
@@ -17,11 +26,12 @@ const C4Edge = ({
   label,
   interactionWidth,
 }: EdgeProps) => {
+  const offset = getEdgeOffset(id);
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
-    sourceY,
+    sourceY: sourceY + offset,
     targetX,
-    targetY,
+    targetY: targetY + offset,
     sourcePosition,
     targetPosition,
   });
@@ -40,7 +50,7 @@ const C4Edge = ({
           <div
             style={{
               position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY + offset}px)`,
               background: '#ffffff',
               border: '1px solid #e2e8f0',
               borderRadius: 6,

@@ -1500,12 +1500,13 @@ const CodeArchitectureViewerInner: React.FC = () => {
         // label: r.relationship_type,
       }));
 
-    const dependencyEdges = selectedLevel === 'container_level'
-      ? generateC4Edges(
-          architecture?.containers || [],
-          architecture?.relationships?.containers || []
-        )
-      : [];
+    const dependencyEdges =
+      selectedLevel === 'container_level' && filteredRelationships.length === 0
+        ? generateC4Edges(
+            architecture?.containers || [],
+            architecture?.relationships?.containers || []
+          )
+        : [];
 
     const mergedEdges = [...rfEdges, ...dependencyEdges];
 
@@ -1585,7 +1586,8 @@ const CodeArchitectureViewerInner: React.FC = () => {
       node.data?.containerMeta?.llm_description ||
       node.data?.containerMeta?.description ||
       node.data?.llm_description ||
-      node.data?.attributes?.llm_description;
+      node.data?.attributes?.llm_description ||
+      node.data?.attributes?.description;
 
     const normalizedPrecomputed = normalizeDescription(precomputedDescription);
     if (normalizedPrecomputed) {
@@ -1912,26 +1914,22 @@ const CodeArchitectureViewerInner: React.FC = () => {
               </button>
             </div>
             <div className="panel-content">
-              {nodeDescription && !isNodeLoading && (
+              {!isNodeLoading && (
                 <div className="detail-row description-row">
                   <span className="detail-value description-text">
-                    {normalizeDescription(nodeDescription)}
+                    {normalizeDescription(
+                      nodeDescription ||
+                        systemAttributes?.purpose ||
+                        selectedNode.containerMeta?.description ||
+                        selectedNode.documentation ||
+                        'No description available'
+                    )}
                   </span>
                 </div>
               )}
               {isNodeLoading && (
                 <div className="detail-row description-row">
                   <span className="detail-value description-text">Generating description…</span>
-                </div>
-              )}
-              {!nodeDescription && !isNodeLoading && (systemAttributes?.purpose || selectedNode.containerMeta?.description || selectedNode.documentation) && (
-                <div className="detail-row description-row">
-                  <span className="detail-value description-text">
-                    {systemAttributes?.purpose ||
-                      selectedNode.containerMeta?.description ||
-                      selectedNode.documentation ||
-                      'No description available'}
-                  </span>
                 </div>
               )}
 
@@ -2218,7 +2216,11 @@ const CodeArchitectureViewerInner: React.FC = () => {
             <div className="panel-content">
               <div className="detail-row description-row">
                 <span className="detail-value description-text">
-                  {isEdgeLoading ? 'Generating description…' : (edgeDescription || 'No description available')}
+                  {isEdgeLoading
+                    ? 'Generating description…'
+                    : (edgeDescription ||
+                        (selectedEdge as any)?.data?.description ||
+                        'No description available')}
                 </span>
               </div>
               <div className="detail-row">
