@@ -452,6 +452,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionStatus, setExtractionStatus] = useState<string | null>(null);
   const [extractionError, setExtractionError] = useState<string | null>(null);
+  const [repoSectionExpanded, setRepoSectionExpanded] = useState(true);
   const pollIntervalRef = useRef<number | null>(null);
 
   const applyArchitecture = useCallback((data: any) => {
@@ -1693,120 +1694,32 @@ const CodeArchitectureViewerInner: React.FC = () => {
   return (
     <div className="code-architecture-viewer">
       <div className="viewer-header">
-        <h2>Architecture Context (Multi-Repository)</h2>
-        <p>
-          Cumulative view of all added repositories - add multiple projects to
-          see complete landscape
-        </p>
+        <div className="header-content">
+          <h2>Architecture Context (Multi-Repository)</h2>
+          <p>
+            Cumulative view of all added repositories - add multiple projects to
+            see complete landscape
+          </p>
+        </div>
+        <div className="header-stats">
+          <div className="header-stat">
+            <span className="header-stat-value">{nodes.length}</span>
+            <span className="header-stat-label">Entities</span>
+          </div>
+          <div className="header-stat">
+            <span className="header-stat-value">{edges.length}</span>
+            <span className="header-stat-label">Relationships</span>
+          </div>
+          <div className="header-stat">
+            <span className="header-stat-value">{avgConnections}</span>
+            <span className="header-stat-label">Avg Connections</span>
+          </div>
+        </div>
       </div>
 
       <div className="viewer-layout">
         <aside className="filters-sidebar">
-          <div className="filter-section">
-            <h3>Extract Context</h3>
-
-            {/* Single URL Quick Add */}
-            <div className="quick-add-section">
-              <input
-                type="text"
-                placeholder="https://github.com/owner/repo"
-                value={githubUrl}
-                onChange={e => setGithubUrl(e.target.value)}
-                className="search-input"
-                onKeyPress={e => e.key === 'Enter' && handleExtractFromGithub()}
-              />
-              <button
-                className="fit-button"
-                onClick={handleExtractFromGithub}
-                disabled={isExtracting}
-              >
-                {isExtracting ? 'Extracting...' : 'Add Repository'}
-              </button>
-            </div>
-
-            {/* Batch URL Input */}
-            <div className="batch-section">
-              <h4 className="subsection-title">Batch Input</h4>
-              <BatchUrlInput
-                onBatchExtract={handleBatchExtract}
-                isExtracting={isExtracting}
-              />
-            </div>
-
-            {/* GitHub Organization Scanner */}
-            <div className="org-scan-section">
-              <h4 className="subsection-title">GitHub Account/Org</h4>
-              <GitHubOrgScanner
-                onScanStart={handleGitHubOrgScan}
-                isScanning={isExtracting}
-              />
-            </div>
-
-            {/* Clear All Button */}
-            <button
-              className="reset-button"
-              onClick={async () => {
-                if (
-                  confirm(
-                    '⚠️ Clear ALL repositories and start fresh? This will remove all accumulated architecture data.'
-                  )
-                ) {
-                  try {
-                    await codeArchitectureAPI.clearArchitecture();
-                    setArchitecture(null);
-                    setNodes([]);
-                    setEdges([]);
-                    setGithubUrl('');
-                    setExtractionStatus(
-                      'All repositories cleared - ready for fresh extraction'
-                    );
-                    setExtractionError('');
-                  } catch (err) {
-                    setExtractionError('Failed to clear data');
-                  }
-                }
-              }}
-              disabled={isExtracting}
-              title="Clear all repositories and start fresh"
-            >
-              Clear All
-            </button>
-
-            {/* Status messages */}
-            {extractionStatus && (
-              <div className="extract-status">{extractionStatus}</div>
-            )}
-            {extractionError && (
-              <div className="extract-error">{extractionError}</div>
-            )}
-            {architecture && (
-              <div className="extract-info">
-                <small>
-                  💡 Data accumulates - add multiple repos to build complete
-                  architecture view
-                </small>
-              </div>
-            )}
-          </div>
-
-          <div className="filter-section">
-            <h3>Statistics</h3>
-            <div className="stats">
-              <div className="stat">
-                <span className="stat-value">{nodes.length}</span>
-                <span className="stat-label">Entities</span>
-              </div>
-              <div className="stat">
-                <span className="stat-value">{edges.length}</span>
-                <span className="stat-label">Relationships</span>
-              </div>
-              <div className="stat">
-                <span className="stat-value">{avgConnections}</span>
-                <span className="stat-label">Avg Connections</span>
-              </div>
-            </div>
-          </div>
-
+          {/* Search - most frequently used */}
           <div className="filter-section">
             <h3>Search</h3>
             <input
@@ -1818,6 +1731,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
             />
           </div>
 
+          {/* Filters */}
           <div className="filter-section">
             <h3>C4 Levels</h3>
             {AVAILABLE_LEVELS.map(level => (
@@ -1862,6 +1776,98 @@ const CodeArchitectureViewerInner: React.FC = () => {
               />
               <span>Show External Dependencies</span>
             </label>
+          </div>
+
+          {/* Collapsible Add Repositories Section */}
+          <div className="filter-section collapsible-section">
+            <button
+              className="section-toggle"
+              onClick={() => setRepoSectionExpanded(!repoSectionExpanded)}
+            >
+              <h3>Add Repositories</h3>
+              <span className={`toggle-icon ${repoSectionExpanded ? 'expanded' : ''}`}>
+                ▼
+              </span>
+            </button>
+
+            {repoSectionExpanded && (
+              <div className="collapsible-content">
+                {/* Single URL Quick Add */}
+                <div className="quick-add-section">
+                  <input
+                    type="text"
+                    placeholder="https://github.com/owner/repo"
+                    value={githubUrl}
+                    onChange={e => setGithubUrl(e.target.value)}
+                    className="search-input"
+                    onKeyPress={e => e.key === 'Enter' && handleExtractFromGithub()}
+                  />
+                  <button
+                    className="fit-button"
+                    onClick={handleExtractFromGithub}
+                    disabled={isExtracting}
+                  >
+                    {isExtracting ? 'Extracting...' : 'Add Repository'}
+                  </button>
+                </div>
+
+                {/* Batch URL Input */}
+                <div className="batch-section">
+                  <h4 className="subsection-title">Batch Input</h4>
+                  <BatchUrlInput
+                    onBatchExtract={handleBatchExtract}
+                    isExtracting={isExtracting}
+                  />
+                </div>
+
+                {/* GitHub Organization Scanner */}
+                <div className="org-scan-section">
+                  <h4 className="subsection-title">GitHub Account/Org</h4>
+                  <GitHubOrgScanner
+                    onScanStart={handleGitHubOrgScan}
+                    isScanning={isExtracting}
+                  />
+                </div>
+
+                {/* Clear All Button */}
+                <button
+                  className="reset-button"
+                  onClick={async () => {
+                    if (
+                      confirm(
+                        '⚠️ Clear ALL repositories and start fresh? This will remove all accumulated architecture data.'
+                      )
+                    ) {
+                      try {
+                        await codeArchitectureAPI.clearArchitecture();
+                        setArchitecture(null);
+                        setNodes([]);
+                        setEdges([]);
+                        setGithubUrl('');
+                        setExtractionStatus(
+                          'All repositories cleared - ready for fresh extraction'
+                        );
+                        setExtractionError('');
+                      } catch (err) {
+                        setExtractionError('Failed to clear data');
+                      }
+                    }
+                  }}
+                  disabled={isExtracting}
+                  title="Clear all repositories and start fresh"
+                >
+                  Clear All
+                </button>
+
+                {/* Status messages */}
+                {extractionStatus && (
+                  <div className="extract-status">{extractionStatus}</div>
+                )}
+                {extractionError && (
+                  <div className="extract-error">{extractionError}</div>
+                )}
+              </div>
+            )}
           </div>
         </aside>
 

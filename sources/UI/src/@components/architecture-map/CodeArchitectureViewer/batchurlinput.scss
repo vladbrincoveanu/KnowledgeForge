@@ -19,15 +19,15 @@
 
       &:focus {
         outline: none;
-        border-color: #667eea;
-        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        border-color: #9ca3af;
+        box-shadow: 0 0 0 3px rgba(156, 163, 175, 0.15);
       }
     }
 
     .add-button {
       width: 100%;
       padding: 10px 20px;
-      background: #667eea;
+      background: #374151;
       color: white;
       border: none;
       border-radius: 8px;
@@ -37,7 +37,7 @@
       transition: all 0.2s;
 
       &:hover {
-        background: #5568d3;
+        background: #1f2937;
       }
     }
   }
@@ -73,8 +73,8 @@
     }
 
     &.status-extracting {
-      border-left: 4px solid #667eea;
-      background: #f0f4ff;
+      border-left: 4px solid #6b7280;
+      background: #f9fafb;
     }
 
     &.status-completed {
@@ -96,7 +96,7 @@
     }
 
     .progress-text {
-      color: #667eea;
+      color: #4b5563;
       font-weight: 600;
       font-size: 0.85rem;
       margin-right: 8px;
@@ -124,7 +124,7 @@
 
   .batch-extract-btn {
     padding: 14px 20px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #374151;
     color: white;
     border: none;
     border-radius: 8px;
@@ -132,10 +132,11 @@
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 2px 8px rgba(55, 65, 81, 0.25);
 
     &:hover:not(:disabled) {
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      background: #1f2937;
+      box-shadow: 0 4px 12px rgba(31, 41, 55, 0.3);
     }
 
     &:disabled {

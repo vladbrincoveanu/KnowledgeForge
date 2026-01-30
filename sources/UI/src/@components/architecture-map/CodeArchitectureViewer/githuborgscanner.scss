@@ -17,8 +17,8 @@
 
       &:focus {
         outline: none;
-        border-color: #667eea;
-        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        border-color: #9ca3af;
+        box-shadow: 0 0 0 3px rgba(156, 163, 175, 0.15);
       }
     }
   }
@@ -70,7 +70,7 @@
 
         &:focus {
           outline: none;
-          border-color: #667eea;
+          border-color: #9ca3af;
         }
       }
     }
@@ -79,7 +79,7 @@
   .scan-button {
     width: 100%;
     padding: 12px 16px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #374151;
     color: white;
     border: none;
     border-radius: 8px;
@@ -87,10 +87,11 @@
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 2px 8px rgba(55, 65, 81, 0.25);
 
     &:hover:not(:disabled) {
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      background: #1f2937;
+      box-shadow: 0 4px 12px rgba(31, 41, 55, 0.3);
     }
 
     &:disabled {
