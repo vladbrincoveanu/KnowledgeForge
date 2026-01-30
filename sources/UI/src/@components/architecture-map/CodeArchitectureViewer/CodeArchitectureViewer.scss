@@ -239,6 +239,8 @@
 }
 
 .cluster-frame {
+  pointer-events: none;
+
   .container-header {
     .container-label {
       font-size: 15px;

@@ -1004,6 +1004,43 @@ export const codeArchitectureAPI = {
       throw error;
     }
   },
+
+  // Describe a node with LLM
+  describeNode: async (payload: {
+    id?: string;
+    name?: string;
+    type?: string;
+    level?: string;
+    attributes?: Record<string, unknown>;
+    containerMeta?: Record<string, unknown>;
+    file?: string;
+  }): Promise<{ description: string; source: string }> => {
+    try {
+      const response: AxiosResponse = await api.post('/api/v1/code/describe/node', payload);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to describe node:', error);
+      throw error;
+    }
+  },
+
+  // Describe an edge with LLM
+  describeEdge: async (payload: {
+    id?: string;
+    source?: string;
+    target?: string;
+    label?: string;
+    relationshipType?: string;
+    protocol?: string;
+  }): Promise<{ description: string; source: string }> => {
+    try {
+      const response: AxiosResponse = await api.post('/api/v1/code/describe/edge', payload);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to describe edge:', error);
+      throw error;
+    }
+  },
 };
 
 export default api;

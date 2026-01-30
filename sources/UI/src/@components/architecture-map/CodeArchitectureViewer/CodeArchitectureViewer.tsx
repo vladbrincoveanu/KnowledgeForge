@@ -90,8 +90,10 @@ const edgeTypes = {
 const buildContainerId = (container: any, idx: number) =>
   `container_${container.name || idx}`;
 
-const generateC4Edges = (containers: any[] = []): Edge[] => {
+const generateC4Edges = (containers: any[] = [], relationships: any[] = []): Edge[] => {
   const nameToId = new Map<string, string>();
+  const edges: Edge[] = [];
+  const relationshipEdgesAdded = new Set<string>();
 
   containers.forEach((container, idx) => {
     if (container?.name) {
@@ -99,7 +101,52 @@ const generateC4Edges = (containers: any[] = []): Edge[] => {
     }
   });
 
-  const edges: Edge[] = [];
+  relationships.forEach((rel, idx) => {
+    const sourceName = rel?.from ?? rel?.source;
+    const targetName = rel?.to ?? rel?.destination;
+    if (!sourceName || !targetName) {
+      return;
+    }
+
+    const sourceId = nameToId.get(String(sourceName));
+    const targetId = nameToId.get(String(targetName));
+    if (!sourceId || !targetId) {
+      return;
+    }
+
+    const relationshipKey = `${sourceId}-${targetId}`;
+    if (relationshipEdgesAdded.has(relationshipKey)) {
+      return;
+    }
+
+    const protocol = typeof rel?.protocol === 'string' ? rel.protocol.trim() : '';
+    const label = protocol ? protocol.toUpperCase() : undefined;
+    const edgeId = `c4-rel-${sourceId}-${targetId}-${idx}`;
+
+    edges.push({
+      id: edgeId,
+      source: sourceId,
+      target: targetId,
+      label,
+      type: 'C4Edge',
+      interactionWidth: 16,
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+      },
+      data: {
+        description: rel?.description || rel?.llm_description,
+        llm_description: rel?.llm_description,
+        protocol: protocol || undefined,
+        relationship_type: rel?.relationship_type || rel?.type,
+      },
+    });
+
+    relationshipEdgesAdded.add(relationshipKey);
+  });
+
+  if (relationships.length > 0) {
+    return edges;
+  }
 
   containers.forEach((container, idx) => {
     const sourceId = buildContainerId(container, idx);
@@ -120,20 +167,34 @@ const generateC4Edges = (containers: any[] = []): Edge[] => {
         return;
       }
 
+      if (relationshipEdgesAdded.has(`${sourceId}-${targetId}`)) {
+        return;
+      }
+
       edges.push({
         id: `c4-edge-${sourceId}-${targetId}-${depIdx}`,
         source: sourceId,
         target: targetId,
         label,
         type: 'C4Edge',
+        interactionWidth: 16,
         markerEnd: {
           type: MarkerType.ArrowClosed,
+        },
+        data: {
+          protocol,
+          relationship_type: 'uses',
         },
       });
     });
   });
 
   return edges;
+};
+
+const normalizeDescription = (text?: string) => {
+  if (!text) return '';
+  return text.replace(/\s+/g, ' ').trim();
 };
 
 const nodeTypes = {
@@ -381,7 +442,11 @@ const CodeArchitectureViewerInner: React.FC = () => {
   const [showExternal, setShowExternal] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedNode, setSelectedNode] = useState<any>(null);
-
+  const [selectedEdge, setSelectedEdge] = useState<any>(null);
+  const [nodeDescription, setNodeDescription] = useState<string>('');
+  const [edgeDescription, setEdgeDescription] = useState<string>('');
+  const [isNodeLoading, setIsNodeLoading] = useState(false);
+  const [isEdgeLoading, setIsEdgeLoading] = useState(false);
   const [relationshipTypes, setRelationshipTypes] = useState<string[]>([]);
   const [githubUrl, setGithubUrl] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
@@ -469,22 +534,25 @@ const CodeArchitectureViewerInner: React.FC = () => {
           containerEntities.map(c => [c.name, c.id])
         );
 
-        data.relationships.containers.forEach(
-          (rel: C4DiagramRelationship, idx: number) => {
-            const sourceId = containerIdByName.get(rel.source);
-            const targetId = containerIdByName.get(rel.destination);
+        data.relationships.containers.forEach((rel: C4DiagramRelationship, idx: number) => {
+          const sourceName = (rel as any).from ?? rel.source;
+          const targetName = (rel as any).to ?? rel.destination;
+          const sourceId = sourceName ? containerIdByName.get(String(sourceName)) : undefined;
+          const targetId = targetName ? containerIdByName.get(String(targetName)) : undefined;
 
-            if (sourceId && targetId) {
-              containerRelationships.push({
-                id: `rel_container_${idx}`,
-                source_entity_id: sourceId,
-                target_entity_id: targetId,
-                relationship_type: rel.relationship_type || 'depends_on',
-                attributes: { description: rel.description },
-              });
-            }
+          if (sourceId && targetId) {
+            containerRelationships.push({
+              id: `rel_container_${idx}`,
+              source_entity_id: sourceId,
+              target_entity_id: targetId,
+              relationship_type: rel.relationship_type || (rel as any).type || 'depends_on',
+              attributes: {
+                description: rel.description || (rel as any).llm_description,
+                protocol: (rel as any).protocol,
+              },
+            });
           }
-        );
+        });
       }
 
       data.container_level = {
@@ -1031,6 +1099,44 @@ const CodeArchitectureViewerInner: React.FC = () => {
       );
     }
 
+    // Fallback: build minimal level data if the backend didn't provide it
+    if (allEntities.length === 0 && selectedLevel === 'container_level' && architecture.containers?.length) {
+      const fallbackContainers = architecture.containers.map((container: any, idx: number) => ({
+        id: `container_${container.name || idx}`,
+        name: container.name,
+        entity_type: 'container',
+        language: container.technology || 'Unknown',
+        file_path: container.path,
+        attributes: {
+          container_type: container.container_type,
+          protocol: container.protocol,
+          runtime_info: container.runtime_info,
+          runtime_environment: container.runtime_environment,
+          deployment: container.deployment,
+        },
+        level: selectedLevel,
+      }));
+      allEntities.push(...fallbackContainers);
+    }
+
+    if (allEntities.length === 0 && selectedLevel === 'context_level' && architecture.system_context) {
+      const systemName = architecture.system_context?.name || 'System';
+      allEntities.push({
+        id: `context_system_${systemName}`,
+        name: systemName,
+        entity_type: 'system',
+        language: 'Unknown',
+        file_path: '',
+        attributes: {
+          owner_team: architecture.system_context?.owner_team,
+          business_domain: architecture.system_context?.business_domain,
+          criticality: architecture.system_context?.criticality,
+          purpose: architecture.system_context?.purpose,
+        },
+        level: selectedLevel,
+      });
+    }
+
     // Filter entities
     let filteredEntities = allEntities.filter(e => {
       const typeMatch =
@@ -1280,6 +1386,8 @@ const CodeArchitectureViewerInner: React.FC = () => {
             type: 'container',
             position: { x: 80, y: 80 },
             className: 'cluster-frame',
+            draggable: false,
+            selectable: false,
             data: {
               label: 'Kubernetes Cluster',
               containerType: 'Runtime Environment',
@@ -1293,6 +1401,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
               border: '2px dashed #cbd5e1',
               borderRadius: '16px',
               padding: '20px',
+              pointerEvents: 'none',
             },
           });
         }
@@ -1343,18 +1452,17 @@ const CodeArchitectureViewerInner: React.FC = () => {
             decorators: e.attributes?.decorators,
             level: e.level,
             attributes: e.attributes,
-            containerMeta: containerInfo
-              ? {
-                  container_type: containerInfo.container_type,
-                  technology: containerInfo.technology,
-                  protocol: containerInfo.protocol,
-                  runtime_environment: containerInfo.runtime_environment,
-                  deployment: containerInfo.deployment,
-                  description: containerInfo.description,
-                  health_endpoint: containerInfo.health_endpoint,
-                  repository_url: containerInfo.repository_url,
-                }
-              : undefined,
+            containerMeta: containerInfo ? {
+              container_type: containerInfo.container_type,
+              technology: containerInfo.technology,
+              protocol: containerInfo.protocol,
+              runtime_environment: containerInfo.runtime_environment,
+              deployment: containerInfo.deployment,
+              description: containerInfo.description,
+              llm_description: containerInfo.llm_description,
+              health_endpoint: containerInfo.health_endpoint,
+              repository_url: containerInfo.repository_url,
+            } : undefined,
           },
         };
 
@@ -1379,18 +1487,25 @@ const CodeArchitectureViewerInner: React.FC = () => {
         target: r.target_entity_id!,
         type: 'smoothstep',
         animated: false,
-        style: {
-          stroke: '#b0bec5',
+        interactionWidth: 16,
+        style: { 
+          stroke: '#b0bec5', 
           strokeWidth: 2,
+        },
+        data: {
+          description: r.attributes?.description,
+          relationship_type: r.relationship_type,
         },
         // Remove labels for cleaner look
         // label: r.relationship_type,
       }));
 
-    const dependencyEdges =
-      selectedLevel === 'container_level'
-        ? generateC4Edges(architecture?.containers || [])
-        : [];
+    const dependencyEdges = selectedLevel === 'container_level'
+      ? generateC4Edges(
+          architecture?.containers || [],
+          architecture?.relationships?.containers || []
+        )
+      : [];
 
     const mergedEdges = [...rfEdges, ...dependencyEdges];
 
@@ -1461,8 +1576,77 @@ const CodeArchitectureViewerInner: React.FC = () => {
     fitView,
   ]);
 
-  const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
+  const onNodeClick = useCallback(async (_event: React.MouseEvent, node: Node) => {
+    setSelectedEdge(null);
+    setEdgeDescription('');
     setSelectedNode(node.data);
+    setNodeDescription('');
+    const precomputedDescription =
+      node.data?.containerMeta?.llm_description ||
+      node.data?.containerMeta?.description ||
+      node.data?.llm_description ||
+      node.data?.attributes?.llm_description;
+
+    const normalizedPrecomputed = normalizeDescription(precomputedDescription);
+    if (normalizedPrecomputed) {
+      setNodeDescription(normalizedPrecomputed);
+      setIsNodeLoading(false);
+      return;
+    }
+
+    setIsNodeLoading(true);
+
+    try {
+      const response = await codeArchitectureAPI.describeNode({
+        id: node.id,
+        name: node.data?.fullName || node.data?.label,
+        type: node.data?.type,
+        level: node.data?.level,
+        attributes: node.data?.attributes,
+        containerMeta: node.data?.containerMeta,
+        file: node.data?.file,
+      });
+      const normalizedResponse = normalizeDescription(response?.description);
+      setNodeDescription(normalizedResponse || 'No description available.');
+    } catch (error) {
+      setNodeDescription('Unable to generate description right now.');
+    } finally {
+      setIsNodeLoading(false);
+    }
+  }, []);
+
+  const onEdgeClick = useCallback(async (_event: React.MouseEvent, edge: Edge) => {
+    setSelectedNode(null);
+    setNodeDescription('');
+    setSelectedEdge(edge);
+    setEdgeDescription('');
+    const precomputedDescription =
+      (edge as any)?.data?.llm_description ||
+      (edge as any)?.data?.description;
+
+    if (precomputedDescription) {
+      setEdgeDescription(precomputedDescription);
+      setIsEdgeLoading(false);
+      return;
+    }
+
+    setIsEdgeLoading(true);
+
+    try {
+      const response = await codeArchitectureAPI.describeEdge({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        label: typeof edge.label === 'string' ? edge.label : undefined,
+        relationshipType: (edge as any)?.data?.relationship_type || (edge as any)?.data?.type,
+        protocol: typeof edge.label === 'string' ? edge.label : undefined,
+      });
+      setEdgeDescription(response?.description || 'No description available.');
+    } catch (error) {
+      setEdgeDescription('Unable to generate description right now.');
+    } finally {
+      setIsEdgeLoading(false);
+    }
   }, []);
 
   const avgConnections =
@@ -1693,13 +1877,16 @@ const CodeArchitectureViewerInner: React.FC = () => {
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 onNodeClick={onNodeClick}
+                onEdgeClick={onEdgeClick}
                 nodeTypes={nodeTypes}
                 edgeTypes={edgeTypes}
+                elementsSelectable
+                edgesFocusable
                 fitView
                 attributionPosition="bottom-left"
-                defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-                minZoom={0.1}
-                maxZoom={3.5}
+                defaultViewport={{ x: 0, y: 0, zoom: 1.2 }}
+                minZoom={0.05}
+                maxZoom={2.5}
               >
                 <Background
                   variant={BackgroundVariant.Dots}
@@ -1725,10 +1912,19 @@ const CodeArchitectureViewerInner: React.FC = () => {
               </button>
             </div>
             <div className="panel-content">
-              {/* One-sentence description (LLM-generated purpose or description) */}
-              {(systemAttributes?.purpose ||
-                selectedNode.containerMeta?.description ||
-                selectedNode.documentation) && (
+              {nodeDescription && !isNodeLoading && (
+                <div className="detail-row description-row">
+                  <span className="detail-value description-text">
+                    {normalizeDescription(nodeDescription)}
+                  </span>
+                </div>
+              )}
+              {isNodeLoading && (
+                <div className="detail-row description-row">
+                  <span className="detail-value description-text">Generating description…</span>
+                </div>
+              )}
+              {!nodeDescription && !isNodeLoading && (systemAttributes?.purpose || selectedNode.containerMeta?.description || selectedNode.documentation) && (
                 <div className="detail-row description-row">
                   <span className="detail-value description-text">
                     {systemAttributes?.purpose ||
@@ -2009,6 +2205,30 @@ const CodeArchitectureViewerInner: React.FC = () => {
                   </span>
                 </div>
               )}
+            </div>
+          </aside>
+        )}
+
+        {selectedEdge && (
+          <aside className="node-details-panel">
+            <div className="panel-header">
+              <h3>{selectedEdge.label || 'Relationship'}</h3>
+              <button className="close-btn" onClick={() => setSelectedEdge(null)}>×</button>
+            </div>
+            <div className="panel-content">
+              <div className="detail-row description-row">
+                <span className="detail-value description-text">
+                  {isEdgeLoading ? 'Generating description…' : (edgeDescription || 'No description available')}
+                </span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">from</span>
+                <span className="detail-value">{selectedEdge.source}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">to</span>
+                <span className="detail-value">{selectedEdge.target}</span>
+              </div>
             </div>
           </aside>
         )}

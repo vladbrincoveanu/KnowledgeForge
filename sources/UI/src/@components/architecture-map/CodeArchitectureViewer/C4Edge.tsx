@@ -15,6 +15,7 @@ const C4Edge = ({
   targetPosition,
   markerEnd,
   label,
+  interactionWidth,
 }: EdgeProps) => {
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
@@ -31,7 +32,8 @@ const C4Edge = ({
         id={id}
         path={edgePath}
         markerEnd={markerEnd}
-        style={{ stroke: '#1168bd', strokeWidth: 2.8 }}
+        interactionWidth={interactionWidth ?? 16}
+        style={{ stroke: '#1168bd', strokeWidth: 2.8, cursor: 'pointer' }}
       />
       {label ? (
         <EdgeLabelRenderer>

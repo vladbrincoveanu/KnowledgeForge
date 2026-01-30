@@ -368,6 +368,9 @@ class C4ArchitectureExtractor:
         if group_components_by_domain and len(self.components) > max_components_per_domain:
             logger.info(f"✓ Grouping {len(self.components)} components by domain...")
             self._group_by_domain()
+
+        # Enrich with LLM-generated descriptions if available
+        self._enrich_with_llm_descriptions()
         
         # Build final structure
         c4_architecture = {
@@ -1269,6 +1272,131 @@ Your answer:"""
                 logger.debug(f"Failed to generate system purpose with LLM: {e}")
         
         return "Purpose not available"
+
+    def _clean_llm_sentence(self, text: Optional[str]) -> str:
+        if not text:
+            return ""
+        cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+        cleaned = re.sub(r'<.*?>', '', cleaned)
+        cleaned = cleaned.strip()
+        if not cleaned:
+            return ""
+        if len(cleaned) > 400:
+            cleaned = cleaned[:400].rsplit(' ', 1)[0] + '...'
+        if cleaned[-1] not in {'.', '!', '?'}:
+            cleaned += '.'
+        return cleaned
+
+    def _describe_node_heuristic(self, node: dict[str, Any]) -> str:
+        name = node.get('name') or 'This node'
+        node_type = node.get('type') or node.get('component') or 'component'
+        if node_type == 'system':
+            return node.get('purpose') or node.get('description') or f"{name} is the main system in this repository."
+
+        if node_type == 'component':
+            method = node.get('endpoint_method')
+            path = node.get('endpoint_path')
+            if method and path:
+                return f"{name} is an API endpoint handling {method} {path}."
+            return f"{name} is a component within the system."
+
+        container_type = node.get('container_type')
+        technology = node.get('technology')
+        deployment = node.get('deployment')
+        details = ", ".join([v for v in [container_type, technology, deployment] if v])
+        details_text = f" ({details})" if details else ""
+        return f"{name} is a deployable service{details_text}."
+
+    def _generate_node_description(self, node: dict[str, Any]) -> str:
+        llm = self.llm_manager
+        if llm is None:
+            return self._describe_node_heuristic(node)
+
+        context = {
+            "name": node.get("name"),
+            "type": node.get("type"),
+            "container_type": node.get("container_type"),
+            "technology": node.get("technology"),
+            "deployment": node.get("deployment"),
+            "path": node.get("path") or node.get("file"),
+            "endpoint_method": node.get("endpoint_method"),
+            "endpoint_path": node.get("endpoint_path"),
+            "purpose": node.get("purpose"),
+            "description": node.get("description"),
+        }
+
+        prompt = (
+            "You are a software architecture assistant. "
+            "Write 1-2 concise sentences describing what this node is used for, "
+            "based only on the provided metadata. Avoid speculation.\n\n"
+            f"Node metadata: {json.dumps(context, ensure_ascii=False)}"
+        )
+
+        try:
+            response = llm.generate_text(prompt, max_tokens=90, temperature=0.3, use_cache=True)
+            cleaned = self._clean_llm_sentence(response)
+            return cleaned or self._describe_node_heuristic(node)
+        except Exception as exc:
+            logger.debug(f"LLM node description failed: {exc}")
+            return self._describe_node_heuristic(node)
+
+    def _describe_edge_heuristic(self, relationship: dict[str, Any]) -> str:
+        source = relationship.get('from') or relationship.get('source') or 'Source'
+        target = relationship.get('to') or relationship.get('destination') or 'Target'
+        rel_type = relationship.get('type') or relationship.get('relationship_type') or 'uses'
+        protocol = relationship.get('protocol')
+        protocol_text = f" over {protocol}" if protocol else ""
+        return f"{source} {rel_type} {target}{protocol_text}."
+
+    def _generate_edge_description(self, relationship: dict[str, Any]) -> str:
+        llm = self.llm_manager
+        if llm is None:
+            return self._describe_edge_heuristic(relationship)
+
+        context = {
+            "source": relationship.get('from') or relationship.get('source'),
+            "target": relationship.get('to') or relationship.get('destination'),
+            "relationship_type": relationship.get('type') or relationship.get('relationship_type'),
+            "protocol": relationship.get('protocol'),
+        }
+        prompt = (
+            "You are a software architecture assistant. "
+            "Write 1 concise sentence describing the interaction between these two nodes. "
+            "If protocol is provided, mention it.\n\n"
+            f"Edge metadata: {json.dumps(context, ensure_ascii=False)}"
+        )
+
+        try:
+            response = llm.generate_text(prompt, max_tokens=60, temperature=0.3, use_cache=True)
+            cleaned = self._clean_llm_sentence(response)
+            return cleaned or self._describe_edge_heuristic(relationship)
+        except Exception as exc:
+            logger.debug(f"LLM edge description failed: {exc}")
+            return self._describe_edge_heuristic(relationship)
+
+    def _enrich_with_llm_descriptions(self) -> None:
+        if self.system_context:
+            if not self.system_context.get('description') and self.system_context.get('purpose'):
+                self.system_context['description'] = self.system_context.get('purpose')
+            self.system_context['llm_description'] = self._generate_node_description(self.system_context)
+
+        for container in self.containers.values():
+            container.setdefault('type', 'container')
+            container['llm_description'] = self._generate_node_description(container)
+
+        for component in self.components.values():
+            component.setdefault('type', 'component')
+            component['llm_description'] = self._generate_node_description(component)
+
+        for relationship in self.context_relationships:
+            if not relationship.get('description'):
+                relationship['description'] = self._generate_edge_description(relationship)
+            relationship['llm_description'] = self._generate_edge_description(relationship)
+
+        for relationship in self.container_relationships:
+            if not relationship.get('description'):
+                relationship['description'] = self._generate_edge_description(relationship)
+            relationship['llm_description'] = self._generate_edge_description(relationship)
     
     def _detect_owner_team(self) -> str:
         """Detect owner team from CODEOWNERS, README, or git contributors.
@@ -2147,7 +2275,11 @@ Examples: "Authentication", "User Management", "Data Processing", "Reporting", e
 Return only 3 group names, one per line, no explanations."""
             
             try:
-                response = self.llm_manager.complete(prompt, max_tokens=100)
+                response = self.llm_manager.generate_text(prompt, max_tokens=100, temperature=0.2, use_cache=True)
+                if not response:
+                    logger.warning("LLM returned no response for grouping, skipping grouping")
+                    continue
+
                 group_names = [line.strip() for line in response.strip().split('\n') if line.strip()][:3]
                 
                 if len(group_names) == 3:
@@ -2182,7 +2314,11 @@ Assign each endpoint to the most appropriate group (1, 2, or 3):
 Return only the group numbers (1, 2, or 3), one per line, matching the endpoint order."""
         
         try:
-            response = self.llm_manager.complete(prompt, max_tokens=200)
+            response = self.llm_manager.generate_text(prompt, max_tokens=200, temperature=0.2, use_cache=True)
+            if not response:
+                logger.warning("LLM returned no response for grouping assignments")
+                return
+
             assignments = [line.strip() for line in response.strip().split('\n') if line.strip()]
             
             # Update component metadata with group assignment

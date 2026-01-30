@@ -49,15 +49,28 @@ def _load_latest_c4_from_json() -> dict:
     try:
         api_root = Path(__file__).resolve().parents[4]
         output_dir = api_root / "sources" / "data" / "c4_extractions"
+        fallback_file = api_root / "c4_architecture.json"
 
         if not output_dir.exists():
             logger.warning(f"C4 extractions directory does not exist: {output_dir}")
+            if fallback_file.exists():
+                try:
+                    with open(fallback_file, 'r', encoding='utf-8') as f:
+                        return json.load(f)
+                except Exception as e:
+                    logger.error(f"Failed to load fallback C4 JSON: {e}", exc_info=True)
             return {}
 
         json_files = sorted(output_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
 
         if not json_files:
             logger.warning("No C4 extraction JSON files found")
+            if fallback_file.exists():
+                try:
+                    with open(fallback_file, 'r', encoding='utf-8') as f:
+                        return json.load(f)
+                except Exception as e:
+                    logger.error(f"Failed to load fallback C4 JSON: {e}", exc_info=True)
             return {}
 
         latest_file = json_files[0]
@@ -107,6 +120,33 @@ class ScanStatusResponse(BaseModel):
     extraction_mode: str = "c4_model"
 
 
+class NodeDescribeRequest(BaseModel):
+    """Request model for node description."""
+    id: Optional[str] = None
+    name: Optional[str] = None
+    type: Optional[str] = None
+    level: Optional[str] = None
+    attributes: Optional[dict[str, Any]] = None
+    container_meta: Optional[dict[str, Any]] = Field(default=None, alias="containerMeta")
+    file: Optional[str] = None
+
+    class Config:
+        allow_population_by_field_name = True
+
+
+class EdgeDescribeRequest(BaseModel):
+    """Request model for edge description."""
+    id: Optional[str] = None
+    source: Optional[str] = None
+    target: Optional[str] = None
+    label: Optional[str] = None
+    relationship_type: Optional[str] = Field(default=None, alias="relationshipType")
+    protocol: Optional[str] = None
+
+    class Config:
+        allow_population_by_field_name = True
+
+
 def get_neo4j_manager():
     """Get Neo4j manager instance."""
     from utils.config import get_config
@@ -134,6 +174,43 @@ def get_llm_manager():
     except Exception as e:
         logger.warning(f"LLM not available: {e}")
         return None
+
+
+def _build_node_prompt(payload: NodeDescribeRequest) -> str:
+    context = {
+        "name": payload.name,
+        "type": payload.type,
+        "level": payload.level,
+        "file": payload.file,
+        "attributes": payload.attributes or {},
+        "container_meta": payload.container_meta or {},
+    }
+
+    return (
+        "You are a software architecture assistant. "
+        "Given the following node details from a C4 diagram, "
+        "write 1-2 concise sentences describing what this node is used for. "
+        "If details are limited, infer from name, type, technology, deployment, and path. "
+        "Avoid speculation beyond the data.\n\n"
+        f"Node details: {json.dumps(context, ensure_ascii=False)}"
+    )
+
+
+def _build_edge_prompt(payload: EdgeDescribeRequest) -> str:
+    context = {
+        "source": payload.source,
+        "target": payload.target,
+        "relationship_type": payload.relationship_type,
+        "protocol": payload.protocol or payload.label,
+    }
+
+    return (
+        "You are a software architecture assistant. "
+        "Given the following relationship between two C4 nodes, "
+        "write 1 concise sentence describing what the interaction represents. "
+        "If protocol is provided, mention it.\n\n"
+        f"Edge details: {json.dumps(context, ensure_ascii=False)}"
+    )
 
 
 @router.post("/upload-repo", response_model=ScanResponse)
@@ -841,3 +918,45 @@ async def get_code_architecture():
             status_code=500,
             detail=f"Failed to get architecture: {str(e)}"
         )
+
+
+@router.post("/describe/node")
+async def describe_node(request: NodeDescribeRequest):
+    """Generate a short description for a C4 node."""
+    llm_manager = get_llm_manager()
+    prompt = _build_node_prompt(request)
+
+    if llm_manager:
+        response = llm_manager.generate_text(prompt, max_tokens=120, temperature=0.3)
+        if response:
+            return {"description": response.strip(), "source": "llm"}
+
+    name = request.name or "This node"
+    node_type = request.type or "component"
+    file_hint = f" in {request.file}" if request.file else ""
+    container_type = None
+    if request.container_meta and isinstance(request.container_meta, dict):
+        container_type = request.container_meta.get("container_type")
+
+    description = f"{name} is a {container_type or node_type} within the system{file_hint}."
+    return {"description": description, "source": "heuristic"}
+
+
+@router.post("/describe/edge")
+async def describe_edge(request: EdgeDescribeRequest):
+    """Generate a short description for a C4 edge."""
+    llm_manager = get_llm_manager()
+    prompt = _build_edge_prompt(request)
+
+    if llm_manager:
+        response = llm_manager.generate_text(prompt, max_tokens=80, temperature=0.3)
+        if response:
+            return {"description": response.strip(), "source": "llm"}
+
+    source = request.source or "Source"
+    target = request.target or "Target"
+    rel = request.relationship_type or "interaction"
+    protocol = request.protocol or request.label
+    protocol_text = f" over {protocol}" if protocol else ""
+    description = f"{source} {rel} {target}{protocol_text}."
+    return {"description": description, "source": "heuristic"}
