@@ -955,6 +955,9 @@ export const codeArchitectureAPI = {
           include_forks: includeForks,
           max_repos: maxRepos,
           append_mode: appendMode,
+        },
+        {
+          timeout: 60000, // 60 seconds for org scanning
         }
       );
       return response.data;

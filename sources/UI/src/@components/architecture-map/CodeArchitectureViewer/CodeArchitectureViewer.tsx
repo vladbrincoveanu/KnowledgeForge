@@ -14,6 +14,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import dagre from 'dagre';
+import axios from 'axios';
 import './CodeArchitectureViewer.scss';
 import { codeArchitectureAPI } from '../../../services/api';
 import CustomNode from './CustomNode';
@@ -440,6 +441,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
     string[]
   >([]);
   const [showExternal, setShowExternal] = useState(true);
+  const [dependencyViewFilter, setDependencyViewFilter] = useState<'all' | 'business' | 'technical'>('business'); // NEW: Filter for C4 compliance
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedNode, setSelectedNode] = useState<any>(null);
   const [selectedEdge, setSelectedEdge] = useState<any>(null);
@@ -483,6 +485,8 @@ const CodeArchitectureViewerInner: React.FC = () => {
         data_class: sysCtx.data_class,
         active_experts: sysCtx.active_experts,
         compliance: sysCtx.compliance,
+          compliance_confidence: sysCtx.compliance_confidence,
+          compliance_factors: sysCtx.compliance_factors,
       };
       const containerEntities: CodeEntity[] = data.containers.map(
         (container: any, idx: number) => ({
@@ -589,6 +593,8 @@ const CodeArchitectureViewerInner: React.FC = () => {
           data_class: data.system_context?.data_class,
           active_experts: data.system_context?.active_experts,
           compliance: data.system_context?.compliance,
+          compliance_confidence: data.system_context?.compliance_confidence,
+          compliance_factors: data.system_context?.compliance_factors,
           purpose: data.system_context?.purpose,
           languages: data.system_context?.languages,
           frameworks: data.system_context?.frameworks,
@@ -621,6 +627,9 @@ const CodeArchitectureViewerInner: React.FC = () => {
           url: dep.url,
           detected_from: dep.detected_from,
           is_external: true,
+          dependency_type: dep.dependency_type || 'UNKNOWN',
+          classification_confidence: dep.classification_confidence || 0.5,
+          classification_reasoning: dep.classification_reasoning || '',
         },
       }));
 
@@ -670,6 +679,8 @@ const CodeArchitectureViewerInner: React.FC = () => {
         data_class: sysCtxForComponents.data_class,
         active_experts: sysCtxForComponents.active_experts,
         compliance: sysCtxForComponents.compliance,
+        compliance_confidence: sysCtxForComponents.compliance_confidence,
+        compliance_factors: sysCtxForComponents.compliance_factors,
       };
       data.components.forEach((component: any, groupIdx: number) => {
         // Check if this is a component group
@@ -1044,10 +1055,34 @@ const CodeArchitectureViewerInner: React.FC = () => {
         }, 3000); // Poll every 3 seconds for batch operations
       } catch (err) {
         setIsExtracting(false);
-        const errorMessage =
-          err instanceof Error
-            ? err.message
-            : 'Failed to scan GitHub organization';
+        let errorMessage = 'Failed to scan GitHub organization';
+        
+        if (axios.isAxiosError(err)) {
+          if (err.response) {
+            // Server responded with error
+            const status = err.response.status;
+            const detail = err.response.data?.detail || err.message;
+            
+            if (status === 404) {
+              errorMessage = `GitHub user/org '${username}' not found`;
+            } else if (status === 429) {
+              errorMessage = detail; // Rate limit message from backend
+            } else if (status === 403) {
+              errorMessage = `Access denied to '${username}'. Repository may be private.`;
+            } else if (status === 504) {
+              errorMessage = 'Request timed out. Try reducing max repositories or try again.';
+            } else {
+              errorMessage = detail || `Server error (${status})`;
+            }
+          } else if (err.code === 'ECONNABORTED') {
+            errorMessage = 'Request timed out. GitHub API may be slow. Try again with fewer repositories.';
+          } else if (err.message) {
+            errorMessage = err.message;
+          }
+        } else if (err instanceof Error) {
+          errorMessage = err.message;
+        }
+        
         setExtractionError(errorMessage);
       }
     },
@@ -1148,8 +1183,20 @@ const CodeArchitectureViewerInner: React.FC = () => {
         searchTerm === '' ||
         e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         e.file_path?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      // NEW: Dependency type filter for C4 Context level
+      let dependencyTypeMatch = true;
+      if (selectedLevel === 'context_level' && e.attributes?.is_external) {
+        const depType = e.attributes?.dependency_type;
+        if (dependencyViewFilter === 'business') {
+          dependencyTypeMatch = depType === 'BUSINESS_SYSTEM';
+        } else if (dependencyViewFilter === 'technical') {
+          dependencyTypeMatch = depType === 'TECHNICAL_INFRA';
+        }
+        // 'all' shows everything
+      }
 
-      return typeMatch && externalMatch && searchMatch;
+      return typeMatch && externalMatch && searchMatch && dependencyTypeMatch;
     });
 
     // Create entity lookup
@@ -1578,44 +1625,22 @@ const CodeArchitectureViewerInner: React.FC = () => {
     fitView,
   ]);
 
-  const onNodeClick = useCallback(async (_event: React.MouseEvent, node: Node) => {
+  const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
     setSelectedEdge(null);
     setEdgeDescription('');
     setSelectedNode(node.data);
-    setNodeDescription('');
+    
+    // All descriptions must be precomputed - no LLM calls
     const precomputedDescription =
       node.data?.containerMeta?.llm_description ||
       node.data?.containerMeta?.description ||
       node.data?.llm_description ||
       node.data?.attributes?.llm_description ||
-      node.data?.attributes?.description;
+      node.data?.attributes?.description ||
+      node.data?.attributes?.purpose;
 
-    const normalizedPrecomputed = normalizeDescription(precomputedDescription);
-    if (normalizedPrecomputed) {
-      setNodeDescription(normalizedPrecomputed);
-      setIsNodeLoading(false);
-      return;
-    }
-
-    setIsNodeLoading(true);
-
-    try {
-      const response = await codeArchitectureAPI.describeNode({
-        id: node.id,
-        name: node.data?.fullName || node.data?.label,
-        type: node.data?.type,
-        level: node.data?.level,
-        attributes: node.data?.attributes,
-        containerMeta: node.data?.containerMeta,
-        file: node.data?.file,
-      });
-      const normalizedResponse = normalizeDescription(response?.description);
-      setNodeDescription(normalizedResponse || 'No description available.');
-    } catch (error) {
-      setNodeDescription('Unable to generate description right now.');
-    } finally {
-      setIsNodeLoading(false);
-    }
+    setNodeDescription(normalizeDescription(precomputedDescription) || '');
+    setIsNodeLoading(false);
   }, []);
 
   const onEdgeClick = useCallback(async (_event: React.MouseEvent, edge: Edge) => {
@@ -1778,6 +1803,42 @@ const CodeArchitectureViewerInner: React.FC = () => {
             </label>
           </div>
 
+          {/* NEW: C4 Context Level Dependency Filter */}
+          {selectedLevel === 'context_level' && showExternal && (
+            <div className="filter-section">
+              <h3>Dependency View</h3>
+              <div className="radio-group">
+                <label className="checkbox-label">
+                  <input
+                    type="radio"
+                    name="dependency-view"
+                    checked={dependencyViewFilter === 'business'}
+                    onChange={() => setDependencyViewFilter('business')}
+                  />
+                  <span>Context View (Business Systems)</span>
+                </label>
+                <label className="checkbox-label">
+                  <input
+                    type="radio"
+                    name="dependency-view"
+                    checked={dependencyViewFilter === 'technical'}
+                    onChange={() => setDependencyViewFilter('technical')}
+                  />
+                  <span>Container View (Technical Infra)</span>
+                </label>
+                <label className="checkbox-label">
+                  <input
+                    type="radio"
+                    name="dependency-view"
+                    checked={dependencyViewFilter === 'all'}
+                    onChange={() => setDependencyViewFilter('all')}
+                  />
+                  <span>Show All</span>
+                </label>
+              </div>
+            </div>
+          )}
+
           {/* Collapsible Add Repositories Section */}
           <div className="filter-section collapsible-section">
             <button
@@ -1911,7 +1972,12 @@ const CodeArchitectureViewerInner: React.FC = () => {
         {selectedNode && (
           <aside className="node-details-panel">
             <div className="panel-header">
-              <h3>{selectedNode.fullName || selectedNode.label}</h3>
+              <div className="panel-title">
+                <h3>{selectedNode.fullName || selectedNode.label}</h3>
+                <span className="pill type-pill">
+                  {selectedNode.type || selectedNode.attributes?.type || 'system'}
+                </span>
+              </div>
               <button
                 className="close-btn"
                 onClick={() => setSelectedNode(null)}
@@ -1920,24 +1986,46 @@ const CodeArchitectureViewerInner: React.FC = () => {
               </button>
             </div>
             <div className="panel-content">
-              {!isNodeLoading && (
-                <div className="detail-row description-row">
-                  <span className="detail-value description-text">
-                    {normalizeDescription(
-                      nodeDescription ||
-                        systemAttributes?.purpose ||
-                        selectedNode.containerMeta?.description ||
-                        selectedNode.documentation ||
-                        'No description available'
-                    )}
+              <div className="detail-row description-row">
+                <span className="detail-value description-text">
+                  {normalizeDescription(
+                    nodeDescription ||
+                      systemAttributes?.llm_description ||
+                      systemAttributes?.description ||
+                      systemAttributes?.purpose ||
+                      selectedNode.containerMeta?.llm_description ||
+                      selectedNode.containerMeta?.description ||
+                      selectedNode.attributes?.llm_description ||
+                      selectedNode.attributes?.description ||
+                      selectedNode.documentation
+                  ) || '⚠️ No description - re-extract this repository to generate'}
+                </span>
+              </div>
+
+              <div className="summary-badges">
+                {(systemAttributes?.status || selectedNode.attributes?.status) && (
+                  <span className="pill status-pill" data-tooltip="Lifecycle status indicates the current operational state of this system. Active systems are in production, Deprecated systems are being phased out, and Frozen systems are no longer maintained but still running.">
+                    {systemAttributes?.status || selectedNode.attributes?.status}
                   </span>
-                </div>
-              )}
-              {isNodeLoading && (
-                <div className="detail-row description-row">
-                  <span className="detail-value description-text">Generating description…</span>
-                </div>
-              )}
+                )}
+                {(systemAttributes?.tier || selectedNode.attributes?.tier) && (
+                  <span className="pill tier-pill" data-tooltip="Criticality tier defines the importance and impact of this system. Tier 1 (Mission Critical) requires 24/7 support, Tier 2 (Production Standard) has business hours support, and Tier 3 (Development/Internal) is for non-production environments.">
+                    {systemAttributes?.tier || selectedNode.attributes?.tier}
+                  </span>
+                )}
+                {(systemAttributes?.compliance || selectedNode.attributes?.compliance) && (
+                  <span
+                    className={`pill compliance-pill ${
+                      (systemAttributes?.compliance || selectedNode.attributes?.compliance || '')
+                        .toString()
+                        .toLowerCase()
+                    }`}
+                    data-tooltip="Architectural compliance measures adherence to engineering standards. EXCELLENT (7/7 checks), COMPLIANT (5-6/7), AT_RISK (3-4/7), and NON_COMPLIANT (0-2/7 or critical security issues). Checks include tests, documentation, CI/CD, security scanning, and proper project structure."
+                  >
+                    {systemAttributes?.compliance || selectedNode.attributes?.compliance}
+                  </span>
+                )}
+              </div>
 
               {/* Domain field (from image: business bucket) */}
               {(systemAttributes?.business_domain ||
@@ -2094,19 +2182,29 @@ const CodeArchitectureViewerInner: React.FC = () => {
                       </span>
                     </span>
                   </span>
-                  <span
-                    className={`detail-value active-experts-value ${
-                      (systemAttributes?.active_experts ??
-                        selectedNode.attributes?.active_experts ??
-                        0) === 0
-                        ? 'active-experts-zero'
-                        : ''
-                    }`}
-                  >
-                    {systemAttributes?.active_experts ??
-                      selectedNode.attributes?.active_experts ??
-                      0}
-                  </span>
+                  {(() => {
+                    const rawValue =
+                      systemAttributes?.active_experts ??
+                      selectedNode.attributes?.active_experts;
+                    const isZero = rawValue === 0;
+                    const label =
+                      rawValue == null
+                        ? 'Unknown'
+                        : rawValue === 0
+                        ? 'No active experts'
+                        : rawValue === 1
+                        ? '1 active expert'
+                        : `${rawValue} active experts`;
+                    return (
+                      <span
+                        className={`detail-value active-experts-value ${
+                          isZero ? 'active-experts-zero' : ''
+                        }`}
+                      >
+                        {label}
+                      </span>
+                    );
+                  })()}
                 </div>
               )}
 
@@ -2119,9 +2217,9 @@ const CodeArchitectureViewerInner: React.FC = () => {
                     <span className="tooltip-hint">
                       ⓘ
                       <span className="tooltip-content">
-                        Architectural compliance status: COMPLIANT = well-owned,
-                        appropriate tier. AT_RISK = sensitive data or no owner.
-                        NON_COMPLIANT = critical gaps in governance.
+                        Calculated from: tier-data alignment, ownership, bus factor, and lifecycle. 
+                        COMPLIANT = proper governance. AT_RISK = ownership/maintenance gaps. 
+                        NON_COMPLIANT = sensitive data mishandled or abandoned.
                       </span>
                     </span>
                   </span>
@@ -2132,17 +2230,85 @@ const CodeArchitectureViewerInner: React.FC = () => {
                 </div>
               )}
 
+              {/* Compliance confidence */}
+              {(systemAttributes?.compliance_confidence ??
+                selectedNode.attributes?.compliance_confidence) !== undefined && (
+                <div className="detail-row">
+                  <span className="detail-label">
+                    Compliance Confidence
+                    <span className="tooltip-hint">
+                      ⓘ
+                      <span className="tooltip-content">
+                        Based on metadata completeness: higher when tier, data classification, 
+                        and owner are known. Range 50-100%.
+                      </span>
+                    </span>
+                  </span>
+                  <span className="detail-value">
+                    {Math.round(
+                      100 *
+                        (systemAttributes?.compliance_confidence ??
+                          selectedNode.attributes?.compliance_confidence ??
+                          0)
+                    )}
+                    %
+                  </span>
+                </div>
+              )}
+
+              {/* Compliance factors */}
+              {(systemAttributes?.compliance_factors?.length ||
+                selectedNode.attributes?.compliance_factors?.length) && (
+                <div className="detail-row">
+                  <span className="detail-label">
+                    Compliance Issues
+                    <span className="tooltip-hint">
+                      ⓘ
+                      <span className="tooltip-content">
+                        Detected architectural risks: sensitive data in low tiers, 
+                        missing ownership, bus factor concerns, deprecated services 
+                        with sensitive data, or single points of failure.
+                      </span>
+                    </span>
+                  </span>
+                  <span className="detail-value">
+                    {(systemAttributes?.compliance_factors ||
+                      selectedNode.attributes?.compliance_factors || [])
+                      .map(factor => factor.replace(/_/g, ' '))
+                      .join(', ')}
+                  </span>
+                </div>
+              )}
+
               {/* Additional metadata for context */}
               {selectedNode.type && (
                 <div className="detail-row metadata-row">
-                  <span className="detail-label">Type:</span>
+                  <span className="detail-label">
+                    Type
+                    <span className="tooltip-hint">
+                      ⓘ
+                      <span className="tooltip-content">
+                        Node type: system (entire service), container (API/UI/DB), 
+                        component (class/module), or external_system (third-party service).
+                      </span>
+                    </span>
+                  </span>
                   <span className="detail-value">{selectedNode.type}</span>
                 </div>
               )}
 
               {selectedNode.containerMeta?.technology && (
                 <div className="detail-row metadata-row">
-                  <span className="detail-label">Technology:</span>
+                  <span className="detail-label">
+                    Technology
+                    <span className="tooltip-hint">
+                      ⓘ
+                      <span className="tooltip-content">
+                        Primary technology stack: Python/FastAPI, React/TypeScript, 
+                        PostgreSQL, Redis, etc. Detected from code and dependencies.
+                      </span>
+                    </span>
+                  </span>
                   <span className="detail-value">
                     {selectedNode.containerMeta.technology}
                   </span>
@@ -2151,7 +2317,16 @@ const CodeArchitectureViewerInner: React.FC = () => {
 
               {selectedNode.file && (
                 <div className="detail-row metadata-row">
-                  <span className="detail-label">File:</span>
+                  <span className="detail-label">
+                    File
+                    <span className="tooltip-hint">
+                      ⓘ
+                      <span className="tooltip-content">
+                        Source file path where this component or container was detected. 
+                        Relative to repository root.
+                      </span>
+                    </span>
+                  </span>
                   <span className="detail-value file-path">
                     {selectedNode.file}
                   </span>
@@ -2161,7 +2336,15 @@ const CodeArchitectureViewerInner: React.FC = () => {
               {/* Show URL for external services */}
               {selectedNode.attributes?.url && (
                 <div className="detail-row">
-                  <span className="detail-label">Service URL</span>
+                  <span className="detail-label">
+                    Service URL
+                    <span className="tooltip-hint">
+                      ⓘ
+                      <span className="tooltip-content">
+                        External service URL or API endpoint for third-party integrations.
+                      </span>
+                    </span>
+                  </span>
                   <span className="detail-value">
                     <a
                       href={selectedNode.attributes.url}
@@ -2203,9 +2386,77 @@ const CodeArchitectureViewerInner: React.FC = () => {
 
               {selectedNode.attributes?.detected_from && (
                 <div className="detail-row metadata-row">
-                  <span className="detail-label">Detected from:</span>
+                  <span className="detail-label">
+                    Detected From
+                    <span className="tooltip-hint">
+                      ⓘ
+                      <span className="tooltip-content">
+                        Configuration file where this dependency was found: 
+                        package.json, requirements.txt, docker-compose.yml, Helm charts, etc.
+                      </span>
+                    </span>
+                  </span>
                   <span className="detail-value">
                     {selectedNode.attributes.detected_from}
+                  </span>
+                </div>
+              )}
+
+              {/* NEW: Classification metadata for external dependencies */}
+              {selectedNode.attributes?.dependency_type && (
+                <div className="detail-row">
+                  <span className="detail-label">
+                    C4 Classification
+                    <span className="tooltip-hint">
+                      ⓘ
+                      <span className="tooltip-content">
+                        BUSINESS_SYSTEM = External business service (should appear at Context level). 
+                        TECHNICAL_INFRA = Infrastructure component (should appear at Container level). 
+                        Classified by LLM or pattern-matching rules.
+                      </span>
+                    </span>
+                  </span>
+                  <span className={`detail-value pill ${
+                    selectedNode.attributes.dependency_type === 'BUSINESS_SYSTEM' 
+                      ? 'business-system-pill' 
+                      : 'technical-infra-pill'
+                  }`}>
+                    {selectedNode.attributes.dependency_type}
+                  </span>
+                </div>
+              )}
+
+              {selectedNode.attributes?.classification_confidence !== undefined && (
+                <div className="detail-row">
+                  <span className="detail-label">
+                    Classification Confidence
+                    <span className="tooltip-hint">
+                      ⓘ
+                      <span className="tooltip-content">
+                        How confident the classifier is about this categorization. 
+                        Range: 0.0-1.0. Higher is better. Based on LLM analysis or pattern matching.
+                      </span>
+                    </span>
+                  </span>
+                  <span className="detail-value">
+                    {Math.round(selectedNode.attributes.classification_confidence * 100)}%
+                  </span>
+                </div>
+              )}
+
+              {selectedNode.attributes?.classification_reasoning && (
+                <div className="detail-row">
+                  <span className="detail-label">
+                    Classification Reasoning
+                    <span className="tooltip-hint">
+                      ⓘ
+                      <span className="tooltip-content">
+                        Explanation of why this dependency was classified as business or technical.
+                      </span>
+                    </span>
+                  </span>
+                  <span className="detail-value">
+                    {selectedNode.attributes.classification_reasoning}
                   </span>
                 </div>
               )}

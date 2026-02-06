@@ -10,6 +10,15 @@
 - **METADATA**: Ensure Domain, Owner, Lifecycle, Tier, Data Class, Experts, and Compliance are always extracted.
 - **ENDPOINTS**: Service URLs and access paths must be extracted from Helm/Ingress/READMEs.
 
+## 👥 Workspace Separation
+- **CONTEXT FOLDER**: `sources/Api/app/services/c4/context/` - **OUR WORKSPACE**
+  - System detection, metadata extraction, context-level C4 logic
+  - **WE MODIFY THIS**
+- **CONTAINERS FOLDER**: `sources/Api/app/services/c4/containers/` - **ANOTHER DEVELOPER'S WORKSPACE**
+  - Container detection (Docker, Helm, Terraform, etc.)
+  - **DO NOT MODIFY** unless explicitly requested or coordinating with the other developer
+- **REASON**: Parallel development - avoid merge conflicts and stepping on each other's work
+
 ## 🛠️ Code Quality
 - **BACKEND**: Python 3.11, FastAPI, Pydantic V2 (strict typing).
 - **FRONTEND**: React, TypeScript, ReactFlow.

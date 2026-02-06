@@ -15,18 +15,47 @@ const GitHubOrgScanner: React.FC<GitHubOrgScannerProps> = ({
   onScanStart,
   isScanning,
 }) => {
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState('venkataravuri');
   const [includeForks, setIncludeForks] = useState(false);
   const [maxRepos, setMaxRepos] = useState(10);
   const [inputError, setInputError] = useState('');
 
+  // Helper function to extract username from GitHub URL or return username as-is
+  const extractUsername = (input: string): string => {
+    const trimmed = input.trim();
+    
+    // Handle various GitHub URL formats
+    // https://github.com/username
+    // http://github.com/username
+    // github.com/username
+    // @username
+    // username
+    
+    const githubUrlPattern = /(?:https?:\/\/)?(?:www\.)?github\.com\/([^\/\s?#]+)/i;
+    const match = trimmed.match(githubUrlPattern);
+    
+    if (match && match[1]) {
+      return match[1]; // Extract username from URL
+    }
+    
+    // Remove @ symbol if present
+    if (trimmed.startsWith('@')) {
+      return trimmed.substring(1);
+    }
+    
+    return trimmed;
+  };
+
   const handleScan = () => {
-    if (!username.trim()) {
+    const cleanUsername = extractUsername(username);
+    
+    if (!cleanUsername) {
       setInputError('Please enter a GitHub username or organization');
       return;
     }
+    
     setInputError('');
-    onScanStart(username.trim(), { includeForks, maxRepos });
+    onScanStart(cleanUsername, { includeForks, maxRepos });
   };
 
   return (
@@ -40,7 +69,7 @@ const GitHubOrgScanner: React.FC<GitHubOrgScannerProps> = ({
             setInputError('');
           }}
           onKeyPress={e => e.key === 'Enter' && handleScan()}
-          placeholder="username or organization"
+          placeholder="username, @username or github.com/username"
           className="org-input"
         />
       </div>

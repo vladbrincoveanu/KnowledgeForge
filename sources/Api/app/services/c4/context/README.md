@@ -200,21 +200,55 @@ Now extracts **ALL Service model fields**:
 - No commits in 180+ days
 - Inactive, legacy code
 
-## Compliance Risk Assessment
+## 7. Compliance Risk Assessment
 
-**COMPLIANT:**
-- High-risk data (PII, Credit-Card) is Tier 1 or 2
-- High-risk data has assigned owner
-- Tier 1 services have owners
+**NEW: 7-Check Engineering Standards Rubric**
 
-**AT_RISK:**
-- 1 compliance issue detected
+Evaluates repository against comprehensive engineering best practices:
 
-**NON_COMPLIANT:**
-- 2+ compliance issues detected
+**The 7 Checks:**
+1. ✅ **README Documentation**: README.md exists with meaningful content (>200 chars)
+2. ✅ **Automated Tests**: Test files or test directories detected
+3. ✅ **CI/CD Pipeline**: GitHub Actions, GitLab CI, Jenkins, or other CI config present
+4. ✅ **Security Scanning**: Snyk, Dependabot, Trivy, Bandit, or security workflows configured
+5. ✅ **No Hardcoded Secrets**: .env.example exists, .env not committed to git
+6. ✅ **Clean Code Structure**: src/ or app/ directories, organized modules
+7. ✅ **Dependency Management**: requirements.txt, package.json, go.mod, etc. present
 
-**UNKNOWN:**
-- Unable to determine compliance level
+**Scoring Thresholds:**
+- **EXCELLENT** (7/7): All engineering standards met
+- **COMPLIANT** (5-6/7): Minor gaps in non-critical areas
+- **AT_RISK** (3-4/7): Multiple standards violations
+- **NON_COMPLIANT** (0-2/7): Severe gaps OR critical security issue (e.g., .env file committed)
+
+**Critical Security Override:**
+If Check 5 fails due to .env file being committed to git, compliance is immediately
+set to NON_COMPLIANT regardless of other checks (marked with 🚨).
+
+**Implementation:**
+Pure deterministic function based on file system scanning. Returns:
+- `compliance_status`: "EXCELLENT", "COMPLIANT", "AT_RISK", "NON_COMPLIANT"
+- `confidence`: 1.0 (deterministic checks)
+- `compliance_factors`: List of passed/failed checks with score summary
+
+**Example Output:**
+```python
+compliance_factors = [
+    "Score: 6/7 checks passed",
+    "✅ README documentation exists",
+    "✅ Automated tests exist",
+    "✅ CI/CD pipeline configured",
+    "✅ Security scanning configured",
+    "✅ No hardcoded secrets (.env.example pattern)",
+    "✅ Dependency management configured",
+    "❌ Poor code organization (no src/ or app/ structure)"
+]
+```
+
+**Old Implementation (Deprecated):**
+The previous 6-rule data-tier-ownership model has been replaced. Legacy fields
+(domain, data_class, owner, tier, status, active_experts) are still passed to
+maintain API compatibility but are no longer used in compliance calculation.
 
 ## Integration
 

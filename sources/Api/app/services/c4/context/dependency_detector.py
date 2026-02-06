@@ -17,19 +17,24 @@ from typing import Any
 import tomli
 import yaml
 
+from .dependency_classifier import DependencyClassifier
+
 logger = logging.getLogger(__name__)
 
 
 class DependencyDetector:
     """Detects external dependencies for C4 Context."""
 
-    def __init__(self, repo_path: Path):
+    def __init__(self, repo_path: Path, llm_manager=None, enable_classification: bool = True):
         """Initialize dependency detector.
 
         Args:
             repo_path: Path to repository
+            llm_manager: Optional LLM manager for classification (supports OpenAI or local LLM)
+            enable_classification: Whether to enable LLM classification (default: True)
         """
         self.repo_path = Path(repo_path).resolve()
+        self.classifier = DependencyClassifier(llm_manager) if enable_classification else None
 
     def detect_external_dependencies(self) -> list[dict[str, Any]]:
         """Detect external service dependencies.
@@ -74,6 +79,28 @@ class DependencyDetector:
                 external_deps.append(dep)
                 seen.add(name)
 
+        # Classify dependencies if classifier enabled
+        if self.classifier:
+            logger.info(f"Classifying {len(external_deps)} external dependencies...")
+            classified_deps = []
+            
+            for dep in external_deps:
+                classification = self.classifier.classify_dependency(
+                    name=dep.get('name', ''),
+                    dep_type=dep.get('type', ''),
+                    detected_from=dep.get('detected_from', ''),
+                    context=dep.get('context', '')
+                )
+                
+                # Add classification fields to dependency
+                dep['dependency_type'] = classification.type.value
+                dep['classification_confidence'] = classification.confidence
+                dep['classification_reasoning'] = classification.reasoning
+                
+                classified_deps.append(dep)
+            
+            return classified_deps
+        
         return external_deps
 
     def _external_dependency_patterns(self) -> dict[str, tuple[str, str]]:

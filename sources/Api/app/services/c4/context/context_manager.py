@@ -17,6 +17,7 @@ Orchestrates the detection of:
 """
 
 import logging
+import re
 from pathlib import Path
 from typing import Any, Optional
 
@@ -44,7 +45,7 @@ class ContextManager:
 
         # Initialize detectors
         self.system_detector = SystemDetector(repo_path, llm_manager)
-        self.dependency_detector = DependencyDetector(repo_path)
+        self.dependency_detector = DependencyDetector(repo_path, llm_manager)
         self.metadata_detector = MetadataDetector(repo_path, llm_manager, containers)
 
     def extract_context(self) -> dict[str, Any]:
@@ -92,12 +93,26 @@ class ContextManager:
         # Owner and contributor stats
         contributor_stats = self.metadata_detector.get_owner_contributor_stats(max_contributors=5)
 
-        # Compliance risk assessment
-        compliance = self.metadata_detector.assess_compliance_risk(
+        # Compliance risk assessment (pure calculation from extracted metadata)
+        compliance, compliance_confidence, compliance_factors = self.metadata_detector.assess_compliance_risk(
             domain=business_domain,
             data_class=data_class,
             owner=owner_team,
             tier=criticality,
+            status=status,
+            active_experts=active_experts
+        )
+
+        # Generate rich LLM description with all metadata context
+        llm_description = self._generate_llm_description(
+            system_name=system_name,
+            purpose=system_purpose,
+            domain=business_domain,
+            owner=owner_team,
+            tier=criticality,
+            status=status,
+            languages=languages,
+            frameworks=frameworks,
         )
 
         context = {
@@ -105,6 +120,8 @@ class ContextManager:
             "type": "system",
             "name": system_name,
             "purpose": system_purpose,
+            "description": llm_description or system_purpose,
+            "llm_description": llm_description or system_purpose,
             "external_dependencies": external_deps,
             "actors": actors,
             "languages": languages,
@@ -141,6 +158,8 @@ class ContextManager:
 
             # 7. compliance - Architectural compliance risk
             "compliance": compliance,
+            "compliance_confidence": compliance_confidence,
+            "compliance_factors": compliance_factors,
 
             # ═══════════════════════════════════════════════════════════
             # GIT ACTIVITY METRICS
@@ -163,7 +182,7 @@ class ContextManager:
         logger.info(f"✓ Tier: {criticality}")
         logger.info(f"✓ Data Class: {data_class}")
         logger.info(f"✓ Active Experts: {active_experts}")
-        logger.info(f"✓ Compliance: {compliance}")
+        logger.info(f"✓ Compliance: {compliance} ({compliance_confidence})")
         logger.info(f"✓ External dependencies: {len(external_deps)}")
 
         return context
@@ -201,3 +220,54 @@ class ContextManager:
             })
 
         return relationships
+
+    def _generate_llm_description(self, system_name: str, purpose: str, domain: str, 
+                                   owner: str, tier: str, status: str, 
+                                   languages: list, frameworks: list) -> Optional[str]:
+        """Generate rich LLM description using all metadata context."""
+        if not self.llm_manager:
+            return None
+
+        # Build context for LLM
+        langs_str = ", ".join([l.get("language", "") for l in languages[:3]]) if languages else "unknown"
+        frameworks_str = ", ".join([f.get("framework", "") for f in frameworks[:3]]) if frameworks else "none detected"
+        
+        prompt = f"""Generate a concise 2-3 sentence description for this system.
+
+System: {system_name}
+Purpose: {purpose}
+Domain: {domain}
+Owner: {owner}
+Tier: {tier}
+Status: {status}
+Languages: {langs_str}
+Frameworks: {frameworks_str}
+
+Provide a clear, technical description that explains what this system does, who owns it, and its current state.
+Do not include metadata labels, just write the description naturally.
+
+Description:"""
+
+        try:
+            response = self.llm_manager.generate_text(
+                prompt,
+                max_tokens=120,
+                temperature=0.3,
+                use_cache=True
+            )
+
+            if response:
+                # Clean up response
+                description = response.strip()
+                # Remove any markdown or XML artifacts
+                description = re.sub(r'<[^>]+>', '', description)
+                description = re.sub(r'\*\*|__', '', description)
+                # Ensure it ends properly
+                if description and not description.endswith('.'):
+                    description += '.'
+                return description if len(description) > 20 else None
+
+        except Exception as e:
+            logger.debug(f"Failed to generate LLM description: {e}")
+
+        return None

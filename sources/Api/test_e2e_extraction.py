@@ -66,20 +66,18 @@ class TestE2EExtraction:
         """Test that system context has all basic required fields."""
         system_context = extracted_data["system_context"]
         
-        # Required fields
-        assert "name" in system_context, "System context must have 'name'"
-        assert "purpose" in system_context, "System context must have 'purpose'"
-        assert "type" in system_context, "System context must have 'type'"
-        assert system_context["type"] == "system"
+        assert system_context.get("name") == EXPECTED_SYSTEM_NAME
+        assert system_context.get("purpose")
+        assert system_context.get("description")
+        assert system_context.get("type") == "system"
+        assert system_context.get("repository_url") == "https://github.com/venkataravuri/e-commerce-microservices-sample"
         
         print(f"✅ System name: {system_context['name']}")
-        print(f"✅ System type: {system_context['type']}")
     
     def test_02_system_context_it_landscape_fields(self, extracted_data):
         """Test that system context has all 7 key IT landscape fields."""
         system_context = extracted_data["system_context"]
-        
-        # The 7 key attributes
+
         required_fields = [
             "domain",           # Business area
             "owner",            # Squad/team
@@ -89,30 +87,114 @@ class TestE2EExtraction:
             "active_experts",   # Bus factor
             "compliance",       # Architectural risk
         ]
-        
+
         for field in required_fields:
             assert field in system_context, f"System context must have '{field}'"
+            assert system_context[field] not in [None, "", "Unknown", "unknown", "Unassigned"], (
+                f"{field} must not be default/empty, got: {system_context[field]}"
+            )
             print(f"✅ {field}: {system_context[field]}")
-        
-        # Validate specific values
-        assert system_context["domain"] in ["Infrastructure", "User Management", "Data", "AI/ML", "Frontend", "Backend"], \
-            f"Invalid domain: {system_context['domain']}"
-        
-        assert system_context["status"] in ["Active-Dev", "Maintenance-Only", "Deprecated / Frozen"], \
-            f"Invalid status: {system_context['status']}"
-        
-        assert "Tier" in system_context["tier"] or system_context["tier"].startswith("Tier"), \
-            f"Invalid tier format: {system_context['tier']}"
-        
-        assert system_context["data_class"] in ["PII", "Credit-Card", "Legal/Security", "General"], \
-            f"Invalid data_class: {system_context['data_class']}"
-        
-        assert isinstance(system_context["active_experts"], int), \
-            f"active_experts must be integer, got: {type(system_context['active_experts'])}"
-        
-        assert system_context["compliance"] in ["COMPLIANT", "AT_RISK", "NON_COMPLIANT"], \
-            f"Invalid compliance: {system_context['compliance']}"
-    
+
+        assert system_context["domain"] == "Infrastructure"
+        assert system_context["status"] == "Deprecated / Frozen"
+        assert system_context["tier"] == "Tier 3 - Development/Internal"
+        assert system_context["data_class"] == "General"
+        assert isinstance(system_context["active_experts"], int)
+
+        # === NEW: 7-Check Compliance Validation ===
+        compliance = system_context.get('compliance')
+        compliance_factors = system_context.get('compliance_factors', [])
+        compliance_confidence = system_context.get('compliance_confidence')
+
+        # Assert compliance is not default/unknown
+        assert compliance is not None, "compliance field must be present"
+        assert compliance != "UNKNOWN", "compliance should be determined for real repos"
+        assert compliance in ["EXCELLENT", "COMPLIANT", "AT_RISK", "NON_COMPLIANT"], \
+            f"Invalid compliance value: {compliance}"
+
+        # Assert compliance factors are populated with checks
+        assert len(compliance_factors) > 0, "compliance_factors should contain check results"
+
+        # Assert first factor is the score summary
+        assert compliance_factors[0].startswith("Score:"), \
+            f"First factor should be score summary, got: {compliance_factors[0]}"
+
+        # Validate score format: "Score: X/7 checks passed"
+        score_line = compliance_factors[0]
+        import re
+        match = re.search(r'Score: (\d+)/7', score_line)
+        assert match, f"Invalid score format: {score_line}"
+        score = int(match.group(1))
+        assert 0 <= score <= 7, f"Score must be 0-7, got {score}"
+
+        # Assert factors contain check results (✅ or ❌)
+        check_factors = [f for f in compliance_factors[1:] if f.startswith(('✅', '❌', '🚨'))]
+        assert len(check_factors) == 7, \
+            f"Should have exactly 7 check results, got {len(check_factors)}: {check_factors}"
+
+        # Validate specific checks are present (at least as pass or fail)
+        expected_checks = [
+            "README", "tests", "CI/CD", "Security", "secrets", "structure", "Dependency"
+        ]
+        factors_text = ' '.join(compliance_factors).lower()
+        for check in expected_checks:
+            assert check.lower() in factors_text, \
+                f"Check '{check}' not found in compliance factors: {compliance_factors}"
+
+        # Assert confidence is 1.0 (deterministic)
+        assert compliance_confidence == 1.0, \
+            f"Compliance confidence should be 1.0 for deterministic checks, got {compliance_confidence}"
+
+        # Validate compliance level matches score
+        if score == 7:
+            assert compliance == "EXCELLENT", f"7/7 should be EXCELLENT, got {compliance}"
+        elif score >= 5:
+            assert compliance in ["COMPLIANT", "EXCELLENT"], \
+                f"5-6/7 should be COMPLIANT or EXCELLENT, got {compliance}"
+        elif score >= 3:
+            assert compliance in ["AT_RISK", "COMPLIANT"], \
+                f"3-4/7 should be AT_RISK, got {compliance}"
+        else:
+            assert compliance == "NON_COMPLIANT", \
+                f"0-2/7 should be NON_COMPLIANT, got {compliance}"
+
+        # Check for critical security override
+        critical_security = any('🚨' in f and 'CRITICAL' in f for f in compliance_factors)
+        if critical_security:
+            assert compliance == "NON_COMPLIANT", \
+                "Critical security issue should force NON_COMPLIANT status"
+
+        print(f"\n✅ Compliance validation passed:")
+        print(f"   Status: {compliance} ({score}/7)")
+        print(f"   Confidence: {compliance_confidence}")
+        print(f"   Factors ({len(compliance_factors)}):")
+        for factor in compliance_factors[:5]:  # Print first 5
+            print(f"     {factor}")
+
+    def test_02b_compliance_edge_cases(self, extracted_data):
+        """Test compliance rubric handles edge cases correctly."""
+
+        # Test that real e-commerce repo has non-default compliance
+        system_context = extracted_data["system_context"]
+        compliance = system_context.get('compliance')
+        compliance_factors = system_context.get('compliance_factors', [])
+
+        # Should detect at least some checks
+        passed_checks = [f for f in compliance_factors if f.startswith('✅')]
+        failed_checks = [f for f in compliance_factors if f.startswith(('❌', '🚨'))]
+
+        assert len(passed_checks) > 0, "Real repo should pass at least some checks"
+
+        # Validate no empty/placeholder factors
+        for factor in compliance_factors:
+            assert len(factor.strip()) > 0, "No empty compliance factors allowed"
+            assert factor not in ["UNKNOWN", "N/A", "TODO"], \
+                f"Placeholder factor detected: {factor}"
+
+        print(f"\n✅ Edge case validation passed:")
+        print(f"   Passed: {len(passed_checks)} checks")
+        print(f"   Failed: {len(failed_checks)} checks")
+
     def test_03_owner_detection(self, extracted_data):
         """Test that owner is properly detected from Git history."""
         system_context = extracted_data["system_context"]
@@ -137,17 +219,19 @@ class TestE2EExtraction:
         """Test that containers are properly detected."""
         containers = extracted_data["containers"]
         
-        # Note: Container detection depends on repository structure
-        # Some repos may have 0 containers if they don't follow expected patterns
-        print(f"\n✅ Detected {len(containers)} containers")
+        assert len(containers) >= 5
+        container_names = {c.get("name") for c in containers}
+        expected = {
+            "products-cna-microservice",
+            "search-cna-microservice",
+            "store-ui",
+            "users-cna-microservice",
+            "cart-cna-microservice",
+        }
+        assert expected.issubset(container_names)
         
-        if len(containers) > 0:
-            print("Containers found:")
-            for container in containers[:5]:  # Print first 5
-                print(f"  - {container['name']} ({container['type']})")
-        else:
-            print("⚠️  No containers detected (repo may not follow container structure patterns)")
-    
+        print(f"\n✅ Detected {len(containers)} containers")
+
     def test_05_container_fields(self, extracted_data):
         """Test that containers have all required fields."""
         containers = extracted_data["containers"]
@@ -248,7 +332,7 @@ def test_ui_data_display():
     assert "Tier" in sample_system_context["tier"]
     assert sample_system_context["data_class"] in ["PII", "Credit-Card", "Legal/Security", "General"]
     assert sample_system_context["active_experts"] >= 0
-    assert sample_system_context["compliance"] in ["COMPLIANT", "AT_RISK", "NON_COMPLIANT"]
+    assert sample_system_context["compliance"] in ["EXCELLENT", "COMPLIANT", "AT_RISK", "NON_COMPLIANT"]
     
     print("✅ UI data structure validation passed")
 

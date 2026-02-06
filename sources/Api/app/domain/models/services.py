@@ -182,6 +182,16 @@ class Service(BaseModel):
         description="Architectural compliance risk level: COMPLIANT, AT_RISK, NON_COMPLIANT, UNKNOWN. "
                     "Checks if sensitive data is properly prioritized and owned."
     )
+    compliance_confidence: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Confidence for compliance assessment (0-1)."
+    )
+    compliance_factors: list[str] = Field(
+        default_factory=list,
+        description="Factors contributing to the compliance assessment."
+    )
 
     # Provenance
     extracted_at: datetime = Field(default_factory=datetime.utcnow)

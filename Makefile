@@ -461,10 +461,10 @@ quick-check:
 	@docker-compose ps | grep api
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "📋 Step 3/4: Running E2E tests..."
+	@echo "📋 Step 3/4: Running E2E extraction tests..."
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@docker compose exec api python -m pytest test_e2e_extraction.py -v || (echo "❌ E2E tests failed!" && exit 1)
-	@echo "✅ E2E tests passed"
+	@$(MAKE) test-e2e || (echo "❌ E2E extraction tests failed!" && exit 1)
+	@echo "✅ E2E extraction tests passed"
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "📋 Step 4/4: Quick syntax check..."

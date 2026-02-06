@@ -45,7 +45,11 @@ def _save_c4_to_json(task_id: str, c4_architecture: dict) -> None:
 
 
 def _load_latest_c4_from_json() -> dict:
-    """Load the most recent C4 architecture from JSON file."""
+    """Load the most recent C4 architecture from JSON file.
+    
+    For batch extractions, loads the aggregated result.
+    Falls back to merging multiple batch files if needed (legacy behavior).
+    """
     try:
         api_root = Path(__file__).resolve().parents[4]
         output_dir = api_root / "sources" / "data" / "c4_extractions"
@@ -77,7 +81,14 @@ def _load_latest_c4_from_json() -> dict:
         logger.info(f"Loading C4 architecture from {latest_file}")
 
         with open(latest_file, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            data = json.load(f)
+            
+        # Log statistics for debugging
+        context_level = data.get('context_level', {})
+        systems = context_level.get('systems', [])
+        logger.info(f"Loaded {len(systems)} systems from {latest_file.name}")
+        
+        return data
     except Exception as e:
         logger.error(f"Failed to load C4 architecture from JSON: {e}", exc_info=True)
         return {}
@@ -361,12 +372,40 @@ async def extract_from_github_org(
     """
     Fetch all public repositories from a GitHub user/org and extract them.
 
-    Note: Unauthenticated GitHub API has 60 requests/hour limit.
+    Note: Supports GitHub token via GITHUB_TOKEN env var for higher rate limits.
+    Unauthenticated: 60 requests/hour | Authenticated: 5000 requests/hour
     """
     import requests
+    import os
+    import re
 
-    # Fetch repos from GitHub API (unauthenticated)
-    repos_url = f'https://api.github.com/users/{request.github_username}/repos'
+    # Clean username - extract from URL if provided
+    username = request.github_username.strip()
+    
+    # Remove GitHub URL prefix if present
+    # Handles: https://github.com/username, github.com/username, @username
+    github_url_pattern = r'(?:https?://)?(?:www\.)?github\.com/([^/\s?#]+)'
+    match = re.search(github_url_pattern, username, re.IGNORECASE)
+    if match:
+        username = match.group(1)
+    
+    # Remove @ symbol if present
+    username = username.lstrip('@')
+    
+    if not username:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid GitHub username or organization"
+        )
+
+    # Check for GitHub token
+    github_token = os.getenv('GITHUB_TOKEN')
+    headers = {}
+    if github_token:
+        headers['Authorization'] = f'token {github_token}'
+
+    # Fetch repos from GitHub API
+    repos_url = f'https://api.github.com/users/{username}/repos'
     params = {
         'type': 'all',
         'sort': 'updated',
@@ -374,13 +413,18 @@ async def extract_from_github_org(
     }
 
     try:
-        response = requests.get(repos_url, params=params, timeout=10)
+        # Increased timeout from 10s to 30s
+        logger.info(f"Fetching repos from GitHub for user: {username}")
+        response = requests.get(repos_url, params=params, headers=headers, timeout=30)
+        logger.info(f"GitHub API responded with status: {response.status_code}")
         response.raise_for_status()
         repos = response.json()
+        logger.info(f"Retrieved {len(repos)} repositories from GitHub")
 
         # Filter out forks if requested
         if not request.include_forks:
             repos = [r for r in repos if not r.get('fork', False)]
+            logger.info(f"After filtering forks: {len(repos)} repositories")
 
         # Limit to max_repos
         repos = repos[:request.max_repos]
@@ -388,12 +432,14 @@ async def extract_from_github_org(
         if not repos:
             raise HTTPException(
                 status_code=404,
-                detail=f"No repositories found for '{request.github_username}'"
+                detail=f"No repositories found for '{username}'"
             )
 
         # Create batch task
         task_id = str(uuid.uuid4())
         repo_urls = [r['html_url'] for r in repos]
+        
+        logger.info(f"Creating batch extraction task {task_id} for {len(repo_urls)} repositories")
 
         scan_tasks[task_id] = {
             'task_id': task_id,
@@ -408,6 +454,7 @@ async def extract_from_github_org(
         }
 
         # Queue batch extraction
+        logger.info(f"Queuing background task for batch extraction of {len(repo_urls)} repos")
         background_tasks.add_task(
             run_batch_extraction,
             task_id,
@@ -415,6 +462,7 @@ async def extract_from_github_org(
             request.append_mode,
         )
 
+        logger.info(f"Returning response for task {task_id}")
         return ScanResponse(
             task_id=task_id,
             status='pending',
@@ -426,14 +474,30 @@ async def extract_from_github_org(
         if e.response.status_code == 404:
             raise HTTPException(
                 status_code=404,
-                detail=f"GitHub user/org '{request.github_username}' not found"
+                detail=f"GitHub user/org '{username}' not found"
             )
         elif e.response.status_code == 403:
-            raise HTTPException(
-                status_code=429,
-                detail="GitHub API rate limit exceeded (60/hour). Please try again later."
-            )
+            # Check if it's rate limit or access denied
+            remaining = e.response.headers.get('X-RateLimit-Remaining', 'unknown')
+            if remaining == '0':
+                reset_time = e.response.headers.get('X-RateLimit-Reset', '')
+                msg = "GitHub API rate limit exceeded."
+                if github_token:
+                    msg += " (authenticated: 5000/hour)"
+                else:
+                    msg += " (unauthenticated: 60/hour). Set GITHUB_TOKEN env var for higher limits."
+                raise HTTPException(status_code=429, detail=msg)
+            else:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Access denied to '{username}'. Repository may be private."
+                )
         raise HTTPException(status_code=500, detail=f"GitHub API error: {str(e)}")
+    except requests.Timeout:
+        raise HTTPException(
+            status_code=504,
+            detail=f"GitHub API request timed out after 30 seconds. Try again or reduce max_repos."
+        )
     except requests.RequestException as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch repositories: {str(e)}")
 
@@ -442,6 +506,10 @@ async def run_batch_extraction(task_id: str, repo_urls: list[str], append_mode: 
     """Background task to extract multiple repositories sequentially."""
     total = len(repo_urls)
 
+    # For batch operations, we want to append all repos together
+    # First extraction clears DB if append_mode=False, subsequent ones always append
+    should_clear_db = not append_mode
+    
     for idx, repo_url in enumerate(repo_urls):
         try:
             scan_tasks[task_id]['message'] = f'Extracting {idx + 1}/{total}: {repo_url}'
@@ -456,11 +524,12 @@ async def run_batch_extraction(task_id: str, repo_urls: list[str], append_mode: 
                 use_git=True
             )
 
-            # Run extraction
+            # Run extraction with same task_id (will aggregate all repos)
+            # Only clear DB on first repo if append_mode=False
             await run_c4_extraction(
-                task_id=f"{task_id}_repo_{idx}",
+                task_id=task_id,  # Use same task_id for all repos
                 repo_path=repo_path,
-                append_mode=append_mode,
+                append_mode=(idx > 0) or append_mode,  # Append after first repo
             )
 
             scan_tasks[task_id]['completed_repos'] = idx + 1
@@ -635,9 +704,15 @@ async def store_c4_in_neo4j(
         # Store system context (Level 1)
         system = c4_architecture['system_context']
         system_ctx = system  # alias for clarity
+        
+        # Get repository URL for unique identification
+        repo_url = system_ctx.get('repository_url', '')
+        
+        # Use both name AND repository_url for MERGE to ensure different repos 
+        # create separate System nodes even if they have the same project name
         neo4j_manager.execute_query(
             """
-            MERGE (s:System {name: $name})
+            MERGE (s:System {name: $name, repository_url: $repository_url})
             SET s.purpose = $purpose,
                 s.c4_level = $c4_level,
                 s.domain = $domain,
@@ -650,6 +725,7 @@ async def store_c4_in_neo4j(
                 s.updated_at = datetime()
             """,
             name=system['name'],
+            repository_url=repo_url,
             purpose=system['purpose'],
             c4_level=system['c4_level'],
             domain=system_ctx.get('business_domain', system_ctx.get('domain', 'Unclassified')),
@@ -667,16 +743,23 @@ async def store_c4_in_neo4j(
                 """
                 MERGE (e:ExternalService {name: $name})
                 SET e.type = $type,
-                    e.url = $url
+                    e.url = $url,
+                    e.dependency_type = $dependency_type,
+                    e.classification_confidence = $classification_confidence,
+                    e.classification_reasoning = $classification_reasoning
                 WITH e
-                MATCH (s:System {name: $system_name})
+                MATCH (s:System {name: $system_name, repository_url: $repository_url})
                 MERGE (s)-[r:DEPENDS_ON]->(e)
                 SET r.detected_from = $detected_from
                 """,
                 name=dep['name'],
                 type=dep['type'],
                 url=dep.get('url', ''),
+                dependency_type=dep.get('dependency_type', 'UNKNOWN'),
+                classification_confidence=dep.get('classification_confidence', 0.5),
+                classification_reasoning=dep.get('classification_reasoning', ''),
                 system_name=system['name'],
+                repository_url=system.get('repository_url', ''),
                 detected_from=dep.get('detected_from', '')
             )
         
@@ -696,9 +779,10 @@ async def store_c4_in_neo4j(
                     c.tier = $tier,
                     c.data_class = $data_class,
                     c.active_experts = $active_experts,
-                    c.compliance = $compliance
+                    c.compliance = $compliance,
+                    c.repository_url = $repository_url
                 WITH c
-                MATCH (s:System {name: $system_name})
+                MATCH (s:System {name: $system_name, repository_url: $repository_url})
                 MERGE (s)-[:CONTAINS]->(c)
                 """,
                 name=container['name'],
@@ -707,6 +791,7 @@ async def store_c4_in_neo4j(
                 protocol=container['protocol'],
                 c4_level=container['c4_level'],
                 path=container['path'],
+                repository_url=repo_url,
                 # Inherit from system context
                 owner=system_ctx.get('owner_team', system_ctx.get('owner', 'Unassigned')),
                 domain=system_ctx.get('business_domain', system_ctx.get('domain', 'Unclassified')),

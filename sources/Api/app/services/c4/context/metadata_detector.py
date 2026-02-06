@@ -571,58 +571,89 @@ Team name:"""
             logger.debug(f"Failed to calculate active experts: {e}")
             return 0
 
-    def assess_compliance_risk(self, domain: str, data_class: str, owner: str, tier: str) -> str:
-        """Assess architectural compliance risk.
 
-        Checks if sensitive data is properly prioritized and owned.
-
+    def assess_compliance_risk(self, domain: str, data_class: str, owner: str, tier: str, 
+                               status: str, active_experts: int) -> tuple[str, float, list[str]]:
+        """Assess architectural compliance as a pure function of extracted metadata.
+        
+        Compliance = proper alignment of criticality, data sensitivity, ownership, and maintenance.
+        NOT about specific DevOps tools (those vary too much across projects).
+        
         Args:
             domain: Business domain
-            owner: Owner team
-            data_class: Data classification
+            data_class: Data sensitivity classification
+            owner: Owner team/person
             tier: Criticality tier
-
+            status: Lifecycle status
+            active_experts: Number of active maintainers
+            
         Returns:
-            "COMPLIANT", "AT_RISK", "NON_COMPLIANT", or "UNKNOWN"
+            Tuple of (compliance_status, confidence, issue_factors)
         """
-        # Extract tier number if present (e.g., "Tier 1 - Production Critical" -> 1)
+        # Extract tier number
         tier_number = None
         tier_match = re.search(r'tier\s*(\d+)', tier.lower())
         if tier_match:
             tier_number = int(tier_match.group(1))
 
-        # High-risk data classifications
         high_risk_data = ["PII", "Credit-Card", "Legal/Security"]
-
-        # Compliance rules:
-        # 1. High-risk data (PII, Credit-Card) should be Tier 1 or 2
-        # 2. High-risk data should have an assigned owner
-        # 3. Tier 1 services should have an owner
-
+        has_owner = bool(owner and owner != "Unassigned")
         issues = []
 
-        # Check if high-risk data is properly tiered
-        if data_class in high_risk_data:
-            if tier_number and tier_number >= 3:
-                issues.append("high_risk_data_low_tier")
+        # RULE 1: Sensitive data must be in high tier (Tier 1 or 2)
+        if data_class in high_risk_data and tier_number and tier_number >= 3:
+            issues.append("sensitive_data_low_tier")
 
-            if not owner or owner == "Unassigned":
-                issues.append("high_risk_data_no_owner")
+        # RULE 2: Sensitive data must have clear ownership
+        if data_class in high_risk_data and not has_owner:
+            issues.append("sensitive_data_no_owner")
 
-        # Check if Tier 1 has owner
-        if tier_number == 1:
-            if not owner or owner == "Unassigned":
-                issues.append("tier1_no_owner")
+        # RULE 3: Production critical services (Tier 1) must have ownership
+        if tier_number == 1 and not has_owner:
+            issues.append("critical_service_no_owner")
 
-        # Determine compliance level
-        if not issues:
-            return "COMPLIANT"
-        elif len(issues) == 1:
-            return "AT_RISK"
-        elif len(issues) >= 2:
-            return "NON_COMPLIANT"
+        # RULE 4: Services must not be abandoned (bus factor risk)
+        if active_experts == 0:
+            issues.append("no_active_maintainers")
+
+        # RULE 5: Deprecated services shouldn't hold sensitive data
+        if status == "Deprecated / Frozen" and data_class in high_risk_data:
+            issues.append("deprecated_with_sensitive_data")
+        
+        # RULE 6: Single maintainer is a risk for critical services
+        if tier_number == 1 and active_experts == 1:
+            issues.append("single_point_of_failure")
+
+        # Calculate risk score
+        risk_weights = {
+            "sensitive_data_low_tier": 2.0,
+            "sensitive_data_no_owner": 2.0,
+            "critical_service_no_owner": 1.5,
+            "no_active_maintainers": 1.5,
+            "deprecated_with_sensitive_data": 1.5,
+            "single_point_of_failure": 1.0,
+        }
+
+        risk_score = sum(risk_weights.get(issue, 0) for issue in issues)
+
+        # Determine compliance status
+        if risk_score >= 3.0:
+            compliance_status = "NON_COMPLIANT"
+        elif risk_score >= 1.5:
+            compliance_status = "AT_RISK"
         else:
-            return "UNKNOWN"
+            compliance_status = "COMPLIANT"
+
+        # Confidence based on data availability
+        confidence = 0.5  # Base confidence
+        if tier_number is not None:
+            confidence += 0.2
+        if data_class:
+            confidence += 0.15
+        if has_owner:
+            confidence += 0.15
+
+        return compliance_status, round(confidence, 2), issues
 
     def get_git_activity_metrics(self) -> dict[str, Any]:
         """Get detailed git activity metrics.
