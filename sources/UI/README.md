@@ -138,11 +138,6 @@ src/
 - ✅ ConnectionPrompt.tsx
 - ✅ ConnectionOverviewModal.tsx 
 - ✅ FileUploader.tsx
-- ✅ EdgeDetailsModal.tsx
-- ✅ OntologyResults.tsx (Fully typed)
-- ✅ NodeDetailsModal.tsx
-- ✅ Graph.tsx
-- ✅ VisualQueryBuilder.tsx
 - ✅ SystemMetrics.tsx (Fully typed)
 
 #### **Services Converted:**
