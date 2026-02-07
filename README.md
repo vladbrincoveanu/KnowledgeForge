@@ -62,7 +62,7 @@ make full-check
 - Task #2 — Baseline integration tests for CodeArchitectureViewer: DONE. Tests scaffolded and committed at sources/UI/src/@components/architecture-map/CodeArchitectureViewer/CodeArchitectureViewer.test.tsx.
 - Task #3 — Baseline integration tests for ArchitectureMap: DONE. Tests added at sources/UI/src/@components/architecture-map/ArchitectureMap.test.tsx.
 - Task #4 — Decompose CodeArchitectureViewer: DONE. NodeDetails stub created at sources/UI/src/@components/architecture-map/CodeArchitectureViewer/components/NodeDetails.tsx with a unit test.
-- Task #5 — Extract ServiceLegend and GraphControls: IN PROGRESS. Stubs and unit tests added at:
+- Task #5 — Extract ServiceLegend and GraphControls: DONE. Stubs and unit tests added at:
   - sources/UI/src/@components/architecture-map/CodeArchitectureViewer/components/ServiceLegend.tsx
   - sources/UI/src/@components/architecture-map/CodeArchitectureViewer/components/ServiceLegend.test.tsx
   - sources/UI/src/@components/architecture-map/CodeArchitectureViewer/components/GraphControls.tsx

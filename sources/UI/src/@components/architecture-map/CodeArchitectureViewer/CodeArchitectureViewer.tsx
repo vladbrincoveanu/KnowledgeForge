@@ -19,6 +19,7 @@ import './CodeArchitectureViewer.scss';
 import { codeArchitectureAPI } from '../../../services/api';
 import CustomNode from './CustomNode';
 import ContainerNode from './ContainerNode';
+import NodeDetails from './components/NodeDetails';
 import C4Edge from './C4Edge';
 import BatchUrlInput from './batchurlinput';
 import GitHubOrgScanner from './githuborgscanner';
@@ -197,6 +198,41 @@ const normalizeDescription = (text?: string) => {
   if (!text) return '';
   return text.replace(/\s+/g, ' ').trim();
 };
+
+const complianceStatusLabels: Record<string, string> = {
+  EXCELLENT: 'Excellent',
+  COMPLIANT: 'Compliant',
+  AT_RISK: 'At risk',
+  NON_COMPLIANT: 'Non-compliant',
+  UNKNOWN: 'Unknown',
+};
+
+const complianceFactorLabels: Record<string, string> = {
+  sensitive_data_low_tier: 'Sensitive data stored in a low-tier system',
+  sensitive_data_no_owner: 'Sensitive data without an owner',
+  critical_service_no_owner: 'Critical service without an owner',
+  no_active_maintainers: 'No active maintainers',
+  deprecated_with_sensitive_data: 'Deprecated service with sensitive data',
+  single_point_of_failure: 'Single maintainer for a Tier 1 service',
+};
+
+const formatComplianceStatus = (status?: string) => {
+  if (!status) return '';
+  return complianceStatusLabels[status] || status.replace(/_/g, ' ');
+};
+
+const formatComplianceFactor = (factor: string) => {
+  const cleaned = factor.trim();
+  const label = complianceFactorLabels[cleaned];
+  if (label) return label;
+  const spaced = cleaned.replace(/_/g, ' ');
+  return spaced ? `${spaced[0].toUpperCase()}${spaced.slice(1)}` : '';
+};
+
+const formatComplianceFactors = (factors?: string[]) =>
+  (factors || [])
+    .map(formatComplianceFactor)
+    .filter((value): value is string => Boolean(value));
 
 const nodeTypes = {
   custom: CustomNode,
@@ -1692,6 +1728,20 @@ const CodeArchitectureViewerInner: React.FC = () => {
 
   const systemAttributes =
     selectedNode?.type === 'system' ? selectedNode.attributes || {} : null;
+  const complianceStatus =
+    systemAttributes?.compliance ?? selectedNode?.attributes?.compliance;
+  const complianceStatusLabel = formatComplianceStatus(complianceStatus);
+  const complianceConfidence =
+    systemAttributes?.compliance_confidence ??
+    selectedNode?.attributes?.compliance_confidence;
+  const complianceConfidencePercent =
+    complianceConfidence != null
+      ? Math.round(100 * complianceConfidence)
+      : undefined;
+  const complianceFactors = formatComplianceFactors(
+    systemAttributes?.compliance_factors ??
+      selectedNode?.attributes?.compliance_factors
+  );
 
   if (loading) {
     return (
@@ -1971,84 +2021,11 @@ const CodeArchitectureViewerInner: React.FC = () => {
 
         {selectedNode && (
           <aside className="node-details-panel">
-            <div className="panel-header">
-              <div className="panel-title">
-                <h3>{selectedNode.fullName || selectedNode.label}</h3>
-                <span className="pill type-pill">
-                  {selectedNode.type || selectedNode.attributes?.type || 'system'}
-                </span>
-              </div>
-              <button
-                className="close-btn"
-                onClick={() => setSelectedNode(null)}
-              >
-                ×
-              </button>
-            </div>
-            <div className="panel-content">
-              <div className="detail-row description-row">
-                <span className="detail-value description-text">
-                  {normalizeDescription(
-                    nodeDescription ||
-                      systemAttributes?.llm_description ||
-                      systemAttributes?.description ||
-                      systemAttributes?.purpose ||
-                      selectedNode.containerMeta?.llm_description ||
-                      selectedNode.containerMeta?.description ||
-                      selectedNode.attributes?.llm_description ||
-                      selectedNode.attributes?.description ||
-                      selectedNode.documentation
-                  ) || '⚠️ No description - re-extract this repository to generate'}
-                </span>
-              </div>
+            <NodeDetails node={selectedNode} />
+          </aside>
+        )}
 
-              <div className="summary-badges">
-                {(systemAttributes?.status || selectedNode.attributes?.status) && (
-                  <span className="pill status-pill" data-tooltip="Lifecycle status indicates the current operational state of this system. Active systems are in production, Deprecated systems are being phased out, and Frozen systems are no longer maintained but still running.">
-                    {systemAttributes?.status || selectedNode.attributes?.status}
-                  </span>
-                )}
-                {(systemAttributes?.tier || selectedNode.attributes?.tier) && (
-                  <span className="pill tier-pill" data-tooltip="Criticality tier defines the importance and impact of this system. Tier 1 (Mission Critical) requires 24/7 support, Tier 2 (Production Standard) has business hours support, and Tier 3 (Development/Internal) is for non-production environments.">
-                    {systemAttributes?.tier || selectedNode.attributes?.tier}
-                  </span>
-                )}
-                {(systemAttributes?.compliance || selectedNode.attributes?.compliance) && (
-                  <span
-                    className={`pill compliance-pill ${
-                      (systemAttributes?.compliance || selectedNode.attributes?.compliance || '')
-                        .toString()
-                        .toLowerCase()
-                    }`}
-                    data-tooltip="Architectural compliance measures adherence to engineering standards. EXCELLENT (7/7 checks), COMPLIANT (5-6/7), AT_RISK (3-4/7), and NON_COMPLIANT (0-2/7 or critical security issues). Checks include tests, documentation, CI/CD, security scanning, and proper project structure."
-                  >
-                    {systemAttributes?.compliance || selectedNode.attributes?.compliance}
-                  </span>
-                )}
-              </div>
-
-              {/* Domain field (from image: business bucket) */}
-              {(systemAttributes?.business_domain ||
-                systemAttributes?.domain ||
-                selectedNode.attributes?.domain) && (
-                <div className="detail-row">
-                  <span className="detail-label">
-                    domain
-                    <span className="tooltip-hint">
-                      ⓘ
-                      <span className="tooltip-content">
-                        Business area this service belongs to (e.g.
-                        Infrastructure, AI/ML, Data, User Management).
-                      </span>
-                    </span>
-                  </span>
-                  <span className="detail-value">
-                    {systemAttributes?.business_domain ||
-                      systemAttributes?.domain ||
-                      selectedNode.attributes?.domain}
-                  </span>
-                </div>
-              )}
+        
 
               {/* Owner field - always show when we have system/container context (even Unassigned) */}
               {(systemAttributes ||
@@ -2209,8 +2186,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
               )}
 
               {/* Compliance (architectural risk) */}
-              {(systemAttributes?.compliance ||
-                selectedNode.attributes?.compliance) && (
+              {complianceStatus && (
                 <div className="detail-row">
                   <span className="detail-label">
                     Architectural Compliance
@@ -2224,15 +2200,13 @@ const CodeArchitectureViewerInner: React.FC = () => {
                     </span>
                   </span>
                   <span className="detail-value status-badge">
-                    {systemAttributes?.compliance ||
-                      selectedNode.attributes?.compliance}
+                    {complianceStatusLabel || complianceStatus}
                   </span>
                 </div>
               )}
 
               {/* Compliance confidence */}
-              {(systemAttributes?.compliance_confidence ??
-                selectedNode.attributes?.compliance_confidence) !== undefined && (
+              {complianceConfidencePercent !== undefined && (
                 <div className="detail-row">
                   <span className="detail-label">
                     Compliance Confidence
@@ -2245,20 +2219,13 @@ const CodeArchitectureViewerInner: React.FC = () => {
                     </span>
                   </span>
                   <span className="detail-value">
-                    {Math.round(
-                      100 *
-                        (systemAttributes?.compliance_confidence ??
-                          selectedNode.attributes?.compliance_confidence ??
-                          0)
-                    )}
-                    %
+                    {complianceConfidencePercent}%
                   </span>
                 </div>
               )}
 
               {/* Compliance factors */}
-              {(systemAttributes?.compliance_factors?.length ||
-                selectedNode.attributes?.compliance_factors?.length) && (
+              {complianceFactors.length > 0 && (
                 <div className="detail-row">
                   <span className="detail-label">
                     Compliance Issues
@@ -2272,10 +2239,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
                     </span>
                   </span>
                   <span className="detail-value">
-                    {(systemAttributes?.compliance_factors ||
-                      selectedNode.attributes?.compliance_factors || [])
-                      .map(factor => factor.replace(/_/g, ' '))
-                      .join(', ')}
+                    {complianceFactors.join('; ')}
                   </span>
                 </div>
               )}
