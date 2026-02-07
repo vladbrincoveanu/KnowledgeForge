@@ -56,3 +56,12 @@ For major infrastructure changes, use:
 ```bash
 make full-check
 ```
+
+## Recent Work & Status (Task Updates)
+
+- Task #2 — Baseline integration tests for CodeArchitectureViewer: DONE. Tests scaffolded and committed at sources/UI/src/@components/architecture-map/CodeArchitectureViewer/CodeArchitectureViewer.test.tsx.
+- Task #3 — Baseline integration tests for ArchitectureMap: DONE. Tests added at sources/UI/src/@components/architecture-map/ArchitectureMap.test.tsx.
+- Fixes applied: deterministic compliance_factors formatting in sources/Api/app/services/c4/context/metadata_detector.py; compatibility shim added at sources/Api/app/utils/config.py to provide get_config() for app.utils imports.
+
+Conclusion: All API E2E extraction tests (12) pass after these changes; repository imports check OK. Continue with the next refactoring task from REFACTORING_MASTER_PLAN.md as planned.
+
