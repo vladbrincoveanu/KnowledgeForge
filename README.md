@@ -63,5 +63,7 @@ make full-check
 - Task #3 — Baseline integration tests for ArchitectureMap: DONE. Tests added at sources/UI/src/@components/architecture-map/ArchitectureMap.test.tsx.
 - Fixes applied: deterministic compliance_factors formatting in sources/Api/app/services/c4/context/metadata_detector.py; compatibility shim added at sources/Api/app/utils/config.py to provide get_config() for app.utils imports.
 
-Conclusion: All API E2E extraction tests (12) pass after these changes; repository imports check OK. Continue with the next refactoring task from REFACTORING_MASTER_PLAN.md as planned.
+Conclusion: All API E2E extraction tests (12) passed after these changes; repository imports check OK.
+
+Next: Task #4 — Decompose CodeArchitectureViewer into smaller components and add targeted unit tests (planned). Note: E2E tests were not re-run after this README update.
 
