@@ -61,8 +61,13 @@ make full-check
 
 - Task #2 — Baseline integration tests for CodeArchitectureViewer: DONE. Tests scaffolded and committed at sources/UI/src/@components/architecture-map/CodeArchitectureViewer/CodeArchitectureViewer.test.tsx.
 - Task #3 — Baseline integration tests for ArchitectureMap: DONE. Tests added at sources/UI/src/@components/architecture-map/ArchitectureMap.test.tsx.
-- Task #4 — Decompose CodeArchitectureViewer: IN PROGRESS. NodeDetails stub created and unit test added at sources/UI/src/@components/architecture-map/CodeArchitectureViewer/components/NodeDetails.tsx.
+- Task #4 — Decompose CodeArchitectureViewer: DONE. NodeDetails stub created at sources/UI/src/@components/architecture-map/CodeArchitectureViewer/components/NodeDetails.tsx with a unit test.
+- Task #5 — Extract ServiceLegend and GraphControls: IN PROGRESS. Stubs and unit tests added at:
+  - sources/UI/src/@components/architecture-map/CodeArchitectureViewer/components/ServiceLegend.tsx
+  - sources/UI/src/@components/architecture-map/CodeArchitectureViewer/components/ServiceLegend.test.tsx
+  - sources/UI/src/@components/architecture-map/CodeArchitectureViewer/components/GraphControls.tsx
+  - sources/UI/src/@components/architecture-map/CodeArchitectureViewer/components/GraphControls.test.tsx
 - Fixes applied: deterministic compliance_factors formatting in sources/Api/app/services/c4/context/metadata_detector.py; compatibility shim added at sources/Api/app/utils/config.py to provide get_config() for app.utils imports.
 
-Conclusion: API E2E extraction tests (12) previously passed after earlier changes; NodeDetails stub added to begin safe decomposition. Next: Task #5 — Extract ServiceLegend and GraphControls stubs and add unit tests. Note: E2E tests were not re-run after the NodeDetails change.
+Conclusion: API E2E extraction tests (12) previously passed after earlier changes; NodeDetails and two new stubs created to begin decomposition. Note: E2E tests were not re-run after these changes.
 
