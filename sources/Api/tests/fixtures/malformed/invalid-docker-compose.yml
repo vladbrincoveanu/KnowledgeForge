@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000
+    environment:
+      DATABASE_URL: postgresql://user:pass@db:5432/mydb
+    # Malformed YAML - unclosed quote and invalid syntax

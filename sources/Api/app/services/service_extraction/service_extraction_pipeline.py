@@ -8,6 +8,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Optional
 
+from app.utils.fs_utils import limited_rglob
+from app.domain.constants.technologies import LANGUAGE_EXTENSIONS, FRAMEWORK_INDICATORS
 from app.domain.models.services import Service, ServiceStatus, ServiceTier, ContextNode
 from app.services.service_extraction.dependency_extractor import DependencyExtractor
 from app.services.service_extraction.domain_extractor import DomainExtractor
@@ -21,51 +23,6 @@ from app.services.service_extraction.description_generator import ServiceDescrip
 from app.services.service_extraction.context_node_extractor import ContextNodeExtractor
 
 logger = logging.getLogger(__name__)
-
-# Language detection mapping
-LANGUAGE_EXTENSIONS: dict[str, str] = {
-    ".py": "Python",
-    ".js": "JavaScript",
-    ".ts": "TypeScript",
-    ".tsx": "TypeScript",
-    ".jsx": "JavaScript",
-    ".go": "Go",
-    ".rs": "Rust",
-    ".java": "Java",
-    ".kt": "Kotlin",
-    ".rb": "Ruby",
-    ".php": "PHP",
-    ".cs": "C#",
-    ".cpp": "C++",
-    ".c": "C",
-    ".swift": "Swift",
-    ".scala": "Scala",
-    ".ex": "Elixir",
-    ".exs": "Elixir",
-}
-
-FRAMEWORK_INDICATORS: dict[str, tuple[str, str]] = {
-    # Python frameworks
-    "fastapi": ("Python", "FastAPI"),
-    "flask": ("Python", "Flask"),
-    "django": ("Python", "Django"),
-    "starlette": ("Python", "Starlette"),
-    # JavaScript/TypeScript frameworks
-    "express": ("JavaScript", "Express"),
-    "next": ("TypeScript", "Next.js"),
-    "react": ("TypeScript", "React"),
-    "vue": ("JavaScript", "Vue.js"),
-    "nestjs": ("TypeScript", "NestJS"),
-    "@nestjs": ("TypeScript", "NestJS"),
-    # Go frameworks
-    "gin-gonic": ("Go", "Gin"),
-    "echo": ("Go", "Echo"),
-    # Rust frameworks
-    "actix-web": ("Rust", "Actix"),
-    "axum": ("Rust", "Axum"),
-    # Java frameworks
-    "spring": ("Java", "Spring"),
-}
 
 
 class ServiceExtractionPipeline:
@@ -299,7 +256,7 @@ class ServiceExtractionPipeline:
             logger.info(f"  status={service.status.value} (inferred={inferred.get('status', {}).get('source', 'N/A')})")
             logger.info(f"  tier={service.tier.value}")
             logger.info(f"  data_class={service.data_class}")
-            logger.info(f"  active_experts={service.active_experts}, compliance={service.compliance}, incidents={service.incident_count}")
+            logger.info(f"  active_experts={service.active_experts}, compliance={service.compliance}")
             logger.info(f"  language={service.language}, framework={service.framework}")
             logger.info(f"  notes={service.notes[:80] if service.notes else None}...")
             logger.info(f"  inferred_fields={list(inferred.keys())}")
@@ -596,7 +553,7 @@ class ServiceExtractionPipeline:
 
         # COMPLIANT: Sensitive data properly handled
         # (Tier 1/2, Active/Maintenance, Has owner)
-        logger.debug(f"Service {service.name} handles {data_class} and is properly managed - COMPLIANT")
+        logger.info(f"Service {service.name} handles {data_class} and is properly managed - COMPLIANT")
         return "COMPLIANT"
 
     def _read_readme_text(self, service_path: Optional[Path]) -> str:
@@ -673,8 +630,8 @@ class ServiceExtractionPipeline:
         # Count file extensions
         ext_counts: Counter[str] = Counter()
         skip_dirs = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build", ".tox"}
-        
-        for file in service_path.rglob("*"):
+
+        for file in limited_rglob(service_path, "*"):
             if any(part in skip_dirs for part in file.parts):
                 continue
             if file.is_file():
