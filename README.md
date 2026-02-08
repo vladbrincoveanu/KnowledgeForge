@@ -67,7 +67,9 @@ make full-check
   - sources/UI/src/@components/architecture-map/CodeArchitectureViewer/components/ServiceLegend.test.tsx
   - sources/UI/src/@components/architecture-map/CodeArchitectureViewer/components/GraphControls.tsx
   - sources/UI/src/@components/architecture-map/CodeArchitectureViewer/components/GraphControls.test.tsx
+- Task #10 — Backend unit tests for service extraction: DONE. Added 26 unit tests across test_service_extractor.py and test_service_extraction_pipeline.py with fixtures; fixed logging reference to non-existent incident_count.
 - Fixes applied: deterministic compliance_factors formatting in sources/Api/app/services/c4/context/metadata_detector.py; compatibility shim added at sources/Api/app/utils/config.py to provide get_config() for app.utils imports.
 
-Conclusion: API E2E extraction tests (12) previously passed after earlier changes; NodeDetails and two new stubs created to begin decomposition. Note: E2E tests were not re-run after these changes.
+Conclusion: Task #10 unit tests are passing (26/26) and overall suite is 45/46 due to a pre-existing failure in test_technologies.py. E2E extraction tests were not re-run during this update.
 
+Next: Task #11 — Backend unit tests for C4 extraction (context, dependencies, compose/helm/terraform parsing; ~15 tests).
