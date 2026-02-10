@@ -156,6 +156,18 @@ class TestDependencyDetectorDetect:
         # Names should be unique
         assert len(names) == len(set(names))
 
+    def test_dependency_freshness_alerts_from_package_json(self, node_project_repo):
+        detector = DependencyDetector(node_project_repo, enable_classification=False)
+        alerts = detector.detect_dependency_freshness_alerts()
+        assert any(alert.get("dependency") == "express" for alert in alerts)
+        assert all("issue" in alert for alert in alerts)
+
+    def test_dependency_freshness_alerts_from_requirements(self, temp_repo):
+        (temp_repo / "requirements.txt").write_text("requests>=2.0\n")
+        detector = DependencyDetector(temp_repo, enable_classification=False)
+        alerts = detector.detect_dependency_freshness_alerts()
+        assert any(alert.get("dependency") == "requests" for alert in alerts)
+
 
 class TestDependencyDetectorClassification:
     """Test dependency type classification."""
