@@ -13,12 +13,12 @@ from typing import Any, Optional
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
-from domain.models.code_entities import ExtractionResult, IncrementalScanResult
-from infrastructure.graph.neo4j_manager import Neo4jGraphManager
-from infrastructure.storage.metadata_store import MetadataStore
-from infrastructure.llm.llm_manager import LLMManager
-from services.code_extraction.c4_extractor import C4ArchitectureExtractor
-from services.service_extraction.github_downloader import GitHubDownloader
+from app.domain.models.code_entities import ExtractionResult, IncrementalScanResult
+from app.infrastructure.graph.neo4j_manager import Neo4jGraphManager
+from app.infrastructure.storage.metadata_store import MetadataStore
+from app.infrastructure.llm.llm_manager import LLMManager
+from app.services.code_extraction.c4_extractor import C4ArchitectureExtractor
+from app.services.service_extraction.github_downloader import GitHubDownloader
 
 logger = logging.getLogger(__name__)
 
