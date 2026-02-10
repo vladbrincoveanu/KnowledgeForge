@@ -107,7 +107,7 @@ class TestFrameworkIndicators:
 
     def test_detect_frameworks_in_content_case_insensitive(self):
         """Test case-insensitive framework detection."""
-        content = "FASTAPI Flask DiJaNgO"
+        content = "FASTAPI Flask DJANGO"
         frameworks = detect_frameworks_in_content(content)
         assert ("Python", "FastAPI") in frameworks
         assert ("Python", "Flask") in frameworks

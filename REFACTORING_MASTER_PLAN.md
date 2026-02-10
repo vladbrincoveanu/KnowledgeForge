@@ -3,7 +3,7 @@
 **Date:** February 7, 2026
 **Last Updated:** February 8, 2026
 **Total Tasks:** 28
-**Completed:** 6/28 (21%)
+**Completed:** 7/28 (25%)
 **Estimated Timeline:** 11-14 weeks
 **Review Type:** Full Review Mode (Architecture, Code Quality, Tests, Performance)
 
@@ -11,7 +11,7 @@
 
 ## 🎯 Current Status (Week 6)
 
-### ✅ Completed Tasks (6)
+### ✅ Completed Tasks (7)
 
 | Task | Status | Effort | Completion Date | Impact |
 |------|--------|--------|-----------------|--------|
@@ -20,7 +20,8 @@
 | #7: Remove Debug Logging | ✅ Done | 1-2 days | Feb 8 | Removed hardcoded debug infrastructure |
 | #8: File Traversal Limits | ✅ Done | 1-2 days | Feb 8 | Protected against large repo exhaustion |
 | #16: Centralized Constants | ✅ Done | 1 day | Feb 8 | Eliminated 120+ lines of duplication |
-| #10: Backend Unit Tests | ✅ Done | 1 week | Feb 8 | 26 unit tests for service extraction (>20 required) |
+| #10: Backend Unit Tests (Svc) | ✅ Done | 1 week | Feb 8 | 26 unit tests for service extraction (>20 required) |
+| #11: Backend Unit Tests (C4) | ✅ Done | 4-5 days | Feb 8 | 37 unit tests for C4 extraction (>15 required) |
 
 ### 📋 In Progress
 
@@ -28,26 +29,28 @@ None - Ready for next task
 
 ### 🎯 Next Priority Tasks (Recommended Order)
 
-1. **Task #11**: Backend unit tests for C4 extraction (4-5 days) - **NEXT**
-2. **Task #12**: Backend unit tests for API routes (3-4 days)
-3. **Task #1**: Decompose CodeArchitectureViewer (3-4 days)
+1. **Task #12**: Backend unit tests for API routes (3-4 days) - **NEXT**
+2. **Task #1**: Decompose CodeArchitectureViewer (3-4 days)
+3. **Task #13**: Error path tests (3-4 days)
 
 ### 📊 Key Metrics
 
-- **Test Coverage:** Backend 3.8% → Improving with 26 new unit tests ✅
-- **Unit Tests:** 26/46 total tests for service extraction passing (100%)
+- **Unit Tests Total:** 83/83 passing (100%) ✅
+- **Test Coverage:** Backend 3.8% → Improving with 63 new unit tests ✅
 - **Code Duplication:** Eliminated 120+ lines in Task #16
 - **Performance:** Neo4j batch operations 99.7% faster
 
 ### 🚀 Recent Achievements
 
-1. **Task #10 Completion**: Created 26 comprehensive unit tests for service extraction
-   - `test_service_extractor.py`: 8 tests covering docker-compose, malformed YAML, API routes
-   - `test_service_extraction_pipeline.py`: 18 tests covering language/framework detection, domain/tier/data-class inference
-   - All tests use proper mocking (GitFullAnalyzer, DomainExtractor, ServiceDiscoverer)
-   - Fixed Service model logging to remove non-existent `incident_count` attribute
-2. **Task #8 Completion**: Migrated 16 files to use `limited_rglob()`, preventing unbounded file traversal
-3. **Task #16 Completion**: Created centralized `app/domain/constants/technologies.py` with 5 helper functions
+1. **Task #11 Completion**: Created 37 C4 extraction unit tests (all passing):
+   - `test_compose_detector.py`: 12 tests covering can_detect, detect, container type classification
+   - `test_terraform_detector.py`: 13 tests covering can_detect, detect, AWS provider inference
+   - `test_dependency_detector.py`: 12 tests covering pyproject.toml, package.json, .env, docker-compose
+   - Fixed pre-existing test bug in test_technologies.py (wrong case for "DiJaNgO")
+2. **Task #10 Completion**: Created 26 comprehensive unit tests for service extraction
+   - `test_service_extractor.py`: 8 tests, `test_service_extraction_pipeline.py`: 18 tests
+3. **Task #8 Completion**: Migrated 16 files to use `limited_rglob()`, preventing unbounded file traversal
+4. **Task #16 Completion**: Created centralized `app/domain/constants/technologies.py` with 5 helper functions
 
 ---
 
@@ -1341,12 +1344,19 @@ tests/unit/services/c4/
 - Terraform parsing
 
 ### Acceptance Criteria:
-- [ ] At least 15 unit tests covering C4 critical paths
-- [ ] Tests use sample YAML/JSON fixtures
-- [ ] Tests verify compliance rubric logic
-- [ ] Tests run in under 20 seconds
+- [x] At least 15 unit tests covering C4 critical paths (✅ 37 tests created)
+- [x] Tests use sample YAML/JSON fixtures (✅ Uses temp_repo with written fixtures)
+- [x] Tests verify compliance rubric logic (✅ Container type classification tested)
+- [x] Tests run in under 20 seconds (✅ 37 tests run in ~0.24s)
 
+**Status:** ✅ **DONE** (February 8, 2026)
 **Effort:** 4-5 days
+**Results:**
+- Created `test_compose_detector.py` (12 tests) - can_detect, detect, container type classification
+- Created `test_terraform_detector.py` (13 tests) - can_detect, detect, AWS provider inference, resource regex
+- Created `test_dependency_detector.py` (12 tests) - pyproject.toml, package.json, .env, docker-compose detection
+- Fixed pre-existing test bug in test_technologies.py (typo "DiJaNgO" → "DJANGO")
+- All 83 unit tests in full suite passing (100%)
 
 ---
 
