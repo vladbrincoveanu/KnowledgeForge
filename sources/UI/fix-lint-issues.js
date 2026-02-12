@@ -29,13 +29,13 @@ function fixFile(filePath) {
   const unusedVarPatterns = [
     /const (ontologyAPI|Papa|Link|Brain|LineChart|Line|performanceData|getConfidenceLabel|connectNodes|setTaskStatus) =/g,
     /function.*\((.*)(onEdgeConfirm|onEdgeReject|index),/g,
-    /const (ConnectionOverviewModal|EdgeDetailsModal|FileUploader|Graph|NodeDetailsModal|VisualQueryBuilder) =/g
+    /const (ConnectionOverviewModal|FileUploader) =/g
   ];
 
   unusedVarPatterns.forEach(pattern => {
     if (pattern.test(content)) {
       content = content.replace(pattern, (match, ...groups) => {
-        return match.replace(/\b(ontologyAPI|Papa|Link|Brain|LineChart|Line|performanceData|getConfidenceLabel|connectNodes|setTaskStatus|onEdgeConfirm|onEdgeReject|index|ConnectionOverviewModal|EdgeDetailsModal|FileUploader|Graph|NodeDetailsModal|VisualQueryBuilder)\b/g, '_$1');
+        return match.replace(/\b(ontologyAPI|Papa|Link|Brain|LineChart|Line|performanceData|getConfidenceLabel|connectNodes|setTaskStatus|onEdgeConfirm|onEdgeReject|index|ConnectionOverviewModal|FileUploader)\b/g, '_$1');
       });
       modified = true;
     }

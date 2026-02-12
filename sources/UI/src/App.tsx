@@ -7,22 +7,16 @@ import {
   Link,
   useLocation,
 } from 'react-router-dom';
-import { wsService, ontologyAPI } from './services/api';
+import { wsService } from './services/api';
 import FileUploader from './@components/upload-extract/FileUploader/FileUploader';
-import Graph from './@components/graph-view/Graph/Graph';
-import OntologyResults from './@components/ontology-results/OntologyResults/OntologyResults';
 import SystemMetrics from './@components/system-metrics/SystemMetrics/SystemMetrics';
 import Settings from './@components/settings/Settings/Settings';
-import ArchitectureMap from './@components/architecture-map/ArchitectureMap';
 import CodeArchitectureViewer from './@components/architecture-map/CodeArchitectureViewer/CodeArchitectureViewer';
 import {
-  Database,
   Activity,
   Upload,
-  BarChart3,
   Settings as SettingsIcon,
   Brain,
-  Network,
   Code,
   ChevronLeft,
   ChevronRight,
@@ -46,64 +40,6 @@ interface UploadedFile {
   size: number;
   rowCount: number;
   type: string;
-}
-
-interface ExtractionTask {
-  taskId: string;
-  fileName: string;
-  status:
-    | 'pending'
-    | 'running'
-    | 'processing'
-    | 'completed'
-    | 'failed'
-    | 'awaiting_recommendations_approval';
-  message: string;
-  createdAt: string;
-  completedAt?: string;
-  timestamp?: string;
-  progress?: number;
-  results?: {
-    entities: Entity[];
-    relationships: Relationship[];
-  };
-  incrementalSummary?: IncrementalSummary;
-}
-
-interface Entity {
-  id: string;
-  name: string;
-  entity_type: string;
-  confidence: number;
-}
-
-interface Relationship {
-  id: string;
-  source_entity_id: string;
-  target_entity_id: string;
-  relationship_type: string;
-  confidence: number;
-}
-
-interface GraphNode {
-  id: string;
-  label: string;
-  type: string;
-  entityType?: string;
-  confidence?: number;
-}
-
-interface GraphLink {
-  id: string;
-  source: string;
-  target: string;
-  label: string;
-  confidence?: number;
-}
-
-interface GraphData {
-  nodes: GraphNode[];
-  links: GraphLink[];
 }
 
 interface WebSocketMessage {
@@ -133,24 +69,6 @@ const Navigation: React.FC<NavigationProps> = ({
       label: 'Upload & Extract',
       icon: <Upload size={20} />,
       path: '/',
-    },
-    {
-      id: 'results',
-      label: 'Ontology Results',
-      icon: <Database size={20} />,
-      path: '/results',
-    },
-    {
-      id: 'graph',
-      label: 'Graph View',
-      icon: <BarChart3 size={20} />,
-      path: '/graph',
-    },
-    {
-      id: 'architecture',
-      label: 'Architecture Map',
-      icon: <Network size={20} />,
-      path: '/architecture',
     },
     {
       id: 'code-architecture',
@@ -248,14 +166,7 @@ const MainContent: React.FC = () => {
   const location = useLocation();
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const isProcessing = false;
-  const [extractionTasks, setExtractionTasks] = useState<
-    Record<string, ExtractionTask>
-  >({});
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
-  const [graphData, setGraphData] = useState<GraphData>({
-    nodes: [],
-    links: [],
-  });
   const [notification, setNotification] = useState<{
     message: string;
     type: 'success' | 'error' | 'info';
@@ -384,37 +295,7 @@ const MainContent: React.FC = () => {
     if (!wsData?.task_id) {
       return;
     }
-
-    setExtractionTasks(prev => {
-      const existingTask = prev[wsData.task_id!];
-
-      const baseTask: ExtractionTask =
-        existingTask ||
-        ({
-          taskId: wsData.task_id!,
-          fileName: `Task ${wsData.task_id!.substring(0, 8)}...`,
-          status: 'pending',
-          message: wsData.message || 'Task update received',
-          createdAt: wsData.timestamp || new Date().toISOString(),
-          progress: wsData.progress ?? 0,
-          incrementalSummary: wsData.incremental_summary,
-        } as ExtractionTask);
-
-      const updatedTask: ExtractionTask = {
-        ...baseTask,
-        status: (wsData.status as ExtractionTask['status']) || baseTask.status,
-        message: wsData.message || baseTask.message,
-        timestamp: wsData.timestamp || baseTask.timestamp,
-        progress: wsData.progress ?? baseTask.progress,
-        incrementalSummary:
-          wsData.incremental_summary ?? baseTask.incrementalSummary,
-      };
-
-      return {
-        ...prev,
-        [wsData.task_id!]: updatedTask,
-      };
-    });
+    // WebSocket message received - could be used for real-time updates in the future
   }, []);
 
   const loadAvailableTasks = useCallback(async () => {
@@ -426,19 +307,6 @@ const MainContent: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         if (data.tasks && data.tasks.length > 0) {
-          const tasksMap: Record<string, ExtractionTask> = {};
-          data.tasks.forEach((task: any) => {
-            tasksMap[task.task_id] = {
-              taskId: task.task_id,
-              fileName: `Task ${task.task_id.substring(0, 8)}...`,
-              status: task.status,
-              message: task.message || 'Task loaded from API',
-              createdAt: task.created_at,
-              completedAt: task.completed_at,
-            };
-          });
-          setExtractionTasks(tasksMap);
-
           // Set the most recent completed task as active
           const completedTasks = data.tasks.filter(
             (t: any) => t.status === 'completed'
@@ -496,20 +364,7 @@ const MainContent: React.FC = () => {
   );
 
   const handleExtractionStarted = useCallback(
-    (taskId: string, file: UploadedFile) => {
-      setExtractionTasks(prev => ({
-        ...prev,
-        [taskId]: {
-          taskId,
-          fileName: file.name,
-          status: 'pending',
-          message: 'Task created and queued',
-          createdAt: new Date().toISOString(),
-          progress: 0,
-          incrementalSummary: undefined,
-        },
-      }));
-
+    (taskId: string, _file: UploadedFile) => {
       // Set as active task (always use the most recent upload)
       setActiveTaskId(taskId);
     },
@@ -547,19 +402,13 @@ const MainContent: React.FC = () => {
   const getActiveTab = (): string => {
     const path = location.pathname;
     if (path === '/') return 'upload';
-    if (path === '/results') return 'results';
-    if (path === '/graph') return 'graph';
-    if (path === '/architecture') return 'architecture';
+    if (path === '/code-architecture') return 'code-architecture';
     if (path === '/metrics') return 'metrics';
     if (path === '/settings') return 'settings';
     return 'upload';
   };
 
   const activeTab = getActiveTab();
-  const activeTaskSummary =
-    activeTaskId && extractionTasks[activeTaskId]
-      ? extractionTasks[activeTaskId]?.incrementalSummary
-      : undefined;
 
   return (
     <div className="app">
