@@ -127,29 +127,6 @@ const Navigation: React.FC<NavigationProps> = ({
   isCollapsed,
   onToggle,
 }) => {
-  // #region agent log
-  React.useEffect(() => {
-    console.log('[DEBUG] Navigation rendered with props:', {
-      activeTab,
-      isCollapsed,
-      hasOnToggle: !!onToggle,
-    });
-    fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        location: 'App.tsx:Navigation',
-        message: 'Navigation component rendered',
-        data: { activeTab, isCollapsed, hasOnToggle: !!onToggle },
-        timestamp: Date.now(),
-        sessionId: 'debug-session',
-        runId: 'run3',
-        hypothesisId: 'E',
-      }),
-    }).catch(() => {});
-  }, [activeTab, isCollapsed, onToggle]);
-  // #endregion
-
   const navItems: NavItem[] = [
     {
       id: 'upload',
@@ -212,76 +189,6 @@ const Navigation: React.FC<NavigationProps> = ({
           className="nav-toggle"
           onClick={onToggle}
           aria-label={isCollapsed ? 'Show navigation' : 'Hide navigation'}
-          ref={el => {
-            // #region agent log
-            if (el) {
-              setTimeout(() => {
-                const rect = el.getBoundingClientRect();
-                const styles = window.getComputedStyle(el);
-                const parent = el.parentElement;
-                const parentStyles = parent
-                  ? window.getComputedStyle(parent)
-                  : null;
-                const data = {
-                  buttonExists: true,
-                  display: styles.display,
-                  visibility: styles.visibility,
-                  opacity: styles.opacity,
-                  width: rect.width,
-                  height: rect.height,
-                  top: rect.top,
-                  left: rect.left,
-                  right: rect.right,
-                  bottom: rect.bottom,
-                  zIndex: styles.zIndex,
-                  position: styles.position,
-                  parentDisplay: parentStyles?.display,
-                  parentOverflow: parentStyles?.overflow,
-                  parentWidth: parent
-                    ? parent.getBoundingClientRect().width
-                    : 0,
-                  inViewport:
-                    rect.width > 0 && rect.height > 0 && rect.top >= 0,
-                };
-                console.log('[DEBUG] Button ref - DOM element details:', data);
-                fetch(
-                  'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
-                  {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      location: 'App.tsx:nav-toggle-ref',
-                      message: 'Button DOM element details',
-                      data,
-                      timestamp: Date.now(),
-                      sessionId: 'debug-session',
-                      runId: 'run3',
-                      hypothesisId: 'A,B,C,D,F',
-                    }),
-                  }
-                ).catch(() => {});
-              }, 100);
-            } else {
-              console.log('[DEBUG] Button ref - element is NULL!');
-              fetch(
-                'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
-                {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    location: 'App.tsx:nav-toggle-ref',
-                    message: 'Button element is NULL',
-                    data: { buttonExists: false },
-                    timestamp: Date.now(),
-                    sessionId: 'debug-session',
-                    runId: 'run3',
-                    hypothesisId: 'A',
-                  }),
-                }
-              ).catch(() => {});
-            }
-            // #endregion
-          }}
           style={{
             background: '#007bff',
             color: '#ffffff',
@@ -365,13 +272,10 @@ const MainContent: React.FC = () => {
 
   const loadGraphData = useCallback(async (taskId: string) => {
     try {
-      console.log('Loading graph data for task:', taskId);
-
       // First try to get graph data from the dedicated graph API endpoint
       try {
         const graphDataResponse =
           await ontologyAPI.getGraphVisualization(taskId);
-        console.log('Graph data from API:', graphDataResponse);
 
         // Convert API response to our GraphData format
         const nodes: GraphNode[] = graphDataResponse.nodes.map((node: any) => ({
@@ -401,17 +305,11 @@ const MainContent: React.FC = () => {
 
         setGraphData({ nodes, links });
         return;
-      } catch (apiError) {
-        console.log(
-          'Graph API not available, loading from entities and relationships:',
-          apiError
-        );
+      } catch {
+        // Graph API not available, fall back to entities and relationships
       }
 
-      // Fallback: Load entities and relationships directly from API (same as Ontology Results)
-      console.log('Loading entities and relationships from API...');
-
-      // Load entities and relationships the same way as Ontology Results
+      // Fallback: Load entities and relationships directly from API
       const entitiesData = await ontologyAPI.getEntities(taskId, 100, 0);
       const relationshipsData = await ontologyAPI.getRelationships(
         taskId,
@@ -421,24 +319,6 @@ const MainContent: React.FC = () => {
 
       const entities = entitiesData.items || [];
       const relationships = relationshipsData.items || [];
-
-      console.log('Loaded entities:', entities.length);
-      console.log('Loaded relationships:', relationships.length);
-      console.log('Sample entity:', entities[0]);
-      console.log('Sample relationship:', relationships[0]);
-      console.log('All relationships:', relationships);
-      console.log(
-        'Entity names:',
-        entities.map(e => e.name)
-      );
-      console.log(
-        'Entity IDs:',
-        entities.map(e => ({ name: e.name, id: e.id, idType: typeof e.id }))
-      );
-      console.log(
-        'Entity types:',
-        entities.map(e => ({ name: e.name, entityType: e.entity_type }))
-      );
 
       // Convert to graph data
       const nodes: GraphNode[] = entities.map(entity => ({
@@ -457,16 +337,8 @@ const MainContent: React.FC = () => {
         columns: entity.attributes || {},
       }));
 
-      // Debug: Log all node IDs
-      console.log(
-        'Node IDs:',
-        nodes.map(n => n.id)
-      );
-
       const links: GraphLink[] = relationships
         .map(rel => {
-          console.log('Processing relationship:', rel);
-
           // The API returns source_entity and target_entity (names) instead of IDs
           // We need to find the corresponding entity IDs by matching the names
           const sourceEntity = entities.find(
@@ -477,119 +349,29 @@ const MainContent: React.FC = () => {
           );
 
           if (!sourceEntity || !targetEntity) {
-            console.warn('Could not find entities for relationship:', rel);
-            console.warn(
-              'Source entity name:',
-              rel.source_entity,
-              'Found:',
-              sourceEntity
-            );
-            console.warn(
-              'Target entity name:',
-              rel.target_entity,
-              'Found:',
-              targetEntity
-            );
             return null;
           }
 
-          const link = {
+          return {
             id: rel.id || `rel-${sourceEntity.id}-${targetEntity.id}`,
             source: String(sourceEntity.id || `entity-${sourceEntity.name}`),
             target: String(targetEntity.id || `entity-${targetEntity.name}`),
             label: rel.relationship_type,
             confidence: rel.confidence,
           };
-          console.log('Created link:', link);
-          console.log(
-            'Source entity ID type:',
-            typeof sourceEntity.id,
-            'Value:',
-            sourceEntity.id
-          );
-          console.log(
-            'Target entity ID type:',
-            typeof targetEntity.id,
-            'Value:',
-            targetEntity.id
-          );
-          console.log(
-            'Link source type:',
-            typeof link.source,
-            'Value:',
-            link.source
-          );
-          console.log(
-            'Link target type:',
-            typeof link.target,
-            'Value:',
-            link.target
-          );
-          return link;
         })
         .filter(Boolean) as GraphLink[];
-
-      // Debug: Log all relationship references
-      console.log(
-        'Relationship source IDs:',
-        links.map(l => l.source)
-      );
-      console.log(
-        'Relationship target IDs:',
-        links.map(l => l.target)
-      );
-
-      // Check if relationship IDs match entity IDs
-      const entityIds = new Set(nodes.map(n => n.id));
-      console.log('Available entity IDs:', Array.from(entityIds));
-
-      links.forEach(link => {
-        if (!entityIds.has(link.source)) {
-          console.warn(`Link source ID not found in entities: ${link.source}`);
-        }
-        if (!entityIds.has(link.target)) {
-          console.warn(`Link target ID not found in entities: ${link.target}`);
-        }
-      });
 
       // Filter out relationships that reference non-existent nodes
       const validLinks = links.filter(link => {
         const sourceExists = nodes.some(node => node.id === link.source);
         const targetExists = nodes.some(node => node.id === link.target);
-
-        if (!sourceExists) {
-          console.warn(`Relationship source node not found: ${link.source}`);
-        }
-        if (!targetExists) {
-          console.warn(`Relationship target node not found: ${link.target}`);
-        }
-
         return sourceExists && targetExists;
       });
-
-      console.log(
-        `Filtered ${links.length - validLinks.length} invalid relationships`
-      );
-
-      console.log('Final graph data:', { nodes, links: validLinks });
-      console.log('Number of valid links:', validLinks.length);
-      console.log('Valid links details:', validLinks);
-
-      // Test: Create a simple link to see if the issue is with our data or ForceGraph2D
-      const testLink = {
-        id: 'test-link',
-        source: 'test-source',
-        target: 'test-target',
-        label: 'Test Link',
-        confidence: 0.9,
-      };
-      console.log('Test link:', testLink);
-      console.log('Test link source type:', typeof testLink.source);
 
       setGraphData({ nodes, links: validLinks });
     } catch (error) {
       console.error('Failed to load graph data:', error);
-      // Set empty graph data on error
       setGraphData({ nodes: [], links: [] });
     }
   }, []);
@@ -671,16 +453,16 @@ const MainContent: React.FC = () => {
           }
         }
       }
-    } catch (error) {
-      console.error('Error loading available tasks:', error);
+    } catch {
+      // Failed to load tasks from API
     }
   }, []);
 
   useEffect(() => {
     wsService.connect();
 
-    const handleConnected = () => console.log('WebSocket connected');
-    const handleDisconnected = () => console.log('WebSocket disconnected');
+    const handleConnected = () => {};
+    const handleDisconnected = () => {};
 
     wsService.on('message', handleWebSocketMessage);
     wsService.on('connected', handleConnected);
@@ -701,7 +483,6 @@ const MainContent: React.FC = () => {
   useEffect(() => {
     Object.values(extractionTasks).forEach(task => {
       if (task.status === 'completed') {
-        console.log('Task completed, loading graph data:', task.taskId);
         loadGraphData(task.taskId);
       }
     });
@@ -735,15 +516,13 @@ const MainContent: React.FC = () => {
     [activeTaskId]
   );
 
-  const handleFeedbackSubmitted = useCallback((feedback: unknown) => {
-    console.log('Feedback submitted:', feedback);
-    // You can add additional logic here, such as updating the UI
+  const handleFeedbackSubmitted = useCallback((_feedback: unknown) => {
+    // Additional feedback handling logic can be added here
   }, []);
 
   // Update graph data when active task changes
   useEffect(() => {
     if (activeTaskId && extractionTasks[activeTaskId]?.status === 'completed') {
-      console.log('Active task changed, loading graph data:', activeTaskId);
       loadGraphData(activeTaskId);
     }
   }, [activeTaskId, extractionTasks, loadGraphData]);
@@ -752,34 +531,16 @@ const MainContent: React.FC = () => {
   useEffect(() => {
     if (location.pathname === '/graph') {
       if (activeTaskId) {
-        console.log(
-          'Navigated to graph view, loading graph data for active task:',
-          activeTaskId
-        );
         loadGraphData(activeTaskId);
       } else {
-        // If no active task ID, try to load data from the most recent completed task
-        console.log(
-          'No active task ID, attempting to load graph data without task filter'
-        );
         loadGraphDataWithoutTask();
       }
     }
   }, [location.pathname, activeTaskId, loadGraphData]);
 
   const loadGraphDataWithoutTask = useCallback(async () => {
-    try {
-      console.log(
-        'No active task - showing empty graph (no data from current session)'
-      );
-
-      // When there's no active task, show empty graph to avoid confusion
-      // This prevents showing data from previous sessions
-      setGraphData({ nodes: [], links: [] });
-    } catch (error) {
-      console.error('Error loading graph data without task:', error);
-      setGraphData({ nodes: [], links: [] });
-    }
+    // When there's no active task, show empty graph to avoid confusion
+    setGraphData({ nodes: [], links: [] });
   }, []);
 
   // Determine active tab based on location
@@ -814,27 +575,6 @@ const MainContent: React.FC = () => {
           activeTab={activeTab}
           isCollapsed={isNavCollapsed}
           onToggle={() => {
-            // #region agent log
-            fetch(
-              'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  location: 'App.tsx:MainContent-onToggle',
-                  message: 'Toggle function called',
-                  data: {
-                    currentState: isNavCollapsed,
-                    newState: !isNavCollapsed,
-                  },
-                  timestamp: Date.now(),
-                  sessionId: 'debug-session',
-                  runId: 'run1',
-                  hypothesisId: 'E',
-                }),
-              }
-            ).catch(() => {});
-            // #endregion
             setIsNavCollapsed(!isNavCollapsed);
           }}
         />
@@ -1087,11 +827,8 @@ const MainContent: React.FC = () => {
                               }));
 
                             setGraphData({ nodes, links });
-                          } catch (error) {
-                            console.error(
-                              'Error loading all graph data:',
-                              error
-                            );
+                          } catch {
+                            // Failed to load graph data
                           }
                         }}
                         style={{
@@ -1111,7 +848,7 @@ const MainContent: React.FC = () => {
 
                   <Graph
                     data={graphData}
-                    onEdgeClick={edge => console.log('Edge clicked:', edge)}
+                    onEdgeClick={undefined}
                     activeTaskId={activeTaskId}
                     onGraphUpdate={() => {
                       if (activeTaskId) {

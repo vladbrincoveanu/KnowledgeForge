@@ -16,6 +16,7 @@ from app.infrastructure.graph.neo4j_manager import Neo4jGraphManager
 from app.infrastructure.storage.metadata_store import (
     PostgreSQLMetadataStore as MetadataStore,
 )
+from app.endpoint.v1.dependencies import get_neo4j_manager, get_metadata_store
 
 # Import actual backend services
 try:
@@ -161,28 +162,6 @@ def get_ontology_mapper():
             else None
         )
     )
-
-
-def get_neo4j_manager():
-    """Get Neo4j manager instance."""
-    config = get_config()
-    manager = Neo4jGraphManager(
-        uri=config.neo4j.uri,
-        username=config.neo4j.username,
-        password=config.neo4j.password,
-        database=config.neo4j.database,
-        encrypted=config.neo4j.encrypted,
-    )
-    # Connect immediately to ensure the connection is established
-    manager.connect()
-    return manager
-
-
-def get_metadata_store():
-    """Get metadata store instance."""
-    config = get_config()
-    return MetadataStore(config=config)
-
 
 
 
@@ -501,7 +480,7 @@ async def extract_ontology(
             estimated_completion=datetime.now() + timedelta(minutes=5),
         )
 
-    except Exception as e:
+    except (ConnectionError, RuntimeError) as e:
         logger.error(f"Failed to create extraction task: {e}")
         raise HTTPException(
             status_code=500, detail=f"Failed to create extraction task: {str(e)}"
@@ -539,7 +518,7 @@ async def run_extraction_pipeline(
                 message="Extraction task started",
                 progress=int(task.progress * 100),
             )
-        except Exception:
+        except (ConnectionError, RuntimeError):
             pass
 
         logger.info(f"Profiling dataset for task {task_id}")
@@ -553,7 +532,7 @@ async def run_extraction_pipeline(
                 message="Dataset profiled",
                 progress=int(task.progress * 100),
             )
-        except Exception:
+        except (ConnectionError, RuntimeError):
             pass
 
         logger.info(f"Extracting entities for task {task_id}")
@@ -569,7 +548,7 @@ async def run_extraction_pipeline(
                 message="Entities extracted",
                 progress=int(task.progress * 100),
             )
-        except Exception:
+        except (ConnectionError, RuntimeError):
             pass
 
         logger.info(f"About to generate recommendations for task {task_id} with service: {recommendation_service is not None}")
@@ -611,7 +590,7 @@ async def run_extraction_pipeline(
                         message="Recommendations ready for human review",
                         progress=int(task.progress * 100),
                     )
-                except Exception:
+                except (ConnectionError, RuntimeError):
                     pass
 
                 logger.info(
@@ -621,7 +600,7 @@ async def run_extraction_pipeline(
                 recommendation_generated = True
                 return
 
-            except Exception as recommendation_error:
+            except (ConnectionError, RuntimeError) as recommendation_error:
                 logger.error(
                     "Failed to generate recommendations for task %s: %s",
                     task_id,
@@ -701,7 +680,7 @@ async def run_extraction_pipeline(
                         message="Recommendations ready for human review",
                         progress=int(task.progress * 100),
                     )
-                except Exception:
+                except (ConnectionError, RuntimeError):
                     pass
 
                 logger.info(
@@ -710,7 +689,7 @@ async def run_extraction_pipeline(
                 )
                 return
 
-            except Exception as fallback_error:
+            except (ConnectionError, RuntimeError) as fallback_error:
                 logger.error(
                     "Failed to build heuristic recommendations for task %s: %s",
                     task_id,
@@ -735,7 +714,7 @@ async def run_extraction_pipeline(
                 message="Relationships discovered",
                 progress=int(task.progress * 100),
             )
-        except Exception:
+        except (ConnectionError, RuntimeError):
             pass
 
         logger.info(f"Mapping entities to ontologies for task {task_id}")
@@ -750,7 +729,7 @@ async def run_extraction_pipeline(
                 message="Entities mapped to ontologies",
                 progress=int(task.progress * 100),
             )
-        except Exception:
+        except (ConnectionError, RuntimeError):
             pass
 
         logger.info(f"Storing results in Neo4j for task {task_id}")
@@ -771,7 +750,7 @@ async def run_extraction_pipeline(
             await store_in_neo4j(
                 entities, relationships, neo4j_manager, task_id, file_path
             )
-        except Exception as storage_error:
+        except (ConnectionError, RuntimeError) as storage_error:
             logger.error(f"Neo4j storage failed: {storage_error}")
 
         task.progress = 1.0
@@ -808,7 +787,7 @@ async def run_extraction_pipeline(
                 message="Extraction pipeline completed",
                 progress=100,
             )
-        except Exception:
+        except (ConnectionError, RuntimeError):
             pass
 
         # Automatically trigger recommendations generation after extraction is complete
@@ -816,12 +795,12 @@ async def run_extraction_pipeline(
             logger.info(f"Automatically triggering recommendations generation for completed task {task_id}")
             # Trigger recommendations generation in the background
             background_tasks.add_task(_generate_recommendations_background, task_id)
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.error(f"Failed to trigger automatic recommendations generation for task {task_id}: {e}")
 
         logger.info(f"Extraction pipeline completed for task {task_id}")
 
-    except Exception as e:
+    except (ConnectionError, RuntimeError) as e:
         logger.error(f"Extraction pipeline failed for task {task_id}: {e}")
         task.status = "failed"
         task.errors.append(str(e))
@@ -833,7 +812,7 @@ async def run_extraction_pipeline(
                 message="Extraction pipeline failed",
                 progress=0,
             )
-        except Exception:
+        except (ConnectionError, RuntimeError):
             pass
 
 
@@ -976,7 +955,7 @@ async def continue_extraction_pipeline(
                 message="Resuming pipeline: discovering relationships.",
                 progress=int(task.progress * 100),
             )
-        except Exception:
+        except (ConnectionError, RuntimeError):
             pass
 
         relationships = await discover_relationships(
@@ -997,7 +976,7 @@ async def continue_extraction_pipeline(
                 message="Relationships discovered after human feedback.",
                 progress=int(task.progress * 100),
             )
-        except Exception:
+        except (ConnectionError, RuntimeError):
             pass
 
         ontology_results = await map_to_ontologies(
@@ -1014,7 +993,7 @@ async def continue_extraction_pipeline(
                 message="Entities mapped to ontologies.",
                 progress=int(task.progress * 100),
             )
-        except Exception:
+        except (ConnectionError, RuntimeError):
             pass
 
         # Ensure identifiers exist before persisting.
@@ -1073,12 +1052,12 @@ async def continue_extraction_pipeline(
                 message="Extraction pipeline completed after human feedback.",
                 progress=100,
             )
-        except Exception:
+        except (ConnectionError, RuntimeError):
             pass
 
         logger.info("Extraction pipeline continuation completed for task %s", task_id)
 
-    except Exception as exc:
+    except (ConnectionError, RuntimeError) as exc:
         logger.error(
             "Failed to continue extraction pipeline for task %s: %s",
             task_id,
@@ -1108,7 +1087,7 @@ async def continue_extraction_pipeline(
                 message="Extraction pipeline failed while resuming after feedback.",
                 progress=int((task.progress or 0) * 100),
             )
-        except Exception:
+        except (ConnectionError, RuntimeError):
             pass
 
 
@@ -1229,7 +1208,7 @@ async def discover_relationships(
         logger.info(f"Discovered {len(relationships)} relationships")
         return relationships
         
-    except Exception as e:
+    except (ConnectionError, RuntimeError) as e:
         logger.error(f"Error during relationship discovery: {e}")
         # Return empty list on error to not break the pipeline
         return []
@@ -1280,7 +1259,7 @@ async def store_in_neo4j(
                     entities_stored += 1
                 else:
                     logger.error(f"Failed to store entity: {getattr(entity, 'name', 'NO_NAME')}")
-            except Exception as e:
+            except (ConnectionError, RuntimeError) as e:
                 logger.error(f"Error storing entity {getattr(entity, 'name', 'NO_NAME')}: {e}")
 
         # Store relationships
@@ -1296,12 +1275,12 @@ async def store_in_neo4j(
                     relationships_stored += 1
                 else:
                     logger.error(f"Failed to store relationship: {getattr(relationship, 'id', 'NO_ID')}")
-            except Exception as e:
+            except (ConnectionError, RuntimeError) as e:
                 logger.error(f"Error storing relationship {getattr(relationship, 'id', 'NO_ID')}: {e}")
         
         logger.info(f"Neo4j storage completed: {entities_stored}/{len(entities)} entities, {relationships_stored}/{len(relationships)} relationships")
 
-    except Exception as e:
+    except (ConnectionError, RuntimeError) as e:
         logger.error(f"Failed to store in Neo4j: {e}")
         logger.error(f"Storage error details: {type(e).__name__}: {str(e)}")
         import traceback
@@ -1431,7 +1410,7 @@ async def generate_edge_recommendations(
                     detail=f"At least 2 nodes are required to generate relationships. Found {len(nodes)} nodes."
                 )
             
-        except Exception as neo_error:
+        except (ConnectionError, RuntimeError) as neo_error:
             logger.error(f"Failed to fetch nodes from Neo4j: {neo_error}")
             raise HTTPException(
                 status_code=500,
@@ -1781,7 +1760,7 @@ async def submit_recommendation_feedback(
             try:
                 if not neo4j_manager.is_connected():
                     neo4j_manager.connect()
-            except Exception as neo_error:
+            except (ConnectionError, RuntimeError) as neo_error:
                 logger.error(
                     "Failed to connect to Neo4j for persisting approved entities: %s",
                     neo_error,
@@ -1806,7 +1785,7 @@ async def submit_recommendation_feedback(
                                 "Neo4j rejected entity %s during persistence",
                                 entity_id,
                             )
-                    except Exception as store_exc:
+                    except (ConnectionError, RuntimeError) as store_exc:
                         logger.error(
                             "Failed to persist approved entity %s to Neo4j: %s",
                             entity_id,
@@ -1830,7 +1809,7 @@ async def submit_recommendation_feedback(
                             "Neo4j rejected relationship %s during persistence",
                             relationship_id,
                         )
-                except Exception as store_exc:
+                except (ConnectionError, RuntimeError) as store_exc:
                     logger.error(
                         "Failed to persist approved relationship %s to Neo4j: %s",
                         relationship_id,
@@ -1971,7 +1950,7 @@ async def submit_recommendation_feedback(
                 message="Human feedback received. Resuming ontology pipeline.",
                 progress=int((task.progress or 0.6) * 100),
             )
-        except Exception:
+        except (ConnectionError, RuntimeError):
             pass
 
         background_tasks.add_task(
@@ -1993,7 +1972,7 @@ async def submit_recommendation_feedback(
             "ready_for_edges": session.phase == "nodes_completed" if session else False
         }
 
-    except Exception as e:
+    except (ConnectionError, RuntimeError) as e:
         logger.error(f"Error in submit_recommendation_feedback: {e}")
         raise HTTPException(
             status_code=500, detail=f"Failed to process feedback: {str(e)}"

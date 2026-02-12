@@ -55,10 +55,10 @@ class GitFullAnalyzer:
     ) -> None:
         """Populate owner/status/domain fields from git history."""
         if not self.is_git_repo:
-            logger.debug(f"Not a git repo, skipping git analysis for {service.name}")
+            logger.info(f"Not a git repo, skipping git analysis for {service.name}")
             return
 
-        logger.debug(f"Enriching service {service.name} from git history")
+        logger.info(f"Enriching service {service.name} from git history")
         
         contributor_stats = self.contributor_analyzer.analyze_service_contributors(
             service_path=service_path,
@@ -82,7 +82,13 @@ class GitFullAnalyzer:
                         "source": "git_contributions",
                         "commit_count": top_contributor.commit_count,
                     }
-                    logger.debug(f"Owner set to {calculated_owner} ({top_contributor.commit_count} commits)")
+                    try:
+                        from app.utils.config import get_config as _get_config
+                        config_debug = getattr(_get_config(), "debug", False)
+                    except Exception:
+                        config_debug = False
+                    if config_debug:
+                        logger.debug(f"Owner set to {calculated_owner} ({top_contributor.commit_count} commits)")
                 
                 service.owner_contributors = [c.email for c in top_contributors]
                 service.owner_contributor_stats = [
@@ -102,7 +108,7 @@ class GitFullAnalyzer:
                 days=90,
                 min_commits=3
             )
-            logger.debug(f"Service {service.name} has {service.active_experts} active experts")
+            logger.info(f"Service {service.name} has {service.active_experts} active experts")
 
             # Get extended stats
             extended = self._get_extended_stats(service_path)
@@ -140,7 +146,7 @@ class GitFullAnalyzer:
                 "issue_references": extended.issue_references[:10],
             }
             
-            logger.debug(f"Git stats for {service.name}: "
+            logger.info(f"Git stats for {service.name}: "
                         f"commits_30d={contributor_stats.commits_30d}, "
                         f"branches={extended.feature_branches} feature, "
                         f"tags={extended.tag_count}")
@@ -151,13 +157,13 @@ class GitFullAnalyzer:
         )
         if git_status != ServiceStatus.UNKNOWN:
             service.status = git_status
-            logger.debug(f"Status from git_status_analyzer: {git_status}")
+            logger.info(f"Status from git_status_analyzer: {git_status}")
 
         if not service.domain:
             domain = self._infer_domain_from_git(service_path, service.name)
             if domain:
                 service.domain = domain
-                logger.debug(f"Domain inferred from git: {domain}")
+                logger.info(f"Domain inferred from git: {domain}")
 
     def _get_extended_stats(self, service_path: Optional[Path]) -> GitExtendedStats:
         """Extract extended git statistics."""
@@ -186,8 +192,8 @@ class GitFullAnalyzer:
                         stats.feature_branches += 1
                     elif any(kw in branch_lower for kw in ["fix", "bug", "hotfix", "patch"]):
                         stats.bugfix_branches += 1
-        except Exception as e:
-            logger.debug(f"Failed to get branches: {e}")
+        except (subprocess.SubprocessError, OSError) as e:
+            logger.info(f"Failed to get branches: {e}")
         
         # Get tags
         try:
@@ -204,8 +210,8 @@ class GitFullAnalyzer:
                 stats.tag_count = len(tags)
                 if tags:
                     stats.latest_tag = tags[0]
-        except Exception as e:
-            logger.debug(f"Failed to get tags: {e}")
+        except (subprocess.SubprocessError, OSError) as e:
+            logger.info(f"Failed to get tags: {e}")
         
         # Get file hotspots (most changed files)
         try:
@@ -233,8 +239,8 @@ class GitFullAnalyzer:
                     if line and not line.startswith("commit"):
                         file_counts[line] += 1
                 stats.hotspot_files = file_counts.most_common(10)
-        except Exception as e:
-            logger.debug(f"Failed to get file hotspots: {e}")
+        except (subprocess.SubprocessError, OSError) as e:
+            logger.info(f"Failed to get file hotspots: {e}")
         
         # Extract PR/Issue references from recent commits
         try:
@@ -261,7 +267,7 @@ class GitFullAnalyzer:
                         if ref not in stats.issue_references:
                             stats.issue_references.append(ref)
         except Exception as e:
-            logger.debug(f"Failed to extract PR/issue references: {e}")
+            logger.info(f"Failed to extract PR/issue references: {e}")
         
         return stats
 
@@ -309,8 +315,8 @@ class GitFullAnalyzer:
                     candidates.extend(self._tokenize_text(stripped))
                 else:
                     candidates.extend(self._tokenize_text(stripped))
-        except Exception as exc:
-            logger.debug("Git domain inference failed for %s: %s", service_name, exc)
+        except (subprocess.SubprocessError, OSError) as exc:
+            logger.info("Git domain inference failed for %s: %s", service_name, exc)
 
         return self._score_candidates(candidates)
 

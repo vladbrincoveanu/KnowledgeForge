@@ -10,43 +10,11 @@ from fastapi.responses import JSONResponse
 from app.infrastructure.graph.neo4j_manager import Neo4jGraphManager
 from app.infrastructure.llm.llm_manager import LLMManager
 from app.infrastructure.storage.metadata_store import MetadataStore
-from utils.config import get_config
+from app.endpoint.v1.dependencies import get_neo4j_manager, get_llm_manager, get_metadata_store
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["health"])
-
-
-# Dependency injection
-def get_neo4j_manager():
-    """Get Neo4j manager instance."""
-    config = get_config()
-    manager = Neo4jGraphManager(
-        uri=config.neo4j.uri,
-        username=config.neo4j.username,
-        password=config.neo4j.password,
-        database=config.neo4j.database,
-        encrypted=config.neo4j.encrypted,
-    )
-    # Connect immediately to ensure the connection is established
-    manager.connect()
-    return manager
-
-
-def get_llm_manager():
-    """Get LLM manager instance."""
-    config = get_config()
-    return LLMManager(
-        lmstudio_url=config.lmstudio.base_url,
-        default_model=config.lmstudio.model_name,
-        max_retries=getattr(config.lmstudio, 'max_retries', 3),
-    )
-
-
-def get_metadata_store():
-    """Get metadata store instance."""
-    config = get_config()
-    return MetadataStore(config=config.dict() if hasattr(config, 'dict') else config)
 
 
 @router.get("/", response_model=dict[str, Any])
@@ -63,7 +31,7 @@ async def health_check(
             with neo4j_manager.driver.session(database=neo4j_manager.database) as session:
                 result = session.run("RETURN 1 as test")
                 result.single()
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             neo4j_status = f"unhealthy: {str(e)}"
             logger.error(f"Neo4j health check failed: {e}")
 
@@ -74,7 +42,7 @@ async def health_check(
             models = llm_manager.list_models()
             if not models:
                 llm_status = "unhealthy: no models available"
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             llm_status = f"unhealthy: {str(e)}"
             logger.error(f"LLM health check failed: {e}")
 
@@ -85,7 +53,7 @@ async def health_check(
             info = metadata_store.get_database_info()
             if info.get("connection_status") != "connected":
                 metadata_status = "unhealthy: cannot access database"
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             metadata_status = f"unhealthy: {str(e)}"
             logger.error(f"PostgreSQL metadata store health check failed: {e}")
 
@@ -109,7 +77,7 @@ async def health_check(
             "dependencies": dependencies,
         }
 
-    except Exception as e:
+    except (ConnectionError, RuntimeError) as e:
         logger.error(f"Health check failed: {e}")
         return {
             "status": "unhealthy",
@@ -135,14 +103,14 @@ async def readiness_check(
                 result = session.run("RETURN 1 as test")
                 result.single()
             ready_checks.append("neo4j")
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.warning(f"Neo4j not ready: {e}")
 
         # Check metadata store
         try:
             metadata_store.get_database_info()
             ready_checks.append("metadata_store")
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.warning(f"Metadata store not ready: {e}")
 
         # Service is ready if at least core services are available
@@ -211,7 +179,7 @@ async def get_system_metrics(
                     "index_count": graph_stats.get("index_count", 0),
                 }
             )
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.warning(f"Could not get Neo4j metrics: {e}")
 
         # Metadata store metrics
@@ -226,7 +194,7 @@ async def get_system_metrics(
                     "total_feedback": record_count.get("feedback", 0),
                 }
             )
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.warning(f"Could not get metadata store metrics: {e}")
 
         # Get config for thresholds
@@ -283,7 +251,7 @@ async def detailed_health_check(
                 ),
                 "database_version": "unknown",  # Would get from actual query
             }
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             detailed_status["neo4j"] = {"status": "unhealthy", "error": str(e)}
 
         # LLM detailed check
@@ -294,7 +262,7 @@ async def detailed_health_check(
                 "available_models": len(models) if models else 0,
                 "base_url": llm_manager.base_url,
             }
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             detailed_status["llm"] = {"status": "unhealthy", "error": str(e)}
 
         # Metadata store detailed check

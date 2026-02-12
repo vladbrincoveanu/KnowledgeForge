@@ -43,7 +43,7 @@ class TestExtractFromGitHub:
                 "/api/v1/code/extract-from-github",
                 json={"github_url": "https://github.com/owner/repo"},
             )
-        assert response.status_code == 200
+        assert response.status_code == 202
         data = response.json()
         assert data["status"] == "pending"
         assert "task_id" in data
@@ -80,7 +80,7 @@ class TestUploadRepo:
                 "/api/v1/code/upload-repo",
                 files={"file": ("project.zip", zip_bytes, "application/zip")},
             )
-        assert response.status_code == 200
+        assert response.status_code == 202
         data = response.json()
         assert "task_id" in data
         assert data["status"] == "pending"

@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Any, Optional
 
+from app.utils.fs_utils import limited_rglob
 from app.domain.models.services import Service, ServiceConnection, ConnectionType
 from app.domain.models.code_entities import CodeRelationship, CodeRelationType
 
@@ -69,10 +70,10 @@ class ServiceRelationshipDiscoverer:
     
     def _discover_from_docker_compose(self) -> None:
         """Discover connections from docker-compose depends_on relationships."""
-        compose_files = list(self.repo_root.rglob('docker-compose*.yml')) + \
-                       list(self.repo_root.rglob('docker-compose*.yaml')) + \
-                       list(self.repo_root.rglob('compose.yml')) + \
-                       list(self.repo_root.rglob('compose.yaml'))
+        compose_files = list(limited_rglob(self.repo_root, 'docker-compose*.yml')) + \
+                       list(limited_rglob(self.repo_root, 'docker-compose*.yaml')) + \
+                       list(limited_rglob(self.repo_root, 'compose.yml')) + \
+                       list(limited_rglob(self.repo_root, 'compose.yaml'))
         
         for compose_file in compose_files:
             try:
@@ -143,16 +144,16 @@ class ServiceRelationshipDiscoverer:
             except Exception as e:
                 error_msg = f"Failed to discover from {compose_file}: {e}"
                 self.errors.append(error_msg)
-                logger.debug(error_msg)
+                logger.info(error_msg)
     
     def _discover_from_http_calls(self) -> None:
         """Discover connections from HTTP client calls in code."""
         # Look for HTTP client patterns in code files
-        code_files = list(self.repo_root.rglob('*.py')) + \
-                    list(self.repo_root.rglob('*.js')) + \
-                    list(self.repo_root.rglob('*.ts')) + \
-                    list(self.repo_root.rglob('*.java')) + \
-                    list(self.repo_root.rglob('*.go'))
+        code_files = list(limited_rglob(self.repo_root, '*.py')) + \
+                    list(limited_rglob(self.repo_root, '*.js')) + \
+                    list(limited_rglob(self.repo_root, '*.ts')) + \
+                    list(limited_rglob(self.repo_root, '*.java')) + \
+                    list(limited_rglob(self.repo_root, '*.go'))
         
         # Patterns to match HTTP calls
         http_patterns = [
@@ -280,7 +281,7 @@ class ServiceRelationshipDiscoverer:
                             file_path=rel_path,
                         )
             
-            except Exception as e:
+            except (OSError, ValueError) as e:
                 self.warnings.append(f"Failed to process {config_file}: {e}")
     
     def _discover_from_message_queues(self) -> None:
@@ -386,7 +387,7 @@ class ServiceRelationshipDiscoverer:
                             # For now, we'll just note it in attributes
                             pass
             
-            except Exception as e:
+            except (OSError, yaml.YAMLError) as e:
                 self.warnings.append(f"Failed to process {db_file}: {e}")
     
     def _discover_from_service_discovery(self) -> None:
@@ -555,7 +556,7 @@ class ServiceRelationshipDiscoverer:
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 return f.read()
-        except Exception as e:
+        except (OSError, ValueError) as e:
             self.warnings.append(f"Failed to read {file_path}: {e}")
             return None
 

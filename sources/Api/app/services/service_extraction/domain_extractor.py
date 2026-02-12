@@ -8,6 +8,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Optional
 
+from app.utils.fs_utils import limited_rglob
+
 logger = logging.getLogger(__name__)
 
 
@@ -78,7 +80,7 @@ class DomainExtractor:
         candidates.append(service_name.lower())
 
         # Collect import namespaces from Python files
-        for py_file in service_path.rglob("*.py"):
+        for py_file in limited_rglob(service_path, "*.py"):
             if self._should_skip(py_file):
                 continue
             candidates.extend(self._extract_python_import_roots(py_file))
@@ -130,8 +132,14 @@ class DomainExtractor:
             clean = re.sub(r"[-_]?service$", "", clean)
             clean = clean.replace("-", "_")
             return clean.lower()
-        except Exception as e:
-            logger.debug(f"Failed to parse package.json at {pkg_file}: {e}")
+        except (OSError, json.JSONDecodeError, ValueError) as e:
+            try:
+                from app.utils.config import get_config as _get_config
+                config_debug = getattr(_get_config(), "debug", False)
+            except (OSError, json.JSONDecodeError, ValueError):
+                config_debug = False
+            if config_debug:
+                logger.debug(f"Failed to parse package.json at {pkg_file}: {e}")
             return None
 
     def extract_domain_from_text(self, text: str) -> Optional[str]:
@@ -185,7 +193,13 @@ class DomainExtractor:
 
         # Return the domain with the highest score
         domain, score = scores.most_common(1)[0]
-        logger.debug(f"Domain scoring: top={domain} (score={score}), all={dict(scores.most_common(5))}")
+        try:
+            from app.utils.config import get_config as _get_config
+            config_debug = getattr(_get_config(), "debug", False)
+        except Exception:
+            config_debug = False
+        if config_debug:
+            logger.debug(f"Domain scoring: top={domain} (score={score}), all={dict(scores.most_common(5))}")
         return domain
 
     def _should_skip(self, file_path: Path) -> bool:

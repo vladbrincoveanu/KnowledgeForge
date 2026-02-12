@@ -150,7 +150,7 @@ class RecommendationService:
                     else:
                         faiss_neighbors = list(maybe_result or [])
                 except Exception as exc:
-                    logger.debug("FAISS similarity lookup failed: %s", exc)
+                    logger.info("FAISS similarity lookup failed: %s", exc)
 
         def similarity_score(a: str, b: str) -> float:
             if not a or not b:

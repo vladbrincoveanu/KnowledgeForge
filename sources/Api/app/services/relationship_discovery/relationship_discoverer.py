@@ -200,7 +200,7 @@ class RelationshipDiscoverer:
                         col.strip().strip('"').strip("'")
                         for col in first_line.split(",")
                     ]
-                    logger.debug(f"Detected headers: {headers}")
+                    logger.info(f"Detected headers: {headers}")
 
                     # Load CSV data for analysis using pandas
                     df = pd.read_csv(file_path)

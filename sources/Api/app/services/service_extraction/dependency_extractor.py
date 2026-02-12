@@ -9,6 +9,7 @@ from typing import Optional
 
 import yaml
 
+from app.utils.fs_utils import limited_rglob
 from app.domain.models.services import Service
 
 logger = logging.getLogger(__name__)
@@ -201,17 +202,17 @@ class DependencyExtractor:
         dependency_map: dict[str, set[str]] = defaultdict(set)
 
         compose_files = (
-            list(self.repo_root.rglob("docker-compose*.yml"))
-            + list(self.repo_root.rglob("docker-compose*.yaml"))
-            + list(self.repo_root.rglob("compose.yml"))
-            + list(self.repo_root.rglob("compose.yaml"))
+            list(limited_rglob(self.repo_root, "docker-compose*.yml"))
+            + list(limited_rglob(self.repo_root, "docker-compose*.yaml"))
+            + list(limited_rglob(self.repo_root, "compose.yml"))
+            + list(limited_rglob(self.repo_root, "compose.yaml"))
         )
 
         for compose_file in compose_files[:80]:
             try:
                 content = compose_file.read_text(encoding="utf-8")
                 compose_data = yaml.safe_load(content)
-            except Exception:
+            except (OSError, yaml.YAMLError):
                 continue
 
             if not compose_data or "services" not in compose_data:
@@ -278,7 +279,7 @@ class DependencyExtractor:
             try:
                 content = k8s_file.read_text(encoding="utf-8")
                 documents = list(yaml.safe_load_all(content))
-            except Exception:
+            except (OSError, yaml.YAMLError):
                 continue
 
             for doc in documents:

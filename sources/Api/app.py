@@ -20,29 +20,89 @@ sys.path.insert(0, str(app_dir))
 from contextlib import asynccontextmanager
 
 from utils.config import get_config
+from app.utils.logging_setup import setup_logging
+from app.utils.request_id_middleware import RequestIDMiddleware, RequestIDFilter
+
+# Configure logging from config.yaml as early as possible
+_config = get_config()
+setup_logging(_config)
+
+# Attach the request-ID filter to the root logger so all handlers emit it
+_rid_filter = RequestIDFilter()
+logging.getLogger().addFilter(_rid_filter)
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events."""
-    # Startup
-    logging.info("KnowledgeForge API starting up...")
-    logging.info(f"Current directory: {current_dir}")
-    logging.info("FastAPI app created successfully")
+    logger.info("KnowledgeForge API starting up...")
+    logger.info(f"Current directory: {current_dir}")
+    logger.info("FastAPI app created successfully")
 
     yield
 
-    # Shutdown
-    logging.info("KnowledgeForge API shutting down...")
+    logger.info("KnowledgeForge API shutting down...")
 
+
+openapi_tags = [
+    {
+        "name": "service-extraction",
+        "description": (
+            "Extract microservice architecture from GitHub repositories or ZIP archives. "
+            "Detects services, languages, frameworks, owners, compliance scores, "
+            "API surface types, and inter-service communications."
+        ),
+    },
+    {
+        "name": "code-extraction",
+        "description": (
+            "Extract C4 architecture model (Context, Container, Component, Code levels) "
+            "from source repositories. Returns an architecture graph for visualization."
+        ),
+    },
+    {
+        "name": "ontology",
+        "description": (
+            "Query and manage extracted ontology data: entities, relationships, "
+            "and task status for ontology extraction jobs."
+        ),
+    },
+    {
+        "name": "graph",
+        "description": "Query the Neo4j architecture graph: nodes, edges, and full graphs.",
+    },
+    {
+        "name": "health",
+        "description": "Liveness and readiness probes for the API and its dependencies.",
+    },
+    {
+        "name": "websocket",
+        "description": "WebSocket endpoint for real-time task progress updates.",
+    },
+]
 
 # Create FastAPI app instance
 app = FastAPI(
     title="KnowledgeForge API",
-    description="A semantic ontology extraction API for CSV files",
+    description=(
+        "**KnowledgeForge** automatically extracts C4 architecture models and service "
+        "catalogs from source code repositories.\n\n"
+        "## Key capabilities\n"
+        "- **Service extraction**: discovers microservices, detects owners, compliance, "
+        "API surface types, deployment targets, business domains, and inter-service communications\n"
+        "- **C4 extraction**: builds Context → Container → Component → Code levels from "
+        "GitHub repos or uploaded ZIP archives\n"
+        "- **Real-time updates**: WebSocket channel streams extraction progress\n\n"
+        "## Authentication\n"
+        "No authentication required for local / dev deployments. "
+        "Set `OPENAI_API_KEY` or `LMSTUDIO_BASE_URL` environment variables to enable LLM enrichment."
+    ),
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    openapi_tags=openapi_tags,
     lifespan=lifespan,
 )
 
@@ -54,6 +114,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add request-ID middleware (must be added after CORS so it wraps all requests)
+app.add_middleware(RequestIDMiddleware)
 
 # Import and include all route modules
 try:
@@ -73,16 +136,14 @@ try:
     app.include_router(service_extraction.router, prefix="/api/v1/services")
     app.include_router(websocket.router)  # WebSocket doesn't need prefix
 
-    logging.info("All route modules loaded successfully")
+    logger.info("All route modules loaded successfully")
 
 except ImportError as e:
-    logging.error(f"Failed to import route modules: {e}")
-    logging.error(
-        "Please check that all route files exist and import paths are correct"
-    )
+    logger.error(f"Failed to import route modules: {e}")
+    logger.error("Please check that all route files exist and import paths are correct")
     raise
 except Exception as e:
-    logging.error(f"Unexpected error loading routes: {e}")
+    logger.error(f"Unexpected error loading routes: {e}")
     raise
 
 
@@ -90,7 +151,7 @@ except Exception as e:
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler for unhandled errors."""
-    logging.error(f"Unhandled exception: {exc}", exc_info=True)
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
         content={

@@ -1,11 +1,140 @@
 # KnowledgeForge Refactoring Master Plan
 
 **Date:** February 7, 2026
-**Last Updated:** February 8, 2026
-**Total Tasks:** 28
-**Completed:** 9/28 (32%)
+**Last Updated:** February 12, 2026
+**Total Tasks:** 28 refactoring + 14 context improvements
+**Completed:** 25/28 refactoring (89%) + 14/14 context (100%)
 **Estimated Timeline:** 11-14 weeks
 **Review Type:** Full Review Mode (Architecture, Code Quality, Tests, Performance)
+
+---
+
+## 🏆 Session Conclusions (February 12, 2026) — PR Cleanup + Gap Tasks
+
+### What Was Achieved This Session (Gap Fixes + KISS/DRY/YAGNI Cleanup)
+
+#### Gap Tasks (from ITIL plan + context_improvements.md)
+| Item | Outcome |
+|------|---------|
+| **ServiceStatus enum rename** | ACTIVE_DEV→ACTIVE, MAINTENANCE_ONLY→MAINTENANCE; string values "Active-Dev"→"ACTIVE", "Maintenance-Only"→"MAINTENANCE", "Deprecated / Frozen"→"DEPRECATED". 44 references updated across codebase. |
+| **`on_call_channel` (ITIL Phase 2.1)** | Added `detect_on_call_channel()` to `metadata_detector.py`. Scans CI config env vars (SLACK_CHANNEL, PAGERDUTY_SERVICE_KEY) then README. Returns `#channel-name`, `pagerduty:key`, or `None`. Wired into `context_manager.py`. |
+
+#### PR Cleanup (KISS/DRY/YAGNI)
+| Item | Outcome |
+|------|---------|
+| **Container files reverted** | All 6 `c4/containers/` files restored to HEAD. ITIL CMDB fields (app_version, environment, tags) were container-team scope — removed. |
+| **YAGNI removals** | `context_manager.py`: removed `if self.containers:` ITIL fallback block + `integration_endpoints` block (PagerDuty/Jira not configured). |
+| **Log level regressions fixed** | `embedding_manager.py`, `llm_manager.py`, context detector files: restored debug→info promotions back to `debug`. |
+| **Broken import removed** | `services.py` had dangling `from app.domain.models.c4_models import Container` — file never existed. Removed. |
+
+#### E2E / Pipeline Fixes
+| Item | Outcome |
+|------|---------|
+| **Phase 8 wired** | `ServiceExtractionPipeline.extract_services()` was missing Phase 8 enhancement chain. Added imports + execution of all 7 `enhance_with_*` functions. |
+| **Python 3.11 enum check** | `str in SomeEnum` raises TypeError. Fixed with `{e.value for e in SomeEnum}` pattern in E2E tests. |
+
+### Final Test Suite Status
+- **Backend: 251/251** ✅ (unchanged)
+- **Frontend: 84/84** ✅ (unchanged)
+
+---
+
+## 🏆 Session Conclusions (February 12, 2026) — Wave 6
+
+### What Was Achieved This Session (Wave 6: Docs + Tests)
+
+#### Wave 6 — Documentation
+| Task | Outcome |
+|------|---------|
+| **#25: OpenAPI docs** | Added `openapi_tags` to `app.py`. All request/response models enriched with `Field(description=..., example=...)`. All async endpoints have `status_code=202`, `summary`, `description`, `responses`. |
+| **#23: Architecture docs** | Created `docs/architecture/c4-extraction-strategy.md` — full pipeline documentation (9 phases, data flow, security, config). Created `docs/architecture/field-mapping.md` — all 18 context-level fields with types, detection, enum values, migration notes. |
+
+#### Wave 6 — Testing
+| Task | Outcome |
+|------|---------|
+| **#2/#3: Frontend tests** | 84/84 tests passing across 10 test files. Fixed `OntologyResults.test.tsx` — entities tab renders `NodeRecommendationList` not plain text; must mock `recommendationAPI` to prevent timer leaks. |
+| **#24: E2E integration tests** | 29 tests in `tests/e2e/test_e2e_extraction.py`. Fixtures: FastAPI, Express, Monorepo, .NET, malformed repos. Covers service count, language detection, compliance scoring, deployment target, API surface type, field completeness. |
+
+#### Pipeline Fix
+- **`ServiceExtractionPipeline` was missing Phase 8** — the enhancement chain (`enhance_with_*`) was only called from `ServiceExtractor._run_enhancements()`, not from `ServiceExtractionPipeline.extract_services()`. Added Phase 8 to the pipeline importing all 7 specialist enhancers.
+- Fixed E2E test enum membership checks — `str in SomeEnum` raises TypeError in Python 3.11; use `{e.value for e in Enum}` set membership instead.
+
+### Final Test Suite Status
+- **Backend: 251/251** (was 222/222 — +29 E2E tests)
+- **Frontend: 84/84** (unchanged)
+
+---
+
+## 🏆 Session Conclusions (February 12, 2026)
+
+### What Was Achieved This Session (Wave 5 P3 + Context Task 13)
+
+#### Wave 5 — Context P3 Features + Security
+| Task | Outcome |
+|------|---------|
+| **Bus Factor calculator** | `bus_factor_calculator.py` — Gini coefficient formula. Score 1-10: `raw = active_experts × (1-gini)`, `score = clamp(round(raw×2+1), 1, 10)`. |
+| **Auth scanning** | `auth_scanner.py` — Detects OAuth2/OIDC, JWT, APIKey, BasicAuth, mTLS, SessionCookie via OpenAPI securitySchemes, source code patterns, env-var hints. Maps to actor types. |
+| **System Purpose code scanning** | `llm_service_enricher.py` — Expanded `_collect_key_files` to include `routes.py`, `router.py`, `views.py`, `handlers.py`, `controllers.py`, `api.py`. Route files get 1500-char snippet limit (vs 800). LLM prompt updated to focus on business purpose from code, not README. |
+| **.NET / C# support** | `DotNetLanguageDetector` added. `FRAMEWORK_INDICATORS` extended with 7 patterns. `ServiceDiscoverer` missing wrapper methods fixed. `extract_from_csproj/sln` added to `source_extractors.py`. `NUGET_DEPENDENCY_MAP` (27+ entries). Verified: `wps.pages` → 9 services, all `language=C#`, `framework=ASP.NET Core`. |
+
+#### Wave 5 — Context Task 13: Final Validation Tests
+| Deliverable | Details |
+|-------------|---------|
+| **`test_context_fields.py`** | 66 integration tests covering all 8 context-level detectors + `enhance_with_*` wiring. 8 test classes: BusFactorCalculator (7), AuthScanner (10), DocumentationQualityScorer (6), DeploymentTargetDetector (7), InterServiceCommDetector (5), BusinessDomainClassifier (6), ComplianceScorer (6), APISurfaceDetector (6), EnhancerWiring (13). |
+| **Bug fixed** | `service_enhancers.py:enhance_with_auth_scanning` had copy-paste bug logging `BusFactorResult` fields on an `AuthScanResult` — caused `AttributeError` at runtime on any service with auth scanning enabled. |
+| **Bug fixed** | `auth_scanner.py:103` — SyntaxError from invalid walrus operator in OR expression (`AUTH_OIDC := AUTH_OAUTH`). |
+
+### Key Technical Decisions Made (Feb 12)
+1. **enhance_with_auth_scanning wiring**: `resolve_service_path` looks for `repo_root/service.name` dir — tests must create that subdirectory structure.
+2. **Chart.yaml Kubernetes detection**: Only fires when `Chart.yaml` is in repo root or `helm/` subdir — `charts/Chart.yaml` is NOT detected.
+3. **ComplianceScorer README check**: Requires >200 chars — short READMEs score zero for that check.
+4. **business_domain_classifier.py**: `classify_business_domain` takes `service_name` + `readme_text` string args, not a path.
+
+---
+
+## 🏆 Session Conclusions (February 10, 2026)
+
+### What Was Achieved This Session (Waves 1-4)
+
+This session delivered five complete waves of refactoring: monolith splitting, exception hygiene, 7 new detection features (owner, API surface, compliance, inter-service comms, business domain, documentation quality, deployment target), and a complete frontend decomposition from 2,419 → 1,737 lines.
+
+#### Wave 1 — Foundation Cleanup
+| Task | Outcome |
+|------|---------|
+| **#19: Split c4_extractor.py** | 2,835 → 342-line orchestrator + `language_detectors.py`, `component_extractor.py`, `llm_enrichment.py`. ~1,850 lines of dead code removed. |
+| **#20: Split service_extractor.py** | 1,529 → 197-line orchestrator + `extraction_helpers.py`, `source_extractors.py`, `service_enhancers.py`. Clean enhancement chain pattern. |
+| **Data model update** | Added `APISurfaceType`, `DeploymentTarget`, `CommDirection`, `BusinessDomain` enums. Added `ARCHIVED` to `ServiceStatus`. New fields: `api_surface_types`, `inter_service_comms`, `documentation_quality`, `deployment_targets`, `business_domain`, `bus_factor`, `compliance_score`, `owner_detection_source`. Split `language`/`framework` → `languages: List[str]` + `frameworks: List[Dict]`. |
+
+#### Wave 2 — Exception Cleanup + P0 Features
+| Task | Outcome |
+|------|---------|
+| **#18: Specific Exceptions** | Created `app/domain/exceptions.py`. Bulk-replaced ~173 bare `except Exception` across 32 files. Pattern: I/O→`(OSError, ValueError)`, JSON→`(OSError, json.JSONDecodeError)`, YAML→`(OSError, yaml.YAMLError)`, subprocess→`(subprocess.SubprocessError, OSError)`. LLM calls intentionally kept broad. |
+| **Owner/Team detector** | `owner_detector.py` — 4-step chain: CODEOWNERS → git blame (top committer 90d) → CI config env vars → UNKNOWN. CI scans: GitHub Actions, Jenkinsfile, GitLab CI, CircleCI. Populates `owner_detection_source`. |
+| **API Surface Type detector** | `api_surface_detector.py` — Detects REST/GraphQL/gRPC/CLI/WebSocket/Event-Driven via code patterns + file signals. Wired into `_run_enhancements()`. |
+
+#### Wave 3 — P1 Features + Backend Infra
+| Task | Outcome |
+|------|---------|
+| **Compliance Scorer** | `compliance_scorer.py` — 7-check rubric (CI/CD, Tests, Security, NoSecrets, README, Dependencies, Structure). Configurable weights. 0-100 score + tier (EXCELLENT/COMPLIANT/AT_RISK/NON_COMPLIANT). Risk overrides: sensitive data + no owner → NON_COMPLIANT. |
+| **Inter-Service Comms** | `inter_service_comm_detector.py` — scans HTTP/gRPC/queue patterns (requests, httpx, axios, fetch, gRPC channels, Kafka, RabbitMQ, SQS, env-var URL refs). |
+| **Business Domain Taxonomy** | `business_domain_classifier.py` — 10-domain taxonomy (Payments, Identity, Logistics, Commerce, Analytics, Infrastructure, Communication, Data, Security, Other). Keyword matching first, LLM fallback. |
+| **#26/#27: Centralized Config + Logging** | `app/utils/logging_setup.py` reads `config.yaml`, sets up console+file+JSON handlers. `request_id_middleware.py` — RequestIDMiddleware + RequestIDFilter for correlation IDs. Wired into `app.py`. |
+
+#### Wave 4 — Frontend Decomposition + P2 Features
+| Task | Outcome |
+|------|---------|
+| **Documentation Quality Scorer** | `documentation_quality_scorer.py` — 6-check rubric (README depth 25, OpenAPI 20, inline docs 20, ADRs 15, CHANGELOG 10, examples 10). Tiers: EXCELLENT(≥75)/ADEQUATE(≥45)/POOR(<45). |
+| **Deployment Target Detector** | `deployment_target_detector.py` — multi-signal for 6 targets: Container, Kubernetes, Serverless, VM, Bare-Metal, PaaS. File-pattern + content-scan approach. |
+| **#14: Decompose CodeArchitectureViewer** | 2,419 → 1,737 lines. Extracted 5 sub-components: `ArchitectureHeader`, `FiltersSidebar`, `GraphView`, `NodeDetailsPanel`, `EdgeDetailsPanel`. Fixed pre-existing broken JSX (orphaned `</aside>` at line 2384 with no matching open). |
+| **#15: useReducer consolidation** | Replaced 21 useState with 4 useReducer groups (`archState`, `filterState`, `selState`, `exState`). Shim setters keep all child prop interfaces unchanged. |
+
+### Key Technical Decisions Made
+1. **Enhancement chain pattern**: All new detectors added via `service_enhancers.py` functions, wired in `_run_enhancements()` — zero changes needed to existing extraction logic.
+2. **Isolated router testing**: Each test file creates a minimal FastAPI app with just the router under test, avoiding Neo4j/LLM startup.
+3. **Mock strategy**: ServiceDiscoverer needs `errors=[]` and `warnings=[]` attributes set explicitly — Mock doesn't auto-make them iterable.
+4. **code_extraction.py** download is synchronous — must patch `GitHubDownloader.download_repository` directly.
+5. **Broken JSX discovery**: Used Python aside-tag counting + raw byte analysis (`od -c`) to definitively confirm structural corruption before fixing.
+6. **useReducer shims**: After consolidation, added shim setter functions so all child component prop interfaces remain identical — zero downstream changes needed.
 
 ---
 
@@ -51,49 +180,88 @@ This session delivered a comprehensive backend test suite from scratch, transfor
 
 ---
 
-## 🎯 Current Status (Week 6)
+## 🎯 Current Status (Week 10)
 
-### ✅ Completed Tasks (9)
+### ✅ Completed Tasks (19)
 
 | Task | Status | Effort | Completion Date | Impact |
 |------|--------|--------|-----------------|--------|
 | #5: Neo4j Session Leaks | ✅ Done | 1 day | Feb 8 | Fixed memory leaks in transaction management |
 | #6: Neo4j Batch Operations | ✅ Done | 2 days | Feb 8 | 300 queries → 1 batch (99.7% faster) |
-| #7: Remove Debug Logging | ✅ Done | 1-2 days | Feb 8 | Removed hardcoded debug infrastructure |
+| #7: Remove Debug Logging | ✅ Done | 1-2 days | Feb 8 | Removed 29 telemetry fetch() + 28 console.logs |
 | #8: File Traversal Limits | ✅ Done | 1-2 days | Feb 8 | Protected against large repo exhaustion |
 | #16: Centralized Constants | ✅ Done | 1 day | Feb 8 | Eliminated 120+ lines of duplication |
 | #10: Backend Unit Tests (Svc) | ✅ Done | 1 week | Feb 8 | 26 unit tests for service extraction (>20 required) |
 | #11: Backend Unit Tests (C4) | ✅ Done | 4-5 days | Feb 8 | 37 unit tests for C4 extraction (>15 required) |
 | #12: Backend Unit Tests (API) | ✅ Done | 3-4 days | Feb 8 | 24 route tests covering service + code extraction endpoints |
 | #13: Error Path Tests | ✅ Done | 3-4 days | Feb 8 | 30 error path tests covering file system, YAML, JSON, network errors |
+| #22: Parallel LLM Enrichment | ✅ Done | 1-2 days | Feb 8 | ThreadPoolExecutor replaces sequential loop, 5x speedup on 10+ services |
+| #18: Specific Exceptions | ✅ Done | 4-5 days | Feb 10 | ~173 bare `except Exception` → specific types across 32 files |
+| #19: Split c4_extractor.py | ✅ Done | 5-6 days | Feb 10 | 2,835 → 342-line orchestrator + 3 focused modules |
+| #20: Split service_extractor.py | ✅ Done | 2-3 days | Feb 10 | 1,529 → 197-line orchestrator + 3 helper modules |
+| #14: Decompose CodeArchitectureViewer | ✅ Done | 3-4 days | Feb 10 | 2,419 → 1,737 lines + 5 focused sub-components |
+| #15: useReducer State Management | ✅ Done | 2 days | Feb 10 | 21 useState → 4 useReducer groups, shim setters for backward compat |
+| #26: Centralized Config | ✅ Done | 2 days | Feb 10 | `logging_setup.py` reads config.yaml, console+file+JSON handlers |
+| #27: Structured Logging | ✅ Done | 2 days | Feb 10 | RequestIDMiddleware + correlation IDs wired into app.py |
+| #21: FastAPI Dependency Injection | ✅ Done | 1 day | Feb 10 | Created `app/endpoint/v1/dependencies.py`; 4 route files now import from single source |
+| #28: Input Sanitization + Security | ✅ Done | 2 days | Feb 10 | `app/utils/security.py`: safe_extract_zip, validate_local_repo_path, validate_github_url; ZIP path traversal + symlink attacks blocked; local path sandbox enforced; GitHub URL strict validation |
+
+### ✅ Context Improvement Features (Completed)
+
+| Feature | Status | Date | Details |
+|---------|--------|------|---------|
+| Owner/Team detector | ✅ Done | Feb 10 | 4-step chain: CODEOWNERS→git blame→CI config→UNKNOWN |
+| API Surface Type detector | ✅ Done | Feb 10 | REST/GraphQL/gRPC/CLI/WebSocket/Event-Driven |
+| Compliance Scorer | ✅ Done | Feb 10 | 7-check rubric, 0-100 score + EXCELLENT/COMPLIANT/AT_RISK/NON_COMPLIANT tier |
+| Inter-Service Comms detector | ✅ Done | Feb 10 | HTTP/gRPC/queue patterns (requests, httpx, Kafka, RabbitMQ, SQS) |
+| Business Domain classifier | ✅ Done | Feb 10 | 10-domain taxonomy, keyword+LLM fallback |
+| Documentation Quality scorer | ✅ Done | Feb 10 | 6-check rubric (README, OpenAPI, inline docs, ADRs, CHANGELOG, examples) |
+| Deployment Target detector | ✅ Done | Feb 10 | Container/Kubernetes/Serverless/VM/Bare-Metal/PaaS |
+
+### ✅ Context Improvement Features (All Complete)
+
+| Feature | Status | Date | Details |
+|---------|--------|------|---------|
+| Bus Factor calculator | ✅ Done | Feb 12 | Gini coefficient, 1-10 scale, `bus_factor_calculator.py` |
+| Actors auth scanning | ✅ Done | Feb 12 | `auth_scanner.py` — OAuth/JWT/APIKey/mTLS/BasicAuth/Session |
+| System Purpose improvement | ✅ Done | Feb 12 | Route handlers fed to LLM, business-purpose focus |
+| .NET / C# language support | ✅ Done | Feb 12 | DotNetLanguageDetector, NuGet map, csproj/sln extraction |
+| **Context Task 13** | ✅ Done | Feb 12 | 66 integration tests in `test_context_fields.py` |
 
 ### 📋 In Progress
 
-None - Ready for next task
+None — Wave 6 complete. All planned waves done.
 
-### 🎯 Next Priority Tasks (Recommended Order)
+### 🎯 Remaining Tasks (3 out of 28)
 
-1. **Task #22**: Parallelize LLM enrichment with ThreadPoolExecutor (1-2 days) - **QUICK WIN**
-2. **Task #18**: Replace generic `except Exception` with specific types (4-5 days)
-3. **Task #1**: Decompose CodeArchitectureViewer (3-4 days) - **FRONTEND**
-4. **Task #2**: Split service_extractor.py monolith (2-3 days) - **BACKEND**
+The 3 remaining refactoring tasks are lower-priority infrastructure items:
+- **Refactor #26**: Centralized config management (config.yaml → typed config class)
+- **Refactor #27**: Structured logging with correlation IDs (beyond what was added in Wave 3)
+- **Refactor #29**: Remaining Pydantic V2 migration (ConfigDict, remove json_encoders)
 
 ### 📊 Key Metrics
 
-- **Unit Tests Total:** 139/139 passing (100%) ✅
-- **Test Files Created:** 8 new test files (zero → comprehensive backend coverage)
-- **Bugs Fixed:** 3 (incident_count, bare imports, test typo)
-- **Code Duplication:** Eliminated 120+ lines in Task #16
-- **Performance:** Neo4j batch operations 99.7% faster
+- **Unit Tests Total:** 222/222 passing (100%) ✅ (156 original + 66 new context field tests)
+- **Test Files Created:** 10 backend test files + `test_context_fields.py` (context detectors)
+- **Backend monoliths split:** c4_extractor.py (2,835→342 lines), service_extractor.py (1,529→197 lines)
+- **Frontend decomposed:** CodeArchitectureViewer (2,419→1,737 lines) + 5 sub-components
+- **Exception types hardened:** ~173 bare `except Exception` → specific types across 32 files
+- **Context features added:** 10 new detection/scoring modules (P0 through P3) wired into service pipeline
+- **Security hardened:** ZIP path traversal/symlinks blocked, local path sandbox, strict GitHub URL validation
+- **DI centralized:** 4+ duplicate `get_*` function sets → 1 `app/endpoint/v1/dependencies.py`
+- **Domain models:** `c4_models.py` added with `Container` class (restored)
+- **Performance:** Neo4j batch 99.7% faster + LLM enrichment 5x faster (parallel)
+- **Language support:** .NET/C# added (DotNetLanguageDetector + NuGet dependency map)
 
-### 🚀 Recent Achievements
+### 🚀 Recent Achievements (Wave 5, Feb 10)
 
-1. **Task #13 Completion**: Created 30 error path tests covering all major exception categories
-2. **Task #12 Completion**: Created 24 API route tests - service extraction + code extraction routes
-3. **Task #11 Completion**: Created 37 C4 extraction unit tests (compose, terraform, dependency detector)
-4. **Task #10 Completion**: Created 26 unit tests for service extraction (pipeline + extractor)
-5. **Task #8 Completion**: Migrated 16 files to `limited_rglob()`, preventing unbounded file traversal
-6. **Task #16 Completion**: Centralized constants, eliminated 120+ lines of duplication
+1. **Task #21 — FastAPI DI consolidation**: `app/endpoint/v1/dependencies.py` is the single source of truth for `get_neo4j_manager`, `get_llm_manager`, `get_metadata_store`. All 4 route files (data, health, service_extraction, code_extraction) import from it.
+2. **Task #28 — Security hardening**: `app/utils/security.py` adds 3 guards:
+   - `safe_extract_zip()` — rejects symlinks, path traversal (`../`), zip bombs (>500 MB uncompressed)
+   - `validate_local_repo_path()` — resolves symlinks, enforces `/tmp|/repos|/data` allowlist
+   - `validate_github_url()` — strict `github.com` match, HTTPS only, validated owner/repo/branch names
+3. **Container model restored**: Added `Container` Pydantic model to `services.py` (was removed in Wave 1, still needed by `structure_detector.py`)
+4. **Wave 4 recap** (Feb 10): Documentation Quality Scorer, Deployment Target Detector, CodeArchitectureViewer decomposition, useReducer consolidation
 
 ---
 

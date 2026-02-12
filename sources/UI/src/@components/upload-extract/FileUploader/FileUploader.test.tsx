@@ -22,6 +22,7 @@ vi.mock('@/services/api', () => ({
     connect: vi.fn(),
     disconnect: vi.fn(),
     on: vi.fn(),
+    off: vi.fn(),
   },
   apiUtils: {
     formatFileSize: vi.fn(() => '1KB'),

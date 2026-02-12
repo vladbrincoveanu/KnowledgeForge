@@ -35,8 +35,6 @@ const Settings: React.FC<SettingsProps> = ({ onSettingsChange }) => {
   const handleSave = () => {
     onSettingsChange?.(settings);
     setIsModified(false);
-    // In a real app, you might want to show a success toast here
-    console.log('Settings saved:', settings);
   };
 
   const handleReset = () => {

@@ -8,7 +8,7 @@ Orchestrates the detection of:
 - All 7 primary Service model fields:
   1. domain - Business area
   2. owner - Team/squad (with contributor stats)
-  3. status - Lifecycle stage (Active-Dev, Maintenance-Only, Deprecated)
+  3. status - Lifecycle stage (ACTIVE, MAINTENANCE, DEPRECATED, ARCHIVED)
   4. tier - Criticality level
   5. data_class - Data sensitivity classification
   6. active_experts - Bus factor indicator
@@ -59,9 +59,17 @@ class ContextManager:
         # System identification
         system_name = self.system_detector.detect_system_name()
         system_purpose = self.system_detector.generate_system_purpose()
+        system_environment = self.system_detector.detect_environments()
+        system_app_version = self.system_detector.detect_app_version()
+        system_tags = self.system_detector.detect_tags()
+        system_api_spec_url = self.system_detector.detect_api_spec_url()
+        system_documentation_url = self.system_detector.detect_documentation_url()
+        system_monitoring_url = self.system_detector.detect_monitoring_url()
+        regulatory_frameworks = self.system_detector.detect_regulatory_frameworks()
 
         # External dependencies
         external_deps = self.dependency_detector.detect_external_dependencies()
+        dependency_freshness_alerts = self.dependency_detector.detect_dependency_freshness_alerts()
 
         # Languages and frameworks
         languages = self.system_detector.detect_languages()
@@ -89,9 +97,11 @@ class ContextManager:
 
         # Git activity metrics
         git_activity = self.metadata_detector.get_git_activity_metrics()
+        dora_metrics = self.metadata_detector.get_dora_metrics()
 
         # Owner and contributor stats
         contributor_stats = self.metadata_detector.get_owner_contributor_stats(max_contributors=5)
+        on_call_channel = self.metadata_detector.detect_on_call_channel()
 
         # Compliance risk assessment (pure calculation from extracted metadata)
         compliance, compliance_confidence, compliance_factors = self.metadata_detector.assess_compliance_risk(
@@ -123,12 +133,20 @@ class ContextManager:
             "description": llm_description or system_purpose,
             "llm_description": llm_description or system_purpose,
             "external_dependencies": external_deps,
+            "dependency_freshness_alerts": dependency_freshness_alerts,
             "actors": actors,
             "languages": languages,
             "frameworks": frameworks,
             "repository_url": repository_url,
             "git": git_metadata,
             "context_sources": context_sources,
+            "environment": system_environment,
+            "app_version": system_app_version,
+            "tags": system_tags,
+            "api_spec_url": system_api_spec_url,
+            "documentation_url": system_documentation_url,
+            "monitoring_url": system_monitoring_url,
+            "regulatory_frameworks": regulatory_frameworks,
 
             # ═══════════════════════════════════════════════════════════
             # PRIMARY SERVICE FIELDS (The 7 key attributes)
@@ -168,6 +186,8 @@ class ContextManager:
             "commit_count_30d": git_activity.get("commit_count_30d", 0),
             "commit_count_90d": git_activity.get("commit_count_90d", 0),
             "commit_count_180d": git_activity.get("commit_count_180d", 0),
+            "dora_metrics": dora_metrics,
+            "on_call_channel": on_call_channel,
 
             # Legacy field aliases for backwards compatibility
             "owner_team": owner_team,

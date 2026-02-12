@@ -54,7 +54,7 @@ class ConnectionManager:
         """Send a message to a specific WebSocket connection."""
         try:
             await websocket.send_text(json.dumps(message))
-        except Exception as e:
+        except (OSError, json.JSONDecodeError, ValueError) as e:
             logging.error(f"Failed to send WebSocket message: {e}")
             self.disconnect(websocket)
 
@@ -64,7 +64,7 @@ class ConnectionManager:
         for connection in self.active_connections:
             try:
                 await connection.send_text(json.dumps(message))
-            except Exception as e:
+            except (OSError, json.JSONDecodeError, ValueError) as e:
                 logging.error(f"Failed to broadcast to connection: {e}")
                 disconnected.append(connection)
 
@@ -143,7 +143,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
     except WebSocketDisconnect:
         logging.info("WebSocket client disconnected")
-    except Exception as e:
+    except (OSError, json.JSONDecodeError, ValueError) as e:
         logging.error(f"WebSocket error: {e}")
 
 

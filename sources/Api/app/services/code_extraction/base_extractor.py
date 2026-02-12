@@ -51,7 +51,7 @@ class BaseExtractor(ABC):
         try:
             with open(file_path, 'rb') as f:
                 return hashlib.sha256(f.read()).hexdigest()
-        except Exception as e:
+        except (OSError, ValueError) as e:
             logger.error(f"Failed to compute hash for {file_path}: {e}")
             return ""
     
@@ -106,7 +106,7 @@ class BaseExtractor(ABC):
                     return f.read()
             except UnicodeDecodeError:
                 continue
-            except Exception as e:
+            except (OSError, ValueError) as e:
                 logger.error(f"Failed to read {file_path}: {e}")
                 return None
         

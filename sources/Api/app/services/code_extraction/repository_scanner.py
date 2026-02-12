@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
+from app.utils.fs_utils import limited_rglob
 from app.domain.models.code_entities import (
     CodeEntity,
     CodeLanguage,
@@ -234,8 +235,8 @@ class RepositoryScanner:
     def _collect_files(self) -> list[Path]:
         """Collect all files to process, respecting ignore patterns."""
         files: list[Path] = []
-        
-        for file_path in self.repo_path.rglob('*'):
+
+        for file_path in limited_rglob(self.repo_path, '*'):
             if not file_path.is_file():
                 continue
             
@@ -331,7 +332,7 @@ class RepositoryScanner:
             if result.returncode == 0:
                 metadata.commit_hash = result.stdout.strip()
         
-        except Exception as e:
+        except (subprocess.SubprocessError, OSError) as e:
             logger.debug(f"Failed to get git info: {e}")
         
         return metadata
@@ -346,7 +347,7 @@ class RepositoryScanner:
         try:
             with open(cache_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
-        except Exception as e:
+        except (OSError, json.JSONDecodeError, ValueError) as e:
             logger.warning(f"Failed to load previous scan data: {e}")
             return None
     
@@ -388,7 +389,7 @@ class RepositoryScanner:
             with open(cache_file, 'w', encoding='utf-8') as f:
                 json.dump(scan_data, f, indent=2)
         
-        except Exception as e:
+        except (OSError, json.JSONDecodeError, ValueError) as e:
             logger.warning(f"Failed to save scan data: {e}")
     
     def _compute_diff(self, current_scan: ExtractionResult) -> IncrementalScanResult:

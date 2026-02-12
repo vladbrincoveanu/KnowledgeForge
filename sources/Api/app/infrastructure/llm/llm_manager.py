@@ -937,7 +937,7 @@ Common relationship types:
             logger.warning("Failed to generate ontology mapping from LLM response")
             return None
 
-        except Exception as e:
+        except (OSError, json.JSONDecodeError, ValueError) as e:
             logger.error(f"Ontology mapping generation failed: {e}")
             return None
 

@@ -20,8 +20,8 @@ class GitStatusAnalyzer:
     Analyze git commit history to infer service lifecycle status.
     
     Heuristics:
-    - Active-Dev: Recent commits (within 30 days), frequent commits
-    - Maintenance-Only: Old commits (30-180 days), only bugfixes/maintenance keywords
+    - ACTIVE: Recent commits (within 30 days)
+    - MAINTENANCE: Fewer commits (30-180 days)
     - Deprecated: Very old commits (>180 days) or explicit deprecation messages
     """
     
@@ -54,7 +54,7 @@ class GitStatusAnalyzer:
             Inferred ServiceStatus based on git activity
         """
         if not self.is_git_repo:
-            logger.debug("Not a git repository, cannot analyze git history")
+            logger.info("Not a git repository, cannot analyze git history")
             return ServiceStatus.UNKNOWN
         
         try:
@@ -142,7 +142,7 @@ class GitStatusAnalyzer:
                             'message': commit_message.lower()
                         })
                     except Exception as e:
-                        logger.debug(f"Failed to parse commit date '{commit_date_str}': {e}")
+                        logger.info(f"Failed to parse commit date '{commit_date_str}': {e}")
                         continue
             
             if not commits:
@@ -179,7 +179,7 @@ class GitStatusAnalyzer:
             logger.warning("Git log command timed out")
             return None
         except Exception as e:
-            logger.debug(f"Failed to get commit stats: {e}")
+            logger.info(f"Failed to get commit stats: {e}")
             return None
     
     def _has_deprecation_keywords(
@@ -235,7 +235,7 @@ class GitStatusAnalyzer:
             return False
         
         except Exception as e:
-            logger.debug(f"Failed to check deprecation keywords: {e}")
+            logger.info(f"Failed to check deprecation keywords: {e}")
             return False
     
     def _infer_status_from_activity(
@@ -279,23 +279,23 @@ class GitStatusAnalyzer:
                 if total_recent > 0:
                     feature_ratio = feature_count / total_recent
                     
-                    # Active-Dev: Recent commits + more features than bugfixes
+                    # ACTIVE: Recent commits + more features than bugfixes
                     if commits_30d >= 3 and feature_ratio > 0.4:
-                        return ServiceStatus.ACTIVE_DEV
+                        return ServiceStatus.ACTIVE
                     # Maintenance: Recent commits but mostly bugfixes
                     elif bugfix_count > feature_count:
-                        return ServiceStatus.MAINTENANCE_ONLY
-                    # Active-Dev: Some features even if fewer
+                        return ServiceStatus.MAINTENANCE
+                    # ACTIVE: Some features even if fewer
                     elif feature_count > 0:
-                        return ServiceStatus.ACTIVE_DEV
+                        return ServiceStatus.ACTIVE
             
             # Old activity (30-180 days)
             if commits_90d > 0 and commits_30d == 0:
                 # Had activity 30-90 days ago, but not recently
                 if bugfix_count > feature_count:
-                    return ServiceStatus.MAINTENANCE_ONLY
+                    return ServiceStatus.MAINTENANCE
                 else:
-                    return ServiceStatus.MAINTENANCE_ONLY  # Still maintenance if no recent activity
+                    return ServiceStatus.MAINTENANCE  # Still maintenance if no recent activity
             
             # Very old (>180 days)
             if commits_180d == 0:
@@ -309,27 +309,27 @@ class GitStatusAnalyzer:
         # Old (30-180 days) with only maintenance commits = maintenance-only
         if 30 < days_since_last <= 180:
             if maintenance_commits > 0 and recent_commits == 0:
-                return ServiceStatus.MAINTENANCE_ONLY
+                return ServiceStatus.MAINTENANCE
             elif recent_commits == 0:
                 # No commits in last 30 days, but had commits 30-180 days ago
-                return ServiceStatus.MAINTENANCE_ONLY
+                return ServiceStatus.MAINTENANCE
         
         # Recent commits (<30 days) = active
         if days_since_last <= 30:
             if recent_commits >= 3:
                 # Multiple recent commits = active development
-                return ServiceStatus.ACTIVE_DEV
+                return ServiceStatus.ACTIVE
             elif recent_commits > 0:
                 # Some recent activity
                 # Check if it's mostly maintenance
                 if maintenance_commits >= recent_commits * 0.7:
-                    return ServiceStatus.MAINTENANCE_ONLY
+                    return ServiceStatus.MAINTENANCE
                 else:
-                    return ServiceStatus.ACTIVE_DEV
+                    return ServiceStatus.ACTIVE
         
         # Default to maintenance if we have some history but it's old
         if total_commits > 0:
-            return ServiceStatus.MAINTENANCE_ONLY
+            return ServiceStatus.MAINTENANCE
         
         return ServiceStatus.UNKNOWN
     

@@ -140,8 +140,8 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   useEffect(() => {
     wsService.connect();
 
-    const handleConnected = () => console.log('WebSocket connected');
-    const handleDisconnected = () => console.log('WebSocket disconnected');
+    const handleConnected = () => {};
+    const handleDisconnected = () => {};
 
     wsService.on('message', handleWebSocketMessage);
     wsService.on('connected', handleConnected);
@@ -436,13 +436,11 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     }));
   };
 
-  const handleRecommendationApprove = (approvedItems: any) => {
-    console.log('Approved items:', approvedItems);
+  const handleRecommendationApprove = (_approvedItems: any) => {
     setRecommendationModal({ isOpen: false, taskId: null });
   };
 
   const handleRecommendationReject = () => {
-    console.log('Recommendations rejected');
     setRecommendationModal({ isOpen: false, taskId: null });
   };
 

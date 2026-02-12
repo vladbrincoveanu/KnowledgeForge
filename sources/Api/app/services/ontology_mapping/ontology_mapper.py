@@ -465,12 +465,12 @@ class OntologyMapper:
                         ]
                         confidence += similarity * 0.1
                     else:
-                        logger.debug("Skipping cosine similarity due to zero vectors")
+                        logger.info("Skipping cosine similarity due to zero vectors")
                 else:
-                    logger.debug("Skipping cosine similarity due to invalid vectors")
+                    logger.info("Skipping cosine similarity due to invalid vectors")
 
             except Exception as e:
-                logger.debug(f"Failed to calculate embedding similarity: {e}")
+                logger.info(f"Failed to calculate embedding similarity: {e}")
 
         return min(confidence, 1.0)
 
@@ -529,7 +529,7 @@ class OntologyMapper:
                     "attributes_mapped": {},
                 }
         except Exception as e:
-            logger.debug(f"LLM mapping suggestion failed: {e}")
+            logger.info(f"LLM mapping suggestion failed: {e}")
 
         return None
 
@@ -861,7 +861,7 @@ class OntologyMapper:
             logger.info(f"Mapping results saved to {file_path}")
             return True
 
-        except Exception as e:
+        except (OSError, json.JSONDecodeError, ValueError) as e:
             logger.error(f"Failed to save mapping results: {e}")
             return False
 
@@ -885,6 +885,6 @@ class OntologyMapper:
                 processing_time=data.get("processing_time", 0.0),
             )
 
-        except Exception as e:
+        except (OSError, json.JSONDecodeError, ValueError) as e:
             logger.error(f"Failed to load mapping results: {e}")
             return None

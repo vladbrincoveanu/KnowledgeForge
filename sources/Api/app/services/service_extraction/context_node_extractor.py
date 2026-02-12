@@ -22,6 +22,7 @@ CONTEXT_FILE_PATTERNS = {
     ContextNodeType.CARGO_TOML: ["Cargo.toml", "Cargo.lock"],
     ContextNodeType.BUILD_GRADLE: ["build.gradle", "build.gradle.kts"],
     ContextNodeType.POM_XML: ["pom.xml"],
+    ContextNodeType.APPSETTINGS: ["appsettings.json", "appsettings.*.json"],
 }
 
 
@@ -64,7 +65,7 @@ class ContextNodeExtractor:
         if search_path.is_file():
             search_path = search_path.parent
         
-        logger.debug(f"Extracting context nodes from {search_path}")
+        logger.info(f"Extracting context nodes from {search_path}")
         
         # Search for each type of context file
         for node_type, patterns in CONTEXT_FILE_PATTERNS.items():
@@ -94,7 +95,7 @@ class ContextNodeExtractor:
         
         logger.info(f"Found {len(context_nodes)} context nodes in {search_path}")
         for node in context_nodes:
-            logger.debug(f"  - {node.name} ({node.type})")
+            logger.info(f"  - {node.name} ({node.type})")
         
         return context_nodes
     
@@ -121,8 +122,8 @@ class ContextNodeExtractor:
             try:
                 with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                     content_preview = f.read(500)
-            except Exception as read_error:
-                logger.debug(f"Could not read {file_path}: {read_error}")
+            except (OSError, ValueError) as read_error:
+                logger.info(f"Could not read {file_path}: {read_error}")
             
             # Get relative path from repo root
             try:
@@ -148,7 +149,7 @@ class ContextNodeExtractor:
                 },
             )
             
-            logger.debug(f"Created context node: {node.name} ({node.type})")
+            logger.info(f"Created context node: {node.name} ({node.type})")
             return node
         
         except Exception as e:

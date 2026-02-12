@@ -1,12 +1,9 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
-import ReactFlow, {
+import React, { useEffect, useReducer, useCallback, useRef } from 'react';
+import {
   Node,
   Edge,
-  Controls,
-  Background,
   useNodesState,
   useEdgesState,
-  BackgroundVariant,
   MarkerType,
   Position,
   useReactFlow,
@@ -19,10 +16,12 @@ import './CodeArchitectureViewer.scss';
 import { codeArchitectureAPI } from '../../../services/api';
 import CustomNode from './CustomNode';
 import ContainerNode from './ContainerNode';
-import NodeDetails from './components/NodeDetails';
 import C4Edge from './C4Edge';
-import BatchUrlInput from './batchurlinput';
-import GitHubOrgScanner from './githuborgscanner';
+import ArchitectureHeader from './components/ArchitectureHeader';
+import FiltersSidebar from './components/FiltersSidebar';
+import GraphView from './components/GraphView';
+import NodeDetailsPanel from './components/NodeDetailsPanel';
+import EdgeDetailsPanel from './components/EdgeDetailsPanel';
 
 interface CodeEntity {
   id: string;
@@ -199,52 +198,10 @@ const normalizeDescription = (text?: string) => {
   return text.replace(/\s+/g, ' ').trim();
 };
 
-const complianceStatusLabels: Record<string, string> = {
-  EXCELLENT: 'Excellent',
-  COMPLIANT: 'Compliant',
-  AT_RISK: 'At risk',
-  NON_COMPLIANT: 'Non-compliant',
-  UNKNOWN: 'Unknown',
-};
-
-const complianceFactorLabels: Record<string, string> = {
-  sensitive_data_low_tier: 'Sensitive data stored in a low-tier system',
-  sensitive_data_no_owner: 'Sensitive data without an owner',
-  critical_service_no_owner: 'Critical service without an owner',
-  no_active_maintainers: 'No active maintainers',
-  deprecated_with_sensitive_data: 'Deprecated service with sensitive data',
-  single_point_of_failure: 'Single maintainer for a Tier 1 service',
-};
-
-const formatComplianceStatus = (status?: string) => {
-  if (!status) return '';
-  return complianceStatusLabels[status] || status.replace(/_/g, ' ');
-};
-
-const formatComplianceFactor = (factor: string) => {
-  const cleaned = factor.trim();
-  const label = complianceFactorLabels[cleaned];
-  if (label) return label;
-  const spaced = cleaned.replace(/_/g, ' ');
-  return spaced ? `${spaced[0].toUpperCase()}${spaced.slice(1)}` : '';
-};
-
-const formatComplianceFactors = (factors?: string[]) =>
-  (factors || [])
-    .map(formatComplianceFactor)
-    .filter((value): value is string => Boolean(value));
-
 const nodeTypes = {
   custom: CustomNode,
   container: ContainerNode,
 };
-
-const AVAILABLE_LEVELS = [
-  'context_level',
-  'container_level',
-  'component_level',
-  'code_level',
-];
 
 // Layout function - grid layout for components in containers
 const getLayoutedElements = (
@@ -384,11 +341,11 @@ const getLayoutedElements = (
     dagreGraph.setGraph({
       rankdir: direction,
       align: 'UL',
-      ranksep: 250,
-      nodesep: 80,
-      edgesep: 20,
-      marginx: 50,
-      marginy: 50,
+      ranksep: 100,
+      nodesep: 50,
+      edgesep: 10,
+      marginx: 100,
+      marginy: 100,
       ranker: 'network-simplex',
     });
 
@@ -453,6 +410,43 @@ const getLayoutedElements = (
   return { nodes: layoutedNodes, edges };
 };
 
+// Star layout for C4 Context level: system centred, actors on left, externals in ring
+function layoutContextLevel(nodes: Node[]): Node[] {
+  const cx = 650, cy = 380;
+  const system = nodes.find(n => n.data?.type === 'system');
+  const persons = nodes.filter(n => n.data?.type === 'person');
+  const externals = nodes.filter(
+    n => n.data?.type !== 'system' && n.data?.type !== 'person'
+  );
+
+  if (system) {
+    system.position = { x: cx - 110, y: cy - 45 };
+    system.sourcePosition = Position.Right;
+    system.targetPosition = Position.Left;
+  }
+
+  // Actors stacked vertically on the left
+  persons.forEach((n, i) => {
+    n.position = { x: cx - 520, y: cy - 80 + i * 190 };
+    n.sourcePosition = Position.Right;
+    n.targetPosition = Position.Left;
+  });
+
+  // External systems in a ring clockwise from top-right
+  const count = externals.length;
+  externals.forEach((n, i) => {
+    const angle = (-Math.PI / 2) + (i * 2 * Math.PI / Math.max(count, 1));
+    n.position = {
+      x: cx + 380 * Math.cos(angle) - 80,
+      y: cy + 380 * Math.sin(angle) - 35,
+    };
+    n.sourcePosition = Position.Right;
+    n.targetPosition = Position.Left;
+  });
+
+  return nodes;
+}
+
 const CodeArchitectureViewer: React.FC = () => {
   return (
     <ReactFlowProvider>
@@ -461,37 +455,225 @@ const CodeArchitectureViewer: React.FC = () => {
   );
 };
 
+// ── State types & reducers ────────────────────────────────────────────────────
+
+interface ArchState {
+  architecture: C4Architecture | null;
+  loading: boolean;
+  error: string | null;
+}
+type ArchAction =
+  | { type: 'SET_ARCHITECTURE'; payload: C4Architecture | null }
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_ERROR'; payload: string | null };
+
+function archReducer(state: ArchState, action: ArchAction): ArchState {
+  switch (action.type) {
+    case 'SET_ARCHITECTURE': return { ...state, architecture: action.payload };
+    case 'SET_LOADING':      return { ...state, loading: action.payload };
+    case 'SET_ERROR':        return { ...state, error: action.payload };
+    default: return state;
+  }
+}
+
+interface FilterState {
+  selectedLevel: string;
+  selectedEntityTypes: string[];
+  selectedRelationshipTypes: string[];
+  showExternal: boolean;
+  dependencyViewFilter: 'all' | 'business' | 'technical';
+  searchTerm: string;
+  relationshipTypes: string[];
+}
+type FilterAction =
+  | { type: 'SET_LEVEL'; payload: string }
+  | { type: 'SET_ENTITY_TYPES'; payload: string[] }
+  | { type: 'SET_RELATIONSHIP_TYPES'; payload: string[] }
+  | { type: 'SET_SHOW_EXTERNAL'; payload: boolean }
+  | { type: 'SET_DEPENDENCY_VIEW'; payload: 'all' | 'business' | 'technical' }
+  | { type: 'SET_SEARCH_TERM'; payload: string }
+  | { type: 'SET_REL_TYPE_LIST'; payload: string[] };
+
+function filterReducer(state: FilterState, action: FilterAction): FilterState {
+  switch (action.type) {
+    case 'SET_LEVEL':             return { ...state, selectedLevel: action.payload };
+    case 'SET_ENTITY_TYPES':      return { ...state, selectedEntityTypes: action.payload };
+    case 'SET_RELATIONSHIP_TYPES':return { ...state, selectedRelationshipTypes: action.payload };
+    case 'SET_SHOW_EXTERNAL':     return { ...state, showExternal: action.payload };
+    case 'SET_DEPENDENCY_VIEW':   return { ...state, dependencyViewFilter: action.payload };
+    case 'SET_SEARCH_TERM':       return { ...state, searchTerm: action.payload };
+    case 'SET_REL_TYPE_LIST':     return { ...state, relationshipTypes: action.payload };
+    default: return state;
+  }
+}
+
+interface SelectionState {
+  selectedNode: any;
+  selectedEdge: any;
+  nodeDescription: string;
+  edgeDescription: string;
+  isNodeLoading: boolean;
+  isEdgeLoading: boolean;
+}
+type SelectionAction =
+  | { type: 'SELECT_NODE'; node: any; description: string }
+  | { type: 'SET_NODE_DESCRIPTION'; payload: string }
+  | { type: 'CLEAR_NODE' }
+  | { type: 'SELECT_EDGE'; edge: any }
+  | { type: 'SET_EDGE_DESCRIPTION'; payload: string }
+  | { type: 'SET_EDGE_LOADING'; payload: boolean }
+  | { type: 'CLEAR_EDGE' };
+
+function selectionReducer(state: SelectionState, action: SelectionAction): SelectionState {
+  switch (action.type) {
+    case 'SELECT_NODE':
+      return { ...state, selectedNode: action.node, nodeDescription: action.description,
+               isNodeLoading: false, selectedEdge: null, edgeDescription: '' };
+    case 'SET_NODE_DESCRIPTION':
+      return { ...state, nodeDescription: action.payload, isNodeLoading: false };
+    case 'CLEAR_NODE':
+      return { ...state, selectedNode: null, nodeDescription: '', isNodeLoading: false };
+    case 'SELECT_EDGE':
+      return { ...state, selectedEdge: action.edge, edgeDescription: '',
+               isEdgeLoading: false, selectedNode: null, nodeDescription: '' };
+    case 'SET_EDGE_DESCRIPTION':
+      return { ...state, edgeDescription: action.payload, isEdgeLoading: false };
+    case 'SET_EDGE_LOADING':
+      return { ...state, isEdgeLoading: action.payload };
+    case 'CLEAR_EDGE':
+      return { ...state, selectedEdge: null, edgeDescription: '', isEdgeLoading: false };
+    default: return state;
+  }
+}
+
+interface ExtractionState {
+  githubUrl: string;
+  localPath: string;
+  isExtracting: boolean;
+  extractionStatus: string | null;
+  extractionError: string | null;
+  repoSectionExpanded: boolean;
+}
+type ExtractionAction =
+  | { type: 'SET_URL'; payload: string }
+  | { type: 'SET_LOCAL_PATH'; payload: string }
+  | { type: 'SET_EXTRACTING'; payload: boolean }
+  | { type: 'SET_STATUS'; payload: string | null }
+  | { type: 'SET_ERROR'; payload: string | null }
+  | { type: 'TOGGLE_REPO_SECTION' }
+  | { type: 'SET_REPO_EXPANDED'; payload: boolean };
+
+function extractionReducer(state: ExtractionState, action: ExtractionAction): ExtractionState {
+  switch (action.type) {
+    case 'SET_URL':          return { ...state, githubUrl: action.payload };
+    case 'SET_LOCAL_PATH':   return { ...state, localPath: action.payload };
+    case 'SET_EXTRACTING':   return { ...state, isExtracting: action.payload };
+    case 'SET_STATUS':       return { ...state, extractionStatus: action.payload };
+    case 'SET_ERROR':        return { ...state, extractionError: action.payload };
+    case 'TOGGLE_REPO_SECTION': return { ...state, repoSectionExpanded: !state.repoSectionExpanded };
+    case 'SET_REPO_EXPANDED':return { ...state, repoSectionExpanded: action.payload };
+    default: return state;
+  }
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 const CodeArchitectureViewerInner: React.FC = () => {
-  const [architecture, setArchitecture] = useState<C4Architecture | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [archState, archDispatch] = useReducer(archReducer, {
+    architecture: null, loading: true, error: null,
+  });
+  const { architecture, loading, error } = archState;
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const { fitView } = useReactFlow();
 
-  // Filters - focus on context-level for manager view
-  const [selectedLevel, setSelectedLevel] = useState<string>('context_level');
-  const [selectedEntityTypes, setSelectedEntityTypes] = useState<string[]>([]);
-  const [selectedRelationshipTypes, setSelectedRelationshipTypes] = useState<
-    string[]
-  >([]);
-  const [showExternal, setShowExternal] = useState(true);
-  const [dependencyViewFilter, setDependencyViewFilter] = useState<'all' | 'business' | 'technical'>('business'); // NEW: Filter for C4 compliance
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedNode, setSelectedNode] = useState<any>(null);
-  const [selectedEdge, setSelectedEdge] = useState<any>(null);
-  const [nodeDescription, setNodeDescription] = useState<string>('');
-  const [edgeDescription, setEdgeDescription] = useState<string>('');
-  const [isNodeLoading, setIsNodeLoading] = useState(false);
-  const [isEdgeLoading, setIsEdgeLoading] = useState(false);
-  const [relationshipTypes, setRelationshipTypes] = useState<string[]>([]);
-  const [githubUrl, setGithubUrl] = useState('');
-  const [isExtracting, setIsExtracting] = useState(false);
-  const [extractionStatus, setExtractionStatus] = useState<string | null>(null);
-  const [extractionError, setExtractionError] = useState<string | null>(null);
-  const [repoSectionExpanded, setRepoSectionExpanded] = useState(true);
+  const [filterState, filterDispatch] = useReducer(filterReducer, {
+    selectedLevel: 'context_level',
+    selectedEntityTypes: [],
+    selectedRelationshipTypes: [],
+    showExternal: true,
+    dependencyViewFilter: 'business',
+    searchTerm: '',
+    relationshipTypes: [],
+  });
+  const {
+    selectedLevel, selectedEntityTypes, selectedRelationshipTypes,
+    showExternal, dependencyViewFilter, searchTerm, relationshipTypes,
+  } = filterState;
+
+  const [selState, selDispatch] = useReducer(selectionReducer, {
+    selectedNode: null, selectedEdge: null,
+    nodeDescription: '', edgeDescription: '',
+    isNodeLoading: false, isEdgeLoading: false,
+  });
+  const {
+    selectedNode, selectedEdge,
+    nodeDescription, edgeDescription,
+    isNodeLoading, isEdgeLoading,
+  } = selState;
+
+  const [exState, exDispatch] = useReducer(extractionReducer, {
+    githubUrl: '', isExtracting: false,
+    extractionStatus: null, extractionError: null,
+    repoSectionExpanded: true,
+    localPath: '',
+  });
+  const {
+    githubUrl, localPath, isExtracting, extractionStatus, extractionError, repoSectionExpanded,
+  } = exState;
+
   const pollIntervalRef = useRef<number | null>(null);
+
+  // ── Shim setters (keep child prop interfaces unchanged) ───────────────────
+  const setArchitecture = (v: C4Architecture | null) =>
+    archDispatch({ type: 'SET_ARCHITECTURE', payload: v });
+  const setLoading = (v: boolean) => archDispatch({ type: 'SET_LOADING', payload: v });
+  const setError = (v: string | null) => archDispatch({ type: 'SET_ERROR', payload: v });
+
+  const setSelectedLevel = (v: string) => filterDispatch({ type: 'SET_LEVEL', payload: v });
+  const setSelectedEntityTypes = (v: string[]) =>
+    filterDispatch({ type: 'SET_ENTITY_TYPES', payload: v });
+  const setSelectedRelationshipTypes = (v: string[]) =>
+    filterDispatch({ type: 'SET_RELATIONSHIP_TYPES', payload: v });
+  const setShowExternal = (v: boolean) =>
+    filterDispatch({ type: 'SET_SHOW_EXTERNAL', payload: v });
+  const setDependencyViewFilter = (v: 'all' | 'business' | 'technical') =>
+    filterDispatch({ type: 'SET_DEPENDENCY_VIEW', payload: v });
+  const setSearchTerm = (v: string) =>
+    filterDispatch({ type: 'SET_SEARCH_TERM', payload: v });
+  const setRelationshipTypes = (v: string[]) =>
+    filterDispatch({ type: 'SET_REL_TYPE_LIST', payload: v });
+
+  const setSelectedNode = (node: any) => {
+    if (node === null) {
+      selDispatch({ type: 'CLEAR_NODE' });
+    } else {
+      selDispatch({ type: 'SELECT_NODE', node, description: '' });
+    }
+  };
+  const setSelectedEdge = (edge: any) => {
+    if (edge === null) {
+      selDispatch({ type: 'CLEAR_EDGE' });
+    } else {
+      selDispatch({ type: 'SELECT_EDGE', edge });
+    }
+  };
+  const setNodeDescription = (v: string) =>
+    selDispatch({ type: 'SET_NODE_DESCRIPTION', payload: v });
+  const setEdgeDescription = (v: string) =>
+    selDispatch({ type: 'SET_EDGE_DESCRIPTION', payload: v });
+  const setIsNodeLoading = (_v: boolean) => { /* handled by SELECT_NODE/CLEAR_NODE */ };
+  const setIsEdgeLoading = (v: boolean) =>
+    selDispatch({ type: 'SET_EDGE_LOADING', payload: v });
+
+  const setGithubUrl = (v: string) => exDispatch({ type: 'SET_URL', payload: v });
+  const setLocalPath = (v: string) => exDispatch({ type: 'SET_LOCAL_PATH', payload: v });
+  const setIsExtracting = (v: boolean) => exDispatch({ type: 'SET_EXTRACTING', payload: v });
+  const setExtractionStatus = (v: string | null) => exDispatch({ type: 'SET_STATUS', payload: v });
+  const setExtractionError = (v: string | null) => exDispatch({ type: 'SET_ERROR', payload: v });
+  const setRepoSectionExpanded = (v: boolean) =>
+    exDispatch({ type: 'SET_REPO_EXPANDED', payload: v });
 
   const applyArchitecture = useCallback((data: any) => {
     // Ensure c4_model_version exists (API might not include it)
@@ -499,16 +681,6 @@ const CodeArchitectureViewerInner: React.FC = () => {
       data.c4_model_version = '1.0';
     }
 
-    console.log(
-      '[CodeArchitectureViewer] Applying cumulative architecture data:',
-      {
-        hasSystemContext: !!data.system_context,
-        containersCount: data.containers?.length || 0,
-        componentsCount: data.components?.length || 0,
-        hasRelationships: !!data.relationships,
-        extractionMode: data.metadata?.extraction_mode || 'unknown',
-      }
-    );
 
     // Transform containers array into container_level structure
     if (data.containers && Array.isArray(data.containers)) {
@@ -631,12 +803,24 @@ const CodeArchitectureViewerInner: React.FC = () => {
           compliance: data.system_context?.compliance,
           compliance_confidence: data.system_context?.compliance_confidence,
           compliance_factors: data.system_context?.compliance_factors,
-          purpose: data.system_context?.purpose,
+          purpose: data.system_context?.purpose || data.system_context?.description,
+          description: data.system_context?.description || data.system_context?.purpose,
           languages: data.system_context?.languages,
           frameworks: data.system_context?.frameworks,
           repository_url: data.system_context?.repository_url,
           git: data.system_context?.git,
           context_sources: data.system_context?.context_sources,
+          external_dependencies: data.system_context?.external_dependencies,
+          documentation_quality: data.system_context?.documentation_quality,
+          deployment_targets: data.system_context?.deployment_targets,
+          dora_metrics: data.system_context?.dora_metrics,
+          last_commit_date: data.system_context?.last_commit_date,
+          commit_count_30d: data.system_context?.commit_count_30d,
+          commit_count_90d: data.system_context?.commit_count_90d,
+          // Derived: count containers as service_count
+          service_count: (data.containers || []).length || undefined,
+          // Actors list for panel display
+          actors: data.system_context?.actors,
         },
       });
 
@@ -647,27 +831,51 @@ const CodeArchitectureViewerInner: React.FC = () => {
           entity_type: actor.type || 'person',
           language: 'Unknown',
           file_path: '',
-          attributes: {},
+          attributes: {
+            description: actor.description || actor.role || '',
+            role: actor.role || actor.type || 'person',
+          },
         })
       );
 
+      // Types that map to TECHNICAL_INFRA when dependency_type is not set
+      const TECH_INFRA_DEP_TYPES = new Set([
+        'database', 'cache', 'logging', 'documentation', 'queue',
+      ]);
+      const inferDepType = (dep: any): { dep_type: string; dep_confidence: number } => {
+        if (dep.dependency_type && dep.dependency_type !== 'UNKNOWN') {
+          return { dep_type: dep.dependency_type, dep_confidence: dep.classification_confidence ?? 0.5 };
+        }
+        if (TECH_INFRA_DEP_TYPES.has(dep.type)) {
+          return { dep_type: 'TECHNICAL_INFRA', dep_confidence: 0.85 };
+        }
+        if (dep.type === 'external_service' || dep.type === 'external_system') {
+          return { dep_type: 'BUSINESS_SYSTEM', dep_confidence: 0.6 };
+        }
+        return { dep_type: 'UNKNOWN', dep_confidence: 0.5 };
+      };
+
       const externalEntities = (
         data.system_context?.external_dependencies || []
-      ).map((dep: any, idx: number) => ({
-        id: `context_external_${idx}`,
-        name: dep.name || dep.url || `External ${idx + 1}`,
-        entity_type: dep.type || 'external_system',
-        language: 'Unknown',
-        file_path: dep.detected_from || '',
-        attributes: {
-          url: dep.url,
-          detected_from: dep.detected_from,
-          is_external: true,
-          dependency_type: dep.dependency_type || 'UNKNOWN',
-          classification_confidence: dep.classification_confidence || 0.5,
-          classification_reasoning: dep.classification_reasoning || '',
-        },
-      }));
+      ).map((dep: any, idx: number) => {
+        const { dep_type, dep_confidence } = inferDepType(dep);
+        return {
+          id: `context_external_${idx}`,
+          name: dep.name || dep.url || `External ${idx + 1}`,
+          entity_type: dep.type || 'external_system',
+          language: 'Unknown',
+          file_path: dep.detected_from || '',
+          attributes: {
+            url: dep.url,
+            detected_from: dep.detected_from,
+            is_external: true,
+            protocol: dep.protocol,
+            dependency_type: dep_type,
+            classification_confidence: dep_confidence,
+            classification_reasoning: dep.classification_reasoning || '',
+          },
+        };
+      });
 
       contextEntities.push(...actorEntities, ...externalEntities);
 
@@ -687,7 +895,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
                 source_entity_id: sourceId,
                 target_entity_id: targetId,
                 relationship_type: rel.relationship_type || 'uses',
-                attributes: { description: rel.description },
+                attributes: { description: rel.description, protocol: (rel as any).protocol },
               });
             }
           }
@@ -807,15 +1015,6 @@ const CodeArchitectureViewerInner: React.FC = () => {
     setArchitecture(data);
     setSelectedNode(null);
 
-    console.log('[CodeArchitectureViewer] Architecture state set:', {
-      contextLevel: data.context_level?.entities?.length || 0,
-      containerLevel: data.container_level?.entities?.length || 0,
-      componentLevel: data.component_level?.entities?.length || 0,
-      codeLevel: data.code_level?.entities?.length || 0,
-      hasSystemContext: !!data.system_context,
-      containersCount: data.containers?.length || 0,
-      componentsCount: data.components?.length || 0,
-    });
 
     // Extract unique entity and relationship types
     const allEntities: CodeEntity[] = [];
@@ -926,10 +1125,6 @@ const CodeArchitectureViewerInner: React.FC = () => {
             const results =
               await codeArchitectureAPI.getExtractionResults(taskId);
             if (results) {
-              console.log(
-                '[CodeArchitectureViewer] Extraction results received:',
-                results
-              );
               applyArchitecture(results);
               setSelectedLevel('context_level');
             }
@@ -957,6 +1152,81 @@ const CodeArchitectureViewerInner: React.FC = () => {
       );
     }
   }, [githubUrl, applyArchitecture]);
+
+  // Local folder scan handler
+  const handleScanLocalPath = useCallback(async () => {
+    const path = localPath.trim();
+    if (!path) {
+      setExtractionError('Please enter a local folder path (e.g. /cms)');
+      return;
+    }
+
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+
+    setExtractionError(null);
+    setExtractionStatus(`Scanning ${path}...`);
+    setIsExtracting(true);
+
+    try {
+      const response = await codeArchitectureAPI.scanLocalPath(path);
+      const taskId = response.task_id;
+
+      if (!taskId) {
+        throw new Error('No task id returned from scan');
+      }
+
+      pollIntervalRef.current = window.setInterval(async () => {
+        try {
+          const status = await codeArchitectureAPI.getExtractionStatus(taskId);
+          const progress =
+            typeof status.progress === 'number'
+              ? Math.round(status.progress * 100)
+              : null;
+          const statusLabel = status.message || status.status;
+          setExtractionStatus(
+            progress !== null ? `${statusLabel} (${progress}%)` : statusLabel
+          );
+
+          if (status.status === 'completed') {
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
+              pollIntervalRef.current = null;
+            }
+            setIsExtracting(false);
+            setExtractionStatus('Scan completed');
+
+            const results = await codeArchitectureAPI.getExtractionResults(taskId);
+            if (results) {
+              applyArchitecture(results);
+              setSelectedLevel('context_level');
+            }
+          } else if (status.status === 'failed') {
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
+              pollIntervalRef.current = null;
+            }
+            setIsExtracting(false);
+            setExtractionError(status.message || 'Scan failed');
+          }
+        } catch {
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
+          setIsExtracting(false);
+          setExtractionError('Failed to poll scan status');
+        }
+      }, 2000);
+    } catch (err) {
+      setIsExtracting(false);
+      setExtractionError(
+        err instanceof Error ? err.message : 'Failed to start scan'
+      );
+    }
+  }, [localPath, applyArchitecture]);
 
   // Batch extraction handler
   const handleBatchExtract = useCallback(
@@ -1128,20 +1398,8 @@ const CodeArchitectureViewerInner: React.FC = () => {
   // Process architecture data into graph format
   useEffect(() => {
     if (!architecture) {
-      console.log('[CodeArchitectureViewer] No architecture data available');
       return;
     }
-
-    console.log(
-      '[CodeArchitectureViewer] Processing graph for level:',
-      selectedLevel,
-      {
-        hasContextLevel: !!architecture.context_level,
-        hasContainerLevel: !!architecture.container_level,
-        hasComponentLevel: !!architecture.component_level,
-        hasCodeLevel: !!architecture.code_level,
-      }
-    );
 
     const allEntities: CodeEntity[] = [];
     const allRelationships: CodeRelationship[] = [];
@@ -1151,10 +1409,6 @@ const CodeArchitectureViewerInner: React.FC = () => {
       const levelData = architecture[
         selectedLevel as keyof C4Architecture
       ] as C4Level;
-      console.log('[CodeArchitectureViewer] Level data found:', {
-        entitiesCount: levelData.entities?.length || 0,
-        relationshipsCount: levelData.relationships?.length || 0,
-      });
       if (levelData.entities) {
         // Add level metadata to each entity
         allEntities.push(
@@ -1164,11 +1418,6 @@ const CodeArchitectureViewerInner: React.FC = () => {
       if (levelData.relationships) {
         allRelationships.push(...levelData.relationships);
       }
-    } else {
-      console.warn(
-        '[CodeArchitectureViewer] No data found for selected level:',
-        selectedLevel
-      );
     }
 
     // Fallback: build minimal level data if the backend didn't provide it
@@ -1192,7 +1441,8 @@ const CodeArchitectureViewerInner: React.FC = () => {
     }
 
     if (allEntities.length === 0 && selectedLevel === 'context_level' && architecture.system_context) {
-      const systemName = architecture.system_context?.name || 'System';
+      const sc = architecture.system_context;
+      const systemName = sc?.name || 'System';
       allEntities.push({
         id: `context_system_${systemName}`,
         name: systemName,
@@ -1200,10 +1450,33 @@ const CodeArchitectureViewerInner: React.FC = () => {
         language: 'Unknown',
         file_path: '',
         attributes: {
-          owner_team: architecture.system_context?.owner_team,
-          business_domain: architecture.system_context?.business_domain,
-          criticality: architecture.system_context?.criticality,
-          purpose: architecture.system_context?.purpose,
+          owner_team: sc?.owner_team,
+          owner: sc?.owner,
+          owner_contributors: sc?.owner_contributors,
+          owner_contributor_stats: sc?.owner_contributor_stats,
+          business_domain: sc?.business_domain,
+          domain: sc?.domain,
+          criticality: sc?.criticality,
+          tier: sc?.tier,
+          status: sc?.status,
+          data_class: sc?.data_class,
+          active_experts: sc?.active_experts,
+          compliance: sc?.compliance,
+          compliance_confidence: sc?.compliance_confidence,
+          compliance_factors: sc?.compliance_factors,
+          purpose: sc?.purpose || sc?.description,
+          description: sc?.description || sc?.purpose,
+          languages: sc?.languages,
+          frameworks: sc?.frameworks,
+          repository_url: sc?.repository_url,
+          git: sc?.git,
+          external_dependencies: sc?.external_dependencies,
+          documentation_quality: sc?.documentation_quality,
+          deployment_targets: sc?.deployment_targets,
+          last_commit_date: sc?.last_commit_date,
+          commit_count_30d: sc?.commit_count_30d,
+          commit_count_90d: sc?.commit_count_90d,
+          actors: sc?.actors,
         },
         level: selectedLevel,
       });
@@ -1525,6 +1798,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
           id: e.id,
           type: 'custom',
           position: { x: 0, y: 0 },
+          ...(e.entity_type === 'system' ? { style: { width: 230, minHeight: 80 } } : {}),
           data: {
             label: shortName,
             fullName: e.name,
@@ -1540,6 +1814,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
               container_type: containerInfo.container_type,
               technology: containerInfo.technology,
               protocol: containerInfo.protocol,
+              runtime_info: containerInfo.runtime_info,
               runtime_environment: containerInfo.runtime_environment,
               deployment: containerInfo.deployment,
               description: containerInfo.description,
@@ -1563,25 +1838,25 @@ const CodeArchitectureViewerInner: React.FC = () => {
       });
     }
 
+    const isContextLevel = selectedLevel === 'context_level';
     const rfEdges: Edge[] = filteredRelationships
       .filter(r => r.target_entity_id)
       .map((r, idx) => ({
         id: `edge-${idx}`,
         source: r.source_entity_id,
         target: r.target_entity_id!,
-        type: 'smoothstep',
+        type: isContextLevel ? 'C4Edge' : 'smoothstep',
         animated: false,
         interactionWidth: 16,
-        style: { 
-          stroke: '#b0bec5', 
-          strokeWidth: 2,
+        style: {
+          stroke: isContextLevel ? '#1168bd' : '#b0bec5',
+          strokeWidth: isContextLevel ? 2.8 : 2,
         },
         data: {
           description: r.attributes?.description,
+          protocol: r.attributes?.protocol,
           relationship_type: r.relationship_type,
         },
-        // Remove labels for cleaner look
-        // label: r.relationship_type,
       }));
 
     const dependencyEdges =
@@ -1594,11 +1869,17 @@ const CodeArchitectureViewerInner: React.FC = () => {
 
     const mergedEdges = [...rfEdges, ...dependencyEdges];
 
-    // Apply layout
-    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
-      rfNodes,
-      mergedEdges
-    );
+    // Apply layout — use star layout for C4 context level, dagre for everything else
+    let layoutedNodes: Node[];
+    let layoutedEdges: Edge[];
+    if (selectedLevel === 'context_level') {
+      layoutedNodes = layoutContextLevel([...rfNodes]);
+      layoutedEdges = mergedEdges;
+    } else {
+      const result = getLayoutedElements(rfNodes, mergedEdges);
+      layoutedNodes = result.nodes;
+      layoutedEdges = result.edges;
+    }
 
     // Ensure all nodes have valid positions (not all at 0,0)
     const nodesWithValidPositions = layoutedNodes.map((node, idx) => {
@@ -1633,11 +1914,11 @@ const CodeArchitectureViewerInner: React.FC = () => {
           setTimeout(() => {
             try {
               fitView({
-                padding: 25,
+                padding: 0.2,
                 includeHiddenNodes: false,
                 duration: attempt === 1 ? 600 : 400,
-                maxZoom: 2.5,
-                minZoom: 0.3,
+                maxZoom: 1.5,
+                minZoom: 0.5,
               });
             } catch (e) {
               console.warn(`[CodeArchitectureViewer] fitView attempt ${attempt} error:`, e);
@@ -1721,27 +2002,11 @@ const CodeArchitectureViewerInner: React.FC = () => {
   };
 
   const toggleRelationshipType = (type: string) => {
-    setSelectedRelationshipTypes(prev =>
-      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
-    );
+    const next = selectedRelationshipTypes.includes(type)
+      ? selectedRelationshipTypes.filter(t => t !== type)
+      : [...selectedRelationshipTypes, type];
+    setSelectedRelationshipTypes(next);
   };
-
-  const systemAttributes =
-    selectedNode?.type === 'system' ? selectedNode.attributes || {} : null;
-  const complianceStatus =
-    systemAttributes?.compliance ?? selectedNode?.attributes?.compliance;
-  const complianceStatusLabel = formatComplianceStatus(complianceStatus);
-  const complianceConfidence =
-    systemAttributes?.compliance_confidence ??
-    selectedNode?.attributes?.compliance_confidence;
-  const complianceConfidencePercent =
-    complianceConfidence != null
-      ? Math.round(100 * complianceConfidence)
-      : undefined;
-  const complianceFactors = formatComplianceFactors(
-    systemAttributes?.compliance_factors ??
-      selectedNode?.attributes?.compliance_factors
-  );
 
   if (loading) {
     return (
@@ -1768,692 +2033,73 @@ const CodeArchitectureViewerInner: React.FC = () => {
 
   return (
     <div className="code-architecture-viewer">
-      <div className="viewer-header">
-        <div className="header-content">
-          <h2>Architecture Context (Multi-Repository)</h2>
-          <p>
-            Cumulative view of all added repositories - add multiple projects to
-            see complete landscape
-          </p>
-        </div>
-        <div className="header-stats">
-          <div className="header-stat">
-            <span className="header-stat-value">{nodes.length}</span>
-            <span className="header-stat-label">Entities</span>
-          </div>
-          <div className="header-stat">
-            <span className="header-stat-value">{edges.length}</span>
-            <span className="header-stat-label">Relationships</span>
-          </div>
-          <div className="header-stat">
-            <span className="header-stat-value">{avgConnections}</span>
-            <span className="header-stat-label">Avg Connections</span>
-          </div>
-        </div>
-      </div>
+      <ArchitectureHeader
+        nodeCount={nodes.length}
+        edgeCount={edges.length}
+        avgConnections={avgConnections}
+      />
 
       <div className="viewer-layout">
-        <aside className="filters-sidebar">
-          {/* Search - most frequently used */}
-          <div className="filter-section">
-            <h3>Search</h3>
-            <input
-              type="text"
-              placeholder="Search entities..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="search-input"
-            />
-          </div>
+        <FiltersSidebar
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          selectedLevel={selectedLevel}
+          toggleLevel={toggleLevel}
+          relationshipTypes={relationshipTypes}
+          selectedRelationshipTypes={selectedRelationshipTypes}
+          toggleRelationshipType={toggleRelationshipType}
+          showExternal={showExternal}
+          setShowExternal={setShowExternal}
+          dependencyViewFilter={dependencyViewFilter}
+          setDependencyViewFilter={setDependencyViewFilter}
+          repoSectionExpanded={repoSectionExpanded}
+          setRepoSectionExpanded={setRepoSectionExpanded}
+          githubUrl={githubUrl}
+          setGithubUrl={setGithubUrl}
+          localPath={localPath}
+          setLocalPath={setLocalPath}
+          isExtracting={isExtracting}
+          handleExtractFromGithub={handleExtractFromGithub}
+          handleScanLocalPath={handleScanLocalPath}
+          handleBatchExtract={handleBatchExtract}
+          handleGitHubOrgScan={handleGitHubOrgScan}
+          setArchitecture={setArchitecture}
+          setNodes={setNodes}
+          setEdges={setEdges}
+          setExtractionStatus={setExtractionStatus}
+          setExtractionError={setExtractionError}
+          extractionStatus={extractionStatus}
+          extractionError={extractionError}
+        />
 
-          {/* Filters */}
-          <div className="filter-section">
-            <h3>C4 Levels</h3>
-            {AVAILABLE_LEVELS.map(level => (
-              <label key={level} className="checkbox-label">
-                <input
-                  type="radio"
-                  name="c4-level"
-                  checked={selectedLevel === level}
-                  onChange={() => toggleLevel(level)}
-                />
-                <span>
-                  {level
-                    .replace('_', ' ')
-                    .replace(/\b\w/g, l => l.toUpperCase())}
-                </span>
-              </label>
-            ))}
-          </div>
-
-          <div className="filter-section">
-            <h3>Relationship Types</h3>
-            <div className="checkbox-group">
-              {relationshipTypes.map(type => (
-                <label key={type} className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={selectedRelationshipTypes.includes(type)}
-                    onChange={() => toggleRelationshipType(type)}
-                  />
-                  <span>{type}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="filter-section">
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={showExternal}
-                onChange={e => setShowExternal(e.target.checked)}
-              />
-              <span>Show External Dependencies</span>
-            </label>
-          </div>
-
-          {/* NEW: C4 Context Level Dependency Filter */}
-          {selectedLevel === 'context_level' && showExternal && (
-            <div className="filter-section">
-              <h3>Dependency View</h3>
-              <div className="radio-group">
-                <label className="checkbox-label">
-                  <input
-                    type="radio"
-                    name="dependency-view"
-                    checked={dependencyViewFilter === 'business'}
-                    onChange={() => setDependencyViewFilter('business')}
-                  />
-                  <span>Context View (Business Systems)</span>
-                </label>
-                <label className="checkbox-label">
-                  <input
-                    type="radio"
-                    name="dependency-view"
-                    checked={dependencyViewFilter === 'technical'}
-                    onChange={() => setDependencyViewFilter('technical')}
-                  />
-                  <span>Container View (Technical Infra)</span>
-                </label>
-                <label className="checkbox-label">
-                  <input
-                    type="radio"
-                    name="dependency-view"
-                    checked={dependencyViewFilter === 'all'}
-                    onChange={() => setDependencyViewFilter('all')}
-                  />
-                  <span>Show All</span>
-                </label>
-              </div>
-            </div>
-          )}
-
-          {/* Collapsible Add Repositories Section */}
-          <div className="filter-section collapsible-section">
-            <button
-              className="section-toggle"
-              onClick={() => setRepoSectionExpanded(!repoSectionExpanded)}
-            >
-              <h3>Add Repositories</h3>
-              <span className={`toggle-icon ${repoSectionExpanded ? 'expanded' : ''}`}>
-                ▼
-              </span>
-            </button>
-
-            {repoSectionExpanded && (
-              <div className="collapsible-content">
-                {/* Single URL Quick Add */}
-                <div className="quick-add-section">
-                  <input
-                    type="text"
-                    placeholder="https://github.com/owner/repo"
-                    value={githubUrl}
-                    onChange={e => setGithubUrl(e.target.value)}
-                    className="search-input"
-                    onKeyPress={e => e.key === 'Enter' && handleExtractFromGithub()}
-                  />
-                  <button
-                    className="fit-button"
-                    onClick={handleExtractFromGithub}
-                    disabled={isExtracting}
-                  >
-                    {isExtracting ? 'Extracting...' : 'Add Repository'}
-                  </button>
-                </div>
-
-                {/* Batch URL Input */}
-                <div className="batch-section">
-                  <h4 className="subsection-title">Batch Input</h4>
-                  <BatchUrlInput
-                    onBatchExtract={handleBatchExtract}
-                    isExtracting={isExtracting}
-                  />
-                </div>
-
-                {/* GitHub Organization Scanner */}
-                <div className="org-scan-section">
-                  <h4 className="subsection-title">GitHub Account/Org</h4>
-                  <GitHubOrgScanner
-                    onScanStart={handleGitHubOrgScan}
-                    isScanning={isExtracting}
-                  />
-                </div>
-
-                {/* Clear All Button */}
-                <button
-                  className="reset-button"
-                  onClick={async () => {
-                    if (
-                      confirm(
-                        '⚠️ Clear ALL repositories and start fresh? This will remove all accumulated architecture data.'
-                      )
-                    ) {
-                      try {
-                        await codeArchitectureAPI.clearArchitecture();
-                        setArchitecture(null);
-                        setNodes([]);
-                        setEdges([]);
-                        setGithubUrl('');
-                        setExtractionStatus(
-                          'All repositories cleared - ready for fresh extraction'
-                        );
-                        setExtractionError('');
-                      } catch (err) {
-                        setExtractionError('Failed to clear data');
-                      }
-                    }
-                  }}
-                  disabled={isExtracting}
-                  title="Clear all repositories and start fresh"
-                >
-                  Clear All
-                </button>
-
-                {/* Status messages */}
-                {extractionStatus && (
-                  <div className="extract-status">{extractionStatus}</div>
-                )}
-                {extractionError && (
-                  <div className="extract-error">{extractionError}</div>
-                )}
-              </div>
-            )}
-          </div>
-        </aside>
-
-        <main className="graph-container">
-          {nodes.length === 0 ? (
-            <div className="empty-state">
-              <p>No entities match the current filters</p>
-            </div>
-          ) : (
-            <div style={{ width: '100%', height: '100%' }}>
-              <ReactFlow
-                key={`${selectedLevel}-${nodes.length}-${edges.length}`}
-                nodes={nodes}
-                edges={edges}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                onNodeClick={onNodeClick}
-                onEdgeClick={onEdgeClick}
-                nodeTypes={nodeTypes}
-                edgeTypes={edgeTypes}
-                elementsSelectable
-                edgesFocusable
-                fitView
-                attributionPosition="bottom-left"
-                defaultViewport={{ x: 0, y: 0, zoom: 1.2 }}
-                minZoom={0.05}
-                maxZoom={2.5}
-              >
-                <Background
-                  variant={BackgroundVariant.Dots}
-                  gap={20}
-                  size={1}
-                  color="#e0e0e0"
-                />
-                <Controls />
-              </ReactFlow>
-            </div>
-          )}
-        </main>
+        <GraphView
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onNodeClick={onNodeClick}
+          onEdgeClick={onEdgeClick}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          selectedLevel={selectedLevel}
+        />
 
         {selectedNode && (
-          <aside className="node-details-panel">
-            <NodeDetails node={selectedNode} />
-          </aside>
-        )}
-
-        
-
-              {/* Owner field - always show when we have system/container context (even Unassigned) */}
-              {(systemAttributes ||
-                selectedNode.attributes?.owner != null ||
-                selectedNode.attributes?.owner_contributors != null ||
-                selectedNode.containerMeta?.owner) && (
-                <div className="detail-row">
-                  <span className="detail-label">
-                    Owner Team
-                    <span className="tooltip-hint">
-                      ⓘ
-                      <span className="tooltip-content">
-                        The team or individual responsible for this system. If
-                        unassigned, add a CODEOWNERS file or specify the team in
-                        the README to assign ownership.
-                      </span>
-                    </span>
-                  </span>
-                  <span className="detail-value">
-                    {systemAttributes?.owner_team ||
-                      systemAttributes?.owner ||
-                      selectedNode.containerMeta?.owner ||
-                      selectedNode.attributes?.owner ||
-                      'Unassigned'}
-                  </span>
-                  {(
-                    (systemAttributes?.owner_contributors ||
-                      selectedNode.attributes?.owner_contributors) ??
-                    []
-                  ).length > 0 && (
-                    <div className="detail-sub">
-                      Contributors:{' '}
-                      {(
-                        systemAttributes?.owner_contributors ||
-                        selectedNode.attributes?.owner_contributors ||
-                        []
-                      )
-                        .slice(0, 3)
-                        .join(', ')}
-                      {(
-                        systemAttributes?.owner_contributors ||
-                        selectedNode.attributes?.owner_contributors ||
-                        []
-                      ).length > 3 && '…'}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Status field (lifecycle: Active-Dev, Maintenance-Only, Deprecated) */}
-              {(systemAttributes?.status ||
-                selectedNode.attributes?.status) && (
-                <div className="detail-row">
-                  <span className="detail-label">
-                    Lifecycle Status
-                    <span className="tooltip-hint">
-                      ⓘ
-                      <span className="tooltip-content">
-                        Lifecycle stage: Active-Dev = new features being
-                        developed. Maintenance-Only = bugfixes only, no new
-                        features. Deprecated = scheduled for shutdown.
-                      </span>
-                    </span>
-                  </span>
-                  <span className="detail-value status-badge">
-                    {systemAttributes?.status ||
-                      selectedNode.attributes?.status}
-                  </span>
-                </div>
-              )}
-
-              {/* Tier field (criticality: Tier 1/2/3) */}
-              {(systemAttributes?.criticality ||
-                systemAttributes?.tier ||
-                selectedNode.attributes?.tier) && (
-                <div className="detail-row">
-                  <span className="detail-label">
-                    Criticality Tier
-                    <span className="tooltip-hint">
-                      ⓘ
-                      <span className="tooltip-content">
-                        Tier 1 = Production Critical (site-wide outage if down).
-                        Tier 2 = Standard (specific journey broken). Tier 3 =
-                        Internal/Development (minor impact).
-                      </span>
-                    </span>
-                  </span>
-                  <span className="detail-value">
-                    {systemAttributes?.criticality ||
-                      systemAttributes?.tier ||
-                      selectedNode.attributes?.tier}
-                  </span>
-                </div>
-              )}
-
-              {/* Data class field (sensitivity) */}
-              {(systemAttributes?.data_class ||
-                selectedNode.attributes?.data_class) && (
-                <div className="detail-row">
-                  <span className="detail-label">
-                    Data Sensitivity
-                    <span className="tooltip-hint">
-                      ⓘ
-                      <span className="tooltip-content">
-                        Personally Identifiable Information (PII) = names,
-                        emails, addresses. Credit-Card = Payment data.
-                        Legal/Security = Compliance, audit, encryption. General
-                        = Non-sensitive data.
-                      </span>
-                    </span>
-                  </span>
-                  <span className="detail-value">
-                    {systemAttributes?.data_class ||
-                      selectedNode.attributes?.data_class}
-                  </span>
-                </div>
-              )}
-
-              {/* Active experts (bus factor) - warning when 0 */}
-              {(systemAttributes?.active_experts != null ||
-                selectedNode.attributes?.active_experts != null) && (
-                <div className="detail-row">
-                  <span className="detail-label">
-                    Active Experts (Bus Factor)
-                    <span className="tooltip-hint">
-                      ⓘ
-                      <span className="tooltip-content">
-                        Bus factor: contributors with 3+ commits in last 90
-                        days. 0 = high risk (no active maintainers). 1 = single
-                        point of failure. Higher is better.
-                      </span>
-                    </span>
-                  </span>
-                  {(() => {
-                    const rawValue =
-                      systemAttributes?.active_experts ??
-                      selectedNode.attributes?.active_experts;
-                    const isZero = rawValue === 0;
-                    const label =
-                      rawValue == null
-                        ? 'Unknown'
-                        : rawValue === 0
-                        ? 'No active experts'
-                        : rawValue === 1
-                        ? '1 active expert'
-                        : `${rawValue} active experts`;
-                    return (
-                      <span
-                        className={`detail-value active-experts-value ${
-                          isZero ? 'active-experts-zero' : ''
-                        }`}
-                      >
-                        {label}
-                      </span>
-                    );
-                  })()}
-                </div>
-              )}
-
-              {/* Compliance (architectural risk) */}
-              {complianceStatus && (
-                <div className="detail-row">
-                  <span className="detail-label">
-                    Architectural Compliance
-                    <span className="tooltip-hint">
-                      ⓘ
-                      <span className="tooltip-content">
-                        Calculated from: tier-data alignment, ownership, bus factor, and lifecycle. 
-                        COMPLIANT = proper governance. AT_RISK = ownership/maintenance gaps. 
-                        NON_COMPLIANT = sensitive data mishandled or abandoned.
-                      </span>
-                    </span>
-                  </span>
-                  <span className="detail-value status-badge">
-                    {complianceStatusLabel || complianceStatus}
-                  </span>
-                </div>
-              )}
-
-              {/* Compliance confidence */}
-              {complianceConfidencePercent !== undefined && (
-                <div className="detail-row">
-                  <span className="detail-label">
-                    Compliance Confidence
-                    <span className="tooltip-hint">
-                      ⓘ
-                      <span className="tooltip-content">
-                        Based on metadata completeness: higher when tier, data classification, 
-                        and owner are known. Range 50-100%.
-                      </span>
-                    </span>
-                  </span>
-                  <span className="detail-value">
-                    {complianceConfidencePercent}%
-                  </span>
-                </div>
-              )}
-
-              {/* Compliance factors */}
-              {complianceFactors.length > 0 && (
-                <div className="detail-row">
-                  <span className="detail-label">
-                    Compliance Issues
-                    <span className="tooltip-hint">
-                      ⓘ
-                      <span className="tooltip-content">
-                        Detected architectural risks: sensitive data in low tiers, 
-                        missing ownership, bus factor concerns, deprecated services 
-                        with sensitive data, or single points of failure.
-                      </span>
-                    </span>
-                  </span>
-                  <span className="detail-value">
-                    {complianceFactors.join('; ')}
-                  </span>
-                </div>
-              )}
-
-              {/* Additional metadata for context */}
-              {selectedNode.type && (
-                <div className="detail-row metadata-row">
-                  <span className="detail-label">
-                    Type
-                    <span className="tooltip-hint">
-                      ⓘ
-                      <span className="tooltip-content">
-                        Node type: system (entire service), container (API/UI/DB), 
-                        component (class/module), or external_system (third-party service).
-                      </span>
-                    </span>
-                  </span>
-                  <span className="detail-value">{selectedNode.type}</span>
-                </div>
-              )}
-
-              {selectedNode.containerMeta?.technology && (
-                <div className="detail-row metadata-row">
-                  <span className="detail-label">
-                    Technology
-                    <span className="tooltip-hint">
-                      ⓘ
-                      <span className="tooltip-content">
-                        Primary technology stack: Python/FastAPI, React/TypeScript, 
-                        PostgreSQL, Redis, etc. Detected from code and dependencies.
-                      </span>
-                    </span>
-                  </span>
-                  <span className="detail-value">
-                    {selectedNode.containerMeta.technology}
-                  </span>
-                </div>
-              )}
-
-              {selectedNode.file && (
-                <div className="detail-row metadata-row">
-                  <span className="detail-label">
-                    File
-                    <span className="tooltip-hint">
-                      ⓘ
-                      <span className="tooltip-content">
-                        Source file path where this component or container was detected. 
-                        Relative to repository root.
-                      </span>
-                    </span>
-                  </span>
-                  <span className="detail-value file-path">
-                    {selectedNode.file}
-                  </span>
-                </div>
-              )}
-
-              {/* Show URL for external services */}
-              {selectedNode.attributes?.url && (
-                <div className="detail-row">
-                  <span className="detail-label">
-                    Service URL
-                    <span className="tooltip-hint">
-                      ⓘ
-                      <span className="tooltip-content">
-                        External service URL or API endpoint for third-party integrations.
-                      </span>
-                    </span>
-                  </span>
-                  <span className="detail-value">
-                    <a
-                      href={selectedNode.attributes.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="external-link"
-                    >
-                      {selectedNode.attributes.url}
-                    </a>
-                  </span>
-                </div>
-              )}
-
-              {/* Show endpoint/access path for services */}
-              {(selectedNode.containerMeta?.endpoint ||
-                selectedNode.attributes?.endpoint ||
-                selectedNode.attributes?.access_path) && (
-                <div className="detail-row">
-                  <span className="detail-label">
-                    Access Endpoint
-                    <span className="tooltip-hint">
-                      ⓘ
-                      <span className="tooltip-content">
-                        The URL path or endpoint used to access this service or
-                        UI directly. This could be an API endpoint, web
-                        interface path, or service access URL.
-                      </span>
-                    </span>
-                  </span>
-                  <span className="detail-value">
-                    <code className="endpoint-path">
-                      {selectedNode.containerMeta?.endpoint ||
-                        selectedNode.attributes?.endpoint ||
-                        selectedNode.attributes?.access_path}
-                    </code>
-                  </span>
-                </div>
-              )}
-
-              {selectedNode.attributes?.detected_from && (
-                <div className="detail-row metadata-row">
-                  <span className="detail-label">
-                    Detected From
-                    <span className="tooltip-hint">
-                      ⓘ
-                      <span className="tooltip-content">
-                        Configuration file where this dependency was found: 
-                        package.json, requirements.txt, docker-compose.yml, Helm charts, etc.
-                      </span>
-                    </span>
-                  </span>
-                  <span className="detail-value">
-                    {selectedNode.attributes.detected_from}
-                  </span>
-                </div>
-              )}
-
-              {/* NEW: Classification metadata for external dependencies */}
-              {selectedNode.attributes?.dependency_type && (
-                <div className="detail-row">
-                  <span className="detail-label">
-                    C4 Classification
-                    <span className="tooltip-hint">
-                      ⓘ
-                      <span className="tooltip-content">
-                        BUSINESS_SYSTEM = External business service (should appear at Context level). 
-                        TECHNICAL_INFRA = Infrastructure component (should appear at Container level). 
-                        Classified by LLM or pattern-matching rules.
-                      </span>
-                    </span>
-                  </span>
-                  <span className={`detail-value pill ${
-                    selectedNode.attributes.dependency_type === 'BUSINESS_SYSTEM' 
-                      ? 'business-system-pill' 
-                      : 'technical-infra-pill'
-                  }`}>
-                    {selectedNode.attributes.dependency_type}
-                  </span>
-                </div>
-              )}
-
-              {selectedNode.attributes?.classification_confidence !== undefined && (
-                <div className="detail-row">
-                  <span className="detail-label">
-                    Classification Confidence
-                    <span className="tooltip-hint">
-                      ⓘ
-                      <span className="tooltip-content">
-                        How confident the classifier is about this categorization. 
-                        Range: 0.0-1.0. Higher is better. Based on LLM analysis or pattern matching.
-                      </span>
-                    </span>
-                  </span>
-                  <span className="detail-value">
-                    {Math.round(selectedNode.attributes.classification_confidence * 100)}%
-                  </span>
-                </div>
-              )}
-
-              {selectedNode.attributes?.classification_reasoning && (
-                <div className="detail-row">
-                  <span className="detail-label">
-                    Classification Reasoning
-                    <span className="tooltip-hint">
-                      ⓘ
-                      <span className="tooltip-content">
-                        Explanation of why this dependency was classified as business or technical.
-                      </span>
-                    </span>
-                  </span>
-                  <span className="detail-value">
-                    {selectedNode.attributes.classification_reasoning}
-                  </span>
-                </div>
-              )}
-            </div>
-          </aside>
+          <NodeDetailsPanel
+            selectedNode={selectedNode}
+            onClose={() => setSelectedNode(null)}
+            nodeDescription={nodeDescription}
+            isNodeLoading={isNodeLoading}
+          />
         )}
 
         {selectedEdge && (
-          <aside className="node-details-panel">
-            <div className="panel-header">
-              <h3>{selectedEdge.label || 'Relationship'}</h3>
-              <button className="close-btn" onClick={() => setSelectedEdge(null)}>×</button>
-            </div>
-            <div className="panel-content">
-              <div className="detail-row description-row">
-                <span className="detail-value description-text">
-                  {isEdgeLoading
-                    ? 'Generating description…'
-                    : (edgeDescription ||
-                        (selectedEdge as any)?.data?.description ||
-                        'No description available')}
-                </span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">from</span>
-                <span className="detail-value">{selectedEdge.source}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">to</span>
-                <span className="detail-value">{selectedEdge.target}</span>
-              </div>
-            </div>
-          </aside>
+          <EdgeDetailsPanel
+            selectedEdge={selectedEdge}
+            onClose={() => setSelectedEdge(null)}
+            edgeDescription={edgeDescription}
+            isEdgeLoading={isEdgeLoading}
+          />
         )}
       </div>
     </div>

@@ -28,7 +28,7 @@ class TestExtractFromGitHub:
                 "/api/v1/services/extract-from-github",
                 json={"github_url": "https://github.com/owner/repo"},
             )
-        assert response.status_code == 200
+        assert response.status_code == 202
         data = response.json()
         assert data["status"] == "pending"
         assert "task_id" in data

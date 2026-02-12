@@ -64,7 +64,7 @@ class KubernetesExtractor(BaseExtractor):
                     if "apiVersion" in line and "kind" in line:
                         return True
         except Exception as exc:
-            logger.debug("Failed to probe %s for Kubernetes markers: %s", file_path, exc)
+            logger.info("Failed to probe %s for Kubernetes markers: %s", file_path, exc)
 
         return False
 

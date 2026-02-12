@@ -62,7 +62,7 @@ class GraphManager:
         except (ServiceUnavailable, AuthError) as e:
             logger.error(f"Failed to connect to Neo4j: {e}")
             return False
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.error(f"Unexpected error connecting to Neo4j: {e}")
             return False
 
@@ -87,7 +87,7 @@ class GraphManager:
                 result = session.run("RETURN 1 as test")
                 result.single()
             return True
-        except Exception:
+        except (ConnectionError, RuntimeError):
             return False
 
     def create_constraints(self):
@@ -111,7 +111,7 @@ class GraphManager:
             logger.info("Database constraints created successfully")
             return True
 
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.error(f"Failed to create constraints: {e}")
             return False
 
@@ -147,7 +147,7 @@ class GraphManager:
             )
             return True
 
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.error(f"Failed to store ontology: {e}")
             return False
 
@@ -313,7 +313,7 @@ class GraphManager:
 
                 return entities
 
-        except Exception as e:
+        except (OSError, json.JSONDecodeError, ValueError) as e:
             logger.error(f"Failed to query entities: {e}")
             return []
 
@@ -381,7 +381,7 @@ class GraphManager:
 
                 return relationships
 
-        except Exception as e:
+        except (OSError, json.JSONDecodeError, ValueError) as e:
             logger.error(f"Failed to query relationships: {e}")
             return []
 
@@ -444,7 +444,7 @@ class GraphManager:
 
                 return {"start_entity": start_entity, "neighbors": neighbors}
 
-        except Exception as e:
+        except (OSError, json.JSONDecodeError, ValueError) as e:
             logger.error(f"Failed to get neighbors: {e}")
             return {}
 
@@ -507,7 +507,7 @@ class GraphManager:
                     "dataset": dataset_name,
                 }
 
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.error(f"Failed to get graph statistics: {e}")
             return {}
 
@@ -553,6 +553,6 @@ class GraphManager:
             logger.info(f"Successfully cleared dataset: {dataset_name}")
             return True
 
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.error(f"Failed to clear dataset {dataset_name}: {e}")
             return False

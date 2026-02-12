@@ -30,6 +30,8 @@ from app.services.service_extraction.extraction_config import (
     JSONResultStore,
 )
 from app.endpoint.v1.routes.websocket import broadcast_task_update
+from app.endpoint.v1.dependencies import get_neo4j_manager, get_metadata_store
+from app.utils.security import safe_extract_zip, validate_local_repo_path
 from utils.config import get_config
 
 logger = logging.getLogger(__name__)
@@ -67,69 +69,114 @@ def _probe_llm_models(base_url: str, headers: Optional[dict[str, str]] = None) -
         if headers:
             return response.status_code == 200
         return response.status_code in {200, 401, 403}
-    except Exception as exc:
+    except (ConnectionError, TimeoutError, ValueError) as exc:
         logger.warning(f"LLM probe failed for {base_url}: {exc}")
         return False
 
 
 class ServiceExtractionRequest(BaseModel):
     """Request model for service extraction."""
-    github_url: Optional[str] = Field(None, description="GitHub repository URL")
-    repo_path: Optional[str] = Field(None, description="Local path to repository")
-    use_git: bool = Field(default=True, description="Use git clone if available")
+
+    github_url: Optional[str] = Field(
+        None,
+        description="GitHub repository URL (HTTPS). Mutually exclusive with repo_path.",
+        examples=["https://github.com/microservices-demo/microservices-demo"],
+    )
+    repo_path: Optional[str] = Field(
+        None,
+        description=(
+            "Absolute path to a local repository already present on the server. "
+            "Allowed prefixes: /tmp, /repos, /data."
+        ),
+        examples=["/repos/my-platform"],
+    )
+    use_git: bool = Field(
+        default=True,
+        description=(
+            "Clone via `git clone` (preserves full history for git-blame owner detection). "
+            "Set False to use a shallow archive download when git is unavailable."
+        ),
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "github_url": "https://github.com/microservices-demo/microservices-demo",
+                    "use_git": True,
+                }
+            ]
+        }
+    }
 
 
 class ServiceExtractionResponse(BaseModel):
     """Response model for extraction operations."""
-    task_id: str = Field(..., description="Unique task identifier")
-    status: str = Field(..., description="Task status")
-    message: str = Field(..., description="Status message")
-    created_at: datetime = Field(..., description="Task creation timestamp")
+
+    task_id: str = Field(
+        ...,
+        description="Human-readable task identifier (format: YYYYMMDD-HHMM-xxxxxx).",
+        examples=["20260212-1045-a3f7c2"],
+    )
+    status: str = Field(
+        ...,
+        description="Initial task status. Always 'pending' immediately after submission.",
+        examples=["pending"],
+    )
+    message: str = Field(..., description="Human-readable status message.")
+    created_at: datetime = Field(..., description="UTC timestamp when the task was created.")
 
 
 class ServiceExtractionStatusResponse(BaseModel):
     """Response model for extraction status."""
-    task_id: str
-    status: str
-    progress: float
-    message: str
-    created_at: datetime
-    completed_at: Optional[datetime] = None
-    services_count: int = 0
-    connections_count: int = 0
-    errors: list[str] = Field(default_factory=list)
-    warnings: list[str] = Field(default_factory=list)
 
-def get_neo4j_manager():
-    """Get Neo4j manager instance."""
-    config = get_config()
-    manager = Neo4jGraphManager(
-        uri=config.neo4j.uri,
-        username=config.neo4j.username,
-        password=config.neo4j.password,
-        database=config.neo4j.database,
-        encrypted=config.neo4j.encrypted,
+    task_id: str = Field(..., description="Task identifier.")
+    status: str = Field(
+        ...,
+        description="Task lifecycle state: pending | extracting | completed | failed.",
+        examples=["completed"],
     )
-    manager.connect()
-    return manager
+    progress: float = Field(
+        ...,
+        description="Fractional progress 0.0–1.0.",
+        examples=[1.0],
+    )
+    message: str = Field(..., description="Latest status message.")
+    created_at: datetime = Field(..., description="UTC creation timestamp.")
+    completed_at: Optional[datetime] = Field(None, description="UTC completion timestamp (null while in progress).")
+    services_count: int = Field(0, description="Number of services discovered so far.")
+    connections_count: int = Field(0, description="Number of inter-service connections discovered.")
+    errors: list[str] = Field(default_factory=list, description="Non-fatal errors encountered during extraction.")
+    warnings: list[str] = Field(default_factory=list, description="Warnings generated during extraction.")
 
-
-def get_metadata_store():
-    """Get metadata store instance."""
-    config = get_config()
-    return MetadataStore(config=config)
-
-
-@router.post("/extract-from-github", response_model=ServiceExtractionResponse)
+@router.post(
+    "/extract-from-github",
+    response_model=ServiceExtractionResponse,
+    status_code=202,
+    summary="Extract services from a GitHub repository",
+    description=(
+        "Starts an asynchronous service extraction task for a public GitHub repository.\n\n"
+        "**Pipeline stages:**\n"
+        "1. Validate and clone the repository\n"
+        "2. Discover service directories (docker-compose, pyproject.toml, package.json, .csproj, …)\n"
+        "3. Detect languages, frameworks, and dependencies\n"
+        "4. Run enhancement chain: owner → compliance → API surface → deployment target → "
+        "business domain → documentation quality → bus factor → inter-service comms\n"
+        "5. Optionally enrich with LLM descriptions (controlled by `ENABLE_LLM_DESCRIPTIONS`)\n"
+        "6. Store results in JSON / Neo4j (controlled by feature flags)\n\n"
+        "Poll `GET /api/v1/services/extraction/{task_id}` for progress."
+    ),
+    responses={
+        202: {"description": "Extraction task created and queued"},
+        400: {"description": "Invalid or missing GitHub URL"},
+        500: {"description": "Internal error starting the extraction task"},
+    },
+)
 async def extract_from_github(
     request: ServiceExtractionRequest,
     background_tasks: BackgroundTasks,
 ):
-    """
-    Extract services from a GitHub repository.
-    
-    This endpoint downloads a GitHub repository and extracts service information.
-    """
+    """Extract services from a GitHub repository (async — returns task_id immediately)."""
     if not request.github_url:
         raise HTTPException(status_code=400, detail="github_url is required")
     
@@ -175,37 +222,50 @@ async def extract_from_github(
         raise HTTPException(status_code=500, detail=f"Failed to start extraction: {str(e)}")
 
 
-@router.post("/extract-from-zip", response_model=ServiceExtractionResponse)
+@router.post(
+    "/extract-from-zip",
+    response_model=ServiceExtractionResponse,
+    status_code=202,
+    summary="Extract services from an uploaded ZIP archive",
+    description=(
+        "Upload a ZIP archive of a repository and start an asynchronous service extraction.\n\n"
+        "**Security:** rejects path-traversal entries (`../`), symlinks, and ZIP bombs (>500 MB uncompressed).\n\n"
+        "Poll `GET /api/v1/services/extraction/{task_id}` for progress."
+    ),
+    responses={
+        202: {"description": "ZIP accepted and extraction task queued"},
+        400: {"description": "Not a ZIP file, or ZIP failed security validation"},
+        500: {"description": "Internal error during upload or extraction startup"},
+    },
+)
 async def extract_from_zip(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),
+    file: UploadFile = File(..., description="ZIP archive of the repository to analyse"),
 ):
-    """
-    Extract services from a ZIP file containing a repository.
-    
-    This endpoint accepts a ZIP file and extracts service information.
-    """
+    """Extract services from an uploaded ZIP archive (async — returns task_id immediately)."""
     if not file.filename or not file.filename.endswith('.zip'):
         raise HTTPException(status_code=400, detail="Only ZIP files are supported")
-    
+
     try:
         # Create task
         task_id = _generate_task_id()
-        
-        # Save uploaded file
+
+        # Save uploaded file using a safe, server-generated filename
         temp_dir = Path(tempfile.mkdtemp(prefix=f"service_extract_{task_id}_"))
-        zip_path = temp_dir / file.filename
-        
+        zip_path = temp_dir / f"{task_id}.zip"
+
         with open(zip_path, 'wb') as f:
             content = await file.read()
             f.write(content)
-        
-        # Extract ZIP
+
+        # Extract ZIP safely (rejects path traversal, symlinks, zip bombs)
         extract_dir = temp_dir / 'extracted'
         extract_dir.mkdir()
-        
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(extract_dir)
+
+        try:
+            safe_extract_zip(zip_path, extract_dir)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
         
         # Find repository root (handle nested directories)
         repo_path = extract_dir
@@ -245,26 +305,41 @@ async def extract_from_zip(
         raise HTTPException(status_code=500, detail=f"Failed to upload repository: {str(e)}")
 
 
-@router.post("/extract-from-path", response_model=ServiceExtractionResponse)
+@router.post(
+    "/extract-from-path",
+    response_model=ServiceExtractionResponse,
+    status_code=202,
+    summary="Extract services from a local repository path",
+    description=(
+        "Start service extraction from a repository already present on the server filesystem.\n\n"
+        "Allowed path prefixes: `/tmp`, `/repos`, `/data`.\n\n"
+        "Poll `GET /api/v1/services/extraction/{task_id}` for progress."
+    ),
+    responses={
+        202: {"description": "Extraction task queued"},
+        400: {"description": "repo_path missing, outside allowed prefixes, or resolves to a symlink"},
+        500: {"description": "Internal error starting the extraction task"},
+    },
+)
 async def extract_from_path(
     request: ServiceExtractionRequest,
     background_tasks: BackgroundTasks,
 ):
-    """
-    Extract services from a local repository path.
-    
-    This endpoint extracts service information from an existing local repository.
-    """
+    """Extract services from an existing local repository path (async — returns task_id immediately)."""
     if not request.repo_path:
         raise HTTPException(status_code=400, detail="repo_path is required")
-    
-    repo_path = Path(request.repo_path)
-    if not repo_path.exists():
-        raise HTTPException(status_code=400, detail=f"Repository not found: {request.repo_path}")
-    
+
+    try:
+        repo_path = validate_local_repo_path(
+            request.repo_path,
+            allowed_prefixes=["/tmp", "/repos", "/data"],
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
     # Create task
     task_id = _generate_task_id()
-    
+
     extraction_tasks[task_id] = {
         'task_id': task_id,
         'status': 'pending',
@@ -572,12 +647,12 @@ async def _run_service_extraction_async(
         if temp_dir and temp_dir.exists():
             try:
                 shutil.rmtree(temp_dir)
-            except Exception as e:
+            except (ConnectionError, RuntimeError) as e:
                 logger.warning(f"Failed to cleanup temp directory: {e}")
         elif 'temp_dir' in task:
             try:
                 shutil.rmtree(task['temp_dir'])
-            except Exception as e:
+            except (ConnectionError, RuntimeError) as e:
                 logger.warning(f"Failed to cleanup temp directory: {e}")
     
     except Exception as e:
@@ -596,7 +671,7 @@ async def _run_service_extraction_async(
                     message=task['message'],
                     progress=0,
                 )
-            except Exception as broadcast_error:
+            except (ConnectionError, RuntimeError) as broadcast_error:
                 logger.error(f"Failed to broadcast task update: {broadcast_error}")
         else:
             logger.error(f"Task {task_id} disappeared during error handling")
@@ -686,7 +761,7 @@ async def store_service_graph_in_neo4j(
             f"{len(service_graph.connections)} connections in Neo4j"
         )
     
-    except Exception as e:
+    except (ConnectionError, RuntimeError) as e:
         logger.error(f"Failed to store in Neo4j: {e}", exc_info=True)
         raise
 
@@ -820,7 +895,19 @@ async def store_service_graph_to_json(
         logger.warning("JSON storage failed but extraction continues")
 
 
-@router.get("/extraction/{task_id}", response_model=ServiceExtractionStatusResponse)
+@router.get(
+    "/extraction/{task_id}",
+    response_model=ServiceExtractionStatusResponse,
+    summary="Poll extraction task status",
+    description=(
+        "Returns the current status and progress of a service extraction task.\n\n"
+        "**Status values:** `pending` → `extracting` → `completed` | `failed`"
+    ),
+    responses={
+        200: {"description": "Task status returned"},
+        404: {"description": "Task not found"},
+    },
+)
 async def get_extraction_status(task_id: str):
     """Get the status of a service extraction task."""
     task = extraction_tasks.get(task_id)
@@ -841,11 +928,27 @@ async def get_extraction_status(task_id: str):
     )
 
 
-@router.get("/extraction/{task_id}/results", response_model=dict[str, Any])
+@router.get(
+    "/extraction/{task_id}/results",
+    response_model=dict[str, Any],
+    summary="Retrieve completed extraction results",
+    description=(
+        "Returns the full service graph (services + connections + context nodes) for a completed task.\n\n"
+        "Loads from JSON files when `STORE_TO_JSON` is enabled, otherwise from in-memory storage.\n\n"
+        "Each service object includes all 18 context-level fields: name, owner, domain, status, tier, "
+        "data_class, compliance_score, api_surface_types, deployment_targets, bus_factor, "
+        "documentation_quality, inter_service_comms, business_domain, and more."
+    ),
+    responses={
+        200: {"description": "Full extraction results"},
+        400: {"description": "Task is not yet completed"},
+        404: {"description": "Task not found or results unavailable"},
+    },
+)
 async def get_extraction_results(task_id: str):
     """
     Get detailed results of a completed extraction.
-    
+
     If JSON storage is enabled, loads from JSON files.
     Otherwise, loads from in-memory task storage.
     """
@@ -955,7 +1058,15 @@ async def download_json_file(task_id: str, file_type: str):
     )
 
 
-@router.delete("/extraction/{task_id}")
+@router.delete(
+    "/extraction/{task_id}",
+    summary="Delete an extraction task",
+    description="Removes a task from in-memory storage and cleans up any temporary directories.",
+    responses={
+        200: {"description": "Task deleted"},
+        404: {"description": "Task not found"},
+    },
+)
 async def delete_extraction_task(task_id: str):
     """Delete an extraction task and cleanup resources."""
     task = extraction_tasks.get(task_id)

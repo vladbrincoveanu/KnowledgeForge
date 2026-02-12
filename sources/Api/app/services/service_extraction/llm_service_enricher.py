@@ -19,7 +19,7 @@ Analyze the service and return JSON with exactly these fields:
 {{
   "domain": "oneword",  // ONE WORD ONLY, no spaces, lowercase (e.g. "payments", "identity", "analytics")
   "owner": "team or person",  // team or maintainer name (e.g. "Platform Team", "Akshay Goel")
-  "status": "Active-Dev | Maintenance-Only | Deprecated / Frozen",
+  "status": "ACTIVE | MAINTENANCE | DEPRECATED | ARCHIVED",
   "tier": "Tier 1 | Tier 2 | Tier 3",
   "data_class": "Public | Internal | PII | Credit-Card | Secret | Unknown",
   "notes": "1-2 complete sentences describing what this service does at the business level. Must end with a period."
@@ -27,8 +27,10 @@ Analyze the service and return JSON with exactly these fields:
 
 CRITICAL RULES:
 - domain: MUST be exactly ONE word, lowercase, no spaces or hyphens
-- notes: MUST be 1-2 sentences, ending with a period. Describe the business purpose, not technical details.
-- If unsure, make a best-effort guess based on README/commits and still return values.
+- notes: Focus on BUSINESS PURPOSE from route handlers and entrypoints, not just README.
+  Say what business operation this service enables (e.g. "Handles user authentication and session management for the web app.").
+  DO NOT describe the tech stack. DO NOT say "This service is a FastAPI app." Say what it DOES for the business.
+- If unsure, make a best-effort guess based on README/commits/routes and still return values.
 
 Known domain hints: {domain_hints}
 
@@ -45,7 +47,7 @@ Existing description: {existing_description}
 Recent commit messages (for activity context):
 {commit_messages}
 
-Key files (truncated):
+Key files including route handlers (truncated to show business logic):
 {file_snippets}
 
 Return ONLY valid JSON, no markdown, no explanations.
@@ -101,7 +103,7 @@ class ServiceLLMEnricher:
 
         estimated_tokens = self._estimate_tokens(prompt, self.max_tokens)
         if self.budget and not self.budget.consume(estimated_tokens):
-            logger.debug("LLM budget exhausted; skipping enrichment for %s", service.name)
+            logger.info("LLM budget exhausted; skipping enrichment for %s", service.name)
             return {}
 
         try:
@@ -112,7 +114,16 @@ class ServiceLLMEnricher:
                 llm_url,
                 getattr(self.llm, "default_model", "unknown"),
             )
-            logger.debug(f"LLM prompt preview (first 500 chars): {prompt[:500]}")
+            config_debug = False
+            try:
+                from app.utils.config import get_config as _get_config
+                config_debug = getattr(_get_config(), "debug", False)
+            except Exception:
+                config_debug = False
+            if config_debug:
+                logger.debug(f"LLM prompt preview (first 500 chars): {prompt[:500]}")
+            else:
+                logger.debug("LLM prompt preview suppressed (non-debug environment)")
             response = self.llm.generate_text(
                 prompt,
                 max_tokens=self.max_tokens,
@@ -160,41 +171,75 @@ class ServiceLLMEnricher:
         return int(len(prompt) / 4) + max_tokens
 
     def _collect_key_files(self, service_path: Path, repo_root: Optional[Path] = None) -> list[Path]:
-        """Prioritize README/docs and entrypoints."""
-        candidates = [
-            "README.md",
-            "README.rst",
-            "readme.md",
-            "readme.rst",
-            "__init__.py",
-            "main.py",
-            "app.py",
-            "index.py",
-            "index.js",
-            "index.ts",
+        """Prioritize README, entrypoints, route handlers, and CLI entrypoints.
+
+        Expanded to include route/handler/controller files so the LLM understands
+        what the service *does* rather than just what it *is* (Task 3 improvement).
+        """
+        # Fixed candidates: README + common entrypoints
+        readme_candidates = [
+            "README.md", "README.rst", "readme.md", "readme.rst",
+        ]
+        entrypoint_candidates = [
+            "__main__.py", "main.py", "app.py", "server.py",
+            "index.py", "index.js", "index.ts",
+            "cli.py", "manage.py", "wsgi.py", "asgi.py",
+        ]
+        # Route/handler filenames that reveal business logic
+        route_candidates = [
+            "routes.py", "router.py", "routers.py", "views.py",
+            "handlers.py", "controllers.py", "api.py",
+            "routes.ts", "routes.js", "router.ts",
         ]
 
         files: list[Path] = []
-        for name in candidates:
-            candidate = service_path / name
-            if candidate.exists():
-                files.append(candidate)
+        seen: set[Path] = set()
 
+        def _add(path: Path) -> None:
+            if path.exists() and path not in seen:
+                files.append(path)
+                seen.add(path)
+
+        # 1. README from service dir and repo root
+        for name in readme_candidates:
+            _add(service_path / name)
         if repo_root and repo_root != service_path:
-            for name in candidates:
-                candidate = repo_root / name
-                if candidate.exists() and candidate not in files:
-                    files.append(candidate)
+            for name in readme_candidates:
+                _add(repo_root / name)
 
-        return files[:4]
+        # 2. Entrypoints from service dir
+        for name in entrypoint_candidates:
+            _add(service_path / name)
+
+        # 3. Named route/handler files in service dir and one level deep
+        for name in route_candidates:
+            _add(service_path / name)
+        for subdir in service_path.iterdir() if service_path.is_dir() else []:
+            if subdir.is_dir() and subdir.name not in ("tests", "test", "__pycache__", "node_modules"):
+                for name in route_candidates:
+                    _add(subdir / name)
+                    if len(files) >= 6:
+                        break
+            if len(files) >= 6:
+                break
+
+        return files[:6]
 
     def _read_snippets(self, files: list[Path]) -> dict[str, str]:
-        """Read up to ~800 characters per file to keep prompt compact."""
+        """Read up to ~1200 characters per file to keep prompt compact.
+
+        Route handler files get priority for understanding business purpose.
+        """
         snippets: dict[str, str] = {}
         for file_path in files:
             try:
                 text = file_path.read_text(encoding="utf-8", errors="ignore")
-                snippets[str(file_path.name)] = text[:800]
+                # Route/handler files: include more to capture route definitions
+                limit = 1500 if any(
+                    kw in file_path.name.lower()
+                    for kw in ("route", "handler", "controller", "view", "api")
+                ) else 800
+                snippets[str(file_path.name)] = text[:limit]
             except Exception:
                 continue
         return snippets
@@ -236,9 +281,9 @@ class ServiceLLMEnricher:
         if any(token in lowered for token in ["deprecat", "sunset", "retire", "frozen", "legacy", "eol"]):
             return ServiceStatus.DEPRECATED.value
         if any(token in lowered for token in ["maint", "bugfix", "support", "stabil", "patch"]):
-            return ServiceStatus.MAINTENANCE_ONLY.value
+            return ServiceStatus.MAINTENANCE.value
         if any(token in lowered for token in ["active", "dev", "feature"]):
-            return ServiceStatus.ACTIVE_DEV.value
+            return ServiceStatus.ACTIVE.value
         return cleaned
 
     def _normalize_tier(self, value: Any) -> Optional[str]:

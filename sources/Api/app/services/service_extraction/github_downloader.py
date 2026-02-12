@@ -11,18 +11,23 @@ from urllib.parse import urlparse
 
 import requests
 
+from app.utils.security import validate_github_url
+
 logger = logging.getLogger(__name__)
 
 
 class GitHubDownloader:
     """Download and extract repositories from GitHub."""
-    
+
     @staticmethod
     def is_github_url(url: str) -> bool:
         """Check if URL is a GitHub repository URL."""
-        parsed = urlparse(url)
-        return 'github.com' in parsed.netloc.lower() or 'github.io' in parsed.netloc.lower()
-    
+        try:
+            validate_github_url(url)
+            return True
+        except ValueError:
+            return False
+
     @staticmethod
     def download_repository(
         github_url: str,
@@ -32,50 +37,21 @@ class GitHubDownloader:
     ) -> Path:
         """
         Download a GitHub repository.
-        
+
         Args:
             github_url: GitHub repository URL (e.g., https://github.com/user/repo)
             output_dir: Directory to extract to (creates temp dir if None)
             use_git: Use git clone if available, otherwise use ZIP download
-        
+
         Returns:
             Path to extracted repository directory
-        
+
         Raises:
             ValueError: If URL is not a valid GitHub URL
             RuntimeError: If download fails
         """
-        if not GitHubDownloader.is_github_url(github_url):
-            raise ValueError(f"Not a valid GitHub URL: {github_url}")
-        
-        # Parse GitHub URL
-        parsed = urlparse(github_url)
-        path_parts = [p for p in parsed.path.split('/') if p]
-        
-        if len(path_parts) < 2:
-            if len(path_parts) == 1:
-                # Organization URL provided, suggest repository URL
-                org = path_parts[0]
-                raise ValueError(
-                    f"Invalid GitHub URL format: {github_url}. "
-                    f"This appears to be an organization URL. Please provide a full repository URL. "
-                    f"Example: https://github.com/{org}/{org} or https://github.com/{org}/<repository-name>"
-                )
-            else:
-                raise ValueError(
-                    f"Invalid GitHub URL format: {github_url}. "
-                    f"Please provide a full repository URL in the format: https://github.com/owner/repository"
-                )
-        
-        owner = path_parts[0]
-        repo = path_parts[1].replace('.git', '')
-        
-        # Handle branch/tag if specified
-        branch = None
-        if len(path_parts) > 3 and path_parts[2] in ['tree', 'blob']:
-            branch = path_parts[3]
-        elif '#' in github_url:
-            branch = github_url.split('#')[-1]
+        # Validates scheme, domain, owner, repo, and branch names
+        owner, repo, branch = validate_github_url(github_url)
         
         # Create output directory
         if output_dir is None:

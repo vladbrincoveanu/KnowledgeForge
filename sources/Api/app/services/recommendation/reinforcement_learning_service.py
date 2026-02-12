@@ -423,7 +423,7 @@ class ReinforcementLearningService:
             self.experience_memory = self.experience_memory[-self.memory_size :]
 
     async def _update_model_weights(self, context_metadata: Dict[str, Any]) -> None:
-        logger.debug("Updating RL model weights with context metadata: %s", context_metadata)
+        logger.info("Updating RL model weights with context metadata: %s", context_metadata)
         # Placeholder: extended RL updates would happen here.
     
     def _summarize_feedback(self, feedback_list: List[Dict[str, Any]]) -> str:

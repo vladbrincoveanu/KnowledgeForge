@@ -369,7 +369,7 @@ class ConfigExtractor(BaseExtractor):
                             source_file=rel_path,
                             dependency_type=dep_type,
                         ))
-            except Exception as e:
+            except (OSError, json.JSONDecodeError, ValueError) as e:
                 self.errors.append(f"Failed to parse {file_path}: {e}")
         
         return deps
@@ -519,7 +519,7 @@ class ConfigExtractor(BaseExtractor):
                         dependency_type=dep_type,
                     ))
         
-        except Exception as e:
+        except (OSError, ValueError) as e:
             self.errors.append(f"Failed to parse {file_path}: {e}")
         
         return deps

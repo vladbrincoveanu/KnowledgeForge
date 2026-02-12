@@ -266,7 +266,7 @@ class PostgreSQLMetadataStore:
                     rows = cursor.fetchall() or []
                     return [dict(row) for row in rows]
             except Exception as exc:
-                logger.debug("Similarity lookup failed: %s", exc)
+                logger.info("Similarity lookup failed: %s", exc)
             finally:
                 if conn:
                     self.connection_pool.putconn(conn)
@@ -311,7 +311,7 @@ class PostgreSQLMetadataStore:
                     rows = cursor.fetchall() or []
                     return [dict(row) for row in rows]
             except Exception as exc:
-                logger.debug("Relationship pattern lookup failed: %s", exc)
+                logger.info("Relationship pattern lookup failed: %s", exc)
             finally:
                 if conn:
                     self.connection_pool.putconn(conn)
@@ -501,7 +501,7 @@ class PostgreSQLMetadataStore:
                 edge.model_dump(mode="python") for edge in session.edge_recommendations
             ]
 
-        except Exception as e:
+        except (ValueError, TypeError) as e:
             logger.error(f"Failed to create recommendation session: {e}")
             raise
 
@@ -773,7 +773,7 @@ class PostgreSQLMetadataStore:
                 for chunk in iter(lambda: f.read(4096), b""):
                     sha256_hash.update(chunk)
             return sha256_hash.hexdigest()
-        except Exception as e:
+        except (ValueError, TypeError) as e:
             logger.error(f"Failed to calculate checksum for {file_path}: {e}")
             return "unknown"
 

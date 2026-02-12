@@ -192,7 +192,7 @@ describe('Graph Component', () => {
     render(<Graph data={emptyData} onEdgeClick={mockOnEdgeClick} />);
 
     expect(screen.queryByTestId('force-graph-mock')).not.toBeInTheDocument();
-    expect(screen.getByText('No Files Uploaded')).toBeInTheDocument();
+    expect(screen.getByText('No Graph Data Available')).toBeInTheDocument();
   });
 
   it('works without onEdgeClick prop', () => {

@@ -19,6 +19,8 @@ from app.infrastructure.storage.metadata_store import MetadataStore
 from app.infrastructure.llm.llm_manager import LLMManager
 from app.services.code_extraction.c4_extractor import C4ArchitectureExtractor
 from app.services.service_extraction.github_downloader import GitHubDownloader
+from app.endpoint.v1.dependencies import get_neo4j_manager, get_llm_manager, get_metadata_store
+from app.utils.security import safe_extract_zip, validate_local_repo_path
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +42,7 @@ def _save_c4_to_json(task_id: str, c4_architecture: dict) -> None:
             json.dump(c4_architecture, f, indent=2, default=str, ensure_ascii=False)
 
         logger.info(f"Saved C4 architecture to {output_file}")
-    except Exception as e:
+    except (OSError, json.JSONDecodeError, ValueError) as e:
         logger.error(f"Failed to save C4 architecture to JSON: {e}", exc_info=True)
 
 
@@ -61,7 +63,7 @@ def _load_latest_c4_from_json() -> dict:
                 try:
                     with open(fallback_file, 'r', encoding='utf-8') as f:
                         return json.load(f)
-                except Exception as e:
+                except (OSError, json.JSONDecodeError, ValueError) as e:
                     logger.error(f"Failed to load fallback C4 JSON: {e}", exc_info=True)
             return {}
 
@@ -73,7 +75,7 @@ def _load_latest_c4_from_json() -> dict:
                 try:
                     with open(fallback_file, 'r', encoding='utf-8') as f:
                         return json.load(f)
-                except Exception as e:
+                except (OSError, json.JSONDecodeError, ValueError) as e:
                     logger.error(f"Failed to load fallback C4 JSON: {e}", exc_info=True)
             return {}
 
@@ -89,46 +91,96 @@ def _load_latest_c4_from_json() -> dict:
         logger.info(f"Loaded {len(systems)} systems from {latest_file.name}")
         
         return data
-    except Exception as e:
+    except (OSError, json.JSONDecodeError, ValueError) as e:
         logger.error(f"Failed to load C4 architecture from JSON: {e}", exc_info=True)
         return {}
 
 
 class ScanRequest(BaseModel):
-    """Request model for repository scan."""
-    repo_path: Optional[str] = Field(None, description="Local path to repository")
-    use_c4_model: bool = Field(default=True, description="Use C4 Model (recommended) vs detailed extraction")
-    max_components_per_domain: int = Field(default=10, description="Group components if more than this")
+    """Request model for local repository C4 scan."""
+
+    repo_path: Optional[str] = Field(
+        None,
+        description="Absolute local path to the repository. Allowed prefixes: /tmp, /repos, /data.",
+        examples=["/repos/my-platform"],
+    )
+    use_c4_model: bool = Field(
+        default=True,
+        description="Use the C4 Model extractor (recommended). Set False for a legacy flat extraction.",
+    )
+    max_components_per_domain: int = Field(
+        default=10,
+        description="Component threshold above which components are grouped by domain.",
+        ge=1,
+        le=100,
+    )
+
 
 class GitHubScanRequest(BaseModel):
     """Request model for GitHub-based C4 scan."""
-    github_url: str = Field(..., description="GitHub repository URL")
-    use_git: bool = Field(default=True, description="Use git clone if available")
-    max_components_per_domain: int = Field(default=10, description="Group components if more than this")
-    append_mode: bool = Field(default=True, description="Append to existing data (True) or clear first (False)")
+
+    github_url: str = Field(
+        ...,
+        description="HTTPS URL of the GitHub repository to scan.",
+        examples=["https://github.com/microservices-demo/microservices-demo"],
+    )
+    use_git: bool = Field(
+        default=True,
+        description="Clone via `git clone`. Set False to use archive download.",
+    )
+    max_components_per_domain: int = Field(
+        default=10,
+        description="Component threshold above which components are grouped by domain.",
+        ge=1,
+        le=100,
+    )
+    append_mode: bool = Field(
+        default=True,
+        description=(
+            "Append results to existing C4 data (True) or clear all stored data first (False)."
+        ),
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "github_url": "https://github.com/microservices-demo/microservices-demo",
+                    "use_git": True,
+                    "append_mode": False,
+                }
+            ]
+        }
+    }
 
 
 class ScanResponse(BaseModel):
-    """Response model for scan operations."""
-    task_id: str = Field(..., description="Unique task identifier")
-    status: str = Field(..., description="Task status")
-    message: str = Field(..., description="Status message")
-    created_at: datetime = Field(..., description="Task creation timestamp")
+    """Response model for C4 scan operations."""
+
+    task_id: str = Field(..., description="Unique task identifier (UUID).", examples=["d4e5f6a7-..."])
+    status: str = Field(..., description="Initial task status. Always 'pending'.", examples=["pending"])
+    message: str = Field(..., description="Human-readable status message.")
+    created_at: datetime = Field(..., description="UTC timestamp when the task was created.")
 
 
 class ScanStatusResponse(BaseModel):
-    """Response model for scan status."""
-    task_id: str
-    status: str
-    progress: float
-    message: str
-    created_at: datetime
-    completed_at: Optional[datetime] = None
-    containers_count: int = 0
-    components_count: int = 0
-    external_deps_count: int = 0
-    errors: list[str] = Field(default_factory=list)
-    extraction_mode: str = "c4_model"
+    """Response model for C4 scan status."""
+
+    task_id: str = Field(..., description="Task identifier.")
+    status: str = Field(
+        ...,
+        description="Task lifecycle state: pending | scanning | completed | failed.",
+        examples=["completed"],
+    )
+    progress: float = Field(..., description="Fractional progress 0.0–1.0.", examples=[1.0])
+    message: str = Field(..., description="Latest status message.")
+    created_at: datetime = Field(..., description="UTC creation timestamp.")
+    completed_at: Optional[datetime] = Field(None, description="UTC completion timestamp.")
+    containers_count: int = Field(0, description="Number of C4 containers extracted.")
+    components_count: int = Field(0, description="Number of C4 components extracted.")
+    external_deps_count: int = Field(0, description="Number of external dependencies detected.")
+    errors: list[str] = Field(default_factory=list, description="Non-fatal errors encountered.")
+    extraction_mode: str = Field("c4_model", description="Extraction mode used (c4_model or legacy).")
 
 
 class NodeDescribeRequest(BaseModel):
@@ -156,35 +208,6 @@ class EdgeDescribeRequest(BaseModel):
 
     class Config:
         allow_population_by_field_name = True
-
-
-def get_neo4j_manager():
-    """Get Neo4j manager instance."""
-    from utils.config import get_config
-    config = get_config()
-    manager = Neo4jGraphManager(
-        uri=config.neo4j.uri,
-        username=config.neo4j.username,
-        password=config.neo4j.password,
-        encrypted=config.neo4j.encrypted,
-        database=config.neo4j.database,
-        max_connection_pool_size=config.neo4j.max_connection_pool_size,
-        connection_timeout=config.neo4j.connection_timeout,
-    )
-    manager.connect()
-    return manager
-
-
-def get_llm_manager():
-    """Get LLM manager instance."""
-    try:
-        import os
-        base_url = os.getenv("LMSTUDIO_BASE_URL", "http://localhost:1234/v1")
-        model = os.getenv("LMSTUDIO_MODEL_NAME", "qwen/qwen2.5-vl-7b")
-        return LLMManager(lmstudio_url=base_url, default_model=model)
-    except Exception as e:
-        logger.warning(f"LLM not available: {e}")
-        return None
 
 
 def _build_node_prompt(payload: NodeDescribeRequest) -> str:
@@ -224,38 +247,51 @@ def _build_edge_prompt(payload: EdgeDescribeRequest) -> str:
     )
 
 
-@router.post("/upload-repo", response_model=ScanResponse)
+@router.post(
+    "/upload-repo",
+    response_model=ScanResponse,
+    status_code=202,
+    summary="Upload a repository ZIP for C4 extraction",
+    description=(
+        "Upload a ZIP archive and start an asynchronous C4 architecture extraction.\n\n"
+        "**Security:** rejects path-traversal entries, symlinks, and ZIP bombs (>500 MB).\n\n"
+        "Poll `GET /api/v1/code/scan/{task_id}` for progress, "
+        "then `GET /api/v1/code/architecture` for results."
+    ),
+    responses={
+        202: {"description": "ZIP accepted and C4 scan queued"},
+        400: {"description": "Not a ZIP file, or ZIP failed security validation"},
+        500: {"description": "Internal error during upload or scan startup"},
+    },
+)
 async def upload_repository(
-    file: UploadFile = File(...),
+    file: UploadFile = File(..., description="ZIP archive of the repository to scan"),
     background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
-    """
-    Upload a repository archive (zip) for scanning.
-    
-    This endpoint accepts a ZIP file containing a repository and
-    extracts it for scanning.
-    """
+    """Upload a repository ZIP archive and start C4 extraction (async — returns task_id immediately)."""
     if not file.filename or not file.filename.endswith('.zip'):
         raise HTTPException(status_code=400, detail="Only ZIP files are supported")
-    
+
     try:
         # Create task
         task_id = str(uuid.uuid4())
-        
-        # Save uploaded file
+
+        # Save uploaded file using a safe, server-generated filename
         temp_dir = Path(tempfile.mkdtemp(prefix=f"repo_{task_id}_"))
-        zip_path = temp_dir / file.filename
-        
+        zip_path = temp_dir / f"{task_id}.zip"
+
         with open(zip_path, 'wb') as f:
             content = await file.read()
             f.write(content)
-        
-        # Extract ZIP
+
+        # Extract ZIP safely (rejects path traversal, symlinks, zip bombs)
         extract_dir = temp_dir / 'extracted'
         extract_dir.mkdir()
-        
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(extract_dir)
+
+        try:
+            safe_extract_zip(zip_path, extract_dir)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
         
         # Find repository root (handle nested directories)
         repo_path = extract_dir
@@ -294,14 +330,29 @@ async def upload_repository(
         raise HTTPException(status_code=500, detail=f"Failed to upload repository: {str(e)}")
 
 
-@router.post("/extract-from-github", response_model=ScanResponse)
+@router.post(
+    "/extract-from-github",
+    response_model=ScanResponse,
+    status_code=202,
+    summary="Extract C4 architecture from a GitHub repository",
+    description=(
+        "Downloads a GitHub repository and runs C4 extraction **synchronously** during "
+        "the request (download phase), then hands the scan off to a background task.\n\n"
+        "**C4 levels extracted:** Context → Container → Component → Code\n\n"
+        "Results are merged into `GET /api/v1/code/architecture` (append_mode=True by default).\n\n"
+        "Set `GITHUB_TOKEN` env var for higher GitHub API rate limits (5000 req/h vs 60 req/h)."
+    ),
+    responses={
+        202: {"description": "Repository downloaded and C4 scan queued"},
+        400: {"description": "Invalid GitHub URL"},
+        500: {"description": "Repository download failed"},
+    },
+)
 async def extract_from_github(
     request: GitHubScanRequest,
     background_tasks: BackgroundTasks,
 ):
-    """
-    Download a GitHub repository and run C4 extraction.
-    """
+    """Download a GitHub repository and start C4 extraction (download is synchronous, scan is async)."""
     if not request.github_url:
         raise HTTPException(status_code=400, detail="github_url is required")
 
@@ -562,14 +613,18 @@ async def scan_repository(
     """
     if not request.repo_path:
         raise HTTPException(status_code=400, detail="repo_path is required")
-    
-    repo_path = Path(request.repo_path)
-    if not repo_path.exists():
-        raise HTTPException(status_code=400, detail=f"Repository not found: {request.repo_path}")
-    
+
+    try:
+        repo_path = validate_local_repo_path(
+            request.repo_path,
+            allowed_prefixes=["/tmp", "/repos", "/data", "/cms", "/app/data"],
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
     # Create task
     task_id = str(uuid.uuid4())
-    
+
     scan_tasks[task_id] = {
         'task_id': task_id,
         'status': 'pending',
@@ -656,10 +711,10 @@ async def run_c4_extraction(
         if 'temp_dir' in task:
             try:
                 shutil.rmtree(task['temp_dir'])
-            except Exception as e:
+            except (ConnectionError, RuntimeError) as e:
                 logger.warning(f"Failed to cleanup temp directory: {e}")
     
-    except Exception as e:
+    except (ConnectionError, RuntimeError) as e:
         logger.error(f"C4 extraction failed for task {task_id}: {e}", exc_info=True)
         
         task = scan_tasks.get(task_id)
@@ -848,12 +903,21 @@ async def store_c4_in_neo4j(
             f"{len(c4_architecture['components'])} components in Neo4j"
         )
     
-    except Exception as e:
+    except (ConnectionError, RuntimeError) as e:
         logger.error(f"Failed to store C4 architecture in Neo4j: {e}", exc_info=True)
         raise
 
 
-@router.get("/scan/{task_id}", response_model=ScanStatusResponse)
+@router.get(
+    "/scan/{task_id}",
+    response_model=ScanStatusResponse,
+    summary="Poll C4 scan task status",
+    description="Returns the current status and progress of a C4 extraction task.",
+    responses={
+        200: {"description": "Task status"},
+        404: {"description": "Task not found"},
+    },
+)
 async def get_scan_status(task_id: str):
     """Get the status of a repository scan task."""
     task = scan_tasks.get(task_id)
@@ -953,12 +1017,34 @@ async def clear_architecture():
             "deleted_count": deleted_count
         }
     
-    except Exception as e:
+    except (ConnectionError, RuntimeError) as e:
         logger.error(f"Failed to clear architecture: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to clear architecture: {str(e)}")
 
 
-@router.get("/architecture")
+@router.get(
+    "/architecture",
+    summary="Retrieve the latest C4 architecture model",
+    description=(
+        "Returns the most recently extracted C4 architecture from the JSON file store.\n\n"
+        "**Response shape:**\n"
+        "```\n"
+        "{\n"
+        "  c4_model_version: string,\n"
+        "  system_context: { name, purpose, languages, frameworks, external_dependencies, … },\n"
+        "  containers: [ { id, name, type, technology, endpoint, … } ],\n"
+        "  components: [ { id, name, type, file_path, … } ],\n"
+        "  context_level: { entities, relationships },\n"
+        "  relationships: { … }\n"
+        "}\n"
+        "```\n\n"
+        "Returns an empty skeleton when no extraction has been run yet."
+    ),
+    responses={
+        200: {"description": "C4 architecture model (may be empty skeleton)"},
+        500: {"description": "Failed to load architecture data"},
+    },
+)
 async def get_code_architecture():
     """
     Get the C4 architecture data from JSON file.
@@ -1005,7 +1091,17 @@ async def get_code_architecture():
         )
 
 
-@router.post("/describe/node")
+@router.post(
+    "/describe/node",
+    summary="Generate an LLM description for a C4 node",
+    description=(
+        "Calls the configured LLM to produce a 1-2 sentence description of a C4 node. "
+        "Falls back to a heuristic description when no LLM is available."
+    ),
+    responses={
+        200: {"description": "Description generated (field `source`: llm | heuristic)"},
+    },
+)
 async def describe_node(request: NodeDescribeRequest):
     """Generate a short description for a C4 node."""
     llm_manager = get_llm_manager()
@@ -1027,7 +1123,17 @@ async def describe_node(request: NodeDescribeRequest):
     return {"description": description, "source": "heuristic"}
 
 
-@router.post("/describe/edge")
+@router.post(
+    "/describe/edge",
+    summary="Generate an LLM description for a C4 edge",
+    description=(
+        "Calls the configured LLM to produce a 1-sentence description of a C4 relationship. "
+        "Falls back to a heuristic description when no LLM is available."
+    ),
+    responses={
+        200: {"description": "Description generated (field `source`: llm | heuristic)"},
+    },
+)
 async def describe_edge(request: EdgeDescribeRequest):
     """Generate a short description for a C4 edge."""
     llm_manager = get_llm_manager()

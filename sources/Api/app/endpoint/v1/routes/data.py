@@ -12,33 +12,11 @@ from app.endpoint.v1.routes.extraction import extraction_tasks
 # Import actual backend services
 from app.infrastructure.graph.neo4j_manager import Neo4jGraphManager
 from app.infrastructure.storage.metadata_store import MetadataStore
-from utils.config import get_config
+from app.endpoint.v1.dependencies import get_neo4j_manager, get_metadata_store
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["data"])
-
-
-# Dependency injection
-def get_neo4j_manager():
-    """Get Neo4j manager instance."""
-    config = get_config()
-    manager = Neo4jGraphManager(
-        uri=config.neo4j.uri,
-        username=config.neo4j.username,
-        password=config.neo4j.password,
-        database=config.neo4j.database,
-        encrypted=config.neo4j.encrypted,
-    )
-    # Connect immediately to ensure the connection is established
-    manager.connect()
-    return manager
-
-
-def get_metadata_store():
-    """Get metadata store instance."""
-    config = get_config()
-    return MetadataStore(config=config)
 
 
 @router.get("/entities")
@@ -62,7 +40,7 @@ async def list_entities(
             total_count = neo4j_manager.count_entities(task_id=task_id)
         else:
             logger.warning("Neo4j not connected. Falling back to in-memory extraction results.")
-    except Exception as neo_error:
+    except (ConnectionError, RuntimeError) as neo_error:
         logger.warning(
             "Failed to retrieve entities from Neo4j: %s. Falling back to in-memory results.",
             neo_error,
@@ -128,7 +106,7 @@ async def list_relationships(
             total_count = neo4j_manager.count_relationships(task_id=task_id)
         else:
             logger.warning("Neo4j not connected. Falling back to in-memory relationship results.")
-    except Exception as neo_error:
+    except (ConnectionError, RuntimeError) as neo_error:
         logger.warning(
             "Failed to retrieve relationships from Neo4j: %s. Falling back to in-memory results.",
             neo_error,
@@ -330,7 +308,7 @@ async def get_current_config():
             "environment": "development",
             "debug": True,
         }
-    except Exception as e:
+    except (ConnectionError, RuntimeError) as e:
         logger.error(f"Failed to get config: {e}")
         return {"error": str(e)}
 
@@ -349,7 +327,7 @@ async def get_entity_details(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except (ConnectionError, RuntimeError) as e:
         logger.error(f"Failed to get entity details: {e}")
         raise HTTPException(
             status_code=500, detail=f"Failed to get entity details: {str(e)}"
@@ -370,7 +348,7 @@ async def get_relationship_details(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except (ConnectionError, RuntimeError) as e:
         logger.error(f"Failed to get relationship details: {e}")
         raise HTTPException(
             status_code=500, detail=f"Failed to get relationship details: {str(e)}"
@@ -401,7 +379,7 @@ async def search_entities_and_relationships(
             },
         }
 
-    except Exception as e:
+    except (ConnectionError, RuntimeError) as e:
         logger.error(f"Search failed: {e}")
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 

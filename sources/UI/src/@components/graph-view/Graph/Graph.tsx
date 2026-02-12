@@ -44,36 +44,17 @@ const Graph: React.FC<GraphProps> = ({
     }
   }, [activeTaskId, onGraphUpdate]);
 
-  // Debug logging
-  console.log('Graph component received data:', data);
-  console.log('Graph nodes count:', data.nodes.length);
-  console.log('Graph links count:', data.links.length);
-
   // Validate data structure
   const isValidData =
     data && Array.isArray(data.nodes) && Array.isArray(data.links);
-  console.log('Graph data is valid:', isValidData);
 
-  // Debug: Check for orphaned links
-  if (data.links && data.links.length > 0) {
-    const nodeIds = new Set(data.nodes.map(n => n.id));
-    const orphanedLinks = data.links.filter(
-      link => !nodeIds.has(link.source) || !nodeIds.has(link.target)
-    );
-    if (orphanedLinks.length > 0) {
-      console.warn('Found orphaned links:', orphanedLinks);
-    }
-
-    // Log valid links
-    const validLinks = data.links.filter(
-      link => nodeIds.has(link.source) && nodeIds.has(link.target)
-    );
-    console.log('Valid links for graph:', validLinks);
-  }
+  // Pre-compute node ID set for O(1) link validation
+  const nodeIdSet = React.useMemo(
+    () => new Set(data.nodes.map(n => String(n.id))),
+    [data.nodes]
+  );
 
   const handleNodeClick = useCallback((node: GraphNode) => {
-    9;
-    console.log('Clicked node:', node);
     // Clear edge selection when clicking on a node
     setSelectedEdge(null);
     setShowEdgeModal(false);
@@ -85,7 +66,6 @@ const Graph: React.FC<GraphProps> = ({
 
   const handleLinkClick = useCallback(
     (link: GraphLink) => {
-      console.log('Clicked link:', link);
       setSelectedEdge(link);
       setShowEdgeModal(true);
 
@@ -113,7 +93,6 @@ const Graph: React.FC<GraphProps> = ({
   const linkColor = useCallback((link: GraphLink) => {
     // Color based on connection strength/confidence
     const confidence = link.confidence || 0;
-    console.log('Link color for:', link.id, 'confidence:', confidence);
     if (confidence >= 0.9) return '#28a745'; // High confidence - green
     if (confidence >= 0.7) return '#fd7e14'; // Medium confidence - orange
     if (confidence >= 0.5) return '#ffc107'; // Lower confidence - yellow
@@ -123,7 +102,6 @@ const Graph: React.FC<GraphProps> = ({
   const linkWidth = useCallback((link: GraphLink) => {
     // Width based on connection strength
     const confidence = link.confidence || 0;
-    console.log('Link width for:', link.id, 'confidence:', confidence);
     if (confidence >= 0.9) return 6;
     if (confidence >= 0.7) return 4;
     if (confidence >= 0.5) return 3;
@@ -207,8 +185,6 @@ const Graph: React.FC<GraphProps> = ({
             graphData={{
               nodes: data.nodes,
               links: data.links.filter(link => {
-                // ForceGraph2D might be converting string IDs to objects
-                // Let's ensure we're working with string IDs
                 const sourceId =
                   typeof link.source === 'object' && link.source !== null
                     ? (link.source as any).id
@@ -217,70 +193,8 @@ const Graph: React.FC<GraphProps> = ({
                   typeof link.target === 'object' && link.target !== null
                     ? (link.target as any).id
                     : String(link.target);
-
-                console.log('Checking link:', link);
-                console.log(
-                  'Original source:',
-                  link.source,
-                  'type:',
-                  typeof link.source
-                );
-                console.log(
-                  'Original target:',
-                  link.target,
-                  'type:',
-                  typeof link.target
-                );
-                console.log('Processed sourceId:', sourceId);
-                console.log('Processed targetId:', targetId);
-
-                const sourceExists = data.nodes.some(node => {
-                  const nodeId = String(node.id);
-                  const matches = nodeId === sourceId;
-                  console.log(
-                    'Comparing node ID:',
-                    nodeId,
-                    'with sourceId:',
-                    sourceId,
-                    'matches:',
-                    matches
-                  );
-                  return matches;
-                });
-                const targetExists = data.nodes.some(node => {
-                  const nodeId = String(node.id);
-                  const matches = nodeId === targetId;
-                  console.log(
-                    'Comparing node ID:',
-                    nodeId,
-                    'with targetId:',
-                    targetId,
-                    'matches:',
-                    matches
-                  );
-                  return matches;
-                });
-
-                const isValid = sourceExists && targetExists;
-                if (!isValid) {
-                  console.warn(`Invalid link: ${sourceId} -> ${targetId}`);
-                  console.warn(
-                    'Source exists:',
-                    sourceExists,
-                    'Target exists:',
-                    targetExists
-                  );
-                } else {
-                  console.log(`Valid link: ${sourceId} -> ${targetId}`);
-                }
-                return isValid;
+                return nodeIdSet.has(sourceId) && nodeIdSet.has(targetId);
               }),
-            }}
-            onLinkHover={link => {
-              console.log('Link hovered:', link);
-            }}
-            onNodeHover={node => {
-              console.log('Node hovered:', node);
             }}
             nodeLabel={nodeLabel}
             linkLabel={linkLabel}
@@ -297,8 +211,6 @@ const Graph: React.FC<GraphProps> = ({
             d3AlphaDecay={0.02}
             d3VelocityDecay={0.3}
             onEngineStop={() => {
-              console.log('Graph engine stopped, zooming to fit');
-              // Add a small delay to ensure the graph has settled
               setTimeout(() => {
                 graphRef.current?.zoomToFit(400, 50);
               }, 100);

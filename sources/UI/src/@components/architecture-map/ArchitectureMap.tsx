@@ -404,97 +404,24 @@ const ArchitectureMap: React.FC = () => {
   };
 
   const handleExtractFromGithub = async () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        location: 'ArchitectureMap.tsx:337',
-        message: 'handleExtractFromGithub called',
-        data: { githubUrl, hasExistingInterval: !!pollIntervalRef.current },
-        timestamp: Date.now(),
-        sessionId: 'debug-session',
-        runId: 'run1',
-        hypothesisId: 'B',
-      }),
-    }).catch(() => {});
-    // #endregion
-
     if (!githubUrl.trim()) {
       setExtractionError('Please enter a GitHub URL');
       return;
     }
 
-    // #region agent log
     if (pollIntervalRef.current) {
-      fetch(
-        'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            location: 'ArchitectureMap.tsx:343',
-            message:
-              'Clearing existing interval before starting new extraction',
-            data: { existingIntervalId: !!pollIntervalRef.current },
-            timestamp: Date.now(),
-            sessionId: 'debug-session',
-            runId: 'run1',
-            hypothesisId: 'B',
-          }),
-        }
-      ).catch(() => {});
       clearInterval(pollIntervalRef.current);
       pollIntervalRef.current = null;
     }
-    // #endregion
 
     setIsExtracting(true);
     setExtractionError(null);
 
     try {
-      // #region agent log
-      fetch(
-        'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            location: 'ArchitectureMap.tsx:347',
-            message: 'Calling extractFromGitHub API',
-            data: { githubUrl },
-            timestamp: Date.now(),
-            sessionId: 'debug-session',
-            runId: 'run1',
-            hypothesisId: 'A',
-          }),
-        }
-      ).catch(() => {});
-      // #endregion
-
       const response = await serviceExtractionAPI.extractFromGitHub(
         githubUrl,
         true
       );
-
-      // #region agent log
-      fetch(
-        'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            location: 'ArchitectureMap.tsx:350',
-            message: 'extractFromGitHub response received',
-            data: { taskId: response.task_id, status: response.status },
-            timestamp: Date.now(),
-            sessionId: 'debug-session',
-            runId: 'run1',
-            hypothesisId: 'A',
-          }),
-        }
-      ).catch(() => {});
-      // #endregion
 
       if (response.task_id) {
         // Poll for results
@@ -504,27 +431,6 @@ const ArchitectureMap: React.FC = () => {
         let stuckProgressAttempts = 0;
         const maxStuckAttempts = 30; // 30 seconds of no progress change = stuck
 
-        // #region agent log
-        fetch(
-          'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              location: 'ArchitectureMap.tsx:354',
-              message: 'Creating polling interval',
-              data: { taskId: response.task_id, maxAttempts },
-              timestamp: Date.now(),
-              sessionId: 'debug-session',
-              runId: 'run1',
-              hypothesisId: 'B',
-            }),
-          }
-        ).catch(() => {});
-        // #endregion
-
-        let lastLoggedStatus = '';
-        let lastLoggedAttempt = 0;
         const pollInterval = setInterval(async () => {
           attempts++;
 
@@ -545,72 +451,12 @@ const ArchitectureMap: React.FC = () => {
               lastProgress = currentProgress;
             }
 
-            // Only log on state changes or every 30 seconds (30 attempts) to drastically reduce noise
-            const shouldLog =
-              status.status !== lastLoggedStatus ||
-              attempts - lastLoggedAttempt >= 30;
-            if (shouldLog) {
-              console.log(
-                `[ArchitectureMap] Poll attempt ${attempts}: status="${status.status}", progress=${status.progress}, message="${status.message}"`
-              );
-              // #region agent log
-              fetch(
-                'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
-                {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    location: 'ArchitectureMap.tsx:360',
-                    message: 'Status response received',
-                    data: {
-                      attempts,
-                      status: status.status,
-                      statusType: typeof status.status,
-                      progress: status.progress,
-                      message: status.message,
-                      stuckAttempts: stuckProgressAttempts,
-                    },
-                    timestamp: Date.now(),
-                    sessionId: 'debug-session',
-                    runId: 'run1',
-                    hypothesisId: 'A',
-                  }),
-                }
-              ).catch(() => {});
-              // #endregion
-              lastLoggedStatus = status.status;
-              lastLoggedAttempt = attempts;
-            }
-
             // Detect if extraction is stuck (no progress for too long) - but only if still extracting
             // Don't show stuck error if it eventually completes
             if (
               stuckProgressAttempts >= maxStuckAttempts &&
               status.status === 'running'
             ) {
-              // #region agent log
-              fetch(
-                'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
-                {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    location: 'ArchitectureMap.tsx:370',
-                    message: 'Extraction appears stuck, clearing interval',
-                    data: {
-                      attempts,
-                      stuckAttempts: stuckProgressAttempts,
-                      progress: status.progress,
-                    },
-                    timestamp: Date.now(),
-                    sessionId: 'debug-session',
-                    runId: 'run1',
-                    hypothesisId: 'C',
-                  }),
-                }
-              ).catch(() => {});
-              // #endregion
-
               clearInterval(pollInterval);
               pollIntervalRef.current = null;
               setIsExtracting(false);
@@ -622,47 +468,9 @@ const ArchitectureMap: React.FC = () => {
 
             // Handle all possible terminal states
             if (status.status === 'completed') {
-              // #region agent log
-              fetch(
-                'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
-                {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    location: 'ArchitectureMap.tsx:361',
-                    message: 'Status is completed, clearing interval',
-                    data: { attempts },
-                    timestamp: Date.now(),
-                    sessionId: 'debug-session',
-                    runId: 'run1',
-                    hypothesisId: 'A',
-                  }),
-                }
-              ).catch(() => {});
-              // #endregion
-
               clearInterval(pollInterval);
               pollIntervalRef.current = null;
               setIsExtracting(false);
-
-              // #region agent log
-              fetch(
-                'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
-                {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    location: 'ArchitectureMap.tsx:431',
-                    message: 'Fetching extraction results',
-                    data: { taskId: response.task_id },
-                    timestamp: Date.now(),
-                    sessionId: 'debug-session',
-                    runId: 'run1',
-                    hypothesisId: 'A',
-                  }),
-                }
-              ).catch(() => {});
-              // #endregion
 
               let results;
               try {
@@ -670,55 +478,11 @@ const ArchitectureMap: React.FC = () => {
                   response.task_id
                 );
               } catch (error: any) {
-                // #region agent log
-                fetch(
-                  'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
-                  {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      location: 'ArchitectureMap.tsx:435',
-                      message: 'Error fetching results',
-                      data: {
-                        error: error?.message,
-                        response: error?.response?.data,
-                      },
-                      timestamp: Date.now(),
-                      sessionId: 'debug-session',
-                      runId: 'run1',
-                      hypothesisId: 'E',
-                    }),
-                  }
-                ).catch(() => {});
-                // #endregion
                 setExtractionError(
                   `Failed to fetch extraction results: ${error?.message || 'Unknown error'}`
                 );
                 return;
               }
-
-              // #region agent log
-              fetch(
-                'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
-                {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    location: 'ArchitectureMap.tsx:433',
-                    message: 'Results received',
-                    data: {
-                      servicesCount: results.services?.length,
-                      servicesSample: results.services?.[0],
-                      hasServices: !!results.services,
-                    },
-                    timestamp: Date.now(),
-                    sessionId: 'debug-session',
-                    runId: 'run1',
-                    hypothesisId: 'A',
-                  }),
-                }
-              ).catch(() => {});
-              // #endregion
 
               if (results.services && results.services.length > 0) {
                 const extractedServices: ServiceMetadata[] =
@@ -772,35 +536,6 @@ const ArchitectureMap: React.FC = () => {
                             ? String(svc.attributes.description)
                             : '';
 
-                    // #region agent log
-                    fetch(
-                      'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
-                      {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          location: 'ArchitectureMap.tsx:453',
-                          message: 'Mapping service',
-                          data: {
-                            index,
-                            serviceId,
-                            serviceName,
-                            serviceDomain,
-                            serviceOwner,
-                            serviceStatus,
-                            rawDomain: svc.domain,
-                            rawOwner: svc.owner,
-                            rawStatus: svc.status,
-                          },
-                          timestamp: Date.now(),
-                          sessionId: 'debug-session',
-                          runId: 'run1',
-                          hypothesisId: 'A',
-                        }),
-                      }
-                    ).catch(() => {});
-                    // #endregion
-
                     return {
                       id: serviceId,
                       name: serviceName,
@@ -813,95 +548,17 @@ const ArchitectureMap: React.FC = () => {
                     };
                   });
 
-                // #region agent log
-                fetch(
-                  'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
-                  {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      location: 'ArchitectureMap.tsx:450',
-                      message: 'Setting extracted services',
-                      data: { count: extractedServices.length },
-                      timestamp: Date.now(),
-                      sessionId: 'debug-session',
-                      runId: 'run1',
-                      hypothesisId: 'A',
-                    }),
-                  }
-                ).catch(() => {});
-                // #endregion
-
                 setServices(extractedServices);
                 setGithubUrl(''); // Clear input on success
               } else {
-                // #region agent log
-                fetch(
-                  'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
-                  {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      location: 'ArchitectureMap.tsx:451',
-                      message: 'No services in results',
-                      data: {
-                        resultsKeys: Object.keys(results),
-                        services: results.services,
-                      },
-                      timestamp: Date.now(),
-                      sessionId: 'debug-session',
-                      runId: 'run1',
-                      hypothesisId: 'A',
-                    }),
-                  }
-                ).catch(() => {});
-                // #endregion
                 setExtractionError('No services found in the repository');
               }
             } else if (status.status === 'failed') {
-              // #region agent log
-              fetch(
-                'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
-                {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    location: 'ArchitectureMap.tsx:383',
-                    message: 'Status is failed/error, clearing interval',
-                    data: { attempts, status: status.status },
-                    timestamp: Date.now(),
-                    sessionId: 'debug-session',
-                    runId: 'run1',
-                    hypothesisId: 'A',
-                  }),
-                }
-              ).catch(() => {});
-              // #endregion
-
               clearInterval(pollInterval);
               pollIntervalRef.current = null;
               setIsExtracting(false);
               setExtractionError(status.message || 'Extraction failed');
             } else if (attempts >= maxAttempts) {
-              // #region agent log
-              fetch(
-                'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
-                {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    location: 'ArchitectureMap.tsx:387',
-                    message: 'Max attempts reached, clearing interval',
-                    data: { attempts, maxAttempts, lastStatus: status.status },
-                    timestamp: Date.now(),
-                    sessionId: 'debug-session',
-                    runId: 'run1',
-                    hypothesisId: 'D',
-                  }),
-                }
-              ).catch(() => {});
-              // #endregion
-
               clearInterval(pollInterval);
               pollIntervalRef.current = null;
               setIsExtracting(false);
@@ -910,30 +567,6 @@ const ArchitectureMap: React.FC = () => {
               );
             }
           } catch (error: any) {
-            // #region agent log
-            fetch(
-              'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  location: 'ArchitectureMap.tsx:392',
-                  message: 'Error in poll attempt',
-                  data: {
-                    attempts,
-                    maxAttempts,
-                    errorMessage: error?.message,
-                    errorType: error?.constructor?.name,
-                  },
-                  timestamp: Date.now(),
-                  sessionId: 'debug-session',
-                  runId: 'run1',
-                  hypothesisId: 'E',
-                }),
-              }
-            ).catch(() => {});
-            // #endregion
-
             if (attempts >= maxAttempts) {
               clearInterval(pollInterval);
               pollIntervalRef.current = null;
@@ -952,28 +585,6 @@ const ArchitectureMap: React.FC = () => {
       }
     } catch (error: any) {
       setIsExtracting(false);
-      // #region agent log
-      fetch(
-        'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            location: 'ArchitectureMap.tsx:404',
-            message: 'Error in handleExtractFromGithub',
-            data: {
-              errorMessage: error?.message,
-              errorResponse: error?.response?.data,
-              status: error?.response?.status,
-            },
-            timestamp: Date.now(),
-            sessionId: 'debug-session',
-            runId: 'run1',
-            hypothesisId: 'E',
-          }),
-        }
-      ).catch(() => {});
-      // #endregion
       const errorMsg =
         error?.response?.data?.detail ||
         error?.response?.data?.message ||
@@ -987,24 +598,6 @@ const ArchitectureMap: React.FC = () => {
   useEffect(() => {
     return () => {
       if (pollIntervalRef.current) {
-        // #region agent log
-        fetch(
-          'http://127.0.0.1:7243/ingest/ad3d13e5-e95a-477d-91b8-639047779d7a',
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              location: 'ArchitectureMap.tsx:408',
-              message: 'Component unmounting, clearing interval',
-              data: {},
-              timestamp: Date.now(),
-              sessionId: 'debug-session',
-              runId: 'run1',
-              hypothesisId: 'B',
-            }),
-          }
-        ).catch(() => {});
-        // #endregion
         clearInterval(pollIntervalRef.current);
         pollIntervalRef.current = null;
       }

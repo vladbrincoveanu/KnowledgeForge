@@ -77,13 +77,8 @@ class LLMService {
     maxConnections = 5
   ): Promise<Connection[]> {
     try {
-      console.log(
-        `Smart analyzing ${connections.length} connections with Ollama...`
-      );
-
       // First, pre-filter connections using smart rules
       const preFiltered = this.preFilterConnections(connections);
-      console.log(`Pre-filtered to ${preFiltered.length} connections`);
 
       // Take only the top connections for LLM analysis
       const topConnections = preFiltered.slice(0, maxConnections);
@@ -92,9 +87,6 @@ class LLMService {
       const canUseOllama = await this.ensureOllamaAvailable();
       if (!canUseOllama) {
         if (!this.warnedUnavailable) {
-          console.warn(
-            'Ollama is disabled or not reachable. Using fallback analysis.'
-          );
           this.warnedUnavailable = true;
         }
         const analyses = topConnections.map(connection =>
@@ -108,9 +100,6 @@ class LLMService {
         const rankedConnections = scoredConnections
           .sort((a, b) => (b.ai_score || 0) - (a.ai_score || 0))
           .slice(0, maxConnections);
-        console.log(
-          `Returning top ${rankedConnections.length} smart connections (fallback)`
-        );
         return rankedConnections;
       }
 
@@ -134,12 +123,8 @@ class LLMService {
         .sort((a, b) => (b.ai_score || 0) - (a.ai_score || 0))
         .slice(0, maxConnections);
 
-      console.log(
-        `Returning top ${rankedConnections.length} smart connections`
-      );
       return rankedConnections;
     } catch (error) {
-      console.error('Error analyzing connections with Ollama:', error);
       // Fallback to smart pre-filtered connections without AI analysis
       return this.preFilterConnections(connections).slice(0, maxConnections);
     }
@@ -186,7 +171,6 @@ class LLMService {
 
       return analysis;
     } catch (error) {
-      console.error('Error calling Ollama:', error);
       return this.getFallbackAnalysis(connection);
     }
   }
@@ -249,7 +233,6 @@ Format your response as JSON:
         };
       }
     } catch (error) {
-      console.error('Error parsing LLM response:', error);
     }
 
     // Fallback parsing for non-JSON responses
@@ -340,8 +323,6 @@ Format your response as JSON:
    * Pre-filter connections using smart rules - NO MORE RANDOM CONNECTIONS!
    */
   private preFilterConnections(connections: Connection[]): Connection[] {
-    console.log('Pre-filtering connections with smart rules...');
-
     const filtered = connections.filter(connection => {
       const sourceCol = connection.source_column?.toLowerCase() || '';
       const targetCol = connection.target_column?.toLowerCase() || '';
@@ -435,9 +416,6 @@ Format your response as JSON:
       return false;
     });
 
-    console.log(
-      `Filtered from ${connections.length} to ${filtered.length} logical connections`
-    );
     return filtered;
   }
 
@@ -449,7 +427,6 @@ Format your response as JSON:
       const response = await fetch(`${this.ollamaUrl}/api/tags`);
       return response.ok;
     } catch (error) {
-      console.error('Ollama not available:', error);
       return false;
     }
   }
@@ -479,7 +456,6 @@ Format your response as JSON:
         return data.models || [];
       }
     } catch (error) {
-      console.error('Error fetching models:', error);
     }
     return [];
   }

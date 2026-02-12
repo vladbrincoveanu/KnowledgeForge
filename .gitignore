@@ -134,6 +134,9 @@ yarn-error.log*
 uploads/
 
 
+# CMS system (managed separately)
+cms/
+
 # Service extraction artifacts
 sources/Api/data/extractions/
 sources/data/extractions/

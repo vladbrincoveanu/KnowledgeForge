@@ -63,7 +63,7 @@ class SmartLLMEnricher:
 
         estimated_tokens = self._estimate_tokens(prompt, self.max_tokens)
         if self.budget and not self.budget.consume(estimated_tokens):
-            logger.debug("LLM budget exhausted; skipping notes for %s", service.name)
+            logger.info("LLM budget exhausted; skipping notes for %s", service.name)
             return None
 
         try:

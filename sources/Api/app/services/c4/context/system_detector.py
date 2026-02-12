@@ -12,52 +12,18 @@ import json
 import logging
 import re
 import subprocess
+import xml.etree.ElementTree as ET
 from collections import Counter
 from pathlib import Path
 from typing import Any, Optional
 
 import tomli
+import yaml
+
+from app.utils.fs_utils import limited_rglob
+from app.domain.constants.technologies import LANGUAGE_EXTENSIONS, FRAMEWORK_INDICATORS
 
 logger = logging.getLogger(__name__)
-
-LANGUAGE_EXTENSIONS: dict[str, str] = {
-    ".py": "Python",
-    ".js": "JavaScript",
-    ".ts": "TypeScript",
-    ".tsx": "TypeScript",
-    ".jsx": "JavaScript",
-    ".go": "Go",
-    ".rs": "Rust",
-    ".java": "Java",
-    ".kt": "Kotlin",
-    ".rb": "Ruby",
-    ".php": "PHP",
-    ".cs": "C#",
-    ".cpp": "C++",
-    ".c": "C",
-    ".swift": "Swift",
-    ".scala": "Scala",
-    ".ex": "Elixir",
-    ".exs": "Elixir",
-}
-
-FRAMEWORK_INDICATORS: dict[str, tuple[str, str]] = {
-    "fastapi": ("Python", "FastAPI"),
-    "flask": ("Python", "Flask"),
-    "django": ("Python", "Django"),
-    "starlette": ("Python", "Starlette"),
-    "express": ("JavaScript", "Express"),
-    "next": ("TypeScript", "Next.js"),
-    "react": ("TypeScript", "React"),
-    "vue": ("JavaScript", "Vue.js"),
-    "nestjs": ("TypeScript", "NestJS"),
-    "@nestjs": ("TypeScript", "NestJS"),
-    "gin-gonic": ("Go", "Gin"),
-    "echo": ("Go", "Echo"),
-    "actix-web": ("Rust", "Actix"),
-    "axum": ("Rust", "Axum"),
-    "spring": ("Java", "Spring"),
-}
 
 
 class SystemDetector:
@@ -83,7 +49,7 @@ class SystemDetector:
                     data = json.load(f)
                     if 'name' in data:
                         return data['name']
-            except Exception:
+            except (OSError, json.JSONDecodeError, ValueError):
                 pass
 
         # Try pyproject.toml
@@ -97,7 +63,7 @@ class SystemDetector:
                     if 'tool' in data and 'poetry' in data['tool']:
                         if 'name' in data['tool']['poetry']:
                             return data['tool']['poetry']['name']
-            except Exception:
+            except (OSError, json.JSONDecodeError, ValueError):
                 pass
 
         # Try README.md
@@ -115,8 +81,26 @@ class SystemDetector:
                         readme_title = first_line.lstrip('#').strip()
                         if readme_title and not any(word in readme_title.lower() for word in ['readme', 'documentation', 'docs']):
                             return readme_title
-            except Exception:
+            except (OSError, ValueError):
                 pass
+
+        # Try .sln file (Visual Studio solution)
+        sln_files = list(self.repo_path.glob("*.sln"))
+        if sln_files:
+            return sln_files[0].stem
+
+        # Try single .csproj at repo root
+        csproj_files = list(self.repo_path.glob("*.csproj"))
+        if csproj_files:
+            csproj = csproj_files[0]
+            try:
+                tree = ET.parse(str(csproj))
+                assembly_elem = tree.getroot().find(".//AssemblyName")
+                if assembly_elem is not None and assembly_elem.text:
+                    return assembly_elem.text.strip()
+            except ET.ParseError:
+                pass
+            return csproj.stem
 
         # Use LLM to generate a better project name if available
         if self.llm_manager and readme_content:
@@ -271,7 +255,7 @@ Your answer:"""
             "dist", "build", ".tox", ".pytest_cache",
         }
 
-        for file_path in self.repo_path.rglob("*"):
+        for file_path in limited_rglob(self.repo_path, "*"):
             if any(part in skip_dirs for part in file_path.parts):
                 continue
             if file_path.is_file():
@@ -317,7 +301,7 @@ Your answer:"""
             "Cargo.toml",
         }
 
-        for manifest in self.repo_path.rglob("*"):
+        for manifest in limited_rglob(self.repo_path, "*"):
             if not manifest.is_file():
                 continue
             if manifest.name not in manifest_names:
@@ -337,23 +321,91 @@ Your answer:"""
                     for indicator, (lang, fw) in FRAMEWORK_INDICATORS.items():
                         if indicator in content:
                             add_framework(lang, fw, rel_path)
-            except Exception:
+            except (OSError, json.JSONDecodeError, ValueError):
+                continue
+
+        # Scan .csproj files for .NET frameworks
+        for csproj in limited_rglob(self.repo_path, "*.csproj"):
+            if not csproj.is_file():
+                continue
+            rel_path = str(csproj.relative_to(self.repo_path))
+            try:
+                tree = ET.parse(str(csproj))
+                root = tree.getroot()
+
+                # Determine .NET version from TargetFramework
+                dotnet_version = None
+                for tag in ("TargetFramework", "TargetFrameworks"):
+                    elem = root.find(f".//{tag}")
+                    if elem is not None and elem.text:
+                        dotnet_version = elem.text.strip().split(";")[0]
+                        break
+
+                # Collect package names and run through indicator matching
+                packages: list[str] = []
+                for ref in root.findall(".//PackageReference"):
+                    include = ref.get("Include", "")
+                    if include:
+                        packages.append(include)
+
+                if packages:
+                    packages_text = " ".join(packages).lower()
+                    for indicator, (lang, fw) in FRAMEWORK_INDICATORS.items():
+                        if indicator in packages_text:
+                            entry: dict[str, Any] = {
+                                "language": lang,
+                                "framework": fw,
+                                "detected_from": rel_path,
+                            }
+                            if dotnet_version:
+                                entry["version"] = dotnet_version
+                            key = (lang, fw)
+                            if key not in seen:
+                                frameworks.append(entry)
+                                seen.add(key)
+                elif dotnet_version:
+                    # No recognisable packages but we know it's .NET
+                    key = ("C#", "ASP.NET Core")
+                    if key not in seen:
+                        frameworks.append({
+                            "language": "C#",
+                            "framework": "ASP.NET Core",
+                            "version": dotnet_version,
+                            "detected_from": rel_path,
+                        })
+                        seen.add(key)
+            except ET.ParseError:
                 continue
 
         return frameworks
 
     def detect_context_actors(self) -> list[dict[str, Any]]:
         """Detect human/system actors for Context diagram."""
-        actor_candidates = set()
+        actor_candidates: dict[str, str] = {}  # name -> description
         role_keywords = {
-            'user': 'User',
-            'admin': 'Administrator',
-            'operator': 'Operator',
-            'developer': 'Developer',
-            'engineer': 'Engineer',
-            'client': 'API Client',
-            'customer': 'Customer',
-            'analyst': 'Analyst',
+            # Generic roles
+            'user': ('User', 'Uses the system'),
+            'admin': ('Administrator', 'Administers and configures the system'),
+            'operator': ('Operator', 'Operates and monitors the system'),
+            'developer': ('Developer', 'Develops and integrates with the system'),
+            'engineer': ('Engineer', 'Builds and maintains the system'),
+            'client': ('API Client', 'Consumes the system API'),
+            'customer': ('Customer', 'End-customer of the service'),
+            'analyst': ('Analyst', 'Analyses data from the system'),
+            # CMS / content management roles
+            'editor': ('Content Editor', 'Creates and edits content'),
+            'author': ('Content Author', 'Authors and publishes content'),
+            'publisher': ('Content Publisher', 'Publishes and releases content'),
+            'marketing': ('Marketing User', 'Creates and manages marketing content'),
+            'webmaster': ('Webmaster', 'Manages web content and configuration'),
+            'reviewer': ('Content Reviewer', 'Reviews and approves content'),
+            'contributor': ('Contributor', 'Contributes content to the system'),
+            'moderator': ('Moderator', 'Moderates and curates content'),
+            # Commerce / product roles
+            'merchant': ('Merchant', 'Manages product catalogue and pricing'),
+            'seller': ('Seller', 'Lists and manages products'),
+            'buyer': ('Buyer', 'Purchases products through the system'),
+            'shopper': ('Shopper', 'Browses and purchases products'),
         }
 
         candidate_files = []
@@ -362,8 +414,13 @@ Your answer:"""
             if path.exists():
                 candidate_files.append(path)
 
-        candidate_files.extend(self.repo_path.rglob("docs/*.md"))
-        candidate_files.extend(self.repo_path.rglob("documentation/*.md"))
+        candidate_files.extend(limited_rglob(self.repo_path, "docs/*.md"))
+        candidate_files.extend(limited_rglob(self.repo_path, "documentation/*.md"))
+
+        # Detect system domain from repo name for smarter fallback
+        system_name_lower = self.repo_path.name.lower()
+        is_cms = any(k in system_name_lower for k in ('cms', 'content', 'editorial', 'publishing', 'blog', 'wiki'))
+        is_commerce = any(k in system_name_lower for k in ('shop', 'store', 'commerce', 'cart', 'checkout', 'catalog'))
 
         for doc in candidate_files:
             try:
@@ -372,21 +429,216 @@ Your answer:"""
                         line_lower = line.lower()
                         # Prefer headings for roles/personas
                         if line.strip().startswith('#'):
-                            for key, label in role_keywords.items():
+                            for key, (label, desc) in role_keywords.items():
                                 if key in line_lower:
-                                    actor_candidates.add(label)
+                                    actor_candidates[label] = desc
                         # Catch inline mentions of CLI or SDK usage
                         if 'cli' in line_lower:
-                            actor_candidates.add('CLI User')
+                            actor_candidates['CLI User'] = 'Uses the command-line interface'
                         if 'sdk' in line_lower or 'api client' in line_lower:
-                            actor_candidates.add('API Client')
+                            actor_candidates['API Client'] = 'Consumes the system API'
+                        # CMS-specific inline patterns
+                        if any(p in line_lower for p in ('content editor', 'content manager', 'cms user')):
+                            actor_candidates['Content Editor'] = 'Creates and manages CMS content'
+                        if any(p in line_lower for p in ('marketing user', 'marketing team', 'marketer')):
+                            actor_candidates['Marketing User'] = 'Creates and manages marketing content'
             except Exception:
                 continue
 
+        # Domain-aware fallback when nothing detected from documentation
         if not actor_candidates:
-            actor_candidates.add('User')
+            if is_cms:
+                actor_candidates['Content Editor'] = 'Creates and manages CMS content'
+                actor_candidates['Administrator'] = 'Administers and configures the system'
+            elif is_commerce:
+                actor_candidates['Shopper'] = 'Browses and purchases products'
+                actor_candidates['Merchant'] = 'Manages product catalogue and pricing'
+            else:
+                actor_candidates['User'] = 'Uses the system'
 
-        return [{"name": name, "type": "person"} for name in sorted(actor_candidates)]
+        return [
+            {"name": name, "type": "person", "description": desc}
+            for name, desc in sorted(actor_candidates.items())
+        ]
+
+    def detect_environments(self) -> list[str]:
+        """Detect deployment environments from values files."""
+        environments: list[str] = []
+        env_patterns = ['dev', 'development', 'staging', 'stage', 'prod', 'production']
+
+        for values_file in limited_rglob(self.repo_path, "values*.y*ml"):
+            filename = values_file.name.lower()
+            for env in env_patterns:
+                if env in filename:
+                    if env in ['dev', 'development']:
+                        normalized = 'dev'
+                    elif env in ['stage', 'staging']:
+                        normalized = 'staging'
+                    elif env in ['prod', 'production']:
+                        normalized = 'prod'
+                    else:
+                        normalized = env
+                    if normalized not in environments:
+                        environments.append(normalized)
+                    break
+
+        return environments
+
+    def detect_app_version(self) -> Optional[str]:
+        """Detect application version from root-level manifests."""
+        package_json = self.repo_path / "package.json"
+        if package_json.exists():
+            try:
+                data = json.loads(package_json.read_text(encoding="utf-8", errors="ignore"))
+                if isinstance(data, dict) and data.get("version"):
+                    return str(data.get("version"))
+            except (OSError, json.JSONDecodeError, ValueError):
+                pass
+
+        pyproject = self.repo_path / "pyproject.toml"
+        if pyproject.exists():
+            try:
+                with open(pyproject, "rb") as f:
+                    data = tomli.load(f)
+                project = data.get("project", {})
+                if isinstance(project, dict) and project.get("version"):
+                    return str(project.get("version"))
+                poetry = data.get("tool", {}).get("poetry", {})
+                if isinstance(poetry, dict) and poetry.get("version"):
+                    return str(poetry.get("version"))
+            except (OSError, json.JSONDecodeError, ValueError):
+                pass
+
+        for chart_yaml in limited_rglob(self.repo_path, "Chart.yaml"):
+            try:
+                data = yaml.safe_load(chart_yaml.read_text(encoding="utf-8", errors="ignore"))
+                if isinstance(data, dict) and data.get("appVersion"):
+                    return str(data.get("appVersion"))
+            except (OSError, yaml.YAMLError):
+                continue
+
+        return None
+
+    def detect_tags(self) -> dict[str, str]:
+        """Detect tags/labels from Helm chart metadata."""
+        tags: dict[str, str] = {}
+        for chart_yaml in limited_rglob(self.repo_path, "Chart.yaml"):
+            try:
+                data = yaml.safe_load(chart_yaml.read_text(encoding="utf-8", errors="ignore")) or {}
+            except (OSError, yaml.YAMLError):
+                continue
+
+            keywords = data.get("keywords")
+            if isinstance(keywords, list):
+                for idx, keyword in enumerate(keywords):
+                    tags.setdefault(f"keyword_{idx+1}", str(keyword))
+
+            annotations = data.get("annotations")
+            if isinstance(annotations, dict):
+                for key, value in annotations.items():
+                    clean_key = key.split("/")[-1] if "/" in key else key
+                    tags.setdefault(f"annotation_{clean_key}", str(value))
+
+            values_file = chart_yaml.parent / "values.yaml"
+            if values_file.exists():
+                try:
+                    values_data = yaml.safe_load(values_file.read_text(encoding="utf-8", errors="ignore")) or {}
+                    if isinstance(values_data, dict) and isinstance(values_data.get("commonLabels"), dict):
+                        for key, value in values_data["commonLabels"].items():
+                            tags.setdefault(f"label_{key}", str(value))
+                except (OSError, yaml.YAMLError):
+                    continue
+
+        return tags
+
+    def detect_documentation_url(self) -> Optional[str]:
+        """Detect documentation URL from README contents."""
+        content = self._read_readme_content()
+        if not content:
+            return None
+
+        md_links = re.findall(r'\[([^\]]*(?:doc|wiki|runbook|guide|manual)[^\]]*)\]\(([^)]+)\)', content, re.I)
+        if md_links:
+            return md_links[0][1]
+
+        plain_links = re.findall(r'(?:documentation|docs|wiki|runbook|guide):\s*(https?://[^\s<>\"\']+)', content, re.I)
+        if plain_links:
+            return plain_links[0]
+
+        doc_platforms = [
+            r'https://[^/]*confluence[^/]*/[^\s<>\"\']+',
+            r'https://[^/]*notion[^/]*/[^\s<>\"\']+',
+            r'https://github\.com/[^/]+/[^/]+/wiki[^\s<>\"\']*',
+            r'https://[^/]*gitbook[^/]*/[^\s<>\"\']+',
+        ]
+        for pattern in doc_platforms:
+            matches = re.findall(pattern, content)
+            if matches:
+                return matches[0]
+
+        return None
+
+    def detect_api_spec_url(self) -> Optional[str]:
+        """Detect API documentation URL from README links."""
+        content = self._read_readme_content()
+        if not content:
+            return None
+
+        url_matches = re.findall(r'https?://[^\s<>\"\')]+', content)
+        for url in url_matches:
+            lowered = url.lower()
+            if any(token in lowered for token in ("/docs", "swagger", "openapi", "redoc")):
+                return url
+
+        for token in ("/docs", "/swagger", "/openapi"):
+            if token in content:
+                return token
+
+        return None
+
+    def detect_monitoring_url(self) -> Optional[str]:
+        """Detect monitoring dashboard URL from README links."""
+        content = self._read_readme_content()
+        if not content:
+            return None
+
+        url_matches = re.findall(r'https?://[^\s<>\"\')]+', content)
+        for url in url_matches:
+            lowered = url.lower()
+            if any(token in lowered for token in ("grafana", "datadog", "cloudwatch", "newrelic", "sentry")):
+                return url
+
+        return None
+
+    def detect_regulatory_frameworks(self) -> list[str]:
+        """Detect regulatory frameworks mentioned in README."""
+        content = self._read_readme_content().lower()
+        if not content:
+            return []
+
+        frameworks = []
+        patterns = {
+            "SOC2": ["soc2", "soc 2"],
+            "GDPR": ["gdpr"],
+            "HIPAA": ["hipaa"],
+            "PCI-DSS": ["pci", "pci-dss", "pci dss"],
+            "ISO27001": ["iso27001", "iso 27001"],
+        }
+        for name, tokens in patterns.items():
+            if any(token in content for token in tokens):
+                frameworks.append(name)
+
+        return frameworks
+
+    def _read_readme_content(self) -> str:
+        for name in ["README.md", "README.rst", "README.txt", "README"]:
+            path = self.repo_path / name
+            if path.exists():
+                try:
+                    return path.read_text(encoding="utf-8", errors="ignore")
+                except Exception:
+                    continue
+        return ""
 
     def get_repository_root_url(self) -> str:
         """Get repository URL from git remote origin."""
@@ -409,7 +661,7 @@ Your answer:"""
                 remote_url = remote_url.replace("git@", "https://").replace(".com:", ".com/")
             remote_url = remote_url.rstrip(".git")
             return remote_url
-        except Exception:
+        except (subprocess.SubprocessError, OSError):
             return ""
 
     def extract_git_metadata(self) -> dict[str, Any]:
@@ -428,7 +680,7 @@ Your answer:"""
                 )
                 if result.returncode == 0:
                     return result.stdout.strip()
-            except Exception:
+            except (subprocess.SubprocessError, OSError):
                 return ""
             return ""
 
@@ -500,22 +752,22 @@ Your answer:"""
             if path.exists():
                 readme_files.append(str(path.relative_to(self.repo_path)))
 
-        for doc in list(self.repo_path.rglob("docs/*.md"))[:5]:
+        for doc in list(limited_rglob(self.repo_path, "docs/*.md"))[:5]:
             readme_files.append(str(doc.relative_to(self.repo_path)))
-        for doc in list(self.repo_path.rglob("documentation/*.md"))[:5]:
+        for doc in list(limited_rglob(self.repo_path, "documentation/*.md"))[:5]:
             readme_files.append(str(doc.relative_to(self.repo_path)))
 
         if readme_files:
             sources["readme_files"] = readme_files[:8]
 
         deployment_files = []
-        for dockerfile in self.repo_path.rglob("Dockerfile"):
+        for dockerfile in limited_rglob(self.repo_path, "Dockerfile"):
             deployment_files.append(str(dockerfile.relative_to(self.repo_path)))
-        for compose_file in self.repo_path.rglob("docker-compose*.y*ml"):
+        for compose_file in limited_rglob(self.repo_path, "docker-compose*.y*ml"):
             deployment_files.append(str(compose_file.relative_to(self.repo_path)))
 
         # Find K8s manifests
-        for manifest in self.repo_path.rglob("*.y*ml"):
+        for manifest in limited_rglob(self.repo_path, "*.y*ml"):
             if len(deployment_files) >= 10:
                 break
             try:

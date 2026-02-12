@@ -2,23 +2,67 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
 class ServiceStatus(str, Enum):
     """
     Status of a service - where it is in its lifecycle.
-    
-    - ACTIVE_DEV: People are actively adding features
-    - MAINTENANCE_ONLY: Bugfixes only, no new features
-    - DEPRECATED: Scheduled for shutdown / frozen
+
+    - ACTIVE: Commits in last 30 days
+    - MAINTENANCE: Commits in 90d window but not 30d
+    - DEPRECATED: Commits in 180d window but not 90d
+    - ARCHIVED: No commits in last 180 days
     - UNKNOWN: Status not determined
     """
-    ACTIVE_DEV = "Active-Dev"
-    MAINTENANCE_ONLY = "Maintenance-Only"
-    DEPRECATED = "Deprecated / Frozen"
+    ACTIVE = "ACTIVE"
+    MAINTENANCE = "MAINTENANCE"
+    DEPRECATED = "DEPRECATED"
+    ARCHIVED = "ARCHIVED"
     UNKNOWN = "unknown"
+
+
+class APISurfaceType(str, Enum):
+    """Types of API surfaces a service can expose."""
+    REST = "REST"
+    GRAPHQL = "GraphQL"
+    GRPC = "gRPC"
+    CLI = "CLI"
+    WEBSOCKET = "WebSocket"
+    EVENT_DRIVEN = "Event-Driven"
+    NONE = "None"
+
+
+class DeploymentTarget(str, Enum):
+    """Where a service is deployed."""
+    CONTAINER = "Container"
+    KUBERNETES = "Kubernetes"
+    SERVERLESS = "Serverless"
+    VM = "VM"
+    BARE_METAL = "Bare-Metal"
+    PAAS = "PaaS"
+    UNKNOWN = "Unknown"
+
+
+class CommDirection(str, Enum):
+    """Direction of inter-service communication."""
+    INBOUND = "INBOUND"
+    OUTBOUND = "OUTBOUND"
+
+
+class BusinessDomain(str, Enum):
+    """Fixed taxonomy for business domain classification."""
+    PAYMENTS = "Payments"
+    IDENTITY = "Identity"
+    LOGISTICS = "Logistics"
+    COMMERCE = "Commerce"
+    ANALYTICS = "Analytics"
+    INFRASTRUCTURE = "Infrastructure"
+    COMMUNICATION = "Communication"
+    DATA = "Data"
+    SECURITY = "Security"
+    OTHER = "Other"
 
 
 class ContextNodeType(str, Enum):
@@ -35,6 +79,7 @@ class ContextNodeType(str, Enum):
     CARGO_TOML = "cargo_toml"  # Rust
     BUILD_GRADLE = "build_gradle"  # Java/Gradle
     POM_XML = "pom_xml"  # Java/Maven
+    APPSETTINGS = "appsettings"  # .NET appsettings
 
 
 class ServiceTier(str, Enum):
@@ -66,7 +111,6 @@ class ConnectionType(str, Enum):
     SUBSCRIBES = "subscribes"
     UNKNOWN = "unknown"
 
-
 class Service(BaseModel):
     """
     Represents a service in the system.
@@ -74,7 +118,7 @@ class Service(BaseModel):
     Primary extraction fields (the 5 key attributes):
     1. domain - Business area (Revenue Core, Checkout, Identity, Logging)
     2. owner - Squad/team that owns and supports the service
-    3. status - Lifecycle stage (Active-Dev, Maintenance-Only, Deprecated)
+    3. status - Lifecycle stage (ACTIVE, MAINTENANCE, DEPRECATED, ARCHIVED)
     4. tier - Criticality (Tier 1 = site-wide, Tier 2 = journey, Tier 3 = minor)
     5. data_class - Sensitive data classification (PII, Credit-Card, etc.)
     """
@@ -109,11 +153,15 @@ class Service(BaseModel):
         default=0,
         description="Unique git contributors for this service"
     )
+    owner_detection_source: Optional[str] = Field(
+        None,
+        description="How owner was detected: 'CODEOWNERS', 'git_blame', 'ci_config', 'manual'"
+    )
     
     # 3. status - Where the service is in its lifecycle
     status: ServiceStatus = Field(
         default=ServiceStatus.UNKNOWN, 
-        description="Lifecycle status: Active-Dev, Maintenance-Only, or Deprecated/Frozen"
+        description="Lifecycle status: ACTIVE, MAINTENANCE, DEPRECATED, or ARCHIVED"
     )
     status_evidence: Optional[dict[str, Any]] = Field(
         None,
@@ -138,8 +186,16 @@ class Service(BaseModel):
     
     description: Optional[str] = Field(None, description="Service description")
     notes: Optional[str] = Field(None, description="Short service notes")
-    language: Optional[str] = Field(None, description="Primary programming language")
-    framework: Optional[str] = Field(None, description="Framework used (e.g., 'FastAPI', 'Express')")
+    language: Optional[str] = Field(None, description="Primary programming language (deprecated: use languages)")
+    framework: Optional[str] = Field(None, description="Framework used (deprecated: use frameworks)")
+    languages: List[str] = Field(
+        default_factory=list,
+        description="Programming languages detected (e.g., ['Python', 'JavaScript'])"
+    )
+    frameworks: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Frameworks with versions (e.g., [{'name': 'FastAPI', 'version': '0.104'}])"
+    )
     port: Optional[int] = Field(None, description="Service port")
     endpoints: list[str] = Field(default_factory=list, description="API endpoints exposed by service")
     
@@ -167,20 +223,63 @@ class Service(BaseModel):
     commit_count_180d: int = Field(default=0, description="Commits in last 180 days")
 
     # ═══════════════════════════════════════════════════════════════════════════
+    # CONTEXT-LEVEL FIELDS (from C4 Context specification)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    # API Surface Type - what kind of API does this service expose?
+    api_surface_types: List[str] = Field(
+        default_factory=list,
+        description="API surface types: REST, GraphQL, gRPC, CLI, WebSocket, Event-Driven"
+    )
+
+    # Inter-Service Communications - runtime dependencies beyond package managers
+    inter_service_comms: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Runtime service dependencies: [{target: str, protocol: str, direction: INBOUND|OUTBOUND}]"
+    )
+
+    # Documentation Quality - composite score
+    documentation_quality: Optional[int] = Field(
+        None, ge=0, le=100,
+        description="Documentation quality score 0-100 (README depth + OpenAPI + ADRs + inline docs)"
+    )
+
+    # Deployment Target - where does this service run?
+    deployment_targets: List[str] = Field(
+        default_factory=list,
+        description="Deployment targets: Container, Kubernetes, Serverless, VM, Bare-Metal, PaaS"
+    )
+
+    # Business Domain - fixed taxonomy classification
+    business_domain: Optional[str] = Field(
+        None,
+        description="Business domain from fixed taxonomy (Payments, Identity, Logistics, etc.)"
+    )
+
+    # ═══════════════════════════════════════════════════════════════════════════
     # RISK & VULNERABILITY TRACKING (Manager-first view)
     # ═══════════════════════════════════════════════════════════════════════════
 
-    # Field 6: Active Experts (Bus Factor)
+    # Field 6: Active Experts (deprecated: use bus_factor)
     active_experts: int = Field(
         default=0,
-        description="Number of active contributors (3+ commits in last 90 days). Bus factor indicator."
+        description="Number of active contributors (3+ commits in last 90 days). Deprecated: use bus_factor."
+    )
+
+    # Bus Factor - composite metric replacing active_experts
+    bus_factor: Optional[float] = Field(
+        None, ge=1.0, le=10.0,
+        description="Bus factor score 1-10. Formula: experts * (1 - gini) * review_spread. Low = high risk."
     )
 
     # Field 7: Compliance Risk Level (Architectural compliance, not legal/regulatory)
     compliance: Optional[str] = Field(
         default=None,
-        description="Architectural compliance risk level: COMPLIANT, AT_RISK, NON_COMPLIANT, UNKNOWN. "
-                    "Checks if sensitive data is properly prioritized and owned."
+        description="Architectural compliance risk level: COMPLIANT, AT_RISK, NON_COMPLIANT, UNKNOWN."
+    )
+    compliance_score: Optional[int] = Field(
+        None, ge=0, le=100,
+        description="Numeric compliance score 0-100 with weighted checks."
     )
     compliance_confidence: Optional[float] = Field(
         default=None,

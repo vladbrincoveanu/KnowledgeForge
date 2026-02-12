@@ -2,9 +2,11 @@
 
 import json
 import logging
+import os
 import re
 import threading
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Optional
 
@@ -21,6 +23,17 @@ from app.services.service_extraction.service_discoverer import ServiceDiscoverer
 from app.services.service_extraction.smart_llm_enricher import SmartLLMEnricher
 from app.services.service_extraction.description_generator import ServiceDescriptionGenerator
 from app.services.service_extraction.context_node_extractor import ContextNodeExtractor
+from app.services.service_extraction.compliance_scorer import ComplianceScorer
+from app.services.service_extraction.extraction_helpers import resolve_service_path
+from app.services.service_extraction.service_enhancers import (
+    enhance_with_api_surface_types,
+    enhance_with_deployment_targets,
+    enhance_with_documentation_quality,
+    enhance_with_inter_service_comms,
+    enhance_with_business_domain,
+    enhance_with_bus_factor,
+    enhance_with_auth_scanning,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -186,31 +199,11 @@ class ServiceExtractionPipeline:
                     if target_service and service.id not in target_service.dependents:
                         target_service.dependents.append(service.id)
 
-        # Phase 5: LLM enrichment (if enabled)
+        # Phase 5: LLM enrichment (if enabled) - runs in parallel for 5x speedup
         logger.info("-" * 40)
-        logger.info("Phase 5: LLM enrichment")
+        logger.info("Phase 5: LLM enrichment (parallel)")
         if getattr(ExtractionConfig, "ENABLE_LLM_LABELS", False) and self.llm_label_enricher:
-            for service in services:
-                if not self._needs_llm_labels(service):
-                    logger.info(f"  {service.name}: all fields populated, skipping LLM")
-                    continue
-                service_path = self._resolve_service_path(service)
-                if not service_path:
-                    continue
-                scan_path = service_path if service_path.is_dir() else service_path.parent
-                logger.info(f"  {service.name}: calling LLM for enrichment...")
-                enrichment = self._enrich_with_llm_labels(service, scan_path)
-                if enrichment:
-                    self._apply_llm_enrichment(service, enrichment)
-                    logger.info(f"    LLM enrichment: {enrichment}")
-
-                if not service.notes and self.note_enricher:
-                    notes = self._generate_notes_with_timeout(service, scan_path)
-                    if notes:
-                        service.notes = notes
-                        if not service.description:
-                            service.description = notes
-                        logger.info(f"    LLM notes: {notes[:100]}...")
+            services = self._enrich_services_parallel(services)
         else:
             logger.info("  LLM enrichment disabled or no LLM manager")
 
@@ -238,11 +231,43 @@ class ServiceExtractionPipeline:
         # Phase 7: Final fallbacks for missing fields + Risk calculations
         logger.info("-" * 40)
         logger.info("Phase 7: Applying final fallbacks and calculating risk metrics")
+        compliance_scorer = ComplianceScorer()
         for service in services:
             self._apply_missing_field_fallbacks(service)
 
-            # Calculate compliance risk (architectural compliance)
-            service.compliance = self._calculate_compliance_risk(service)
+            # Weighted compliance scoring (replaces simple rule-based check)
+            service_path = resolve_service_path(self.repo_root, service)
+            scan_root = service_path if (service_path and service_path.is_dir()) else self.repo_root
+            result = compliance_scorer.score(
+                service_path=scan_root,
+                data_class=service.data_class,
+                owner=service.owner,
+                status=service.status.value if service.status else None,
+            )
+            service.compliance = result.tier
+            service.compliance_score = result.score
+            service.compliance_confidence = result.confidence
+            service.compliance_factors = result.factors
+
+        # Phase 8: Specialist enhancement chain (API surface, deployment, docs, comms, domain, etc.)
+        logger.info("-" * 40)
+        logger.info("Phase 8: Specialist enhancements")
+        _enhancement_steps = [
+            ("API surface types", lambda: enhance_with_api_surface_types(services, self.repo_root)),
+            ("deployment targets", lambda: enhance_with_deployment_targets(services, self.repo_root)),
+            ("documentation quality", lambda: enhance_with_documentation_quality(services, self.repo_root)),
+            ("inter-service comms", lambda: enhance_with_inter_service_comms(services, self.repo_root)),
+            ("business domain", lambda: enhance_with_business_domain(services, self.repo_root, self.llm_manager)),
+            ("bus factor", lambda: enhance_with_bus_factor(services, self.repo_root)),
+            ("auth scanning", lambda: enhance_with_auth_scanning(services, self.repo_root)),
+        ]
+        for label, fn in _enhancement_steps:
+            try:
+                fn()
+                logger.info(f"  {label}: done")
+            except Exception as e:
+                logger.error(f"  {label} failed: {e}", exc_info=True)
+                self.errors.append(f"{label} enhancement failed: {str(e)}")
 
         # Log final state
         logger.info("=" * 60)
@@ -308,6 +333,74 @@ class ServiceExtractionPipeline:
         if not service.notes and not service.description:
             return True
         return False
+
+    def _enrich_single_service(self, service: Service) -> Service:
+        """Enrich one service with LLM labels and notes. Thread-safe (operates on isolated service)."""
+        service_path = self._resolve_service_path(service)
+        if not service_path:
+            return service
+        scan_path = service_path if service_path.is_dir() else service_path.parent
+
+        enrichment = self._enrich_with_llm_labels(service, scan_path)
+        if enrichment:
+            self._apply_llm_enrichment(service, enrichment)
+            logger.info(f"    [{service.name}] LLM enrichment: {enrichment}")
+
+        if not service.notes and self.note_enricher:
+            notes = self._generate_notes_with_timeout(service, scan_path)
+            if notes:
+                service.notes = notes
+                if not service.description:
+                    service.description = notes
+                logger.info(f"    [{service.name}] LLM notes: {notes[:100]}...")
+
+        return service
+
+    def _enrich_services_parallel(
+        self,
+        services: list[Service],
+        max_workers: int | None = None,
+    ) -> list[Service]:
+        """Enrich a list of services in parallel using ThreadPoolExecutor.
+
+        Each service is enriched independently so there are no shared-state issues.
+        Workers are bounded by the LLM_MAX_CONCURRENT_CALLS env var (default 5).
+        """
+        if max_workers is None:
+            max_workers = int(os.getenv("LLM_MAX_CONCURRENT_CALLS", "5"))
+
+        services_needing_llm = [s for s in services if self._needs_llm_labels(s)]
+        services_skipped = [s for s in services if not self._needs_llm_labels(s)]
+
+        for s in services_skipped:
+            logger.info(f"  {s.name}: all fields populated, skipping LLM")
+
+        if not services_needing_llm:
+            return services
+
+        logger.info(
+            f"  Starting parallel LLM enrichment: {len(services_needing_llm)} services, "
+            f"max_workers={max_workers}"
+        )
+
+        enriched: list[Service] = list(services_skipped)
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_service = {
+                executor.submit(self._enrich_single_service, svc): svc
+                for svc in services_needing_llm
+            }
+            for future in as_completed(future_to_service):
+                svc = future_to_service[future]
+                try:
+                    enriched.append(future.result())
+                except Exception as exc:
+                    logger.warning(f"  LLM enrichment failed for {svc.name}: {exc}")
+                    enriched.append(svc)
+
+        # Preserve original ordering
+        id_to_enriched = {s.id: s for s in enriched}
+        return [id_to_enriched[s.id] for s in services]
 
     def _enrich_with_llm_labels(self, service: Service, scan_path: Path, timeout: int = 8) -> dict[str, Optional[str]]:
         """Run LLM label enrichment with a timeout to avoid hangs."""
@@ -388,9 +481,9 @@ class ServiceExtractionPipeline:
         if "deprecat" in lowered or "frozen" in lowered or "eol" in lowered:
             return ServiceStatus.DEPRECATED
         if "maint" in lowered or "bugfix" in lowered or "support" in lowered:
-            return ServiceStatus.MAINTENANCE_ONLY
+            return ServiceStatus.MAINTENANCE
         if "active" in lowered or "dev" in lowered or "feature" in lowered:
-            return ServiceStatus.ACTIVE_DEV
+            return ServiceStatus.ACTIVE
         return ServiceStatus.UNKNOWN
 
     def _normalize_tier(self, value: str) -> ServiceTier:
@@ -433,19 +526,19 @@ class ServiceExtractionPipeline:
 
         # Active development: commits in last 30 days
         if service.commit_count_30d > 0:
-            service.status = ServiceStatus.ACTIVE_DEV
+            service.status = ServiceStatus.ACTIVE
             inferred["status"] = {"confidence": "medium", "source": "commit_counts"}
             return
         
         # Maintenance mode: commits in last 90 days but not 30
         if service.commit_count_90d > 0:
-            service.status = ServiceStatus.MAINTENANCE_ONLY
+            service.status = ServiceStatus.MAINTENANCE
             inferred["status"] = {"confidence": "low", "source": "commit_counts"}
             return
         
         # Low activity but not dead: commits in last 180 days but not 90
         if service.commit_count_180d > 0:
-            service.status = ServiceStatus.MAINTENANCE_ONLY
+            service.status = ServiceStatus.MAINTENANCE
             inferred["status"] = {"confidence": "low", "source": "commit_counts"}
             return
         
@@ -664,7 +757,7 @@ class ServiceExtractionPipeline:
                             break
                     if framework:
                         break
-            except Exception:
+            except (OSError, json.JSONDecodeError, ValueError):
                 pass
         
         # Check requirements.txt / pyproject.toml for Python frameworks

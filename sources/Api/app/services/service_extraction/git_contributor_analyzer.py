@@ -78,7 +78,7 @@ class GitContributorAnalyzer:
             GitContributorStats with contributor and commit information
         """
         if not self.is_git_repo:
-            logger.debug("Not a git repository, cannot analyze contributors")
+            logger.info("Not a git repository, cannot analyze contributors")
             return None
         
         try:
@@ -112,7 +112,7 @@ class GitContributorAnalyzer:
 
             # If no commits found for service_path, fall back to entire repo
             if not result.stdout.strip() and service_path:
-                logger.debug(f"No git history found for {service_path}, analyzing entire repo")
+                logger.info(f"No git history found for {service_path}, analyzing entire repo")
                 return self.analyze_service_contributors(
                     service_path=None,  # Analyze entire repo
                     service_name=service_name,
@@ -120,7 +120,7 @@ class GitContributorAnalyzer:
                 )
 
             if not result.stdout.strip():
-                logger.debug(f"No git history found in repository")
+                logger.info(f"No git history found in repository")
                 return None
             
             # Parse commits
@@ -176,7 +176,7 @@ class GitContributorAnalyzer:
                         clean_date = date_str.split('+')[0].strip()
                         commit_date = datetime.strptime(clean_date, '%Y-%m-%d %H:%M:%S')
                     except ValueError:
-                        logger.debug(f"Could not parse date: {date_str}")
+                        logger.info(f"Could not parse date: {date_str}")
                         continue
                 
                 # Track first and last commit dates
@@ -242,10 +242,16 @@ class GitContributorAnalyzer:
                 recent_commit_messages=recent_messages,
             )
             
-            logger.debug(
-                f"Analyzed {len(commits)} commits for {service_path}: "
-                f"{commits_30d} in 30d, top contributor: {top_contributors[0].email if top_contributors else 'N/A'}"
-            )
+            try:
+                from app.utils.config import get_config as _get_config
+                config_debug = getattr(_get_config(), "debug", False)
+            except Exception:
+                config_debug = False
+            if config_debug:
+                logger.debug(
+                    f"Analyzed {len(commits)} commits for {service_path}: "
+                    f"{commits_30d} in 30d, top contributor: {top_contributors[0].email if top_contributors else 'N/A'}"
+                )
             
             return stats
         
@@ -282,7 +288,7 @@ class GitContributorAnalyzer:
             Number of active experts (0 if no git history)
         """
         if not self.is_git_repo:
-            logger.debug("Not a git repository, cannot calculate active experts")
+            logger.info("Not a git repository, cannot calculate active experts")
             return 0
 
         try:
@@ -321,7 +327,7 @@ class GitContributorAnalyzer:
             # Count experts (contributors with >= min_commits)
             experts = sum(1 for count in contributor_commits.values() if count >= min_commits)
 
-            logger.debug(f"Found {experts} active experts for {service_path} "
+            logger.info(f"Found {experts} active experts for {service_path} "
                         f"({len(contributor_commits)} total contributors in last {days} days)")
 
             return experts

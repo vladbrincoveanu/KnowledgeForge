@@ -1,8 +1,20 @@
+import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import '@testing-library/jest-dom';
 import OntologyResults from './OntologyResults';
 
-// Mock the API
+// Mock recommendationAPI to prevent network calls and open timers
+vi.mock('@/services/recommendationService', () => ({
+  recommendationAPI: {
+    getRecommendations: vi.fn(),
+    generateRecommendations: vi.fn(),
+    generateEdgeRecommendations: vi.fn(),
+    submitRecommendationFeedback: vi.fn(),
+  },
+}));
+
+// Mock the ontology API
 vi.mock('@/services/api', () => ({
   ontologyAPI: {
     getEntities: vi.fn(),
@@ -49,46 +61,45 @@ const mockRelationships = [
   },
 ];
 
-const mockApiResponse = (items: typeof mockEntities = mockEntities) => ({
+const mockApiResponse = (items: typeof mockEntities | typeof mockRelationships) => ({
   items,
   total: items.length,
 });
 
 describe('OntologyResults Component', () => {
-  const mockOnFeedbackSubmitted = vi.fn();
-
   beforeEach(async () => {
     vi.clearAllMocks();
     const { ontologyAPI } = await import('@/services/api');
+    const { recommendationAPI } = await import('@/services/recommendationService');
     (ontologyAPI.getEntities as ReturnType<typeof vi.fn>).mockResolvedValue(
       mockApiResponse(mockEntities)
     );
-    (
-      ontologyAPI.getRelationships as ReturnType<typeof vi.fn>
-    ).mockResolvedValue(mockApiResponse(mockRelationships));
+    (ontologyAPI.getRelationships as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockApiResponse(mockRelationships)
+    );
+    // Return a non-404 error so no retry timer is set
+    (recommendationAPI.getRecommendations as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error('No recommendations')
+    );
   });
 
   it('renders loading state initially', async () => {
     const { ontologyAPI } = await import('@/services/api');
-    let resolveLoading;
+    let resolveLoading: (value: unknown) => void;
     const loadingPromise = new Promise(resolve => {
       resolveLoading = resolve;
     });
-    (ontologyAPI.getEntities as ReturnType<typeof vi.fn>).mockReturnValue(
-      loadingPromise
-    );
-    (ontologyAPI.getRelationships as ReturnType<typeof vi.fn>).mockReturnValue(
-      loadingPromise
-    );
+    (ontologyAPI.getEntities as ReturnType<typeof vi.fn>).mockReturnValue(loadingPromise);
+    (ontologyAPI.getRelationships as ReturnType<typeof vi.fn>).mockReturnValue(loadingPromise);
 
     render(
       <OntologyResults
         taskId="test-task-123"
-        onFeedbackSubmitted={mockOnFeedbackSubmitted}
+        onFeedbackSubmitted={vi.fn()}
+        showNotification={vi.fn()}
       />
     );
 
-    // Check that the component renders (initially no entities loaded)
     expect(screen.getByText('Extraction Results')).toBeInTheDocument();
     expect(screen.getByText('Entities (0)')).toBeInTheDocument();
 
@@ -98,90 +109,109 @@ describe('OntologyResults Component', () => {
     });
   });
 
-  it('renders entities tab by default', async () => {
+  it('updates tab labels with loaded data counts', async () => {
     render(
       <OntologyResults
         taskId="test-task-123"
-        onFeedbackSubmitted={mockOnFeedbackSubmitted}
+        onFeedbackSubmitted={vi.fn()}
+        showNotification={vi.fn()}
       />
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Customer')).toBeInTheDocument();
-      expect(screen.getByText('Product')).toBeInTheDocument();
+      expect(screen.getByText('Entities (2)')).toBeInTheDocument();
+      expect(screen.getByText('Relationships (1)')).toBeInTheDocument();
     });
   });
 
-  it('switches to relationships tab when clicked', async () => {
+  it('shows relationship data when relationships tab is clicked', async () => {
     render(
       <OntologyResults
         taskId="test-task-123"
-        onFeedbackSubmitted={mockOnFeedbackSubmitted}
+        onFeedbackSubmitted={vi.fn()}
+        showNotification={vi.fn()}
       />
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Customer')).toBeInTheDocument();
+      expect(screen.getByText('Relationships (1)')).toBeInTheDocument();
     });
 
-    const relationshipsTab = screen.getByText(/Relationships/);
-    fireEvent.click(relationshipsTab);
+    fireEvent.click(screen.getByText('Relationships (1)'));
 
     await waitFor(() => {
+      expect(screen.getByText('Discovered Relationships')).toBeInTheDocument();
       expect(screen.getByText('purchases')).toBeInTheDocument();
     });
   });
 
-  it('displays entity confidence as percentage', async () => {
+  it('displays relationship confidence as percentage', async () => {
     render(
       <OntologyResults
         taskId="test-task-123"
-        onFeedbackSubmitted={mockOnFeedbackSubmitted}
+        onFeedbackSubmitted={vi.fn()}
+        showNotification={vi.fn()}
       />
     );
 
     await waitFor(() => {
-      expect(screen.getByText('95%')).toBeInTheDocument();
-      expect(screen.getByText('87%')).toBeInTheDocument();
+      expect(screen.getByText('Relationships (1)')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Relationships (1)'));
+
+    await waitFor(() => {
+      expect(screen.getByText('92%')).toBeInTheDocument();
     });
   });
 
-  it('handles feedback submission for entities', async () => {
+  it('handles feedback submission for relationships', async () => {
     const { ontologyAPI } = await import('@/services/api');
     (ontologyAPI.submitFeedback as ReturnType<typeof vi.fn>).mockResolvedValue({
       success: true,
     });
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
     render(
       <OntologyResults
         taskId="test-task-123"
-        onFeedbackSubmitted={mockOnFeedbackSubmitted}
+        onFeedbackSubmitted={vi.fn()}
+        showNotification={vi.fn()}
       />
     );
 
+    // Switch to relationships tab
     await waitFor(() => {
-      expect(screen.getByText('Customer')).toBeInTheDocument();
+      expect(screen.getByText('Relationships (1)')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText('Relationships (1)'));
+
+    // Wait for the relationship to appear
+    await waitFor(() => {
+      expect(screen.getByText('purchases')).toBeInTheDocument();
     });
 
-    // Find and click the thumbs up button for the first entity
-    const thumbsUpButtons = await screen.findAllByRole('button');
-    const firstThumbsUp = thumbsUpButtons.find(btn =>
+    // Click the thumbs up button for the relationship
+    const thumbsUpButtons = screen.getAllByRole('button');
+    const feedbackBtn = thumbsUpButtons.find(btn =>
       btn.className.includes('positive')
     );
-    fireEvent.click(firstThumbsUp!);
+    fireEvent.click(feedbackBtn!);
 
-    // Now check for the feedback form
+    // Feedback form should appear
     const submitButton = await screen.findByText('Submit Feedback');
     fireEvent.click(submitButton);
 
     await waitFor(() => {
       expect(ontologyAPI.submitFeedback).toHaveBeenCalledWith({
         type: 'positive',
-        entity_id: '1',
-        relationship_id: undefined,
+        entity_id: undefined,
+        relationship_id: '1',
         comment: '',
       });
     });
+
+    alertSpy.mockRestore();
   });
 
   it('handles API errors gracefully', async () => {
@@ -193,7 +223,8 @@ describe('OntologyResults Component', () => {
     render(
       <OntologyResults
         taskId="test-task-123"
-        onFeedbackSubmitted={mockOnFeedbackSubmitted}
+        onFeedbackSubmitted={vi.fn()}
+        showNotification={vi.fn()}
       />
     );
 
@@ -202,37 +233,55 @@ describe('OntologyResults Component', () => {
     });
   });
 
-  it('displays pagination information', async () => {
+  it('shows relationships count in relationships tab', async () => {
     render(
       <OntologyResults
         taskId="test-task-123"
-        onFeedbackSubmitted={mockOnFeedbackSubmitted}
+        onFeedbackSubmitted={vi.fn()}
+        showNotification={vi.fn()}
       />
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/2 entities found/i)).toBeInTheDocument();
+      expect(screen.getByText('Relationships (1)')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Relationships (1)'));
+
+    await waitFor(() => {
+      expect(screen.getByText('1 relationships found')).toBeInTheDocument();
     });
   });
 
+  it('shows Export Results button', async () => {
+    render(
+      <OntologyResults
+        taskId="test-task-123"
+        onFeedbackSubmitted={vi.fn()}
+        showNotification={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Export Results')).toBeInTheDocument();
+  });
+
   it('handles download functionality', async () => {
-    // Mock URL.createObjectURL
     global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
     global.URL.revokeObjectURL = vi.fn();
 
     render(
       <OntologyResults
         taskId="test-task-123"
-        onFeedbackSubmitted={mockOnFeedbackSubmitted}
+        onFeedbackSubmitted={vi.fn()}
+        showNotification={vi.fn()}
       />
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Customer')).toBeInTheDocument();
+      expect(screen.getByText('Entities (2)')).toBeInTheDocument();
     });
 
-    const downloadButton = screen.getByText(/Export Results/i);
-    fireEvent.click(downloadButton);
+    fireEvent.click(screen.getByText(/Export Results/i));
 
     await waitFor(() => {
       expect(global.URL.createObjectURL).toHaveBeenCalled();
@@ -245,38 +294,45 @@ describe('OntologyResults Component', () => {
     render(
       <OntologyResults
         taskId="test-task-123"
-        onFeedbackSubmitted={mockOnFeedbackSubmitted}
+        onFeedbackSubmitted={vi.fn()}
+        showNotification={vi.fn()}
       />
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Customer')).toBeInTheDocument();
+      expect(screen.getByText('Entities (2)')).toBeInTheDocument();
     });
 
-    const refreshButton = screen.getByText(/Refresh/i);
-    fireEvent.click(refreshButton);
+    fireEvent.click(screen.getByText('Refresh'));
 
     await waitFor(() => {
-      // Called once on load for entities, once for relationships, then once for entities on refresh
+      // Called once on initial load, once more on refresh
       expect(ontologyAPI.getEntities).toHaveBeenCalledTimes(2);
     });
   });
 
-  it('shows empty state when no data', async () => {
+  it('shows empty relationship count when no relationships', async () => {
     const { ontologyAPI } = await import('@/services/api');
-    (ontologyAPI.getEntities as ReturnType<typeof vi.fn>).mockResolvedValue(
+    (ontologyAPI.getRelationships as ReturnType<typeof vi.fn>).mockResolvedValue(
       mockApiResponse([])
     );
 
     render(
       <OntologyResults
         taskId="test-task-123"
-        onFeedbackSubmitted={mockOnFeedbackSubmitted}
+        onFeedbackSubmitted={vi.fn()}
+        showNotification={vi.fn()}
       />
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/0 entities found/i)).toBeInTheDocument();
+      expect(screen.getByText('Relationships (0)')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Relationships (0)'));
+
+    await waitFor(() => {
+      expect(screen.getByText('0 relationships found')).toBeInTheDocument();
     });
   });
 });

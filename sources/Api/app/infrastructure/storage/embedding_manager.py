@@ -268,7 +268,7 @@ class EmbeddingManager:
             )
             with open(metadata_path, "w") as f:
                 json.dump(metadata, f, indent=2)
-        except Exception as e:
+        except (OSError, json.JSONDecodeError, ValueError) as e:
             logger.warning(f"Failed to save cache metadata: {e}")
 
     def similarity_search(

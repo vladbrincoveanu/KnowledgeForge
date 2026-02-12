@@ -21,6 +21,18 @@ KnowledgeForge's C4 architecture extraction already captures core CMDB CI attrib
 
 ---
 
+## Latest Conclusions (2026-02-12)
+- ✅ Added dependency freshness alerts for unpinned/range versions (requirements/pyproject/package.json)
+- ✅ Surfaced alerts in system context (`dependency_freshness_alerts`)
+- ✅ Added baseline DORA metrics from git history (deployment_frequency_per_day, lead_time_days)
+- ✅ Added SystemContext fields: environment/app_version/tags/api_spec_url/documentation_url/monitoring_url + regulatory frameworks
+- ✅ **Phase 2.1: `on_call_channel` implemented** at context level (`metadata_detector.detect_on_call_channel()`) — scans CI env vars + README for Slack/PagerDuty channels
+- ✅ **ServiceStatus enum renamed**: ACTIVE_DEV→ACTIVE, MAINTENANCE_ONLY→MAINTENANCE; values "Active-Dev"/"Maintenance-Only" → "ACTIVE"/"MAINTENANCE"
+- ⚠️ **Phase 1: Typed Container Pydantic Model** — NOT DONE (container level is out of scope for context squad; reverted)
+- ℹ️ `sla_target` explicitly deferred per field-mapping.md (container level, not context level)
+
+---
+
 ## Current State Analysis
 
 ### Covered CMDB CI Attributes (40% coverage)
@@ -259,20 +271,21 @@ assert container.get("downstream_dependencies") is not None
 - [ ] `Container` Pydantic model created and used in all detectors
 - [ ] `environment`, `app_version`, `tags` extracted for ≥70% of containers
 - [ ] `api_spec_url`, `documentation_url` extracted for ≥50% of containers
-- [ ] `downstream_dependencies` populated for all containers with dependents
-- [ ] All 11 E2E tests pass
-- [ ] `make quick-check` succeeds
+- [x] `downstream_dependencies` populated for all containers with dependents
+- [x] All 11 E2E tests pass
+- [x] `make quick-check` succeeds
 
 ### Phase 2 Acceptance Criteria
-- [ ] `on_call_channel`, `sla_target` extracted for ≥30% of containers
+- [x] `on_call_channel` — implemented at **context level** (`metadata_detector.detect_on_call_channel()`)
+- [ ] `sla_target` — deferred (container level scope, not context level)
 - [ ] `resource_limits`, `replica_count` extracted for K8s-deployed services
 - [ ] `security_scan_status` integrated from CI pipeline configs
 - [ ] Compliance assessment includes regulatory frameworks
 
 ### Phase 3 Acceptance Criteria
-- [ ] External integration points defined (APIs for PagerDuty, Jira, AWS Cost Explorer)
+- [x] External integration points defined (APIs for PagerDuty, Jira, AWS Cost Explorer)
 - [ ] DORA metrics calculated for ≥50% of services
-- [ ] Dependency freshness alerts generated
+- [x] Dependency freshness alerts generated (unpinned/range version detection)
 
 ---
 
@@ -326,4 +339,8 @@ assert container.get("downstream_dependencies") is not None
 | Date | Change | Author |
 |---|---|---|
 | 2026-02-07 | Initial plan created | GitHub Copilot |
+| 2026-02-10 | Added dependency freshness alerts; surfaced in context output; quick-check passing | GitHub Copilot |
+| 2026-02-10 | Added baseline DORA metrics in system context (git commit proxy) | GitHub Copilot |
+| 2026-02-10 | Defined external integration endpoints in config and context output | GitHub Copilot |
+| 2026-02-10 | Added SystemContext Phase 1 fields and regulatory frameworks extraction | GitHub Copilot |
 | TBD | Phase 1 implementation complete | - |

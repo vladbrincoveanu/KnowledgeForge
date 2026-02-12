@@ -67,7 +67,7 @@ class Neo4jGraphManager:
         self.pool_lock = None
 
         # Transaction management
-        self.active_transactions: dict[str, Transaction] = {}
+        self.active_transactions: dict[str, tuple[Session, Transaction]] = {}
         self.transaction_timeout = 300  # 5 minutes
 
         # Performance tracking
@@ -126,7 +126,7 @@ class Neo4jGraphManager:
         except (ServiceUnavailable, AuthError) as e:
             logger.error(f"Failed to connect to Neo4j: {e}")
             return False
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.error(f"Unexpected error connecting to Neo4j: {e}")
             return False
 
@@ -157,7 +157,7 @@ class Neo4jGraphManager:
                 f"Graph schema initialized with {len(labels)} labels and {len(rel_types)} relationship types"
             )
 
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.warning(f"Failed to initialize schema: {e}")
             self.graph_schema = None
 
@@ -178,7 +178,7 @@ class Neo4jGraphManager:
             for index_query in indexes:
                 session.run(index_query)
             logger.info("Performance indexes created successfully")
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.warning(f"Failed to create some indexes: {e}")
 
     def _create_constraints(self, session: Session):
@@ -187,9 +187,8 @@ class Neo4jGraphManager:
         try:
             session.run("DROP INDEX entity_id_index IF EXISTS")
             logger.info("Dropped legacy index 'entity_id_index' to prepare for unique constraint.")
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             # It's okay if this fails, the index might not exist under that name.
-            # The important part is handling the constraint creation failure gracefully.
             logger.debug(f"Could not drop legacy index 'entity_id_index', may not exist: {e}")
 
         constraints = [
@@ -205,7 +204,7 @@ class Neo4jGraphManager:
             for constraint_query in constraints:
                 session.run(constraint_query)
             logger.info("Advanced constraints created successfully")
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.warning(f"Failed to create some constraints: {e}")
 
     def begin_transaction(self, transaction_id: Optional[str] = None) -> str:
@@ -218,12 +217,12 @@ class Neo4jGraphManager:
         try:
             session = self.driver.session(database=self.database)
             transaction = session.begin_transaction(timeout=self.transaction_timeout)
-            self.active_transactions[tx_id] = transaction
+            self.active_transactions[tx_id] = (session, transaction)
 
             logger.info(f"Transaction {tx_id} started")
             return tx_id
 
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.error(f"Failed to start transaction {tx_id}: {e}")
             raise
 
@@ -234,9 +233,10 @@ class Neo4jGraphManager:
             return False
 
         try:
-            transaction = self.active_transactions[transaction_id]
+            session, transaction = self.active_transactions[transaction_id]
             transaction.commit()
             transaction.close()
+            session.close()
             del self.active_transactions[transaction_id]
 
             logger.info(f"Transaction {transaction_id} committed successfully")
@@ -253,9 +253,10 @@ class Neo4jGraphManager:
             return False
 
         try:
-            transaction = self.active_transactions[transaction_id]
+            session, transaction = self.active_transactions[transaction_id]
             transaction.rollback()
             transaction.close()
+            session.close()
             del self.active_transactions[transaction_id]
 
             logger.info(f"Transaction {transaction_id} rolled back successfully")
@@ -324,7 +325,7 @@ class Neo4jGraphManager:
 
         try:
             if transaction_id and transaction_id in self.active_transactions:
-                transaction = self.active_transactions[transaction_id]
+                session, transaction = self.active_transactions[transaction_id]
                 transaction.run(query, params)
             else:
                 with self.driver.session(database=self.database) as session:
@@ -332,7 +333,7 @@ class Neo4jGraphManager:
 
             return True
 
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.error(f"Failed to store entity {entity.id}: {e}")
             return False
 
@@ -387,7 +388,7 @@ class Neo4jGraphManager:
 
         try:
             if transaction_id and transaction_id in self.active_transactions:
-                transaction = self.active_transactions[transaction_id]
+                session, transaction = self.active_transactions[transaction_id]
                 transaction.run(query, params)
             else:
                 with self.driver.session(database=self.database) as session:
@@ -395,7 +396,7 @@ class Neo4jGraphManager:
 
             return True
 
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.error(f"Failed to store relationship {relationship.id}: {e}")
             return False
 
@@ -407,7 +408,7 @@ class Neo4jGraphManager:
             with self.driver.session(database=self.database) as session:
                 result = session.run(query, {"entity_id": entity_id})
                 return result.single() is not None
-        except Exception:
+        except (ConnectionError, RuntimeError):
             return False
 
     def bulk_insert_entities(
@@ -492,23 +493,59 @@ class Neo4jGraphManager:
                 tx_id = self.begin_transaction()
 
                 try:
-                    for relationship in batch:
-                        if self.store_relationship_with_metadata(
-                            relationship, transaction_id=tx_id
-                        ):
-                            success_count += 1
-                        else:
-                            failure_count += 1
-                            errors.append(
-                                f"Failed to store relationship {relationship.id}"
-                            )
+                    # Prepare batch payload for UNWIND
+                    payload = []
+                    for rel in batch:
+                        payload.append(
+                            {
+                                "source_id": rel.source_entity_id,
+                                "target_id": rel.target_entity_id,
+                                "rel_id": rel.id,
+                                "rel_type": rel.relationship_type,
+                                "confidence": rel.confidence,
+                                "attributes": rel.attributes,
+                                "discovered_at": (rel.discovered_at.isoformat() if getattr(rel, "discovered_at", None) is not None else datetime.now().isoformat()),
+                                "evidence": getattr(rel, "evidence", "statistical_discovery"),
+                                "created_at": datetime.now().isoformat(),
+                                "updated_at": datetime.now().isoformat(),
+                            }
+                        )
+
+                    # Run a single UNWIND query to avoid N+1 behavior
+                    cypher = """
+                    UNWIND $batch AS r
+                    MATCH (source:Entity {id: r.source_id})
+                    MATCH (target:Entity {id: r.target_id})
+                    MERGE (source)-[rr:RELATES_TO {id: r.rel_id}]->(target)
+                    ON CREATE SET rr.created_at = r.created_at
+                    ON MATCH SET rr.updated_at = r.updated_at
+                    SET rr.type = r.rel_type,
+                        rr.confidence = r.confidence,
+                        rr.discovered_at = r.discovered_at,
+                        rr.evidence = r.evidence
+                    SET rr += r.attributes
+                    RETURN count(rr) as processed_count
+                    """
+
+                    session, transaction = self.active_transactions[tx_id]
+                    result = transaction.run(cypher, {"batch": payload})
+                    record = result.single()
+                    processed = record["processed_count"] if record is not None else 0
+
+                    success_count += int(processed)
+                    failure_count += len(batch) - int(processed)
+                    if processed < len(batch):
+                        errors.append(f"Some relationships were skipped in batch {i//batch_size + 1}: {len(batch)-int(processed)}")
 
                     self.commit_transaction(tx_id)
 
                 except Exception as e:
-                    self.rollback_transaction(tx_id)
+                    # Ensure transaction is rolled back on error
+                    try:
+                        self.rollback_transaction(tx_id)
+                    except Exception:
+                        pass
                     failure_count += len(batch)
-                    success_count -= success_count
                     errors.append(f"Batch {i//batch_size + 1} failed: {e}")
 
             processing_time = time.time() - start_time
@@ -598,7 +635,7 @@ class Neo4jGraphManager:
                         "Low average entity confidence detected"
                     )
 
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             validation_results["valid"] = False
             validation_results["errors"].append(f"Schema validation failed: {e}")
 
@@ -797,7 +834,7 @@ class Neo4jGraphManager:
                 )
                 return pruned_count
 
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.error(f"Entity pruning failed: {e}")
             return 0
 
@@ -833,7 +870,7 @@ class Neo4jGraphManager:
                 logger.info(f"Materialized view '{view_name}' created successfully")
                 return True
 
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.error(f"Failed to create materialized view '{view_name}': {e}")
             return False
 
@@ -877,7 +914,7 @@ class Neo4jGraphManager:
                 logger.info(f"Materialized view '{view_name}' refreshed successfully")
                 return True
 
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.error(f"Failed to refresh materialized view '{view_name}': {e}")
             return False
 
@@ -922,7 +959,7 @@ class Neo4jGraphManager:
                     }
                     entities.append(entity)
                 return entities
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.error(f"Failed to get entities: {e}")
             return []
 
@@ -939,7 +976,7 @@ class Neo4jGraphManager:
             with self.driver.session(database=self.database) as session:
                 result = session.run(query, params)
                 return result.single()["count"]
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.error(f"Failed to count entities: {e}")
             return 0
 
@@ -1004,7 +1041,7 @@ class Neo4jGraphManager:
             with self.driver.session(database=self.database) as session:
                 result = session.run(query, params)
                 return result.single()["count"]
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.error(f"Failed to count relationships: {e}")
             return 0
 
@@ -1046,7 +1083,7 @@ class Neo4jGraphManager:
                 index_result = session.run("SHOW INDEXES")
                 stats["index_count"] = len(list(index_result))
 
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.warning(f"Could not get graph statistics: {e}")
 
         return stats
@@ -1099,7 +1136,7 @@ class Neo4jGraphManager:
                     }
                     results.append(item)
                 return results
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.error(f"Failed to search graph: {e}")
             return []
 
@@ -1130,7 +1167,7 @@ class Neo4jGraphManager:
                         "attributes": attributes,
                     }
                 return None
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.error(f"Failed to get entity by ID: {e}")
             return None
 
@@ -1198,7 +1235,7 @@ class Neo4jGraphManager:
                             "edition": db_info["edition"],
                         }
 
-            except Exception as e:
+            except (ConnectionError, RuntimeError) as e:
                 logger.warning(f"Failed to get database stats: {e}")
 
         return metrics
@@ -1229,7 +1266,7 @@ class Neo4jGraphManager:
                 result = session.run("RETURN 1 as test")
                 result.single()
             return True
-        except Exception:
+        except (ConnectionError, RuntimeError):
             return False
 
     def execute_query(self, query: str, **params: Any) -> list[dict[str, Any]]:
@@ -1281,7 +1318,7 @@ class Neo4jGraphManager:
                 result = session.run(query, params)
                 logger.info(f"  Query executed successfully")
                 return True
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.error(f"❌ Failed to create entity {getattr(entity, 'name', 'NO_NAME')}: {e}")
             logger.error(f"  Error details: {type(e).__name__}: {str(e)}")
             import traceback
@@ -1327,7 +1364,7 @@ class Neo4jGraphManager:
                 result = session.run(query, params)
                 logger.info(f"  Query executed successfully")
                 return True
-        except Exception as e:
+        except (ConnectionError, RuntimeError) as e:
             logger.error(f"❌ Failed to create relationship {getattr(relationship, 'id', 'NO_ID')}: {e}")
             logger.error(f"  Error details: {type(e).__name__}: {str(e)}")
             import traceback

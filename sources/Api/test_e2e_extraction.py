@@ -96,7 +96,7 @@ class TestE2EExtraction:
             print(f"✅ {field}: {system_context[field]}")
 
         assert system_context["domain"] == "Infrastructure"
-        assert system_context["status"] == "Deprecated / Frozen"
+        assert system_context["status"] == "DEPRECATED"
         assert system_context["tier"] == "Tier 3 - Development/Internal"
         assert system_context["data_class"] == "General"
         assert isinstance(system_context["active_experts"], int)
@@ -316,7 +316,7 @@ def test_ui_data_display():
         "domain": "Infrastructure",
         "owner": "Test Team",
         "owner_contributors": ["user1@example.com", "user2@example.com"],
-        "status": "Active-Dev",
+        "status": "ACTIVE",
         "tier": "Tier 2 - Standard",
         "data_class": "PII",
         "active_experts": 3,
@@ -328,7 +328,7 @@ def test_ui_data_display():
     assert sample_system_context["domain"] is not None
     assert sample_system_context["owner"] != "Unassigned"
     assert len(sample_system_context["owner_contributors"]) > 0
-    assert sample_system_context["status"] in ["Active-Dev", "Maintenance-Only", "Deprecated / Frozen"]
+    assert sample_system_context["status"] in ["ACTIVE", "MAINTENANCE", "DEPRECATED", "ARCHIVED"]
     assert "Tier" in sample_system_context["tier"]
     assert sample_system_context["data_class"] in ["PII", "Credit-Card", "Legal/Security", "General"]
     assert sample_system_context["active_experts"] >= 0
