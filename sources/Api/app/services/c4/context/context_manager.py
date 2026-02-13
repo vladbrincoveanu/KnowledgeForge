@@ -89,6 +89,10 @@ class ContextManager:
         criticality = self.metadata_detector.determine_criticality()
         data_class = self.metadata_detector.infer_data_classification()
 
+        # If the repository looks infrastructure-focused, prefer General data class to avoid false positives
+        if business_domain and business_domain.lower().startswith('infrastructure'):
+            data_class = 'General'
+
         # Service status and lifecycle
         status, status_evidence = self.metadata_detector.detect_service_status()
 

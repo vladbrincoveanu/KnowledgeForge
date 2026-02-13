@@ -1,5 +1,4 @@
-import React from 'react';
-import { useState, useCallback, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   BrowserRouter as Router,
   Routes,
@@ -7,11 +6,6 @@ import {
   Link,
   useLocation,
 } from 'react-router-dom';
-import { wsService } from './services/api';
-import FileUploader from './@components/upload-extract/FileUploader/FileUploader';
-import SystemMetrics from './@components/system-metrics/SystemMetrics/SystemMetrics';
-import Settings from './@components/settings/Settings/Settings';
-import CodeArchitectureViewer from './@components/architecture-map/CodeArchitectureViewer/CodeArchitectureViewer';
 import {
   Activity,
   Upload,
@@ -20,9 +14,19 @@ import {
   Code,
   ChevronLeft,
   ChevronRight,
+  Database,
+  BarChart3,
 } from 'lucide-react';
 import './App.scss';
+import OntologyResults from './@components/ontology-results/OntologyResults/OntologyResults';
+import Graph from './@components/graph-view/Graph/Graph';
+import ArchitectureMap from './@components/architecture-map/ArchitectureMap';
+import CodeArchitectureViewer from './@components/architecture-map/CodeArchitectureViewer/CodeArchitectureViewer';
 import Notification from './@components/notification/Notification';
+import FileUploader from './@components/upload-extract/FileUploader/FileUploader';
+import SystemMetrics from './@components/system-metrics/SystemMetrics/SystemMetrics';
+import Settings from './@components/settings/Settings/Settings';
+import { ontologyAPI, wsService } from './services/api';
 import { IncrementalSummary } from '@/types';
 
 // TypeScript interfaces
@@ -55,6 +59,31 @@ interface NavigationProps {
   activeTab: string;
   isCollapsed: boolean;
   onToggle: () => void;
+}
+
+interface ExtractionTask {
+  taskId: string;
+  fileName: string;
+  status: string;
+  createdAt: string;
+}
+
+interface GraphNode {
+  id: string;
+  label: string;
+  type: string;
+  entityType?: string;
+  confidence?: number;
+  metadata?: any;
+  columns?: any;
+}
+
+interface GraphLink {
+  id: string;
+  source: string;
+  target: string;
+  label: string;
+  confidence?: number;
 }
 
 // Navigation component
@@ -162,6 +191,7 @@ const Navigation: React.FC<NavigationProps> = ({
 };
 
 // Main content wrapper
+
 const MainContent: React.FC = () => {
   const location = useLocation();
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -172,6 +202,9 @@ const MainContent: React.FC = () => {
     type: 'success' | 'error' | 'info';
   } | null>(null);
   const [isNavCollapsed, setIsNavCollapsed] = useState<boolean>(false);
+  const [extractionTasks, setExtractionTasks] = useState<Record<string, ExtractionTask>>({});
+  const [graphData, setGraphData] = useState<{ nodes: GraphNode[]; links: GraphLink[] }>({ nodes: [], links: [] });
+  const [activeTaskSummary, setActiveTaskSummary] = useState<IncrementalSummary | null>(null);
 
   const showNotification = (
     message: string,
@@ -311,6 +344,16 @@ const MainContent: React.FC = () => {
           const completedTasks = data.tasks.filter(
             (t: any) => t.status === 'completed'
           );
+          const tasksMap: Record<string, ExtractionTask> = {};
+          data.tasks.forEach((t: any) => {
+            tasksMap[t.task_id] = {
+              taskId: t.task_id,
+              fileName: t.file_name || t.filename || 'Unknown',
+              status: t.status,
+              createdAt: t.created_at,
+            };
+          });
+          setExtractionTasks(tasksMap);
           if (completedTasks.length > 0) {
             const mostRecent = completedTasks.sort(
               (a: any, b: any) =>
@@ -318,6 +361,7 @@ const MainContent: React.FC = () => {
                 new Date(a.created_at).getTime()
             )[0];
             setActiveTaskId(mostRecent.task_id);
+            setActiveTaskSummary(mostRecent.incremental_summary || null);
           }
         }
       }

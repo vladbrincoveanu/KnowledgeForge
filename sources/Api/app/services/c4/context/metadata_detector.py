@@ -288,6 +288,9 @@ Team name:"""
 
         # Check repo name first — strong signal
         repo_name = self.repo_path.name.lower()
+        # Boost infrastructure for microservice/cloud-native repositories and common infra keywords
+        if any(k in repo_name for k in ['microservice', 'microservices', 'cna', 'cloud', 'k8s', 'kubernetes', 'infra']):
+            indicators['infrastructure'] += 4
         if any(k in repo_name for k in ['cms', 'content', 'editorial', 'publishing', 'blog', 'wiki', 'pages', 'media']):
             indicators['cms_content'] += 5
         if any(k in repo_name for k in ['shop', 'store', 'commerce', 'cart', 'checkout', 'catalog', 'product', 'price', 'order']):
@@ -396,6 +399,10 @@ Team name:"""
 
         if not any(indicators.values()):
             return "General"
+
+        # If both infrastructure and commerce indicators are present, prefer Infrastructure
+        if indicators.get('infrastructure', 0) > 0 and indicators.get('commerce', 0) > 0:
+            return 'Infrastructure'
 
         domain_map = {
             'infrastructure': 'Infrastructure',
@@ -525,9 +532,12 @@ Team name:"""
 
         sensitive_keywords = {
             'pii': ['email', 'phone', 'address', 'firstname', 'lastname', 'username', 'customer', 'profile', 'gdpr', 'ccpa', 'personaldata', 'personal_data'],
+            # Keep conservative financial keywords; count general commerce terms but require strict keywords for Credit-Card classification
             'financial': ['payment', 'creditcard', 'credit_card', 'invoice', 'transaction', 'billing', 'stripe', 'paypal', 'checkout', 'order'],
             'legal': ['compliance', 'audit', 'encryption', 'authorize', 'authenticate', 'permission', 'rbac', 'acl', 'security'],
         }
+        strict_financial_keywords = {'creditcard', 'credit_card', 'stripe', 'paypal'}
+        strict_financial_found = False
 
         skip_parts = {'.git', 'node_modules', '__pycache__', 'bin', 'obj', 'dist', 'build'}
 
@@ -542,6 +552,8 @@ Team name:"""
                     for keyword in keywords:
                         if keyword in content:
                             data_indicators[category] += 1
+                            if category == 'financial' and keyword in strict_financial_keywords:
+                                strict_financial_found = True
             except (OSError, ValueError):
                 pass
 
@@ -571,7 +583,8 @@ Team name:"""
                 _scan_file(json_file)
 
         # Determine classification
-        if data_indicators['financial'] >= 2:
+        # Require stronger signal for financial data and a strict keyword (e.g., 'credit_card', 'stripe')
+        if data_indicators['financial'] >= 3 and strict_financial_found:
             return "Credit-Card"
         elif data_indicators['pii'] >= 3:
             return "PII"
