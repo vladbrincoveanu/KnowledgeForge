@@ -106,6 +106,28 @@ export default function NodeDetailsPanel({
   const docQuality = formatDocQuality(systemAttributes?.documentation_quality);
   const deploymentTargets: string[] = systemAttributes?.deployment_targets || [];
 
+  const atRiskTooltip = complianceStatus === 'AT_RISK'
+    ? complianceFactors.length > 0
+      ? `Why at risk: ${complianceFactors.join('; ')}`
+      : 'Missing ownership, active maintainers, or tier-data alignment'
+    : undefined;
+
+  // Context-level: only business systems (not messaging/cache/db infra)
+  const TECH_DEP_TYPES = new Set([
+    'messaging', 'cache', 'database', 'storage', 'logging', 'monitoring',
+    'observability', 'search', 'rpc', 'error-tracking', 'authentication',
+    'service-discovery', 'sms', 'email', 'payment',
+  ]);
+  const allExternalDeps: any[] = systemAttributes?.external_dependencies || attrs.external_dependencies || [];
+  const contextLevelDeps = allExternalDeps.filter((d: any) => {
+    const name = typeof d === 'string' ? d : (d?.name || '');
+    if (!name || name.startsWith('*') || name.startsWith('$')) return false;
+    const depType = d?.dependency_type;
+    if (depType === 'BUSINESS_SYSTEM') return true;
+    if (depType === 'TECHNICAL_INFRA') return false;
+    return !TECH_DEP_TYPES.has(d?.type || '');
+  });
+
   // Person/actor node — dedicated panel
   if (nodeType === 'person') {
     const actorDesc = attrs.description || attrs.role || '';
@@ -278,7 +300,7 @@ export default function NodeDetailsPanel({
         {nodeType === 'system' && (
           <DetailRow
             label="Active Experts (Bus Factor)"
-            tooltip="Bus factor: contributors with 3+ commits in last 90 days. 0 = high risk (no active maintainers). 1 = single point of failure. Higher is better."
+            tooltip="Bus factor: unique contributors with at least 1 commit in the last 90 days. 0 = high risk (no active maintainers). 1 = single point of failure. Higher is better."
           >
             {(() => {
               const rawValue = systemAttributes?.active_experts ?? attrs.active_experts;
@@ -330,7 +352,11 @@ export default function NodeDetailsPanel({
             label="Architectural Compliance"
             tooltip="Calculated from: tier-data alignment, ownership, bus factor, and lifecycle. COMPLIANT = proper governance. AT_RISK = ownership/maintenance gaps. NON_COMPLIANT = sensitive data mishandled or abandoned."
           >
-            <span className={`detail-value${complianceStatus && complianceStatus !== 'UNKNOWN' ? ' status-badge' : ''}`}>
+            <span
+              className={`detail-value${complianceStatus && complianceStatus !== 'UNKNOWN' ? ' status-badge' : ''}`}
+              title={atRiskTooltip}
+              style={atRiskTooltip ? { cursor: 'help' } : undefined}
+            >
               {complianceStatus && complianceStatus !== 'UNKNOWN'
                 ? (complianceStatusLabel || complianceStatus)
                 : 'Not assessed'}
@@ -484,7 +510,9 @@ export default function NodeDetailsPanel({
           >
             <span className="detail-value">
               {[
-                ...(systemAttributes?.languages || []),
+                ...(systemAttributes?.languages || []).map((l: any) =>
+                  typeof l === 'string' ? l : l?.name || l?.language || ''
+                ),
                 ...(systemAttributes?.frameworks || []).map((f: any) =>
                   typeof f === 'string' ? f : f?.name || ''
                 ),
@@ -495,19 +523,15 @@ export default function NodeDetailsPanel({
           </DetailRow>
         )}
 
-        {/* External Dependencies (system node) */}
-        {selectedNode?.type === 'system' &&
-          (systemAttributes?.external_dependencies?.length > 0 ||
-           attrs.external_dependencies?.length > 0) && (
+        {/* External Dependencies (system node) — context level: business systems only */}
+        {selectedNode?.type === 'system' && contextLevelDeps.length > 0 && (
           <DetailRow
             label="External Dependencies"
-            tooltip="Third-party services detected from package manifests: databases, message brokers, cloud services, etc."
+            tooltip="External business systems and services this system integrates with. Technical infrastructure (databases, queues, caches) is shown at the Container level."
           >
             <span className="detail-value">
-              {(systemAttributes?.external_dependencies || attrs.external_dependencies || [])
-                .map((d: any) =>
-                  typeof d === 'string' ? d : `${d.name}${d.type ? ` (${d.type})` : ''}`
-                )
+              {contextLevelDeps
+                .map((d: any) => (typeof d === 'string' ? d : d.name))
                 .join(', ')}
             </span>
           </DetailRow>

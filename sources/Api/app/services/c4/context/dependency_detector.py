@@ -73,6 +73,11 @@ logger = logging.getLogger(__name__)
 class DependencyDetector:
     """Detects external dependencies for C4 Context."""
 
+    _INTERNAL_HOST_RE = re.compile(
+        r'^(\*|localhost|0\.0\.0\.0|127\.\d+\.\d+\.\d+|\d{1,3}(?:\.\d{1,3}){3})'
+        r'(:\d+)?$'
+    )
+
     def __init__(self, repo_path: Path, llm_manager=None, enable_classification: bool = True):
         """Initialize dependency detector.
 
@@ -127,9 +132,10 @@ class DependencyDetector:
         external_deps = []
         for dep in all_deps:
             name = dep['name']
-            if name not in seen:
-                external_deps.append(dep)
-                seen.add(name)
+            if not name or name.startswith('$') or name in seen:
+                continue
+            external_deps.append(dep)
+            seen.add(name)
 
         # Classify dependencies if classifier enabled
         if self.classifier:
@@ -470,6 +476,8 @@ class DependencyDetector:
                     })
 
         def add_from_url(url: str, detected_from: str):
+            if self._is_internal_url(url):
+                return
             deps.append({
                 "name": self._extract_service_name_from_url(url),
                 "type": "external_service",
@@ -522,6 +530,8 @@ class DependencyDetector:
                 external_urls = self._find_external_urls(data)
 
                 for url in external_urls:
+                    if self._is_internal_url(url):
+                        continue
                     name = self._extract_service_name_from_url(url)
                     deps.append({
                         'name': name,
@@ -552,6 +562,8 @@ class DependencyDetector:
                 urls = re.findall(url_pattern, content)
 
                 for url in urls:
+                    if self._is_internal_url(url):
+                        continue
                     name = self._extract_service_name_from_url(url)
                     deps.append({
                         'name': name,
@@ -593,3 +605,19 @@ class DependencyDetector:
         if len(parts) >= 2:
             return parts[-2].title()
         return domain
+
+    def _is_internal_url(self, url: str) -> bool:
+        """Return True for local/wildcard bindings that are not real external services.
+
+        Filters out:
+        - http://*:PORT   (.NET all-interface bindings)
+        - http://localhost:PORT
+        - http://0.0.0.0:PORT
+        - http://127.x.x.x:PORT
+        - http://192.168.x.x:PORT  (any bare IP)
+        - https://${VAR}/...       (unresolved template variables)
+        """
+        clean = url.replace('https://', '').replace('http://', '').split('/')[0]
+        if clean.startswith('$'):
+            return True
+        return bool(self._INTERNAL_HOST_RE.match(clean))

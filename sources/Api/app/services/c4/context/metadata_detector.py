@@ -732,7 +732,7 @@ Team name:"""
                         email = match.group(2).strip()
                         email_counts[email] = email_counts.get(email, 0) + count
 
-            return sum(1 for count in email_counts.values() if count >= 3)
+            return sum(1 for count in email_counts.values() if count >= 1)
 
         except (OSError, ValueError) as e:
             logger.debug(f"Failed to calculate active experts: {e}")
