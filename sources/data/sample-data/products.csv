@@ -1,6 +1,0 @@
-product_id,product_name,category,price,stock_quantity,supplier_id
-P001,Laptop,Electronics,1200.00,50,SUP001
-P002,Phone,Electronics,800.00,100,SUP002
-P003,Tablet,Electronics,500.00,75,SUP001
-P004,Headphones,Electronics,150.00,200,SUP003
-P005,Monitor,Electronics,300.00,30,SUP002 

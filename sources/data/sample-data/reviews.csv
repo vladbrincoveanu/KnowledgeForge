@@ -1,7 +1,0 @@
-review_id,product_id,customer_id,rating,review_text,review_date
-RVW1001,P001,1,5,Excellent laptop very fast and reliable,2024-02-01
-RVW1002,P002,2,4,Great phone but battery life could be better,2024-02-02
-RVW1003,P004,1,5,Headphones have superb sound quality,2024-02-03
-RVW1004,P003,3,3,Tablet is okay for the price,2024-02-04
-RVW1005,P005,4,4,Monitor has crisp display,2024-02-05
-

@@ -1,7 +1,0 @@
-payment_id,order_id,customer_id,payment_date,amount,payment_method,status,transaction_ref
-PMT1001,1001,1,2024-01-15,1200.00,Credit Card,Completed,TXN-ABC-1001
-PMT1002,1002,2,2024-01-16,1600.00,PayPal,Completed,TXN-ABC-1002
-PMT1003,1003,3,2024-01-17,500.00,Credit Card,Completed,TXN-ABC-1003
-PMT1004,1004,1,2024-01-18,150.00,Credit Card,Completed,TXN-ABC-1004
-PMT1005,1005,4,2024-01-19,300.00,Bank Transfer,Pending,TXN-ABC-1005
-

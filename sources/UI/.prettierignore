@@ -1,7 +1,0 @@
-node_modules
-dist
-build
-.vite
-package-lock.json
-*.min.js
-*.min.css

@@ -1,4 +1,0 @@
-return_id,order_item_id,product_id,customer_id,return_date,reason,status,refund_amount
-RTN1001,OI1002,P002,2,2024-01-25,Defective item,Approved,800.00
-RTN1002,OI1005,P005,4,2024-01-28,Changed mind,Pending,300.00
-
