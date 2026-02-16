@@ -1,0 +1,40 @@
+{
+  "task_id": "4a621a40-1adb-428f-b419-703a24f162bc",
+  "total_connections": 3,
+  "extracted_at": "2025-12-10T11:49:40.919459",
+  "connections": [
+    {
+      "id": "conn-svc-shuup_tests-svc-shuup-http",
+      "source_service_id": "svc-shuup_tests",
+      "target_service_id": "svc-shuup",
+      "connection_type": "http",
+      "protocol": null,
+      "endpoint": "shuup.com",
+      "strength": 1.0,
+      "file_path": "shuup_tests/front/test_powered_by_content.py",
+      "confidence": 1.0
+    },
+    {
+      "id": "conn-svc-shuup-svc-doc-http",
+      "source_service_id": "svc-shuup",
+      "target_service_id": "svc-doc",
+      "connection_type": "http",
+      "protocol": null,
+      "endpoint": "readthedocs.org",
+      "strength": 1.0,
+      "file_path": "shuup/guide/settings.py",
+      "confidence": 1.0
+    },
+    {
+      "id": "conn-svc-shuup_workbench-svc-doc-http",
+      "source_service_id": "svc-shuup_workbench",
+      "target_service_id": "svc-doc",
+      "connection_type": "http",
+      "protocol": null,
+      "endpoint": "docs.djangoproject.com",
+      "strength": 1.0,
+      "file_path": "shuup_workbench/wsgi.py",
+      "confidence": 1.0
+    }
+  ]
+}

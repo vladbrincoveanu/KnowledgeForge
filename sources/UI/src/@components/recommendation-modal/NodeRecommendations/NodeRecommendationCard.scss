@@ -1,0 +1,356 @@
+.node-recommendation-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 4px;
+  transition: all 0.2s ease;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+
+  &:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  &.selected {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+  }
+
+  .approval-toggle {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+
+    .toggle-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      background: white;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: #64748b;
+
+      &:hover {
+        border-color: #cbd5e1;
+      }
+
+      &.approve {
+        &.active {
+          background: #10b981;
+          border-color: #10b981;
+          color: white;
+        }
+
+        &:hover:not(.active) {
+          border-color: #10b981;
+          color: #10b981;
+        }
+      }
+
+      &.reject {
+        &.active {
+          background: #ef4444;
+          border-color: #ef4444;
+          color: white;
+        }
+
+        &:hover:not(.active) {
+          border-color: #ef4444;
+          color: #ef4444;
+        }
+      }
+
+      .icon {
+        font-size: 12px;
+      }
+    }
+  }
+
+  .entity-icon {
+    font-size: 16px;
+    color: #6366f1;
+    flex-shrink: 0;
+  }
+
+  .entity-info {
+    flex: 1;
+    min-width: 0;
+
+    .entity-name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 2px;
+
+      .entity-name-text {
+        font-size: 14px;
+        font-weight: 600;
+        color: #1f2937;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .entity-type-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 6px;
+        background: #f3f4f6;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 500;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        flex-shrink: 0;
+
+        .entity-icon {
+          font-size: 12px;
+        }
+      }
+    }
+
+    .entity-description {
+      font-size: 12px;
+      color: #6b7280;
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .source-columns {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+
+      strong {
+        color: #374151;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .column-chips {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+
+        .column-chip {
+          padding: 2px 6px;
+          background: #8b5cf6;
+          color: white;
+          border-radius: 8px;
+          font-size: 10px;
+          font-weight: 500;
+          white-space: nowrap;
+        }
+      }
+    }
+  }
+
+  .confidence-indicator {
+    flex-shrink: 0;
+
+    .confidence-bar {
+      padding: 4px 8px;
+      border-radius: 12px;
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+  }
+
+  .card-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+
+    .action-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      background: white;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: #64748b;
+
+      &:hover {
+        border-color: #cbd5e1;
+        color: #374151;
+      }
+
+      .icon {
+        font-size: 14px;
+      }
+    }
+  }
+}
+
+// Panel-specific compact styles
+.recommendations-panel .node-recommendation-card {
+  padding: 6px 10px;
+  margin-bottom: 3px;
+  min-height: 40px;
+  gap: 8px;
+
+  .approval-toggle .toggle-btn {
+    width: 20px;
+    height: 20px;
+
+    .icon {
+      font-size: 10px;
+    }
+  }
+
+  .entity-icon {
+    font-size: 14px;
+  }
+
+  .entity-info {
+    .entity-name .entity-name-text {
+      font-size: 13px;
+    }
+
+    .entity-description {
+      font-size: 11px;
+    }
+
+    .source-columns {
+      font-size: 10px;
+
+      .column-chips .column-chip {
+        font-size: 9px;
+        padding: 1px 4px;
+      }
+    }
+  }
+
+  .confidence-indicator .confidence-bar {
+    padding: 3px 6px;
+    font-size: 10px;
+  }
+
+  .card-actions .action-btn {
+    width: 24px;
+    height: 24px;
+
+    .icon {
+      font-size: 12px;
+    }
+  }
+}
+
+// Edit mode styles
+.node-recommendation-card.editing {
+  .entity-name-text {
+    background: #f9fafb;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 14px;
+    width: 100%;
+  }
+
+  .entity-type-select {
+    background: #f9fafb;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 11px;
+    color: #6b7280;
+  }
+}
+
+// Advanced details
+.advanced-details {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+
+  .metadata-section,
+  .selection-metadata {
+    margin-bottom: 12px;
+
+    h4 {
+      font-size: 12px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 6px;
+    }
+
+    .metadata-content {
+      background: #f9fafb;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      padding: 8px;
+      font-size: 10px;
+      color: #6b7280;
+      overflow-x: auto;
+      max-height: 120px;
+    }
+
+    .selection-info {
+      p {
+        font-size: 11px;
+        color: #6b7280;
+        margin: 2px 0;
+
+        strong {
+          color: #374151;
+        }
+      }
+    }
+  }
+}
+
+// Rotated icon animation
+.rotated {
+  transform: rotate(180deg);
+  transition: transform 0.2s ease;
+}
+
+// Responsive adjustments
+@media (max-width: 768px) {
+  .node-recommendation-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    min-height: auto;
+    padding: 8px;
+
+    .entity-info {
+      width: 100%;
+    }
+
+    .card-actions {
+      align-self: flex-end;
+    }
+  }
+}

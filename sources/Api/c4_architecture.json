@@ -1,0 +1,544 @@
+{
+  "c4_model_version": "1.0",
+  "system_context": {
+    "c4_level": 1,
+    "type": "system",
+    "name": "ai-factory-monorepo",
+    "purpose": "curl -LsSf https://astral.",
+    "external_dependencies": [
+      {
+        "name": "Ac",
+        "type": "external_service",
+        "url": "https://harbor.ai-factory.datalab.tuwien.ac.at",
+        "detected_from": "projects/harbor/chart/values.yaml"
+      },
+      {
+        "name": "Letsencrypt",
+        "type": "external_service",
+        "url": "https://acme-v02.api.letsencrypt.org/directory",
+        "detected_from": "projects/cert-manager/chart/values.yaml"
+      },
+      {
+        "name": "Default",
+        "type": "external_service",
+        "url": "https://kubernetes.default.svc",
+        "detected_from": "gitops/platform-apps/gitlab-runner.yaml"
+      },
+      {
+        "name": "Github",
+        "type": "external_service",
+        "url": "https://clearml.github.io/clearml-helm-charts",
+        "detected_from": "gitops/platform-apps/clearml.yaml"
+      }
+    ],
+    "actors": [
+      {
+        "name": "User",
+        "type": "person"
+      }
+    ],
+    "languages": [
+      {
+        "language": "Python",
+        "file_count": 21
+      }
+    ],
+    "frameworks": [
+      {
+        "language": "Python",
+        "framework": "FastAPI",
+        "detected_from": "pyproject.toml"
+      }
+    ],
+    "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo",
+    "git": {
+      "branch": "feature/add-apisix-with-metrics",
+      "commit_hash": "8e8528610b9b202248d901454005f04128eb6bd2",
+      "last_commit_date": "2025-11-18T10:35:14+01:00",
+      "first_commit_date": "2025-11-18T10:35:14+01:00",
+      "total_commits": 183,
+      "commits_30d": 0,
+      "commits_90d": 48,
+      "commits_180d": 183,
+      "top_contributors": [
+        {
+          "name": "gentrexha",
+          "email": "",
+          "commit_count": 166
+        },
+        {
+          "name": "Rexha, Gent",
+          "email": "",
+          "commit_count": 29
+        },
+        {
+          "name": "Iulia Georgiana Rinea",
+          "email": "",
+          "commit_count": 4
+        },
+        {
+          "name": "iuliarinea17",
+          "email": "",
+          "commit_count": 2
+        }
+      ]
+    },
+    "context_sources": {
+      "readme_files": [
+        "README.md"
+      ],
+      "deployment_files": [
+        "projects/slurm_gateway_api/Dockerfile",
+        "projects/apisix/chart/templates/slurm-route.yaml",
+        "projects/apisix/chart/templates/servicemonitor.yaml",
+        "projects/apisix/chart/templates/metrics-service.yaml",
+        "projects/cert-manager/chart/templates/clusterissuer.yaml",
+        "projects/slurm_gateway_api/chart/templates/deployment.yaml",
+        "projects/slurm_gateway_api/chart/templates/ingress.yaml",
+        "projects/slurm_gateway_api/chart/templates/service.yaml",
+        "projects/kubeflow-pipelines/kustomize/ui-patch.yaml"
+      ],
+      "framework_files": [
+        "pyproject.toml"
+      ]
+    },
+    "owner_team": "tuwien-ac-at-team",
+    "business_domain": "API Gateway",
+    "criticality": "Tier 1 - Production Critical",
+    "data_class": "PII",
+    "description": "curl -LsSf https://astral.",
+    "llm_description": "This node is a system-level placeholder or stub with no functional deployment or technology specification, serving only as a metadata anchor for the string \"curl -LsSf https://astral.\"."
+  },
+  "containers": [
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "apisix",
+      "container_type": "Helm Deployed Service",
+      "technology": "Kubernetes",
+      "protocol": "HTTP",
+      "path": "projects/apisix",
+      "runtime_environment": "Kubernetes",
+      "deployment": "Helm",
+      "description": "APISIX API Gateway for AI Factory",
+      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/apisix",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [
+        "cert-manager"
+      ],
+      "health_endpoint": "",
+      "llm_description": "This node represents an APISIX API Gateway deployed via Helm on Kubernetes, serving as the entry point for API traffic within the AI Factory project."
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "harbor",
+      "container_type": "Helm Deployed Service",
+      "technology": "Kubernetes",
+      "protocol": "HTTP",
+      "path": "projects/harbor",
+      "runtime_environment": "Kubernetes",
+      "deployment": "Helm",
+      "description": "Helm chart for Harbor container registry",
+      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/harbor",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [
+        "cert-manager"
+      ],
+      "health_endpoint": "",
+      "llm_description": "This node represents a Helm-deployed Kubernetes service for Harbor, a container registry, managed via its Helm chart in the projects/harbor path."
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "cert-manager",
+      "container_type": "Helm Deployed Service",
+      "technology": "Kubernetes",
+      "protocol": "HTTP",
+      "path": "projects/cert-manager",
+      "runtime_environment": "Kubernetes",
+      "deployment": "Helm",
+      "description": "Helm chart for cert-manager certificate management",
+      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/cert-manager",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "components": [
+        {
+          "id": "infra_cert-manager_clusterissuer",
+          "name": "Clusterissuer",
+          "type": "Infrastructure"
+        }
+      ],
+      "llm_description": "This node represents a Helm-deployed cert-manager service in Kubernetes, used for automated certificate management via its Helm chart."
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "clearml",
+      "container_type": "Helm Deployed Service",
+      "technology": "Kubernetes",
+      "protocol": "HTTP",
+      "path": "projects/clearml",
+      "runtime_environment": "Kubernetes",
+      "deployment": "Helm",
+      "description": "Helm chart for ClearML platform deployment",
+      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/clearml",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "llm_description": "This node is a Helm chart used to deploy the ClearML platform on Kubernetes."
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "slurm_gateway_api",
+      "container_type": "Python Service",
+      "technology": "Python",
+      "protocol": "HTTP",
+      "path": "projects/slurm_gateway_api",
+      "runtime_environment": "Kubernetes",
+      "deployment": "Helm",
+      "description": "Helm chart for slurm_gateway_api",
+      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/slurm_gateway_api",
+      "runtime_info": "Python 3.11",
+      "dependencies_internal": [
+        "harbor"
+      ],
+      "health_endpoint": "http://localhost:8080/health",
+      "components": [
+        {
+          "id": "endpoint_code_eaa187b4210a7c8a",
+          "name": "GET /api/health-check",
+          "type": "API Endpoint"
+        },
+        {
+          "id": "endpoint_code_d7cb098c812350d3",
+          "name": "POST /api/submit-job",
+          "type": "API Endpoint"
+        },
+        {
+          "id": "endpoint_code_30eca68b54bba1c9",
+          "name": "POST /api/submit-hello-world-job",
+          "type": "API Endpoint"
+        },
+        {
+          "id": "endpoint_code_43331cfd0c25ab21",
+          "name": "GET /api/get-job",
+          "type": "API Endpoint"
+        },
+        {
+          "id": "endpoint_code_abe94170b848479e",
+          "name": "DELETE /api/delete-job",
+          "type": "API Endpoint"
+        },
+        {
+          "id": "endpoint_code_0393211e59c1fd60",
+          "name": "POST /api/submit-container-job",
+          "type": "API Endpoint"
+        }
+      ],
+      "llm_description": "This node is a Helm chart for deploying the slurm_gateway_api as a Python service container."
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "kubeflow-pipelines",
+      "container_type": "Service",
+      "technology": "Unknown",
+      "protocol": "HTTP",
+      "path": "projects/kubeflow-pipelines",
+      "runtime_environment": "Kubernetes",
+      "deployment": "Kustomize",
+      "description": "Kubernetes workload deployed via Kustomize.",
+      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/kubeflow-pipelines",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [
+        "cert-manager"
+      ],
+      "health_endpoint": "",
+      "components": [
+        {
+          "id": "infra_kubeflow-pipelines_ui_patch",
+          "name": "Ui Patch",
+          "type": "Infrastructure"
+        },
+        {
+          "id": "infra_kubeflow-pipelines_ingress",
+          "name": "Ingress",
+          "type": "Ingress"
+        },
+        {
+          "id": "infra_kubeflow-pipelines_network_policy",
+          "name": "Network Policy",
+          "type": "Infrastructure"
+        }
+      ],
+      "llm_description": "This node represents a Kubernetes service deployed via Kustomize, specifically for Kubeflow Pipelines, and is used to manage machine learning workflows in a Kubernetes environment."
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "gitlab-runner",
+      "container_type": "Helm Deployed Service",
+      "technology": "Kubernetes",
+      "protocol": "HTTP",
+      "path": "projects/gitlab-runner",
+      "runtime_environment": "Kubernetes",
+      "deployment": "Helm",
+      "description": "Helm chart for GitLab Runner CI/CD",
+      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/gitlab-runner",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "llm_description": "This node represents a Helm-deployed Kubernetes service for GitLab Runner, used to manage CI/CD execution environments via a Helm chart."
+    }
+  ],
+  "components": [
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "GET /api/health-check",
+      "component_type": "API Endpoint",
+      "container": "slurm_gateway_api",
+      "file": "components/ai_factory/slurm/__init__.py",
+      "line_start": 19,
+      "signature": "health_check()",
+      "documentation": null,
+      "endpoint_path": "/api/health-check",
+      "endpoint_method": "GET",
+      "functional_group": "Job Management",
+      "container_id": "slurm_gateway_api",
+      "llm_description": "This node is a GET endpoint at `/api/health-check` used to verify the operational status of the AI Factory SLURM component."
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "POST /api/submit-job",
+      "component_type": "API Endpoint",
+      "container": "slurm_gateway_api",
+      "file": "components/ai_factory/slurm/__init__.py",
+      "line_start": 24,
+      "signature": "submit_job(job_request, x_slurm_user_name, x_slurm_user_token)",
+      "documentation": "Submit a job request to Slurm.\n\nArgs:\n    job_request: User's job request\n    x_slurm_user_name: Slurm username\n    x_slurm_user_token: Slurm JWT token\n\nReturns:\n    Slurm API response",
+      "endpoint_path": "/api/submit-job",
+      "endpoint_method": "POST",
+      "functional_group": "Health Monitoring",
+      "container_id": "slurm_gateway_api",
+      "llm_description": "This node is an endpoint for submitting AI jobs, likely to a Slurm job scheduler, as indicated by its file path and HTTP POST method."
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "POST /api/submit-hello-world-job",
+      "component_type": "API Endpoint",
+      "container": "slurm_gateway_api",
+      "file": "components/ai_factory/slurm/__init__.py",
+      "line_start": 76,
+      "signature": "submit_hello_world_job(x_slurm_user_name, x_slurm_user_token)",
+      "documentation": "Submit a hello world job with minimal configuration.\n\nArgs:\n    partition: Slurm partition to use\n    x_slurm_user_name: Slurm username (from header)\n    x_slurm_user_token: Slurm JWT token (from header)\n\nReturns:\n    Slurm API response",
+      "endpoint_path": "/api/submit-hello-world-job",
+      "endpoint_method": "POST",
+      "functional_group": "Container Operations",
+      "container_id": "slurm_gateway_api",
+      "llm_description": "This node is an endpoint for submitting a \"hello-world\" job, likely for testing or initializing AI workflows within a Slurm-managed system."
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "GET /api/get-job",
+      "component_type": "API Endpoint",
+      "container": "slurm_gateway_api",
+      "file": "components/ai_factory/slurm/__init__.py",
+      "line_start": 109,
+      "signature": "get_job(job_id)",
+      "documentation": null,
+      "endpoint_path": "/api/get-job",
+      "endpoint_method": "GET",
+      "functional_group": "Job Management",
+      "container_id": "slurm_gateway_api",
+      "llm_description": "This node is a GET endpoint at `/api/get-job` used to retrieve job information, likely within an AI factory system integrated with Slurm."
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "DELETE /api/delete-job",
+      "component_type": "API Endpoint",
+      "container": "slurm_gateway_api",
+      "file": "components/ai_factory/slurm/__init__.py",
+      "line_start": 117,
+      "signature": "delete_job(job_id)",
+      "documentation": null,
+      "endpoint_path": "/api/delete-job",
+      "endpoint_method": "DELETE",
+      "functional_group": "Health Monitoring",
+      "container_id": "slurm_gateway_api",
+      "llm_description": "This node is a DELETE endpoint at \"/api/delete-job\" used to remove a job, likely within an AI factory or Slurm job management context."
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "POST /api/submit-container-job",
+      "component_type": "API Endpoint",
+      "container": "slurm_gateway_api",
+      "file": "components/ai_factory/slurm/__init__.py",
+      "line_start": 125,
+      "signature": "submit_container_job(container_request, x_slurm_user_name, x_slurm_user_token)",
+      "documentation": "Submit a containerized job request using Apptainer.\n\nArgs:\n    container_request: Container job configuration\n    x_slurm_user_name: Slurm username\n    x_slurm_user_token: Slurm JWT token\n\nReturns:\n    Slurm API response\n\nRaises:\n    HTTPException: If the container request is invalid or Slurm API call fails",
+      "endpoint_path": "/api/submit-container-job",
+      "endpoint_method": "POST",
+      "functional_group": "Container Operations",
+      "container_id": "slurm_gateway_api",
+      "llm_description": "This node is a POST endpoint at `/api/submit-container-job` used to submit containerized jobs, likely within an AI Factory system leveraging SLURM for job orchestration."
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "Clusterissuer",
+      "component_type": "Infrastructure",
+      "container": "cert-manager",
+      "file": "projects/cert-manager/chart/templates/clusterissuer.yaml",
+      "line_start": null,
+      "signature": null,
+      "documentation": null,
+      "component_kind": "Manifest",
+      "container_id": "cert-manager",
+      "llm_description": "This node represents a ClusterIssuer resource in cert-manager, used to define a cluster-wide issuer for automatically issuing and managing TLS certificates."
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "Ui Patch",
+      "component_type": "Infrastructure",
+      "container": "kubeflow-pipelines",
+      "file": "projects/kubeflow-pipelines/kustomize/ui-patch.yaml",
+      "line_start": null,
+      "signature": null,
+      "documentation": null,
+      "component_kind": "Manifest",
+      "container_id": "kubeflow-pipelines",
+      "llm_description": "This node, named \"Ui Patch,\" is a component defined in the Kubeflow Pipelines project's Kustomize configuration, likely intended to customize or extend the UI behavior or appearance for the pipeline interface."
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "Ingress",
+      "component_type": "Ingress",
+      "container": "kubeflow-pipelines",
+      "file": "projects/kubeflow-pipelines/kustomize/ingress.yaml",
+      "line_start": null,
+      "signature": null,
+      "documentation": null,
+      "component_kind": "Manifest",
+      "container_id": "kubeflow-pipelines",
+      "llm_description": "This node represents an Ingress component, typically used to manage and route external traffic to services within a Kubernetes cluster, as defined in the Kubeflow Pipelines Kustomize configuration."
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "Network Policy",
+      "component_type": "Infrastructure",
+      "container": "kubeflow-pipelines",
+      "file": "projects/kubeflow-pipelines/kustomize/network-policy.yaml",
+      "line_start": null,
+      "signature": null,
+      "documentation": null,
+      "component_kind": "Manifest",
+      "container_id": "kubeflow-pipelines",
+      "llm_description": "This node defines a Kubernetes Network Policy for the Kubeflow Pipelines project, as specified in the kustomize configuration file."
+    }
+  ],
+  "relationships": {
+    "context": [
+      {
+        "source": "User",
+        "destination": "ai-factory-monorepo",
+        "description": "uses",
+        "relationship_type": "uses",
+        "llm_description": "The User uses the ai-factory-monorepo without a specified protocol."
+      },
+      {
+        "source": "ai-factory-monorepo",
+        "destination": "Ac",
+        "description": "uses external_service",
+        "relationship_type": "uses",
+        "llm_description": "The ai-factory-monorepo uses Ac without a specified protocol."
+      },
+      {
+        "source": "ai-factory-monorepo",
+        "destination": "Letsencrypt",
+        "description": "uses external_service",
+        "relationship_type": "uses",
+        "llm_description": "The ai-factory-monorepo uses Let's Encrypt to obtain and manage SSL/TLS certificates for its services."
+      },
+      {
+        "source": "ai-factory-monorepo",
+        "destination": "Default",
+        "description": "uses external_service",
+        "relationship_type": "uses",
+        "llm_description": "The ai-factory-monorepo uses Default without a specified protocol."
+      },
+      {
+        "source": "ai-factory-monorepo",
+        "destination": "Github",
+        "description": "uses external_service",
+        "relationship_type": "uses",
+        "llm_description": "The ai-factory-monorepo uses GitHub to manage and version its codebase, though no specific protocol is defined for this interaction."
+      }
+    ],
+    "containers": [
+      {
+        "from": "apisix",
+        "to": "cert-manager",
+        "type": "uses",
+        "protocol": "HTTP",
+        "description": "APISIX uses cert-manager over HTTP to manage and provision TLS certificates for its services.",
+        "llm_description": "APISIX uses cert-manager over HTTP to manage and provision TLS certificates for its services."
+      },
+      {
+        "from": "harbor",
+        "to": "cert-manager",
+        "type": "uses",
+        "protocol": "HTTP",
+        "description": "Harbor uses cert-manager over HTTP to manage TLS certificates for its services.",
+        "llm_description": "Harbor uses cert-manager over HTTP to manage TLS certificates for its services."
+      },
+      {
+        "from": "slurm_gateway_api",
+        "to": "harbor",
+        "type": "uses",
+        "protocol": "HTTP",
+        "description": "The slurm_gateway_api uses HTTP to interact with harbor.",
+        "llm_description": "The slurm_gateway_api uses HTTP to interact with harbor."
+      },
+      {
+        "from": "kubeflow-pipelines",
+        "to": "cert-manager",
+        "type": "uses",
+        "protocol": "HTTP",
+        "description": "kubeflow-pipelines uses cert-manager via HTTP to manage TLS certificates for its pipeline components.",
+        "llm_description": "kubeflow-pipelines uses cert-manager via HTTP to manage TLS certificates for its pipeline components."
+      }
+    ]
+  },
+  "code_level": {
+    "entities": [],
+    "relationships": []
+  },
+  "metadata": {
+    "total_containers": 7,
+    "total_components": 10,
+    "total_code_entities": 0,
+    "extraction_approach": "c4_model_hybrid",
+    "runtime": {
+      "platform": "Kubernetes",
+      "cluster": {
+        "gitops_files_count": 10,
+        "gitops_directories": [
+          "gitops/platform-apps",
+          "gitops/applicationsets"
+        ]
+      }
+    }
+  }
+}

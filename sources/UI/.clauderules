@@ -1,0 +1,14 @@
+# KnowledgeForge UI Rules for Claude
+
+## 🚀 Mandatory Regression Check
+- **ALWAYS** run `make quick-check` from the root after modifying UI logic to ensure backend data still renders correctly.
+
+## ⚛️ React & UI Standards
+- Functional components, TypeScript, Tailwind CSS.
+- **ReactFlow**: Maintain zoom range between 0.1 and 2.
+- **Tooltips**: Use `position: fixed` for tooltips to prevent clipping in the overflow container.
+- **Labels**: Use user-friendly English labels (e.g., "Lifecycle" instead of "lifecycle_status").
+
+## 📊 Data Integration
+- Ensure all metadata fields (Domain, Owner, Tier, Experts) are displayed in the node details.
+- Handle empty or "Unassigned" states gracefully in the UI.

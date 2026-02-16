@@ -1,0 +1,13 @@
+# KnowledgeForge E2E Testing Rules for Claude
+
+## 🚀 Mandatory Regression Check
+- **ALWAYS** run `make quick-check` from the root when updating or adding tests.
+- Ensure the extraction benchmark (11/11 tests) remains green.
+
+## 🧪 Testing Standards
+- Pytest with `pytest-asyncio`.
+- Tests should validate the full data flow: Extraction -> API -> JSON Format -> Display.
+- Mock external APIs (like GitHub) only when necessary; prefer using real sample repos for E2E validation.
+
+## 📂 Test Cases
+- Focus on metadata accuracy: Domain, Owner, Lifecycle, Tier, Data Class, Experts, Compliance, and Service Endpoints.

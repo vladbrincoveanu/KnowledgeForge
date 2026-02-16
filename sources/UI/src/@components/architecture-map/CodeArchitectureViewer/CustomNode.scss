@@ -1,0 +1,61 @@
+.custom-node {
+  min-width: 180px;
+  max-width: 350px;
+  min-height: 100px;
+  background: white;
+  border: 3px solid;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s ease;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
+
+  &:hover {
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    transform: translateY(-2px);
+  }
+
+  .node-header {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    background: inherit;
+    border-radius: 5px 5px 0 0;
+
+    .node-type {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #546e7a;
+    }
+  }
+
+  .node-content {
+    padding: 16px 12px;
+
+    .node-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #2c3e50;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+  }
+
+  .react-flow__handle {
+    width: 10px;
+    height: 10px;
+    background: #6b7280;
+    border: 2px solid white;
+
+    &.react-flow__handle-top {
+      top: -5px;
+    }
+
+    &.react-flow__handle-bottom {
+      bottom: -5px;
+    }
+  }
+}
