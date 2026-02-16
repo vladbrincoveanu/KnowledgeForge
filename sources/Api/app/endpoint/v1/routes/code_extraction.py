@@ -13,13 +13,10 @@ from typing import Any, Optional
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
-from app.domain.models.code_entities import ExtractionResult, IncrementalScanResult
-from app.infrastructure.graph.neo4j_manager import Neo4jGraphManager
-from app.infrastructure.storage.metadata_store import MetadataStore
 from app.infrastructure.llm.llm_manager import LLMManager
 from app.services.code_extraction.c4_extractor import C4ArchitectureExtractor
-from app.services.service_extraction.github_downloader import GitHubDownloader
-from app.endpoint.v1.dependencies import get_neo4j_manager, get_llm_manager, get_metadata_store
+from app.utils.github_downloader import GitHubDownloader
+from app.endpoint.v1.dependencies import get_llm_manager
 from app.utils.security import safe_extract_zip, validate_local_repo_path
 
 logger = logging.getLogger(__name__)
@@ -688,17 +685,10 @@ async def run_c4_extraction(
         task['external_deps_count'] = len(c4_architecture['system_context'].get('external_dependencies', []))
         task['c4_architecture'] = c4_architecture
 
-        # Save to JSON file for easy debugging
+        # Save to JSON file
         _save_c4_to_json(task_id, c4_architecture)
 
         logger.info(f"{task['message']} (progress: {int(task['progress'] * 100)}%)")
-
-        # Store in Neo4j (simplified for C4 model)
-        task['progress'] = 0.8
-        task['message'] = 'Storing architecture in graph database'
-        logger.info(f"{task['message']} (progress: {int(task['progress'] * 100)}%)")
-        
-        await store_c4_in_neo4j(task_id, c4_architecture, append_mode=append_mode)
         
         task['progress'] = 1.0
         task['status'] = 'completed'
@@ -725,187 +715,6 @@ async def run_c4_extraction(
             logger.error(f"Task {task_id} failed: {task['message']}")
         else:
             logger.error(f"Task {task_id} disappeared during error handling")
-
-
-async def store_c4_in_neo4j(
-    task_id: str,
-    c4_architecture: dict[str, Any],
-    append_mode: bool = True,
-):
-    """Store C4 architecture in Neo4j (simplified, clean structure).
-    
-    Args:
-        task_id: Task identifier
-        c4_architecture: C4 architecture data
-        append_mode: If True, append to existing data. If False, clear first.
-    """
-    try:
-        neo4j_manager = get_neo4j_manager()
-        
-        if not neo4j_manager.is_connected():
-            neo4j_manager.connect()
-        
-        # Clear existing data if not in append mode
-        if not append_mode:
-            logger.info("Clearing existing C4 architecture data from Neo4j")
-            neo4j_manager.execute_query(
-                """
-                MATCH (n)
-                WHERE n:System OR n:Container OR n:Component OR n:ExternalService
-                DETACH DELETE n
-                """
-            )
-        
-        # Store system context (Level 1)
-        system = c4_architecture['system_context']
-        system_ctx = system  # alias for clarity
-        
-        # Get repository URL for unique identification
-        repo_url = system_ctx.get('repository_url', '')
-        
-        # Use both name AND repository_url for MERGE to ensure different repos 
-        # create separate System nodes even if they have the same project name
-        neo4j_manager.execute_query(
-            """
-            MERGE (s:System {name: $name, repository_url: $repository_url})
-            SET s.purpose = $purpose,
-                s.c4_level = $c4_level,
-                s.domain = $domain,
-                s.owner = $owner,
-                s.status = $status,
-                s.tier = $tier,
-                s.data_class = $data_class,
-                s.active_experts = $active_experts,
-                s.compliance = $compliance,
-                s.updated_at = datetime()
-            """,
-            name=system['name'],
-            repository_url=repo_url,
-            purpose=system['purpose'],
-            c4_level=system['c4_level'],
-            domain=system_ctx.get('business_domain', system_ctx.get('domain', 'Unclassified')),
-            owner=system_ctx.get('owner_team', system_ctx.get('owner', 'Unassigned')),
-            status=system_ctx.get('status', 'Unknown'),
-            tier=system_ctx.get('criticality', system_ctx.get('tier', 'Unknown')),
-            data_class=system_ctx.get('data_class', 'Unknown'),
-            active_experts=system_ctx.get('active_experts', 0),
-            compliance=system_ctx.get('compliance', 'UNKNOWN'),
-        )
-        
-        # Store external dependencies
-        for dep in system.get('external_dependencies', []):
-            neo4j_manager.execute_query(
-                """
-                MERGE (e:ExternalService {name: $name})
-                SET e.type = $type,
-                    e.url = $url,
-                    e.dependency_type = $dependency_type,
-                    e.classification_confidence = $classification_confidence,
-                    e.classification_reasoning = $classification_reasoning
-                WITH e
-                MATCH (s:System {name: $system_name, repository_url: $repository_url})
-                MERGE (s)-[r:DEPENDS_ON]->(e)
-                SET r.detected_from = $detected_from
-                """,
-                name=dep['name'],
-                type=dep['type'],
-                url=dep.get('url', ''),
-                dependency_type=dep.get('dependency_type', 'UNKNOWN'),
-                classification_confidence=dep.get('classification_confidence', 0.5),
-                classification_reasoning=dep.get('classification_reasoning', ''),
-                system_name=system['name'],
-                repository_url=system.get('repository_url', ''),
-                detected_from=dep.get('detected_from', '')
-            )
-        
-        # Store containers (Level 2) - inherit system-level fields for each container
-        for container in c4_architecture['containers']:
-            neo4j_manager.execute_query(
-                """
-                MERGE (c:Container {name: $name})
-                SET c.container_type = $container_type,
-                    c.technology = $technology,
-                    c.protocol = $protocol,
-                    c.c4_level = $c4_level,
-                    c.path = $path,
-                    c.owner = $owner,
-                    c.domain = $domain,
-                    c.status = $status,
-                    c.tier = $tier,
-                    c.data_class = $data_class,
-                    c.active_experts = $active_experts,
-                    c.compliance = $compliance,
-                    c.repository_url = $repository_url
-                WITH c
-                MATCH (s:System {name: $system_name, repository_url: $repository_url})
-                MERGE (s)-[:CONTAINS]->(c)
-                """,
-                name=container['name'],
-                container_type=container['container_type'],
-                technology=container['technology'],
-                protocol=container['protocol'],
-                c4_level=container['c4_level'],
-                path=container['path'],
-                repository_url=repo_url,
-                # Inherit from system context
-                owner=system_ctx.get('owner_team', system_ctx.get('owner', 'Unassigned')),
-                domain=system_ctx.get('business_domain', system_ctx.get('domain', 'Unclassified')),
-                status=system_ctx.get('status', 'Unknown'),
-                tier=system_ctx.get('criticality', system_ctx.get('tier', 'Unknown')),
-                data_class=system_ctx.get('data_class', 'Unknown'),
-                active_experts=system_ctx.get('active_experts', 0),
-                compliance=system_ctx.get('compliance', 'UNKNOWN'),
-                system_name=system['name']
-            )
-        
-        # Store components (Level 3) - inherit system-level fields
-        for component in c4_architecture['components']:
-            neo4j_manager.execute_query(
-                """
-                MERGE (comp:Component {name: $name})
-                SET comp.component_type = $component_type,
-                    comp.c4_level = $c4_level,
-                    comp.endpoint_path = $endpoint_path,
-                    comp.endpoint_method = $endpoint_method,
-                    comp.function_name = $function_name,
-                    comp.file = $file,
-                    comp.owner = $owner,
-                    comp.domain = $domain,
-                    comp.status = $status,
-                    comp.tier = $tier,
-                    comp.data_class = $data_class,
-                    comp.active_experts = $active_experts,
-                    comp.compliance = $compliance
-                WITH comp
-                MATCH (c:Container {name: $container_name})
-                MERGE (c)-[:EXPOSES]->(comp)
-                """,
-                name=component['name'],
-                component_type=component['component_type'],
-                c4_level=component['c4_level'],
-                endpoint_path=component.get('endpoint_path', ''),
-                endpoint_method=component.get('endpoint_method', ''),
-                function_name=component.get('function_name', ''),
-                file=component.get('file', ''),
-                container_name=component['container'],
-                # Inherit from system context
-                owner=system_ctx.get('owner_team', system_ctx.get('owner', 'Unassigned')),
-                domain=system_ctx.get('business_domain', system_ctx.get('domain', 'Unclassified')),
-                status=system_ctx.get('status', 'Unknown'),
-                tier=system_ctx.get('criticality', system_ctx.get('tier', 'Unknown')),
-                data_class=system_ctx.get('data_class', 'Unknown'),
-                active_experts=system_ctx.get('active_experts', 0),
-                compliance=system_ctx.get('compliance', 'UNKNOWN'),
-            )
-        
-        logger.info(
-            f"Stored C4 architecture: {len(c4_architecture['containers'])} containers, "
-            f"{len(c4_architecture['components'])} components in Neo4j"
-        )
-    
-    except (ConnectionError, RuntimeError) as e:
-        logger.error(f"Failed to store C4 architecture in Neo4j: {e}", exc_info=True)
-        raise
 
 
 @router.get(
@@ -986,40 +795,6 @@ async def delete_scan_task(task_id: str):
     del scan_tasks[task_id]
     
     return {"message": "Task deleted successfully"}
-
-
-@router.post("/clear")
-async def clear_architecture():
-    """Clear all architecture data from Neo4j."""
-    try:
-        neo4j_manager = get_neo4j_manager()
-        
-        if not neo4j_manager.is_connected():
-            neo4j_manager.connect()
-        
-        # Clear all nodes and relationships
-        result = neo4j_manager.execute_query(
-            """
-            MATCH (n)
-            WHERE n:System OR n:Container OR n:Component OR n:ExternalService
-            WITH n
-            DETACH DELETE n
-            RETURN count(n) as deleted_count
-            """
-        )
-        
-        deleted_count = result[0]['deleted_count'] if result else 0
-        logger.info(f"Cleared {deleted_count} nodes from Neo4j")
-        
-        return {
-            "status": "success",
-            "message": f"Cleared {deleted_count} nodes from database",
-            "deleted_count": deleted_count
-        }
-    
-    except (ConnectionError, RuntimeError) as e:
-        logger.error(f"Failed to clear architecture: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to clear architecture: {str(e)}")
 
 
 @router.get(

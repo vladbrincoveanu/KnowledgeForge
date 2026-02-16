@@ -48,30 +48,11 @@ async def lifespan(app: FastAPI):
 
 openapi_tags = [
     {
-        "name": "service-extraction",
-        "description": (
-            "Extract microservice architecture from GitHub repositories or ZIP archives. "
-            "Detects services, languages, frameworks, owners, compliance scores, "
-            "API surface types, and inter-service communications."
-        ),
-    },
-    {
         "name": "code-extraction",
         "description": (
-            "Extract C4 architecture model (Context, Container, Component, Code levels) "
+            "Extract C4 architecture model (Context, Container, Component levels) "
             "from source repositories. Returns an architecture graph for visualization."
         ),
-    },
-    {
-        "name": "ontology",
-        "description": (
-            "Query and manage extracted ontology data: entities, relationships, "
-            "and task status for ontology extraction jobs."
-        ),
-    },
-    {
-        "name": "graph",
-        "description": "Query the Neo4j architecture graph: nodes, edges, and full graphs.",
     },
     {
         "name": "health",
@@ -87,12 +68,10 @@ openapi_tags = [
 app = FastAPI(
     title="KnowledgeForge API",
     description=(
-        "**KnowledgeForge** automatically extracts C4 architecture models and service "
-        "catalogs from source code repositories.\n\n"
+        "**KnowledgeForge** automatically extracts C4 architecture models "
+        "from source code repositories.\n\n"
         "## Key capabilities\n"
-        "- **Service extraction**: discovers microservices, detects owners, compliance, "
-        "API surface types, deployment targets, business domains, and inter-service communications\n"
-        "- **C4 extraction**: builds Context → Container → Component → Code levels from "
+        "- **C4 extraction**: builds Context → Container → Component levels from "
         "GitHub repos or uploaded ZIP archives\n"
         "- **Real-time updates**: WebSocket channel streams extraction progress\n\n"
         "## Authentication\n"
@@ -121,19 +100,13 @@ app.add_middleware(RequestIDMiddleware)
 # Import and include all route modules
 try:
     from app.endpoint.v1.routes import (
-        data,
-        extraction,
         health,
         websocket,
         code_extraction,
-        service_extraction,
     )
 
     app.include_router(health.router, prefix="/api/v1/health")
-    app.include_router(data.router, prefix="/api/v1")
-    app.include_router(extraction.router, prefix="/api/v1/extract")
     app.include_router(code_extraction.router, prefix="/api/v1/code")
-    app.include_router(service_extraction.router, prefix="/api/v1/services")
     app.include_router(websocket.router)  # WebSocket doesn't need prefix
 
     logger.info("All route modules loaded successfully")

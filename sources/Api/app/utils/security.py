@@ -7,6 +7,7 @@ ensure consistent validation across endpoints.
 import re
 import zipfile
 from pathlib import Path
+from typing import Optional
 from urllib.parse import urlparse
 
 # Regex for safe git owner/repo names (letters, digits, hyphens, underscores, dots)
@@ -17,7 +18,7 @@ _SAFE_BRANCH = re.compile(r'^[a-zA-Z0-9._\-/]{1,200}$')
 MAX_ZIP_UNCOMPRESSED_BYTES = 500 * 1024 * 1024
 
 
-def validate_github_url(url: str) -> tuple[str, str, str | None]:
+def validate_github_url(url: str) -> tuple[str, str, Optional[str]]:
     """Validate a GitHub repository URL and return (owner, repo, branch).
 
     Enforces:
@@ -64,7 +65,7 @@ def validate_github_url(url: str) -> tuple[str, str, str | None]:
         raise ValueError(f"Invalid GitHub repo name: {repo!r}")
 
     # Detect branch from /tree/<branch> or fragment (#branch)
-    branch: str | None = None
+    branch: Optional[str] = None
     if len(path_parts) > 3 and path_parts[2] in ("tree", "blob"):
         branch = "/".join(path_parts[3:])
     elif parsed.fragment:
@@ -121,7 +122,7 @@ def safe_extract_zip(zip_path: Path, extract_dir: Path) -> None:
         zf.extractall(extract_dir)
 
 
-def validate_local_repo_path(raw_path: str, allowed_prefixes: list[str] | None = None) -> Path:
+def validate_local_repo_path(raw_path: str, allowed_prefixes: Optional[list[str]] = None) -> Path:
     """Resolve and validate a user-supplied local repository path.
 
     Prevents path traversal by:

@@ -11,8 +11,6 @@ from pathlib import Path
 from typing import Any, Optional
 
 from app.utils.fs_utils import limited_rglob
-from app.services.code_extraction.python_ast_extractor import PythonASTExtractor
-from app.domain.models.code_entities import CodeEntityType, CodeEntity
 from app.services.c4.containers import is_deployable_service
 
 logger = logging.getLogger(__name__)
@@ -42,40 +40,6 @@ def extract_route_info_from_decorators(
                 else:
                     path = f"/api/{func_name.replace('_', '-')}"
                 return {'method': method.upper(), 'path': path}
-    return None
-
-
-def classify_component(class_entity: CodeEntity) -> Optional[str]:
-    """Classify a class as an architectural component type.
-
-    Returns component type or None if not architecturally significant.
-    """
-    name = class_entity.name.lower()
-    file_path = class_entity.file_path.lower()
-
-    if 'config' in name or 'settings' in name or 'config' in file_path:
-        return 'Configuration'
-    if 'model' in name or 'schema' in name or 'entity' in name or 'models.py' in file_path:
-        return 'Data Model'
-    if 'service' in name or 'manager' in name or 'handler' in name:
-        return 'Service'
-    if 'controller' in name or 'api' in name or 'router' in name:
-        return 'Controller'
-    if 'gateway' in name or 'client' in name or 'adapter' in name:
-        return 'Integration'
-    if 'repository' in name or 'dao' in name:
-        return 'Repository'
-
-    base_classes = class_entity.attributes.get('base_classes', [])
-    if base_classes:
-        for base in base_classes:
-            if any(keyword in str(base).lower() for keyword in ['base', 'abc', 'protocol']):
-                return 'Base Class'
-
-    decorators = class_entity.attributes.get('decorators', [])
-    if decorators:
-        return 'Decorated Component'
-
     return None
 
 
@@ -342,21 +306,20 @@ def extract_level3_components(
     repo_path: Path,
     containers: dict,
     components: dict,
-    detailed_entities: list,
+    detailed_entities: list,  # Deprecated parameter, kept for compatibility
     language_detectors: list,
     llm_manager: Any = None,
 ) -> None:
-    """Extract Level 3: Components using AST for Python and LanguageDetectors for others.
+    """Extract Level 3: Components using regex patterns for route detection.
 
     Modifies components dict in-place.
     """
     from app.services.code_extraction.language_detectors import PythonLanguageDetector
 
-    logger.info("Extracting components using AST for Python and detectors for other languages...")
+    logger.info("Extracting components using regex patterns for route detection...")
     components_by_container = defaultdict(list)
 
-    # 1. Extract Python entry points using AST
-    python_extractor = PythonASTExtractor(repo_path)
+    # 1. Extract Python entry points using simple regex (no AST)
     python_files = list(limited_rglob(repo_path, "*.py"))
 
     excluded_dirs = {'node_modules', 'test', 'tests', '__tests__', '__pycache__', '.git', 'venv', '.venv'}
@@ -365,92 +328,44 @@ def extract_level3_components(
         if not any(excluded in f.parts for excluded in excluded_dirs)
     ]
 
-    logger.info(f"Scanning {len(python_files)} Python files for entry point decorators...")
+    logger.info(f"Scanning {len(python_files)} Python files for route decorators...")
+
+    # Simple regex pattern for route decorators
+    route_pattern = re.compile(r'@(?:app|router|api)\.(?:get|post|put|delete|patch)\([\'"]([^\'"]+)[\'"]')
 
     for py_file in python_files:
         try:
-            entities, _ = python_extractor.extract(py_file)
+            with open(py_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Find all route decorators
+            matches = route_pattern.findall(content)
+            
+            for route_path in matches:
+                container = infer_container_from_path(py_file, repo_path, containers)
+                rel_path = py_file.relative_to(repo_path)
 
-            for entity in entities:
-                if entity.entity_type != CodeEntityType.FUNCTION:
-                    continue
+                component = {
+                    'c4_level': 3,
+                    'type': 'component',
+                    'name': f"Endpoint {route_path}",
+                    'component_type': 'API Endpoint',
+                    'container': container,
+                    'file': str(rel_path),
+                    'endpoint_path': route_path,
+                }
 
-                decorators = entity.attributes.get('decorators', [])
-                if not decorators:
-                    continue
-
-                is_entry = any(is_route_decorator(dec) for dec in decorators)
-
-                if is_entry:
-                    endpoint_info = extract_route_info_from_decorators(decorators, entity.name)
-                    if endpoint_info:
-                        container = infer_container_from_path(py_file, repo_path, containers)
-                        rel_path = py_file.relative_to(repo_path)
-
-                        component = {
-                            'c4_level': 3,
-                            'type': 'component',
-                            'name': f"{endpoint_info['method']} {endpoint_info['path']}",
-                            'component_type': 'API Endpoint',
-                            'container': container,
-                            'file': str(rel_path),
-                            'line_start': entity.line_start,
-                            'signature': entity.signature,
-                            'documentation': entity.documentation,
-                            'endpoint_path': endpoint_info['path'],
-                            'endpoint_method': endpoint_info['method'],
-                        }
-
-                        component_id = f"endpoint_{entity.id}"
-                        components[component_id] = component
-                        components_by_container[container].append(component)
+                component_id = f"endpoint_{hash(route_path)}_{py_file.stem}"
+                components[component_id] = component
+                components_by_container[container].append(component)
 
         except Exception as e:
             logger.warning(f"Failed to parse {py_file}: {e}")
 
     logger.info(f"Found {len(components)} Python entry point components")
 
-    # 1b. Extract class-level components
-    class_component_count = 0
-    for entity in detailed_entities:
-        if entity.entity_type != CodeEntityType.CLASS:
-            continue
-
-        component_type = classify_component(entity)
-        if not component_type:
-            continue
-
-        try:
-            file_path = Path(entity.file_path)
-            container = infer_container_from_path(file_path, repo_path, containers)
-            rel_path = file_path.relative_to(repo_path)
-        except Exception:
-            container = None
-            rel_path = entity.file_path
-
-        component_id = f"class_{entity.id}"
-        if component_id in components:
-            continue
-
-        component = {
-            'c4_level': 3,
-            'type': 'component',
-            'name': entity.name,
-            'component_type': component_type,
-            'container': container,
-            'file': str(rel_path),
-            'line_start': entity.line_start,
-            'signature': entity.signature,
-            'documentation': entity.documentation,
-            'component_kind': 'Class',
-        }
-
-        components[component_id] = component
-        components_by_container[container].append(component)
-        class_component_count += 1
-
-    if class_component_count:
-        logger.info(f"Added {class_component_count} class-level components")
+    # Skip class-level components (Level 4 not implemented yet)
+    # If you need class-level extraction, implement Level 4 first
 
     # 2. Fall back to LanguageDetectors for non-Python files
     for detector in language_detectors:
