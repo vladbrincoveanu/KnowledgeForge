@@ -1,0 +1,28 @@
+.settings {
+  padding: 20px;
+  
+  h2 {
+    margin-bottom: 16px;
+  }
+
+  .settings-form {
+    max-width: 600px;
+    
+    .form-group {
+      margin-bottom: 16px;
+      
+      label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+      }
+      
+      input, select, textarea {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+    }
+  }
+}
