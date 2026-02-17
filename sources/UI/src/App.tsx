@@ -265,15 +265,6 @@ const MainContent: React.FC = () => {
     };
   }, [handleWebSocketMessage, loadAvailableTasks]);
 
-  // Effect to load graph data when tasks are completed
-  useEffect(() => {
-    Object.values(extractionTasks).forEach(task => {
-      if (task.status === 'completed') {
-        loadGraphData(task.taskId);
-      }
-    });
-  }, [extractionTasks, loadGraphData]);
-
   const handleFilesUploaded = useCallback(
     async (uploadedFiles: UploadedFile[]) => {
       setFiles(uploadedFiles);
