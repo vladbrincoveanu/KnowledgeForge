@@ -18,12 +18,29 @@ Orchestrates the detection of:
 
 import logging
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+from .canonical_models import (
+    CanonicalEntity,
+    CanonicalEntityType,
+    CanonicalFieldValue,
+    CanonicalRelationship,
+    CanonicalRelationshipType,
+    CanonicalSnapshot,
+    EffectiveFieldValue,
+    FieldCandidate,
+    deterministic_id,
+)
 from .system_detector import SystemDetector
 from .dependency_detector import DependencyDetector
+from .feature_flags import C4FeatureFlags
+from .harvesters import RepositoryArtifactHarvester, ServiceUniverseHarvester
+from .merge_engine import ContextMergeEngine
 from .metadata_detector import MetadataDetector
+from .precedence import FieldPrecedenceResolver
+from .stores import CanonicalSnapshotStore, OverrideStore
 
 logger = logging.getLogger(__name__)
 
@@ -42,11 +59,18 @@ class ContextManager:
         self.repo_path = Path(repo_path).resolve()
         self.llm_manager = llm_manager
         self.containers = containers or {}
+        self.flags = C4FeatureFlags.from_env()
 
         # Initialize detectors
         self.system_detector = SystemDetector(repo_path, llm_manager)
         self.dependency_detector = DependencyDetector(repo_path, llm_manager)
         self.metadata_detector = MetadataDetector(repo_path, llm_manager, containers)
+        self.service_universe_harvester = ServiceUniverseHarvester(self.repo_path)
+        self.repo_artifact_harvester = RepositoryArtifactHarvester(self.repo_path)
+        self.precedence_resolver = FieldPrecedenceResolver()
+        self.snapshot_store = CanonicalSnapshotStore()
+        self.override_store = OverrideStore()
+        self.merge_engine = ContextMergeEngine()
 
     def extract_context(self) -> dict[str, Any]:
         """Extract complete system context (Level 1).
@@ -69,6 +93,7 @@ class ContextManager:
 
         # External dependencies
         external_deps = self.dependency_detector.detect_external_dependencies()
+        deployment_deps = self.dependency_detector.detect_deployment_dependencies()
         dependency_freshness_alerts = self.dependency_detector.detect_dependency_freshness_alerts()
 
         # Languages and frameworks
@@ -106,6 +131,36 @@ class ContextManager:
         # Owner and contributor stats
         contributor_stats = self.metadata_detector.get_owner_contributor_stats(max_contributors=5)
         on_call_channel = self.metadata_detector.detect_on_call_channel()
+        data_steward = (
+            self.metadata_detector.detect_data_steward(owner_team)
+            if self.flags.enable_owner_steward
+            else None
+        )
+        squad = (
+            self.metadata_detector.detect_squad(owner_team)
+            if self.flags.enable_owner_steward
+            else None
+        )
+        sensitivity_tags = (
+            self.metadata_detector.infer_sensitivity_tags(data_class)
+            if self.flags.enable_sensitivity_tags
+            else []
+        )
+        quality_score = (
+            self.metadata_detector.get_quality_score()
+            if self.flags.enable_quality_score
+            else None
+        )
+        usage_stats = (
+            self.metadata_detector.get_usage_stats()
+            if self.flags.enable_usage_stats
+            else {}
+        )
+        column_lineage_summary = (
+            self.metadata_detector.get_column_lineage_summary()
+            if self.flags.enable_column_lineage
+            else {}
+        )
 
         # Compliance risk assessment (pure calculation from extracted metadata)
         compliance, compliance_confidence, compliance_factors = self.metadata_detector.assess_compliance_risk(
@@ -137,6 +192,7 @@ class ContextManager:
             "description": llm_description or system_purpose,
             "llm_description": llm_description or system_purpose,
             "external_dependencies": external_deps,
+            "deployment_dependencies": deployment_deps,
             "dependency_freshness_alerts": dependency_freshness_alerts,
             "actors": actors,
             "languages": languages,
@@ -192,6 +248,19 @@ class ContextManager:
             "commit_count_180d": git_activity.get("commit_count_180d", 0),
             "dora_metrics": dora_metrics,
             "on_call_channel": on_call_channel,
+            "data_steward": data_steward,
+            "sensitivity_tags": sensitivity_tags,
+            "quality_score": quality_score,
+            "usage_stats": usage_stats,
+            "column_lineage_summary": column_lineage_summary,
+            "squad": squad,
+            "feature_flags": {
+                "owner_steward": self.flags.enable_owner_steward,
+                "sensitivity_tags": self.flags.enable_sensitivity_tags,
+                "quality_score": self.flags.enable_quality_score,
+                "usage_stats": self.flags.enable_usage_stats,
+                "column_lineage": self.flags.enable_column_lineage,
+            },
 
             # Legacy field aliases for backwards compatibility
             "owner_team": owner_team,
@@ -210,6 +279,158 @@ class ContextManager:
         logger.info(f"✓ External dependencies: {len(external_deps)}")
 
         return context
+
+    def extract_canonical_snapshot(self) -> CanonicalSnapshot:
+        """Extract and persist a canonical snapshot for the current system."""
+        context = self.extract_context()
+        system_name = context.get("name", self.repo_path.name)
+        system_id = deterministic_id("system", system_name)
+
+        raw_candidates = self._collect_candidates(context)
+        canonical_fields: dict[str, CanonicalFieldValue] = {}
+        for field_name in (
+            "owner",
+            "domain",
+            "lifecycle",
+            "tier",
+            "data_class",
+            "experts",
+            "compliance_flags",
+        ):
+            field_candidates = [
+                candidate
+                for candidate in raw_candidates
+                if candidate.field_name == field_name
+            ]
+            canonical_fields[field_name] = self.precedence_resolver.resolve(
+                field_name, field_candidates
+            )
+
+        system_entity = CanonicalEntity(
+            entity_id=system_id,
+            entity_type=CanonicalEntityType.SOFTWARE_SYSTEM,
+            name=system_name,
+            fields=canonical_fields,
+        )
+
+        external_entities: list[CanonicalEntity] = []
+        relationships: list[CanonicalRelationship] = []
+        for dependency in context.get("external_dependencies", []):
+            dependency_name = dependency.get("name") or dependency.get("service")
+            if not dependency_name:
+                continue
+            external_id = deterministic_id("external", dependency_name)
+            external_entities.append(
+                CanonicalEntity(
+                    entity_id=external_id,
+                    entity_type=CanonicalEntityType.EXTERNAL_SYSTEM,
+                    name=dependency_name,
+                    fields={},
+                )
+            )
+            relationships.append(
+                CanonicalRelationship(
+                    relationship_id=deterministic_id(
+                        system_id,
+                        CanonicalRelationshipType.DEPENDS_ON.value,
+                        external_id,
+                    ),
+                    source_entity_id=system_id,
+                    relation_type=CanonicalRelationshipType.DEPENDS_ON,
+                    target_entity_id=external_id,
+                    confidence=float(dependency.get("classification_confidence", 1.0)),
+                    provenance=[],
+                )
+            )
+
+        extracted_at = datetime.now(timezone.utc)
+        snapshot_id = deterministic_id(
+            system_id,
+            extracted_at.isoformat(),
+            ",".join(sorted(entity.entity_id for entity in [system_entity, *external_entities])),
+        )
+        snapshot = CanonicalSnapshot(
+            system_id=system_id,
+            snapshot_id=snapshot_id,
+            extracted_at=extracted_at,
+            entities=[system_entity, *external_entities],
+            relationships=relationships,
+        )
+        return self.snapshot_store.save(snapshot)
+
+    def build_effective_view(
+        self, system_id: str, snapshot_id: str
+    ) -> dict[str, EffectiveFieldValue]:
+        """Build generated+override effective field view for a snapshot."""
+        snapshot = self.snapshot_store.get(system_id, snapshot_id)
+        if snapshot is None:
+            return {}
+        system_entities = [
+            entity
+            for entity in snapshot.entities
+            if entity.entity_type == CanonicalEntityType.SOFTWARE_SYSTEM
+        ]
+        if not system_entities:
+            return {}
+
+        system_entity = system_entities[0]
+        merged: dict[str, EffectiveFieldValue] = {}
+        for field_name, generated in system_entity.fields.items():
+            field_path = f"system.{field_name}"
+            override = self.override_store.get(system_id, field_path)
+            merged[field_name] = self.merge_engine.merge_field(generated, override)
+        return merged
+
+    def _collect_candidates(self, context: dict[str, Any]) -> list[FieldCandidate]:
+        """Collect candidates from harvesters and deterministic context mappings."""
+        system_name = context.get("name", self.repo_path.name)
+        candidates = self.service_universe_harvester.harvest(system_name)
+        candidates.extend(self.repo_artifact_harvester.harvest())
+
+        context_map = {
+            "owner": ("owner", 0.7),
+            "domain": ("domain", 0.7),
+            "lifecycle": ("status", 0.7),
+            "tier": ("tier", 0.7),
+            "data_class": ("data_class", 0.7),
+            "experts": ("active_experts", 0.75),
+        }
+        now = datetime.now(timezone.utc)
+        for field_name, (context_key, confidence) in context_map.items():
+            value = context.get(context_key)
+            if value in (None, "", []):
+                continue
+            candidates.append(
+                FieldCandidate(
+                    field_name=field_name,
+                    value=value,
+                    source_type="heuristic",
+                    source_path="context_manager",
+                    source_hash="",
+                    artifact_version="",
+                    extraction_rule=f"context_map:{context_key}",
+                    confidence=confidence,
+                    last_seen=now,
+                )
+            )
+
+        compliance_factors = context.get("compliance_factors", [])
+        if compliance_factors:
+            candidates.append(
+                FieldCandidate(
+                    field_name="compliance_flags",
+                    value=compliance_factors,
+                    source_type="heuristic",
+                    source_path="context_manager",
+                    source_hash="",
+                    artifact_version="",
+                    extraction_rule="context_map:compliance_factors",
+                    confidence=0.6,
+                    last_seen=now,
+                )
+            )
+
+        return candidates
 
     def build_context_relationships(self, system_context: dict[str, Any]) -> list[dict[str, Any]]:
         """Build relationships for the Context diagram.
@@ -234,7 +455,9 @@ class ContextManager:
 
         # System -> External dependency relationships
         for dep in system_context.get('external_dependencies', []):
-            dep_name = dep.get('name') or dep.get('service') or 'External Service'
+            dep_name = self._normalize_logical_name(
+                dep.get('name') or dep.get('service') or 'External Service'
+            )
             dep_type = dep.get('type') or dep.get('category') or 'external'
             relationships.append({
                 "source": system_name,
@@ -244,6 +467,27 @@ class ContextManager:
             })
 
         return relationships
+
+    def _normalize_logical_name(self, value: str) -> str:
+        """Normalize raw endpoint/container-style names to a logical label."""
+        label = str(value or "").strip()
+        if not label:
+            return "External Service"
+
+        # Strip scheme/path if URL-like
+        label = re.sub(r"^https?://", "", label, flags=re.IGNORECASE)
+        label = label.split("/", 1)[0]
+
+        # Remove trailing :port
+        label = re.sub(r":\d{2,5}$", "", label)
+
+        # Keep only host/service token and prettify
+        label = label.split(".", 1)[0]
+        label = label.replace("_", " ").replace("-", " ").strip()
+        if not label:
+            return "External Service"
+
+        return label.title()
 
     def _generate_llm_description(self, system_name: str, purpose: str, domain: str, 
                                    owner: str, tier: str, status: str, 
