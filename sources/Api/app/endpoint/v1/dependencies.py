@@ -14,9 +14,12 @@ from app.infrastructure.llm.llm_manager import LLMManager
 from app.infrastructure.storage.metadata_store import (
     PostgreSQLMetadataStore as MetadataStore,
 )
+from app.services.c4.context.level1_context_service import Level1ContextService
 from utils.config import get_config
 
 logger = logging.getLogger(__name__)
+
+_level1_context_service_singleton: Optional[Level1ContextService] = None
 
 
 def get_neo4j_manager() -> Neo4jGraphManager:
@@ -70,3 +73,17 @@ def get_metadata_store() -> MetadataStore:
     """Create a metadata store for the current request."""
     config = get_config()
     return MetadataStore(config=config)
+
+
+def get_level1_context_service() -> Level1ContextService:
+    """Return singleton context service to preserve in-memory state in dev/tests."""
+    global _level1_context_service_singleton
+    if _level1_context_service_singleton is None:
+        _level1_context_service_singleton = Level1ContextService()
+    return _level1_context_service_singleton
+
+
+def reset_level1_context_service_for_tests() -> None:
+    """Reset singleton for test isolation."""
+    global _level1_context_service_singleton
+    _level1_context_service_singleton = None
