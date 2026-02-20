@@ -44,6 +44,10 @@ __all__ = [
     "APPROVED_RELATIONSHIP_TYPES",
     "REVIEW_STATUSES",
     "VALID_ROLES",
+    "QualityGateThresholds",
+    "WpsQualityGateResult",
+    "evaluate_wps_quality_gate",
+    "can_rollout_system",
 ]
 
 
@@ -65,6 +69,10 @@ _LAZY_IMPORTS = {
     "CanonicalSnapshotStore": ("app.services.c4.context.stores", "CanonicalSnapshotStore"),
     "OverrideStore": ("app.services.c4.context.stores", "OverrideStore"),
     "ContextMergeEngine": ("app.services.c4.context.merge_engine", "ContextMergeEngine"),
+    "QualityGateThresholds": ("app.services.c4.context.quality_gate", "QualityGateThresholds"),
+    "WpsQualityGateResult": ("app.services.c4.context.quality_gate", "WpsQualityGateResult"),
+    "evaluate_wps_quality_gate": ("app.services.c4.context.quality_gate", "evaluate_wps_quality_gate"),
+    "can_rollout_system": ("app.services.c4.context.quality_gate", "can_rollout_system"),
 }
 
 

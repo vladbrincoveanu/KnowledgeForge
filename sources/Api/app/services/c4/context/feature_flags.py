@@ -1,4 +1,4 @@
-"""Feature flags for C4 context extraction and exports."""
+"""Feature flags for C4 context extraction, quality gate, and exports."""
 
 from __future__ import annotations
 
@@ -15,8 +15,9 @@ def _env_bool(name: str, default: bool) -> bool:
 
 @dataclass(frozen=True)
 class C4FeatureFlags:
-    """Runtime feature flags controlling roadmap capability rollout."""
+    """Runtime feature flags controlling roadmap capability rollout and WPS quality gates."""
 
+    # Owner/steward detection
     enable_owner_steward: bool = True
     enable_sensitivity_tags: bool = True
     enable_quality_score: bool = False
@@ -25,6 +26,10 @@ class C4FeatureFlags:
     enable_platform_collapse: bool = True
     enable_structurizr_export: bool = True
     enable_mermaid_export: bool = True
+
+    # WPS quality gate
+    enable_wps_quality_gate: bool = True
+    enable_wps_only_rollout: bool = True
 
     @classmethod
     def from_env(cls) -> "C4FeatureFlags":
@@ -53,4 +58,6 @@ class C4FeatureFlags:
                 "KF_ENABLE_MERMAID_EXPORT",
                 cls.enable_mermaid_export,
             ),
+            enable_wps_quality_gate=_env_bool("C4_ENABLE_WPS_QUALITY_GATE", True),
+            enable_wps_only_rollout=_env_bool("C4_ENABLE_WPS_ONLY_ROLLOUT", True),
         )
