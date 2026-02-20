@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Database,
   BarChart3,
+  ClipboardCheck,
 } from 'lucide-react';
 import './App.scss';
 import OntologyResults from './@components/ontology-results/OntologyResults/OntologyResults';
@@ -26,6 +27,7 @@ import Notification from './@components/notification/Notification';
 import FileUploader from './@components/upload-extract/FileUploader/FileUploader';
 import SystemMetrics from './@components/system-metrics/SystemMetrics/SystemMetrics';
 import Settings from './@components/settings/Settings/Settings';
+import BusinessContextValidation from './@components/BusinessContextValidation';
 import { ontologyAPI, wsService } from './services/api';
 import { IncrementalSummary } from '@/types';
 
@@ -104,6 +106,12 @@ const Navigation: React.FC<NavigationProps> = ({
       label: 'Code Architecture',
       icon: <Code size={20} />,
       path: '/code-architecture',
+    },
+    {
+      id: 'business-context',
+      label: 'Business Context',
+      icon: <ClipboardCheck size={20} />,
+      path: '/business-context',
     },
     {
       id: 'metrics',
@@ -447,6 +455,7 @@ const MainContent: React.FC = () => {
     const path = location.pathname;
     if (path === '/') return 'upload';
     if (path === '/code-architecture') return 'code-architecture';
+    if (path === '/business-context') return 'business-context';
     if (path === '/metrics') return 'metrics';
     if (path === '/settings') return 'settings';
     return 'upload';
@@ -762,6 +771,24 @@ const MainContent: React.FC = () => {
             <Route
               path="/code-architecture"
               element={<CodeArchitectureViewer />}
+            />
+
+            <Route
+              path="/business-context"
+              element={
+                <div className="results-section">
+                  <div className="section-header">
+                    <h1>
+                      <ClipboardCheck size={32} /> Business Context Validation
+                    </h1>
+                    <p>
+                      Review generated metadata, provenance, overrides, and
+                      snapshot conflicts.
+                    </p>
+                  </div>
+                  <BusinessContextValidation />
+                </div>
+              }
             />
 
             <Route

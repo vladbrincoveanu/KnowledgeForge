@@ -124,6 +124,96 @@ interface FeedbackData {
   comment?: string;
 }
 
+/**
+ * Represents the user-visible state of a context field.
+ */
+export type BusinessFieldState = 'generated' | 'overridden' | 'missing';
+
+/**
+ * Captures provenance metadata for a generated context field.
+ */
+export interface BusinessFieldProvenance {
+  source_type: string;
+  source_path: string;
+  source_hash: string;
+  artifact_version: string;
+  extraction_rule: string;
+  confidence: number;
+  last_seen: string;
+}
+
+/**
+ * Captures override lifecycle metadata for a context field.
+ */
+export interface BusinessFieldOverrideMeta {
+  updated_by: string;
+  field_updated_at: string;
+  override_reason: string;
+  status: 'active' | 'stale' | 'superseded';
+  needs_review: boolean;
+}
+
+/**
+ * Represents one business context field in generated/override/effective form.
+ */
+export interface BusinessContextField {
+  field_path: string;
+  label: string;
+  generated_value: string | null;
+  override_value: string | null;
+  effective_value: string | null;
+  state: BusinessFieldState;
+  confidence: number | null;
+  provenance: BusinessFieldProvenance | null;
+  override_meta: BusinessFieldOverrideMeta | null;
+}
+
+/**
+ * Represents review-level business context data for one system.
+ */
+export interface BusinessContextPayload {
+  system_id: string;
+  system_label: string;
+  review_status: 'draft' | 'reviewed' | 'approved_for_publish';
+  fields: BusinessContextField[];
+  snapshot: {
+    current_snapshot_id: string;
+    previous_snapshot_id: string | null;
+    extracted_at: string;
+  };
+}
+
+/**
+ * Captures a single changed field between snapshots.
+ */
+export interface BusinessSnapshotDiffItem {
+  field_path: string;
+  label: string;
+  previous_value: string | null;
+  current_value: string | null;
+  has_override_conflict: boolean;
+  override_value: string | null;
+}
+
+/**
+ * Represents a snapshot-to-snapshot diff payload.
+ */
+export interface BusinessSnapshotDiffPayload {
+  system_id: string;
+  current_snapshot_id: string;
+  previous_snapshot_id: string | null;
+  changes: BusinessSnapshotDiffItem[];
+}
+
+/**
+ * Request body for creating/updating a field override.
+ */
+export interface UpdateOverrideRequest {
+  value: string;
+  reason: string;
+  updated_by: string;
+}
+
 // API configuration
 // Use empty string to leverage Vite proxy, or explicit URL for direct connection
 // Force empty string if VITE_API_URL contains 'api:' (Docker service name) which browser can't resolve
@@ -635,6 +725,30 @@ export const codeArchitectureAPI = {
     }
   },
 
+  // Export latest architecture as Structurizr DSL
+  exportStructurizr: async (): Promise<{
+    format: 'structurizr';
+    filename: string;
+    content: string;
+  }> => {
+    const response: AxiosResponse = await api.get(
+      '/api/v1/code/architecture/export/structurizr'
+    );
+    return response.data;
+  },
+
+  // Export latest architecture as Mermaid C4 snippet
+  exportMermaid: async (): Promise<{
+    format: 'mermaid';
+    filename: string;
+    content: string;
+  }> => {
+    const response: AxiosResponse = await api.get(
+      '/api/v1/code/architecture/export/mermaid'
+    );
+    return response.data;
+  },
+
   // Trigger code extraction from GitHub
   extractFromGitHub: async (
     githubUrl: string,
@@ -741,6 +855,42 @@ export const codeArchitectureAPI = {
     }
   },
 
+  // Apply human feedback to the Context (L1) diagram for a specific extraction task
+  submitContextFeedback: async (
+    taskId: string,
+    payload: {
+      system_name?: string;
+      actors?: Array<{
+        index: number;
+        name?: string;
+        description?: string;
+        ignore?: boolean;
+      }>;
+      external_dependencies?: Array<{
+        index: number;
+        name?: string;
+        dependency_type?: 'BUSINESS_SYSTEM' | 'TECHNICAL_INFRA' | 'UNKNOWN';
+        url?: string;
+        protocol?: string;
+        notes?: string;
+        ignore?: boolean;
+      }>;
+      relationships?: Array<{
+        source: string;
+        destination: string;
+        description: string;
+        relationship_type?: string;
+        protocol?: string;
+      }>;
+    }
+  ): Promise<any> => {
+    const response: AxiosResponse = await api.post(
+      `/api/v1/code/scan/${taskId}/context-feedback`,
+      payload
+    );
+    return response.data;
+  },
+
   // Describe a node with LLM
   describeNode: async (payload: {
     id?: string;
@@ -775,6 +925,235 @@ export const codeArchitectureAPI = {
     } catch (error) {
 
       throw error;
+    }
+  },
+};
+
+const fallbackBusinessContextStore: Record<string, BusinessContextPayload> = {
+  wps: {
+    system_id: 'wps',
+    system_label: 'WPS',
+    review_status: 'draft',
+    snapshot: {
+      current_snapshot_id: 'snap-2026-02-19-001',
+      previous_snapshot_id: 'snap-2026-02-12-001',
+      extracted_at: '2026-02-19T12:10:00Z',
+    },
+    fields: [
+      {
+        field_path: 'owner',
+        label: 'Owner',
+        generated_value: 'Platform Engineering',
+        override_value: null,
+        effective_value: 'Platform Engineering',
+        state: 'generated',
+        confidence: 0.94,
+        provenance: {
+          source_type: 'codeowners',
+          source_path: '/repos/wps/.github/CODEOWNERS',
+          source_hash: 'sha256:7de215',
+          artifact_version: 'main@2f4ae8c',
+          extraction_rule: 'owner_from_codeowners',
+          confidence: 0.94,
+          last_seen: '2026-02-19T11:59:00Z',
+        },
+        override_meta: null,
+      },
+      {
+        field_path: 'domain',
+        label: 'Domain',
+        generated_value: 'Payments',
+        override_value: 'Global Payments',
+        effective_value: 'Global Payments',
+        state: 'overridden',
+        confidence: 0.76,
+        provenance: {
+          source_type: 'service_universe',
+          source_path: '/repos/wps/service-universe.yaml',
+          source_hash: 'sha256:c37d1f',
+          artifact_version: 'main@2f4ae8c',
+          extraction_rule: 'domain_from_service_universe',
+          confidence: 0.76,
+          last_seen: '2026-02-19T11:57:00Z',
+        },
+        override_meta: {
+          updated_by: 'business.sme',
+          field_updated_at: '2026-02-17T08:30:00Z',
+          override_reason: 'Official business taxonomy uses Global Payments.',
+          status: 'active',
+          needs_review: false,
+        },
+      },
+      {
+        field_path: 'experts',
+        label: 'Experts',
+        generated_value: null,
+        override_value: null,
+        effective_value: null,
+        state: 'missing',
+        confidence: null,
+        provenance: null,
+        override_meta: null,
+      },
+      {
+        field_path: 'lifecycle',
+        label: 'Lifecycle',
+        generated_value: 'Active-Dev',
+        override_value: null,
+        effective_value: 'Active-Dev',
+        state: 'generated',
+        confidence: 0.9,
+        provenance: {
+          source_type: 'service_universe',
+          source_path: '/repos/wps/service-universe.yaml',
+          source_hash: 'sha256:c37d1f',
+          artifact_version: 'main@2f4ae8c',
+          extraction_rule: 'lifecycle_from_service_universe',
+          confidence: 0.9,
+          last_seen: '2026-02-19T11:57:00Z',
+        },
+        override_meta: null,
+      },
+    ],
+  },
+};
+
+const fallbackBusinessDiffStore: Record<string, BusinessSnapshotDiffPayload> = {
+  wps: {
+    system_id: 'wps',
+    current_snapshot_id: 'snap-2026-02-19-001',
+    previous_snapshot_id: 'snap-2026-02-12-001',
+    changes: [
+      {
+        field_path: 'domain',
+        label: 'Domain',
+        previous_value: 'Payments Core',
+        current_value: 'Payments',
+        has_override_conflict: true,
+        override_value: 'Global Payments',
+      },
+      {
+        field_path: 'lifecycle',
+        label: 'Lifecycle',
+        previous_value: 'Maintenance-Only',
+        current_value: 'Active-Dev',
+        has_override_conflict: false,
+        override_value: null,
+      },
+    ],
+  },
+};
+
+/**
+ * Creates a safe JSON clone for local fallback adapters.
+ */
+function cloneFallbackValue<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+/**
+ * Business context API adapter for generated/effective/override review flows.
+ * Falls back to local data when backend contracts are unavailable.
+ */
+export const businessContextAPI = {
+  /**
+   * Fetches the business context payload for a system.
+   */
+  getContext: async (systemId: string): Promise<BusinessContextPayload> => {
+    try {
+      const response: AxiosResponse<BusinessContextPayload> = await api.get(
+        `/api/v1/context/${encodeURIComponent(systemId)}`
+      );
+      return response.data;
+    } catch {
+      const fallback =
+        fallbackBusinessContextStore[systemId] ||
+        fallbackBusinessContextStore.wps;
+      return cloneFallbackValue(fallback);
+    }
+  },
+
+  /**
+   * Fetches snapshot diff details for a system.
+   */
+  getSnapshotDiff: async (
+    systemId: string
+  ): Promise<BusinessSnapshotDiffPayload> => {
+    try {
+      const response: AxiosResponse<BusinessSnapshotDiffPayload> = await api.get(
+        `/api/v1/context/${encodeURIComponent(systemId)}/diff`
+      );
+      return response.data;
+    } catch {
+      const fallback =
+        fallbackBusinessDiffStore[systemId] || fallbackBusinessDiffStore.wps;
+      return cloneFallbackValue(fallback);
+    }
+  },
+
+  /**
+   * Persists an override for a single field path.
+   */
+  updateOverride: async (
+    systemId: string,
+    fieldPath: string,
+    payload: UpdateOverrideRequest
+  ): Promise<BusinessContextField> => {
+    try {
+      const response: AxiosResponse<BusinessContextField> = await api.put(
+        `/api/v1/context/${encodeURIComponent(systemId)}/overrides/${encodeURIComponent(fieldPath)}`,
+        payload
+      );
+      return response.data;
+    } catch {
+      const store =
+        fallbackBusinessContextStore[systemId] ||
+        fallbackBusinessContextStore.wps;
+      const idx = store.fields.findIndex(field => field.field_path === fieldPath);
+      if (idx < 0) {
+        throw new Error(`Unknown field path: ${fieldPath}`);
+      }
+
+      const field = store.fields[idx];
+      const updated: BusinessContextField = {
+        ...field,
+        override_value: payload.value,
+        effective_value: payload.value,
+        state: 'overridden',
+        override_meta: {
+          updated_by: payload.updated_by,
+          field_updated_at: new Date().toISOString(),
+          override_reason: payload.reason,
+          status: 'active',
+          needs_review: false,
+        },
+      };
+      store.fields[idx] = updated;
+      return cloneFallbackValue(updated);
+    }
+  },
+
+  /**
+   * Updates a system-level review status.
+   */
+  updateReviewStatus: async (
+    systemId: string,
+    status: BusinessContextPayload['review_status']
+  ): Promise<{ review_status: BusinessContextPayload['review_status'] }> => {
+    try {
+      const response: AxiosResponse<{
+        review_status: BusinessContextPayload['review_status'];
+      }> = await api.patch(
+        `/api/v1/context/${encodeURIComponent(systemId)}/review-status`,
+        { review_status: status }
+      );
+      return response.data;
+    } catch {
+      const store =
+        fallbackBusinessContextStore[systemId] ||
+        fallbackBusinessContextStore.wps;
+      store.review_status = status;
+      return { review_status: status };
     }
   },
 };
