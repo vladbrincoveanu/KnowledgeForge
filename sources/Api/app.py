@@ -19,9 +19,9 @@ sys.path.insert(0, str(app_dir))
 # Lifespan context manager
 from contextlib import asynccontextmanager
 
-from utils.config import get_config
 from app.utils.logging_setup import setup_logging
-from app.utils.request_id_middleware import RequestIDMiddleware, RequestIDFilter
+from app.utils.request_id_middleware import RequestIDFilter, RequestIDMiddleware
+from utils.config import get_config
 
 # Configure logging from config.yaml as early as possible
 _config = get_config()
@@ -63,6 +63,13 @@ openapi_tags = [
         ),
     },
     {
+        "name": "context",
+        "description": (
+            "Render C4 Level-1 context from explicit snapshots and manage "
+            "override/review workflows with role checks."
+        ),
+    },
+    {
         "name": "ontology",
         "description": (
             "Query and manage extracted ontology data: entities, relationships, "
@@ -92,7 +99,7 @@ app = FastAPI(
         "## Key capabilities\n"
         "- **Service extraction**: discovers microservices, detects owners, compliance, "
         "API surface types, deployment targets, business domains, and inter-service communications\n"
-        "- **C4 extraction**: builds Context → Container → Component → Code levels from "
+        "- **C4 extraction**: builds Context -> Container -> Component -> Code levels from "
         "GitHub repos or uploaded ZIP archives\n"
         "- **Real-time updates**: WebSocket channel streams extraction progress\n\n"
         "## Authentication\n"
@@ -121,16 +128,18 @@ app.add_middleware(RequestIDMiddleware)
 # Import and include all route modules
 try:
     from app.endpoint.v1.routes import (
+        code_extraction,
+        context,
         data,
         extraction,
         health,
-        websocket,
-        code_extraction,
         service_extraction,
+        websocket,
     )
 
     app.include_router(health.router, prefix="/api/v1/health")
     app.include_router(data.router, prefix="/api/v1")
+    app.include_router(context.router, prefix="/api/v1")
     app.include_router(extraction.router, prefix="/api/v1/extract")
     app.include_router(code_extraction.router, prefix="/api/v1/code")
     app.include_router(service_extraction.router, prefix="/api/v1/services")
