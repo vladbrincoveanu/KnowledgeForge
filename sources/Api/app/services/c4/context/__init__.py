@@ -1,4 +1,4 @@
-"""Context detection for C4 Model Level 1 (System Context)."""
+"""Context detection and Level-1 context services."""
 
 from importlib import import_module
 
@@ -24,6 +24,15 @@ __all__ = [
     "WpsQualityGateResult",
     "evaluate_wps_quality_gate",
     "can_rollout_system",
+    "Level1ContextService",
+    "Level1ContextResponse",
+    "Level1Relationship",
+    "OverrideRequest",
+    "ReviewStatusRequest",
+    "InMemoryContextStore",
+    "APPROVED_RELATIONSHIP_TYPES",
+    "REVIEW_STATUSES",
+    "VALID_ROLES",
 ]
 
 
@@ -49,6 +58,18 @@ _LAZY_IMPORTS = {
     "WpsQualityGateResult": ("app.services.c4.context.quality_gate", "WpsQualityGateResult"),
     "evaluate_wps_quality_gate": ("app.services.c4.context.quality_gate", "evaluate_wps_quality_gate"),
     "can_rollout_system": ("app.services.c4.context.quality_gate", "can_rollout_system"),
+    "Level1ContextService": ("app.services.c4.context.level1_context_service", "Level1ContextService"),
+    "Level1ContextResponse": ("app.services.c4.context.level1_context_service", "Level1ContextResponse"),
+    "Level1Relationship": ("app.services.c4.context.level1_context_service", "Level1Relationship"),
+    "OverrideRequest": ("app.services.c4.context.level1_context_service", "OverrideRequest"),
+    "ReviewStatusRequest": ("app.services.c4.context.level1_context_service", "ReviewStatusRequest"),
+    "InMemoryContextStore": ("app.services.c4.context.level1_context_service", "InMemoryContextStore"),
+    "APPROVED_RELATIONSHIP_TYPES": (
+        "app.services.c4.context.level1_context_service",
+        "APPROVED_RELATIONSHIP_TYPES",
+    ),
+    "REVIEW_STATUSES": ("app.services.c4.context.level1_context_service", "REVIEW_STATUSES"),
+    "VALID_ROLES": ("app.services.c4.context.level1_context_service", "VALID_ROLES"),
 }
 
 
