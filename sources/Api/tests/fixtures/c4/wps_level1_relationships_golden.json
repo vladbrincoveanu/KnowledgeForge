@@ -1,0 +1,26 @@
+[
+  {
+    "confidence": 1.0,
+    "description": "owned by platform-core",
+    "is_automatic": false,
+    "relation_type": "owned_by",
+    "source_entity_id": "wps",
+    "target_entity_id": "platform-core"
+  },
+  {
+    "confidence": 0.85,
+    "description": "integrates with ERP",
+    "is_automatic": true,
+    "relation_type": "integrates_with",
+    "source_entity_id": "wps",
+    "target_entity_id": "sap"
+  },
+  {
+    "confidence": 0.95,
+    "description": "uses payment processing",
+    "is_automatic": true,
+    "relation_type": "uses",
+    "source_entity_id": "wps",
+    "target_entity_id": "stripe"
+  }
+]
