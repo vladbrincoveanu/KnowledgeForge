@@ -1,0 +1,31 @@
+### KnowledgeForge Code Architecture API
+### Use with IntelliJ HTTP Client:
+### docker run --rm -i -t -v $PWD:/workdir jetbrains/intellij-http-client sources/Api/http/code_architecture.http
+
+@baseUrl = http://localhost:8000
+@apiKey = test-api-key-12345
+
+### Get latest architecture
+GET {{baseUrl}}/api/v1/code/architecture
+Authorization: Bearer {{apiKey}}
+
+### Export latest architecture as Structurizr DSL
+GET {{baseUrl}}/api/v1/code/architecture/export/structurizr
+Authorization: Bearer {{apiKey}}
+
+### Export latest architecture as Mermaid C4 snippet
+GET {{baseUrl}}/api/v1/code/architecture/export/mermaid
+Authorization: Bearer {{apiKey}}
+
+### Trigger extraction from GitHub
+POST {{baseUrl}}/api/v1/code/extract-from-github
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "github_url": "https://github.com/microservices-demo/microservices-demo",
+  "use_git": true,
+  "append_mode": true,
+  "max_components_per_domain": 10
+}
+

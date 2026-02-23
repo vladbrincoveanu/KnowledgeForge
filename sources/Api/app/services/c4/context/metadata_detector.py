@@ -13,13 +13,13 @@ Detects:
 """
 
 import logging
+import json
 import re
 import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Optional
-
-from app.utils.fs_utils import limited_rglob
+import xml.etree.ElementTree as ET
 
 import tomli
 from app.utils.fs_utils import limited_rglob
@@ -155,6 +155,319 @@ class MetadataDetector:
 
         logger.warning("No owner detected, returning 'Unassigned'")
         return "Unassigned"
+
+    def detect_data_steward(self, owner_team: Optional[str] = None) -> Optional[str]:
+        """Detect data steward from docs/config, fallback to owner."""
+        readme_paths = [
+            self.repo_path / "README.md",
+            self.repo_path / "README.rst",
+            self.repo_path / "README.txt",
+        ]
+        patterns = [
+            r"data\s+steward[s]?:\s*(.+)",
+            r"steward[s]?:\s*(.+)",
+            r"data\s+governance\s+contact:\s*(.+)",
+        ]
+
+        for readme in readme_paths:
+            if not readme.exists():
+                continue
+            try:
+                content = readme.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            for pattern in patterns:
+                match = re.search(pattern, content, re.IGNORECASE)
+                if match:
+                    steward = match.group(1).strip()
+                    if steward and len(steward) < 80:
+                        return steward
+
+        # Fallback: steward defaults to owner for accountability until dedicated source is wired
+        if owner_team and owner_team != "Unassigned":
+            return owner_team
+        return None
+
+    def detect_squad(self, owner_team: Optional[str] = None) -> Optional[str]:
+        """Detect squad name from CODEOWNERS or owner."""
+        codeowners_paths = [
+            self.repo_path / "CODEOWNERS",
+            self.repo_path / ".github" / "CODEOWNERS",
+        ]
+        for codeowners_file in codeowners_paths:
+            if not codeowners_file.exists():
+                continue
+            try:
+                content = codeowners_file.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            match = re.search(r'@([a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+)', content)
+            if match:
+                return match.group(1)
+
+        return owner_team if owner_team and owner_team != "Unassigned" else None
+
+    def infer_sensitivity_tags(self, data_class: Optional[str]) -> list[str]:
+        """Map legacy data_class to normalized sensitivity tags."""
+        if not data_class:
+            return []
+
+        mapping = {
+            "credit-card": ["PCI", "Financial"],
+            "pii": ["PII", "PersonalData"],
+            "legal/security": ["Security", "Compliance"],
+            "general": [],
+        }
+        key = str(data_class).strip().lower()
+        return mapping.get(key, [data_class])
+
+    def get_quality_score(self) -> Optional[int]:
+        """Return deterministic quality score (0-100) from repo + test artifacts."""
+        # Foundation signals (40 max)
+        checks = [
+            (self.repo_path / "README.md").exists(),
+            (self.repo_path / "tests").exists() or any(limited_rglob(self.repo_path, "test_*.py")),
+            (self.repo_path / ".github" / "workflows").exists()
+            or (self.repo_path / ".gitlab-ci.yml").exists()
+            or (self.repo_path / "Jenkinsfile").exists(),
+            (self.repo_path / "requirements.txt").exists()
+            or (self.repo_path / "pyproject.toml").exists()
+            or (self.repo_path / "package.json").exists(),
+        ]
+        passed = sum(1 for check in checks if check)
+        foundation_score = int(round((passed / len(checks)) * 40))
+
+        # Test artifact signals (50 max): dbt/GE/JUnit pass rate proxies.
+        pass_rates: list[float] = []
+        pass_rates.extend(self._read_dbt_run_result_pass_rates())
+        pass_rates.extend(self._read_junit_pass_rates())
+        pass_rates.extend(self._read_great_expectations_pass_rates())
+
+        if pass_rates:
+            avg_pass_rate = max(0.0, min(1.0, sum(pass_rates) / len(pass_rates)))
+            artifact_score = int(round(avg_pass_rate * 50))
+        else:
+            artifact_score = 0
+
+        # Recency bonus (10 max) based on latest artifact timestamp.
+        latest_artifact = self._latest_quality_artifact_time()
+        recency_score = 0
+        if latest_artifact:
+            age_days = max(0, (datetime.now() - latest_artifact).days)
+            if age_days <= 7:
+                recency_score = 10
+            elif age_days <= 30:
+                recency_score = 6
+            elif age_days <= 90:
+                recency_score = 3
+
+        return max(0, min(100, foundation_score + artifact_score + recency_score))
+
+    def get_usage_stats(self) -> dict[str, Any]:
+        """Estimate usage stats from local gateway/access log artifacts."""
+        access_count = 0
+        last_accessed: Optional[datetime] = None
+        scanned_files = 0
+
+        log_patterns = ("*access*.log", "*gateway*.log", "*nginx*.log", "*traefik*.log")
+        max_files = 25
+        max_lines_per_file = 5000
+
+        for pattern in log_patterns:
+            for log_file in limited_rglob(self.repo_path, pattern):
+                if scanned_files >= max_files:
+                    break
+                if any(part in log_file.parts for part in (".git", "node_modules", "dist", "build")):
+                    continue
+                try:
+                    if log_file.stat().st_size > 50_000_000:
+                        continue
+                    scanned_files += 1
+                    with open(log_file, encoding="utf-8", errors="ignore") as f:
+                        lines = f.readlines()[-max_lines_per_file:]
+
+                    access_count += sum(
+                        1
+                        for line in lines
+                        if re.search(r'\b(GET|POST|PUT|PATCH|DELETE)\b', line)
+                        or " 200 " in line
+                    )
+                    mtime = datetime.fromtimestamp(log_file.stat().st_mtime)
+                    if last_accessed is None or mtime > last_accessed:
+                        last_accessed = mtime
+                except OSError:
+                    continue
+
+        if access_count >= 50_000:
+            bucket = "p95+"
+        elif access_count >= 10_000:
+            bucket = "p75-p95"
+        elif access_count >= 1_000:
+            bucket = "p50-p75"
+        elif access_count > 0:
+            bucket = "p1-p50"
+        else:
+            bucket = "unknown"
+
+        return {
+            "window_days": 30,
+            "access_count": access_count if access_count > 0 else None,
+            "percentile_bucket": bucket,
+            "last_accessed_at": last_accessed.isoformat() if last_accessed else None,
+            "source": "local_log_heuristic" if scanned_files else "not_configured",
+            "scanned_files": scanned_files,
+        }
+
+    def get_column_lineage_summary(self) -> dict[str, Any]:
+        """Return lineage summary inferred from SQL/dbt artifacts."""
+        source_columns: set[str] = set()
+        links = 0
+        sql_files_scanned = 0
+        manifest_models = 0
+
+        for sql_file in limited_rglob(self.repo_path, "*.sql"):
+            if any(part in sql_file.parts for part in (".git", "node_modules", "dist", "build", "target")):
+                continue
+            try:
+                content = sql_file.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            sql_files_scanned += 1
+            source_columns.update(re.findall(r"\b([A-Za-z_][\w]*\.[A-Za-z_][\w]*)\b", content))
+            links += len(
+                re.findall(
+                    r"\b([A-Za-z_][\w]*\.[A-Za-z_][\w]*)\s+as\s+([A-Za-z_][\w]*)\b",
+                    content,
+                    flags=re.IGNORECASE,
+                )
+            )
+
+        for manifest_file in limited_rglob(self.repo_path, "manifest.json"):
+            try:
+                manifest = json.loads(manifest_file.read_text(encoding="utf-8", errors="ignore"))
+            except (OSError, ValueError, json.JSONDecodeError):
+                continue
+            nodes = manifest.get("nodes") if isinstance(manifest, dict) else None
+            if not isinstance(nodes, dict):
+                continue
+            model_nodes = [
+                node for node in nodes.values()
+                if isinstance(node, dict) and str(node.get("resource_type", "")).lower() == "model"
+            ]
+            manifest_models += len(model_nodes)
+            for node in model_nodes:
+                columns = node.get("columns")
+                if isinstance(columns, dict):
+                    source_columns.update(columns.keys())
+                depends = (node.get("depends_on") or {}).get("nodes")
+                if isinstance(depends, list):
+                    links += len(depends)
+
+        covered_columns = len(source_columns)
+        coverage_ratio = round(min(1.0, covered_columns / 100.0), 3) if covered_columns else 0.0
+        return {
+            "covered_columns": covered_columns,
+            "total_links": links,
+            "coverage_ratio": coverage_ratio,
+            "source": "sql_dbt_heuristic" if (sql_files_scanned or manifest_models) else "not_configured",
+            "sql_files_scanned": sql_files_scanned,
+            "dbt_models_scanned": manifest_models,
+        }
+
+    def _read_dbt_run_result_pass_rates(self) -> list[float]:
+        """Extract pass-rate proxies from dbt run_results artifacts."""
+        pass_rates: list[float] = []
+        for result_file in limited_rglob(self.repo_path, "run_results.json"):
+            try:
+                payload = json.loads(result_file.read_text(encoding="utf-8", errors="ignore"))
+            except (OSError, ValueError, json.JSONDecodeError):
+                continue
+            results = payload.get("results") if isinstance(payload, dict) else None
+            if not isinstance(results, list) or not results:
+                continue
+            ok = 0
+            total = 0
+            for item in results:
+                if not isinstance(item, dict):
+                    continue
+                status = str(item.get("status", "")).lower()
+                if not status:
+                    continue
+                total += 1
+                if status in {"success", "pass", "passed", "ok"}:
+                    ok += 1
+            if total > 0:
+                pass_rates.append(ok / total)
+        return pass_rates
+
+    def _read_junit_pass_rates(self) -> list[float]:
+        """Extract pass-rate proxies from junit xml outputs."""
+        pass_rates: list[float] = []
+        for xml_file in limited_rglob(self.repo_path, "*.xml"):
+            if "junit" not in xml_file.name.lower() and "test" not in xml_file.name.lower():
+                continue
+            try:
+                root = ET.parse(xml_file).getroot()
+            except (OSError, ET.ParseError):
+                continue
+
+            suites = [root]
+            suites.extend(root.findall(".//testsuite"))
+            for suite in suites:
+                tests_raw = suite.attrib.get("tests")
+                failures_raw = suite.attrib.get("failures")
+                errors_raw = suite.attrib.get("errors")
+                if tests_raw is None:
+                    continue
+                try:
+                    tests = int(tests_raw)
+                    failures = int(failures_raw or "0")
+                    errors = int(errors_raw or "0")
+                except ValueError:
+                    continue
+                if tests <= 0:
+                    continue
+                passed = max(0, tests - failures - errors)
+                pass_rates.append(passed / tests)
+        return pass_rates
+
+    def _read_great_expectations_pass_rates(self) -> list[float]:
+        """Extract pass-rate proxies from Great Expectations result json files."""
+        pass_rates: list[float] = []
+        for result_file in limited_rglob(self.repo_path, "*.json"):
+            if "expectation" not in str(result_file).lower() and "validation" not in str(result_file).lower():
+                continue
+            try:
+                payload = json.loads(result_file.read_text(encoding="utf-8", errors="ignore"))
+            except (OSError, ValueError, json.JSONDecodeError):
+                continue
+
+            stats = payload.get("statistics") if isinstance(payload, dict) else None
+            if isinstance(stats, dict):
+                success_percent = stats.get("success_percent")
+                if isinstance(success_percent, (int, float)):
+                    pass_rates.append(max(0.0, min(1.0, float(success_percent) / 100.0)))
+                    continue
+
+            results = payload.get("results") if isinstance(payload, dict) else None
+            if isinstance(results, list) and results:
+                total = len(results)
+                passed = sum(1 for r in results if isinstance(r, dict) and bool(r.get("success")))
+                pass_rates.append(passed / total)
+        return pass_rates
+
+    def _latest_quality_artifact_time(self) -> Optional[datetime]:
+        """Return latest mtime among known quality artifacts."""
+        latest: Optional[datetime] = None
+        for pattern in ("run_results.json", "*.xml", "*validation*.json", "*expectation*.json"):
+            for path in limited_rglob(self.repo_path, pattern):
+                try:
+                    mtime = datetime.fromtimestamp(path.stat().st_mtime)
+                except OSError:
+                    continue
+                if latest is None or mtime > latest:
+                    latest = mtime
+        return latest
 
     def _get_git_roots(self) -> list[Path]:
         """Return effective git roots for this repo path.
@@ -545,6 +858,7 @@ Team name:"""
             return any(part in skip_parts for part in path.parts)
 
         def _scan_file(file_path: Path, max_bytes: int = 8000) -> None:
+            nonlocal strict_financial_found
             try:
                 with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                     content = f.read(max_bytes).lower()
@@ -718,7 +1032,7 @@ Team name:"""
             email_counts: dict[str, int] = {}
             for root in git_roots:
                 result = subprocess.run(
-                    ['git', 'shortlog', '-sne', '--since=90.days'],
+                    ['git', 'shortlog', '-sne', '--all', '--since=90.days'],
                     cwd=root, capture_output=True, text=True, timeout=10,
                 )
                 if result.returncode != 0:

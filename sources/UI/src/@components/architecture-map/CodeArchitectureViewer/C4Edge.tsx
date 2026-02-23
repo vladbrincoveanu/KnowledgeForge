@@ -39,10 +39,12 @@ const C4Edge = ({
 
   const protocol = data?.protocol as string | undefined;
   const description = data?.description as string | undefined;
+  const businessLabel = data?.business_label as string | undefined;
   const fallbackLabel = label as string | undefined;
+  const primaryLabel = businessLabel || description || fallbackLabel;
 
   // Show label box if we have protocol, description, or a plain label
-  const hasContent = protocol || description || fallbackLabel;
+  const hasContent = protocol || primaryLabel;
 
   return (
     <>
@@ -59,34 +61,44 @@ const C4Edge = ({
             style={{
               position: 'absolute',
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY + offset}px)`,
-              background: '#ffffff',
-              border: '1px solid #e2e8f0',
-              borderRadius: 6,
-              padding: '3px 8px',
+              background: '#f8fafc',
+              border: '1px solid #cbd5e1',
+              borderRadius: 10,
+              padding: '4px 10px',
               fontSize: 11,
-              fontFamily: 'sans-serif',
+              fontFamily: 'Inter, sans-serif',
               color: '#0f172a',
               pointerEvents: 'none',
               textAlign: 'center',
-              maxWidth: 160,
+              maxWidth: 220,
             }}
           >
-            {protocol ? (
-              <div style={{ fontWeight: 700 }}>[{protocol}]</div>
-            ) : fallbackLabel ? (
-              <div style={{ fontWeight: 600 }}>{fallbackLabel}</div>
-            ) : null}
-            {description && (
+            {primaryLabel && (
               <div
                 style={{
-                  fontStyle: 'italic',
-                  color: '#64748b',
-                  marginTop: (protocol || fallbackLabel) ? 2 : 0,
-                  fontSize: 10,
-                  lineHeight: '1.3',
+                  fontWeight: 600,
+                  color: '#0f172a',
+                  lineHeight: 1.2,
                 }}
               >
-                {description}
+                {primaryLabel}
+              </div>
+            )}
+            {protocol && (
+              <div
+                style={{
+                  marginTop: primaryLabel ? 3 : 0,
+                  display: 'inline-block',
+                  padding: '1px 6px',
+                  borderRadius: 999,
+                  background: '#e2e8f0',
+                  color: '#334155',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                }}
+              >
+                {protocol}
               </div>
             )}
           </div>

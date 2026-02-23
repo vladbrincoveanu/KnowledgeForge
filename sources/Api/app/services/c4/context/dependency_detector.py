@@ -108,8 +108,11 @@ class DependencyDetector:
         # Detect from .env files
         deps_from_env = self._parse_env_files()
 
-        # Detect from deployment files
-        deps_from_deployment = self._parse_deployment_files()
+        # Detect from deployment files (kept separate; not "external systems" at C4 context level)
+        # However, docker-compose often encodes *technical platforms* (Postgres/Redis/Kafka/etc).
+        # We infer those platform dependencies from images, but never expose raw container images
+        # as "external services" in the Context diagram.
+        deps_from_deployment = self._infer_technical_platforms_from_deployment()
 
         # Detect from README/docs
         deps_from_readme = self._parse_readme_dependencies()
@@ -131,9 +134,11 @@ class DependencyDetector:
         seen = set()
         external_deps = []
         for dep in all_deps:
-            name = dep['name']
+            raw_name = dep.get('name', '')
+            name = self._normalize_logical_name(raw_name)
             if not name or name.startswith('$') or name in seen:
                 continue
+            dep['name'] = name
             external_deps.append(dep)
             seen.add(name)
 
@@ -160,6 +165,107 @@ class DependencyDetector:
             return classified_deps
         
         return external_deps
+
+    def _infer_technical_platforms_from_deployment(self) -> list[dict[str, Any]]:
+        """Infer well-known technical platforms from Docker/compose without leaking docker artifacts.
+
+        Output is *platform names* (e.g. 'PostgreSQL'), not images.
+        """
+        platforms: list[dict[str, Any]] = []
+        seen: set[str] = set()
+
+        def add(name: str, dep_type: str, detected_from: str, context: str):
+            if name in seen:
+                return
+            platforms.append(
+                {
+                    "name": name,
+                    "type": dep_type,
+                    "dependency_type": "TECHNICAL_INFRA",
+                    "classification_confidence": 0.9,
+                    "classification_reasoning": "Inferred from deployment configuration (docker/compose).",
+                    # Do not leak docker/compose paths into context-level "externals".
+                    "detected_from": "deployment",
+                    "context": context,
+                }
+            )
+            seen.add(name)
+
+        def classify_image(image: str) -> Optional[tuple[str, str]]:
+            s = image.lower()
+            # Databases
+            if "postgres" in s:
+                return ("PostgreSQL", "database")
+            if "mcr.microsoft.com/mssql" in s or "sqlserver" in s or "mssql" in s:
+                return ("SQL Server", "database")
+            if "mysql" in s:
+                return ("MySQL", "database")
+            if "mariadb" in s:
+                return ("MariaDB", "database")
+            if "mongo" in s:
+                return ("MongoDB", "database")
+            # Cache
+            if re.search(r'(^|[/:.-])redis([/:.-]|$)', s):
+                return ("Redis", "cache")
+            # Messaging/streaming
+            if "rabbitmq" in s:
+                return ("RabbitMQ", "messaging")
+            if "kafka" in s or "cp-kafka" in s:
+                return ("Kafka", "messaging")
+            if "zookeeper" in s:
+                return ("ZooKeeper", "messaging")
+            # Observability/logging
+            if "grafana" in s:
+                return ("Grafana", "monitoring")
+            if "prometheus" in s:
+                return ("Prometheus", "monitoring")
+            if "loki" in s:
+                return ("Loki", "logging")
+            return None
+
+        # docker-compose images
+        for compose_file in limited_rglob(self.repo_path, "docker-compose*.y*ml"):
+            try:
+                rel = str(compose_file.relative_to(self.repo_path))
+                data = yaml.safe_load(
+                    compose_file.read_text(encoding="utf-8", errors="ignore")
+                )
+                if not isinstance(data, dict):
+                    continue
+                services = data.get("services", {}) or {}
+                if not isinstance(services, dict):
+                    continue
+
+                for svc_name, svc in services.items():
+                    if not isinstance(svc, dict):
+                        continue
+                    image = svc.get("image")
+                    if not isinstance(image, str) or not image.strip():
+                        continue
+                    image = image.strip()
+                    classified = classify_image(image)
+                    if not classified:
+                        continue
+                    name, dep_type = classified
+                    add(
+                        name=name,
+                        dep_type=dep_type,
+                        detected_from=rel,
+                        context=f"Inferred from docker-compose service '{svc_name}' image.",
+                    )
+            except (OSError, yaml.YAMLError):
+                continue
+
+        return platforms
+
+    def detect_deployment_dependencies(self) -> list[dict[str, Any]]:
+        """Return internal deployment/runtime dependencies (Docker/compose).
+
+        These are useful as evidence of infrastructure used by the system, but they are
+        not external business systems and should not be placed in the C4 System Context
+        diagram as "external services".
+        """
+        return self._parse_deployment_files()
 
     def _parse_nuget_dependencies(self) -> list[dict[str, Any]]:
         """Scan .csproj files for NuGet packages and map them to external services."""
@@ -463,52 +569,62 @@ class DependencyDetector:
     def _parse_deployment_files(self) -> list[dict[str, Any]]:
         """Parse deployment files for dependencies."""
         deps: list[dict[str, Any]] = []
-        external_patterns = self._external_dependency_patterns()
 
-        def add_from_text(text: str, detected_from: str):
-            lowered = text.lower()
-            for pattern, (name, dep_type) in external_patterns.items():
-                if pattern in lowered:
-                    deps.append({
-                        "name": name,
-                        "type": dep_type,
-                        "detected_from": detected_from,
-                    })
-
-        def add_from_url(url: str, detected_from: str):
-            if self._is_internal_url(url):
-                return
-            deps.append({
-                "name": self._extract_service_name_from_url(url),
-                "type": "external_service",
-                "url": url,
-                "detected_from": detected_from,
-            })
-
-        # Dockerfiles
         from app.utils.fs_utils import limited_rglob
+
+        # Dockerfiles: capture base images used (runtime/build dependencies).
         for dockerfile in limited_rglob(self.repo_path, "Dockerfile"):
             try:
+                rel = str(dockerfile.relative_to(self.repo_path))
                 content = dockerfile.read_text(encoding="utf-8", errors="ignore")
-                add_from_text(content, str(dockerfile.relative_to(self.repo_path)))
-                for url in re.findall(r'https?://[^\s"\']+', content):
-                    add_from_url(url, str(dockerfile.relative_to(self.repo_path)))
+                for line in content.splitlines():
+                    m = re.match(r'^\s*FROM\s+([^\s]+)', line, re.IGNORECASE)
+                    if not m:
+                        continue
+                    image = m.group(1).strip()
+                    deps.append(
+                        {
+                            "name": image,
+                            "type": "container_image",
+                            "scope": "deployment",
+                            "is_external": False,
+                            "detected_from": rel,
+                            "context": f"Docker base image: {image}",
+                        }
+                    )
             except (OSError, ValueError):
                 continue
 
-        # docker-compose files
-        for compose_file in limited_rglob(self.repo_path,"docker-compose*.y*ml"):
+        # docker-compose: capture service images (internal infra used at runtime).
+        for compose_file in limited_rglob(self.repo_path, "docker-compose*.y*ml"):
             try:
-                data = yaml.safe_load(compose_file.read_text(encoding="utf-8", errors="ignore"))
+                rel = str(compose_file.relative_to(self.repo_path))
+                data = yaml.safe_load(
+                    compose_file.read_text(encoding="utf-8", errors="ignore")
+                )
                 if not isinstance(data, dict):
                     continue
                 services = data.get("services", {}) or {}
-                for service in services.values():
-                    if not isinstance(service, dict):
+                if not isinstance(services, dict):
+                    continue
+
+                for svc_name, svc in services.items():
+                    if not isinstance(svc, dict):
                         continue
-                    image = service.get("image")
-                    if isinstance(image, str):
-                        add_from_text(image, str(compose_file.relative_to(self.repo_path)))
+                    image = svc.get("image")
+                    if not isinstance(image, str) or not image.strip():
+                        continue
+                    image = image.strip()
+                    deps.append(
+                        {
+                            "name": image,
+                            "type": "container_image",
+                            "scope": "deployment",
+                            "is_external": False,
+                            "detected_from": rel,
+                            "context": f"docker-compose service '{svc_name}' image: {image}",
+                        }
+                    )
             except (OSError, yaml.YAMLError):
                 continue
 
@@ -596,15 +712,9 @@ class DependencyDetector:
 
     def _extract_service_name_from_url(self, url: str) -> str:
         """Extract service name from URL."""
-        # Remove protocol
         clean = url.replace('https://', '').replace('http://', '')
-        # Get domain
         domain = clean.split('/')[0]
-        # Get main part
-        parts = domain.split('.')
-        if len(parts) >= 2:
-            return parts[-2].title()
-        return domain
+        return self._normalize_logical_name(domain)
 
     def _is_internal_url(self, url: str) -> bool:
         """Return True for local/wildcard bindings that are not real external services.
@@ -621,3 +731,20 @@ class DependencyDetector:
         if clean.startswith('$'):
             return True
         return bool(self._INTERNAL_HOST_RE.match(clean))
+
+    def _normalize_logical_name(self, value: str) -> str:
+        """Normalize raw host/service identifiers to stable logical names."""
+        label = str(value or '').strip()
+        if not label:
+            return ""
+
+        label = re.sub(r'^https?://', '', label, flags=re.IGNORECASE)
+        label = label.split('/', 1)[0]
+        label = re.sub(r':\d{2,5}$', '', label)
+
+        # Keep single host token for label, convert common separators
+        head = label.split('.', 1)[0]
+        head = head.replace('_', ' ').replace('-', ' ').strip()
+        if not head:
+            return ""
+        return head.title()

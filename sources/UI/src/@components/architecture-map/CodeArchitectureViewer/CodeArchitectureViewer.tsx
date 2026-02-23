@@ -22,6 +22,10 @@ import FiltersSidebar from './components/FiltersSidebar';
 import GraphView from './components/GraphView';
 import NodeDetailsPanel from './components/NodeDetailsPanel';
 import EdgeDetailsPanel from './components/EdgeDetailsPanel';
+import ExportPreviewDialog from './components/ExportPreviewDialog';
+import ContextReviewDialog, {
+  type ContextFeedbackPayload,
+} from './components/ContextReviewDialog';
 
 interface CodeEntity {
   id: string;
@@ -196,6 +200,525 @@ const generateC4Edges = (containers: any[] = [], relationships: any[] = []): Edg
 const normalizeDescription = (text?: string) => {
   if (!text) return '';
   return text.replace(/\s+/g, ' ').trim();
+};
+
+const HUMAN_RELATIONSHIP_LABELS: Record<string, string> = {
+  uses: 'Uses',
+  uses_external_service: 'Uses',
+  contains: 'Contains',
+  depends_on: 'Depends on',
+  calls: 'Calls API',
+  invokes: 'Invokes',
+  reads_from: 'Reads data from',
+  writes_to: 'Writes data to',
+  publishes_to: 'Publishes events to',
+  subscribes_to: 'Consumes events from',
+  sends_to: 'Sends data to',
+  receives_from: 'Receives data from',
+  authenticates_with: 'Authenticates with',
+  reports_to: 'Reports updates to',
+};
+
+const toHumanLabel = (value?: string) =>
+  String(value || '')
+    .trim()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
+
+const humanizeNodeName = (value?: string) =>
+  String(value || '')
+    .replace(/^:+/, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const isTechnicalRelationshipText = (value?: string) => {
+  const text = normalizeDescription(value).toLowerCase();
+  if (!text) return true;
+
+  if (/^[a-z0-9_:/.-]+$/.test(text) && text.includes('_')) return true;
+  if (/^[a-z0-9_:/.-]+$/.test(text) && !text.includes(' ')) return true;
+  if (
+    [
+      'uses external service',
+      'uses',
+      'depends on',
+      'calls',
+      'invokes',
+      'contains',
+    ].includes(text)
+  ) {
+    return true;
+  }
+
+  return false;
+};
+
+type InferredAction = { verb: string; prep: 'to' | 'via' | 'in' | 'with' };
+
+const inferBusinessActionFromTarget = (targetName?: string): InferredAction | null => {
+  const name = String(targetName || '').toLowerCase();
+  if (!name) return null;
+  if (/(analytics|mixpanel|ga4|google analytics)/.test(name))
+    return { verb: 'Analyzes product behavior', prep: 'in' };
+  if (/(sentry|monitor|observability|datadog|new relic)/.test(name))
+    return { verb: 'Tracks errors', prep: 'in' };
+  if (/(stripe|paypal|billing|payment)/.test(name))
+    return { verb: 'Processes payments', prep: 'via' };
+  if (/(mail|email|resend|sendgrid|smtp)/.test(name))
+    return { verb: 'Sends customer emails', prep: 'via' };
+  if (/(slack|teams|chat|pagerduty)/.test(name))
+    return { verb: 'Sends alerts', prep: 'to' };
+  if (/(github|gitlab|npm|registry|bitbucket)/.test(name))
+    return { verb: 'Publishes packages', prep: 'to' };
+  if (/(redis|mongo|postgres|mysql|database|sql|s3|storage|bucket)/.test(name))
+    return { verb: 'Stores operational data', prep: 'in' };
+  return null;
+};
+
+const isLocalOrEmptyUrl = (url?: string) => {
+  const v = String(url || '').toLowerCase().trim();
+  if (!v) return true;
+  return (
+    v.startsWith('http://localhost') ||
+    v.startsWith('https://localhost') ||
+    v.startsWith('http://127.0.0.1') ||
+    v.startsWith('https://127.0.0.1') ||
+    v.startsWith('http://0.0.0.0') ||
+    v.startsWith('https://0.0.0.0')
+  );
+};
+
+const isDockerDerivedContextExternal = (entity: CodeEntity) => {
+  if (!entity.attributes?.is_external) return false;
+
+  const name = String(entity.name || '').trim();
+  const filePath = String(entity.file_path || '').toLowerCase();
+  const detectedFrom = String(entity.attributes?.detected_from || '').toLowerCase();
+  const url = String(entity.attributes?.url || '').trim();
+
+  // If it has a real URL, treat as external.
+  if (url && !isLocalOrEmptyUrl(url)) return false;
+
+  // Docker/compose-derived "externals" should not appear at Context level.
+  if (/dockerfile|docker-compose|compose\.ya?ml/.test(filePath)) return true;
+  if (/dockerfile|docker-compose|compose\.ya?ml/.test(detectedFrom)) return true;
+
+  // Ports like ":40121" are almost certainly internal service bindings.
+  if (/^:?\d{2,5}$/.test(name)) return true;
+
+  return false;
+};
+
+const inferDependencyTypeForContext = (dep: any): 'BUSINESS_SYSTEM' | 'TECHNICAL_INFRA' | 'UNKNOWN' => {
+  const explicit = String(dep?.dependency_type || '').toUpperCase();
+  if (explicit === 'BUSINESS_SYSTEM' || explicit === 'TECHNICAL_INFRA') {
+    return explicit as any;
+  }
+
+  const depType = String(dep?.type || '').toLowerCase();
+  if (['database', 'cache', 'queue', 'messaging', 'logging', 'monitoring', 'observability', 'storage', 'search', 'rpc'].includes(depType)) {
+    return 'TECHNICAL_INFRA';
+  }
+
+  const name = `${dep?.name || ''} ${dep?.service || ''}`.toLowerCase();
+  if (
+    /(sql server|postgres|postgresql|mysql|mariadb|mongodb|redis|kafka|rabbitmq|elasticsearch|opensearch|s3|bucket)/.test(name)
+  ) return 'TECHNICAL_INFRA';
+  if (/(serilog|opentelemetry|datadog|prometheus|grafana|new relic)/.test(name))
+    return 'TECHNICAL_INFRA';
+  if (/(proget|artifactory|nexus|nuget|npm registry|package registry)/.test(name))
+    return 'TECHNICAL_INFRA';
+
+  return 'BUSINESS_SYSTEM';
+};
+
+const isDockerishExternalDependency = (dep: any) => {
+  const name = String(dep?.name || '').trim();
+  const detectedFrom = String(dep?.detected_from || '').toLowerCase();
+  const url = String(dep?.url || '').toLowerCase();
+  const depType = String(dep?.type || '').toLowerCase();
+  const depClass = String(dep?.dependency_type || '').toUpperCase();
+
+  if (!name) return true;
+  if (/^:?\d{2,5}$/.test(name)) return true;
+  // Keep technical platforms even if inferred from docker/compose (we only drop raw docker artifacts).
+  const looksLikeTechPlatform =
+    depClass === 'TECHNICAL_INFRA' ||
+    ['database', 'cache', 'messaging', 'queue', 'logging', 'monitoring', 'observability', 'storage', 'search'].includes(
+      depType
+    );
+  if (!looksLikeTechPlatform && /dockerfile|docker-compose|compose\.ya?ml/.test(detectedFrom))
+    return true;
+  if (url && isLocalOrEmptyUrl(url)) {
+    // Local-only + docker-derived path is a strong internal signal.
+    if (!looksLikeTechPlatform && /dockerfile|docker-compose|compose\.ya?ml/.test(detectedFrom))
+      return true;
+  }
+  return false;
+};
+
+const buildBusinessRelationshipCopy = (
+  relationshipType?: string,
+  description?: string,
+  sourceName?: string,
+  targetName?: string,
+  sourceType?: string,
+  targetType?: string
+) => {
+  const source = humanizeNodeName(sourceName || 'This system');
+  const target = humanizeNodeName(targetName || 'external system');
+  const fromType = String(sourceType || '').toLowerCase();
+  const toType = String(targetType || '').toLowerCase();
+  const normalizedDescription = normalizeDescription(description).replace(
+    /[_-]+/g,
+    ' '
+  );
+
+  if (fromType === 'person' && toType === 'system') {
+    return {
+      label: 'Uses product',
+      sentence: `${source} uses ${target} to perform business workflows.`,
+    };
+  }
+
+  if (fromType === 'system' && toType === 'person') {
+    return {
+      label: 'Provides updates',
+      sentence: `${source} provides updates to ${target}.`,
+    };
+  }
+
+  if (
+    normalizedDescription &&
+    !isTechnicalRelationshipText(normalizedDescription) &&
+    normalizedDescription.length <= 110
+  ) {
+    const trimmed = normalizedDescription.replace(/[.;:]+$/, '');
+    return {
+      label:
+        trimmed.length > 46 ? `${trimmed.slice(0, 43).trim()}...` : trimmed,
+      sentence: `${source}: ${trimmed}.`,
+    };
+  }
+
+  const inferred = inferBusinessActionFromTarget(targetName);
+  if (inferred) {
+    const label = `${inferred.verb} ${inferred.prep} ${target}`.slice(0, 46);
+    return {
+      label,
+      sentence: `${source} ${inferred.verb.toLowerCase()} ${inferred.prep} ${target}.`,
+    };
+  }
+
+  const relKey = String(relationshipType || '')
+    .trim()
+    .toLowerCase();
+  const baseFallbackLabel =
+    HUMAN_RELATIONSHIP_LABELS[relKey] ||
+    toHumanLabel(relationshipType) ||
+    'Interacts with';
+  const includeTargetInLabel =
+    ['Uses', 'Depends on', 'Interacts with', 'Integrates with'].includes(baseFallbackLabel) &&
+    target &&
+    target.toLowerCase() !== 'external system';
+  const fallbackLabel = includeTargetInLabel
+    ? `${baseFallbackLabel} ${target}`.slice(0, 46)
+    : baseFallbackLabel;
+  return {
+    label: fallbackLabel,
+    sentence: `${source} ${baseFallbackLabel.toLowerCase()} ${target}.`,
+  };
+};
+
+const CONTEXT_FEEDBACK_STORAGE_PREFIX = 'kf_context_feedback:';
+
+const makeContextFeedbackRepoKey = (githubUrl?: string, localPath?: string) => {
+  const gh = String(githubUrl || '').trim();
+  if (gh) return `github:${gh}`;
+  const lp = String(localPath || '').trim();
+  if (lp) return `local:${lp}`;
+  return 'unknown';
+};
+
+const loadStoredContextFeedback = (repoKey: string): ContextFeedbackPayload | null => {
+  try {
+    const raw = window.localStorage.getItem(`${CONTEXT_FEEDBACK_STORAGE_PREFIX}${repoKey}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return parsed as ContextFeedbackPayload;
+  } catch {
+    return null;
+  }
+};
+
+const persistStoredContextFeedback = (repoKey: string, payload: ContextFeedbackPayload) => {
+  try {
+    window.localStorage.setItem(
+      `${CONTEXT_FEEDBACK_STORAGE_PREFIX}${repoKey}`,
+      JSON.stringify(payload)
+    );
+  } catch {
+    // ignore storage failures (private mode, quota, etc.)
+  }
+};
+
+const needsHumanContextReview = (results: any) => {
+  const sc = results?.system_context || {};
+  const actors = Array.isArray(sc.actors) ? sc.actors : [];
+  const deps = Array.isArray(sc.external_dependencies) ? sc.external_dependencies : [];
+  const contextRels = Array.isArray(results?.relationships?.context)
+    ? results.relationships.context
+    : [];
+
+  const hasSuspiciousDeps = deps.some((d: any) => {
+    const name = String(d?.name || '').trim();
+    const detectedFrom = String(d?.detected_from || '').toLowerCase();
+    if (!name || /^:?\d{2,5}$/.test(name)) return true;
+    if (/dockerfile|docker-compose|compose\.ya?ml/.test(detectedFrom)) return true;
+    return false;
+  });
+
+  const hasGenericRelationships = contextRels.some((r: any) => {
+    const desc = normalizeDescription(r?.description);
+    const type = String(r?.relationship_type || r?.type || '').trim();
+    if (isTechnicalRelationshipText(desc)) return true;
+    if (!desc && (!type || type.toLowerCase() === 'uses')) return true;
+    return false;
+  });
+
+  const hasNoActors = actors.length === 0;
+  return hasSuspiciousDeps || hasGenericRelationships || hasNoActors;
+};
+
+const buildInitialContextFeedbackPayload = (
+  results: any,
+  repoKey: string
+): ContextFeedbackPayload => {
+  const sc = results?.system_context || {};
+  const systemName = String(sc?.name || '').trim();
+
+  const stored = loadStoredContextFeedback(repoKey);
+  const storedActors = Array.isArray(stored?.actors) ? stored?.actors : [];
+  const storedDeps = Array.isArray(stored?.external_dependencies)
+    ? stored?.external_dependencies
+    : [];
+
+  const actors = (Array.isArray(sc.actors) ? sc.actors : []).map((a: any, idx: number) => {
+    const previous = storedActors.find(x => x.index === idx);
+    return {
+      index: idx,
+      name: previous?.name ?? a?.name ?? '',
+      description: previous?.description ?? a?.description ?? a?.role ?? '',
+      ignore: previous?.ignore ?? false,
+    };
+  });
+
+  const rawDeps = Array.isArray(sc.external_dependencies) ? sc.external_dependencies : [];
+  const keptDepIndexes = new Set<number>();
+  const deps = rawDeps
+    .map((d: any, idx: number) => ({ d, idx }))
+    .filter(({ d }) => !isDockerishExternalDependency(d)) // drop internal/docker noise entirely
+    .map(({ d, idx }) => {
+      keptDepIndexes.add(idx);
+      const previous = storedDeps.find(x => x.index === idx);
+      const inferred = inferDependencyTypeForContext(d);
+      const depType = previous?.dependency_type ?? inferred;
+      return {
+        index: idx,
+        name: previous?.name ?? d?.name ?? d?.service ?? '',
+        dependency_type: depType,
+        url: previous?.url ?? d?.url ?? '',
+        protocol: previous?.protocol ?? d?.protocol ?? '',
+        notes: previous?.notes ?? '',
+        ignore: previous?.ignore ?? false,
+      };
+    });
+
+  const droppedDepNames = new Set<string>(
+    rawDeps
+      .map((d: any) => String(d?.name || d?.service || '').trim())
+      .filter((n: string, idx: number) => n && !keptDepIndexes.has(idx))
+  );
+
+  const rels = (Array.isArray(results?.relationships?.context)
+    ? results.relationships.context
+    : []
+  )
+    .map((r: any) => {
+    const src = String(r?.source || r?.from || '').trim();
+    const dst = String(r?.destination || r?.to || '').trim();
+    const relType = String(r?.relationship_type || r?.type || 'uses');
+    const descRaw = normalizeDescription(r?.description);
+    const suggested = buildBusinessRelationshipCopy(relType, descRaw, src, dst);
+    const desc =
+      descRaw && !isTechnicalRelationshipText(descRaw) ? descRaw : suggested.label || 'Uses';
+    return {
+      source: src,
+      destination: dst,
+      description: desc,
+      relationship_type: relType || 'uses',
+      protocol: String(r?.protocol || '').trim() || undefined,
+    };
+  })
+    // drop relationships pointing to removed docker-ish deps
+    .filter((r: any) => !droppedDepNames.has(String(r?.destination || '').trim()));
+
+  return {
+    system_name: (stored?.system_name ?? systemName) || undefined,
+    actors,
+    external_dependencies: deps,
+    relationships: rels,
+  };
+};
+
+const isTechnicalContextNode = (node: Node) => {
+  if (node.data?.attributes?.platform_boundary) return true;
+  const depType = String(node.data?.attributes?.dependency_type || '').toUpperCase();
+  if (depType === 'TECHNICAL_INFRA') return true;
+  if (depType === 'BUSINESS_SYSTEM') return false;
+
+  const type = String(node.data?.type || '').toLowerCase();
+  if (['database', 'cache', 'messaging', 'logging', 'queue'].includes(type)) {
+    return true;
+  }
+
+  const fullText = `${node.data?.label || ''} ${node.data?.fullName || ''}`.toLowerCase();
+  return /(redis|mongo|postgres|mysql|database|sql|kafka|rabbitmq|queue|cache|s3|storage|serilog|grafana|prometheus|cloudwatch|datadog)/.test(
+    fullText
+  );
+};
+
+const isTechnicalContextEntity = (entity: CodeEntity) => {
+  const attrs = entity.attributes || {};
+  if (attrs.platform_boundary) return true;
+
+  const depType = String(attrs.dependency_type || '').toUpperCase();
+  if (depType === 'TECHNICAL_INFRA') return true;
+  if (depType === 'BUSINESS_SYSTEM') return false;
+
+  const type = String(entity.entity_type || '').toLowerCase();
+  if (['database', 'cache', 'messaging', 'logging', 'queue'].includes(type)) {
+    return true;
+  }
+
+  const fullText = `${entity.name || ''} ${attrs.detected_from || ''}`.toLowerCase();
+  return /(redis|mongo|postgres|mysql|database|sql|kafka|rabbitmq|queue|cache|s3|storage|serilog|grafana|prometheus|cloudwatch|datadog)/.test(
+    fullText
+  );
+};
+
+const sortNodesByLabel = (a: Node, b: Node) =>
+  String(a.data?.label || a.id).localeCompare(String(b.data?.label || b.id));
+
+const getNodeSize = (node: Node) => {
+  const width =
+    typeof node.style?.width === 'number'
+      ? node.style.width
+      : node.data?.type === 'system'
+        ? 230
+        : 220;
+  const height =
+    typeof node.style?.height === 'number'
+      ? node.style.height
+      : node.data?.type === 'system'
+        ? 90
+        : 100;
+  return { width, height };
+};
+
+const getBounds = (nodes: Node[]) => {
+  if (nodes.length === 0) return null;
+
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  nodes.forEach(node => {
+    const { width, height } = getNodeSize(node);
+    minX = Math.min(minX, node.position.x);
+    minY = Math.min(minY, node.position.y);
+    maxX = Math.max(maxX, node.position.x + width);
+    maxY = Math.max(maxY, node.position.y + height);
+  });
+
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
+};
+
+const _createContextGroupFrame = (
+  id: string,
+  label: string,
+  kind: 'actors' | 'system' | 'business' | 'technical',
+  nodes: Node[]
+): Node | null => {
+  const bounds = getBounds(nodes);
+  if (!bounds) return null;
+
+  const padX = kind === 'system' ? 42 : 58;
+  const padY = kind === 'system' ? 32 : 46;
+
+  const frameColors: Record<string, { bg: string; border: string; type: string }> = {
+    actors: {
+      bg: 'rgba(14, 116, 144, 0.05)',
+      border: '#67e8f9',
+      type: 'Human interactions',
+    },
+    system: {
+      bg: 'rgba(37, 99, 235, 0.06)',
+      border: '#93c5fd',
+      type: 'Core product',
+    },
+    business: {
+      bg: 'rgba(71, 85, 105, 0.06)',
+      border: '#cbd5e1',
+      type: 'External business systems',
+    },
+    technical: {
+      bg: 'rgba(15, 23, 42, 0.05)',
+      border: '#94a3b8',
+      type: 'Technical infrastructure',
+    },
+  };
+
+  const color = frameColors[kind];
+
+  return {
+    id,
+    type: 'container',
+    className: `context-group-frame group-${kind}`,
+    draggable: false,
+    selectable: false,
+    connectable: false,
+    focusable: false,
+    zIndex: 0,
+    position: {
+      x: bounds.x - padX,
+      y: bounds.y - padY,
+    },
+    data: {
+      label,
+      containerType: `${nodes.length} node${nodes.length === 1 ? '' : 's'}`,
+      technology: color.type,
+      isGroup: true,
+      groupKind: kind,
+    },
+    style: {
+      width: Math.max(kind === 'system' ? 320 : 360, bounds.width + padX * 2),
+      height: Math.max(kind === 'system' ? 170 : 240, bounds.height + padY * 2),
+      backgroundColor: color.bg,
+      border: `2px dashed ${color.border}`,
+      borderRadius: 18,
+      pointerEvents: 'none',
+    },
+  };
 };
 
 const nodeTypes = {
@@ -410,41 +933,181 @@ const getLayoutedElements = (
   return { nodes: layoutedNodes, edges };
 };
 
-// Star layout for C4 Context level: system centred, actors on left, externals in ring
-function layoutContextLevel(nodes: Node[]): Node[] {
-  const cx = 650, cy = 380;
+// Context layout with view modes:
+// - developer: lanes (actors left, business right, technical lower lane)
+// - executive: actors left + external ring around system
+function layoutContextLevel(
+  nodes: Node[],
+  viewMode: 'developer' | 'executive' = 'developer'
+): Node[] {
+  const cx = 700;
+  const cy = 420;
   const system = nodes.find(n => n.data?.type === 'system');
-  const persons = nodes.filter(n => n.data?.type === 'person');
+  const persons = nodes.filter(n => n.data?.type === 'person').sort(sortNodesByLabel);
   const externals = nodes.filter(
     n => n.data?.type !== 'system' && n.data?.type !== 'person'
   );
+  const technicalExternals = externals
+    .filter(isTechnicalContextNode)
+    .sort(sortNodesByLabel);
+  const businessExternals = externals
+    .filter(n => !isTechnicalContextNode(n))
+    .sort(sortNodesByLabel);
 
   if (system) {
-    system.position = { x: cx - 110, y: cy - 45 };
+    system.position = { x: cx - 130, y: cy - 52 };
     system.sourcePosition = Position.Right;
     system.targetPosition = Position.Left;
   }
 
-  // Actors stacked vertically on the left
+  // Actors stacked on the left lane
+  const actorStartY = cy - ((persons.length - 1) * 125) / 2;
   persons.forEach((n, i) => {
-    n.position = { x: cx - 520, y: cy - 80 + i * 190 };
+    n.position = { x: cx - 620, y: actorStartY + i * 125 };
     n.sourcePosition = Position.Right;
+    n.targetPosition = Position.Right;
+  });
+
+  if (viewMode === 'executive') {
+    const ringNodes = [...businessExternals, ...technicalExternals].sort(sortNodesByLabel);
+    const radiusX = 470;
+    const radiusY = 290;
+    const count = Math.max(1, ringNodes.length);
+    // Keep left side clearer for actors by skipping a wedge around pi.
+    const start = -Math.PI / 2;
+    const sweep = Math.PI * 1.6;
+    ringNodes.forEach((n, i) => {
+      const t = count === 1 ? 0.5 : i / (count - 1);
+      const angle = start + t * sweep;
+      n.position = {
+        x: cx + Math.cos(angle) * radiusX,
+        y: cy + Math.sin(angle) * radiusY,
+      };
+      n.sourcePosition = Position.Left;
+      n.targetPosition = Position.Left;
+    });
+    return nodes;
+  }
+
+  // Business systems on the right lane (top-to-mid)
+  const bizColSpacing = 260;
+  const bizRowSpacing = 118;
+  const bizCols = Math.max(1, Math.min(3, Math.ceil(businessExternals.length / 8)));
+  const bizRows = Math.ceil(businessExternals.length / bizCols);
+  const bizBlockHeight = (bizRows - 1) * bizRowSpacing;
+  const bizYStart = cy - bizBlockHeight / 2;
+  const bizXStart = cx + 350;
+  businessExternals.forEach((n, i) => {
+    const col = Math.floor(i / bizRows);
+    const row = i % bizRows;
+    n.position = {
+      x: bizXStart + col * bizColSpacing,
+      y: bizYStart + row * bizRowSpacing,
+    };
+    n.sourcePosition = Position.Left;
     n.targetPosition = Position.Left;
   });
 
-  // External systems in a ring clockwise from top-right
-  const count = externals.length;
-  externals.forEach((n, i) => {
-    const angle = (-Math.PI / 2) + (i * 2 * Math.PI / Math.max(count, 1));
+  // Technical platforms on a lower lane
+  const techColSpacing = 260;
+  const techRowSpacing = 115;
+  const techCols = Math.max(1, Math.min(4, technicalExternals.length));
+  const techYStart = cy + 250;
+  technicalExternals.forEach((n, i) => {
+    const row = Math.floor(i / techCols);
+    const col = i % techCols;
+    const itemsInRow =
+      row === Math.floor((technicalExternals.length - 1) / techCols)
+        ? ((technicalExternals.length - 1) % techCols) + 1
+        : techCols;
+    const rowWidth = (itemsInRow - 1) * techColSpacing;
+    const xStart = cx - rowWidth / 2;
     n.position = {
-      x: cx + 380 * Math.cos(angle) - 80,
-      y: cy + 380 * Math.sin(angle) - 35,
+      x: xStart + col * techColSpacing,
+      y: techYStart + row * techRowSpacing,
     };
-    n.sourcePosition = Position.Right;
-    n.targetPosition = Position.Left;
+    n.sourcePosition = Position.Top;
+    n.targetPosition = Position.Top;
   });
 
   return nodes;
+}
+
+function applyExecutiveContainerGrouping(nodes: Node[]): Node[] {
+  const containers = nodes.filter(
+    node =>
+      node.type === 'custom' &&
+      node.data?.type === 'container' &&
+      !node.parentNode
+  );
+  if (containers.length <= 1) {
+    return nodes;
+  }
+
+  const groups = new Map<string, Node[]>();
+  containers.forEach(node => {
+    const attrs = node.data?.attributes || {};
+    const domain = String(attrs.business_domain || attrs.domain || 'Core').trim();
+    const squad = String(attrs.squad || attrs.owner || 'Default Squad').trim();
+    const key = `${domain}__${squad}`;
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+    groups.get(key)!.push(node);
+  });
+
+  if (groups.size <= 1) {
+    return nodes;
+  }
+
+  const next = [...nodes];
+  let groupIdx = 0;
+  groups.forEach((groupNodes, key) => {
+    const [domain, squad] = key.split('__');
+    const frameId = `exec_group_${groupIdx++}`;
+    const columns = Math.min(3, Math.max(1, Math.ceil(Math.sqrt(groupNodes.length))));
+    const rows = Math.ceil(groupNodes.length / columns);
+    const width = Math.max(620, columns * 260 + 80);
+    const height = Math.max(330, rows * 150 + 120);
+
+    next.push({
+      id: frameId,
+      type: 'container',
+      className: 'exec-group-frame',
+      draggable: false,
+      selectable: false,
+      connectable: false,
+      focusable: false,
+      zIndex: 0,
+      position: { x: 0, y: 0 },
+      data: {
+        label: domain,
+        containerType: squad,
+        technology: 'Domain Cluster',
+      },
+      style: {
+        width,
+        height,
+        backgroundColor: 'rgba(59, 130, 246, 0.04)',
+        border: '2px dashed #93c5fd',
+        borderRadius: 14,
+        padding: '20px',
+      },
+    });
+
+    groupNodes.forEach((node, idx) => {
+      const row = Math.floor(idx / columns);
+      const col = idx % columns;
+      node.parentNode = frameId;
+      node.extent = 'parent';
+      node.position = {
+        x: 30 + col * 245,
+        y: 70 + row * 130,
+      };
+    });
+  });
+
+  return next;
 }
 
 const CodeArchitectureViewer: React.FC = () => {
@@ -481,6 +1144,7 @@ interface FilterState {
   selectedEntityTypes: string[];
   selectedRelationshipTypes: string[];
   showExternal: boolean;
+  graphViewMode: 'developer' | 'executive';
   dependencyViewFilter: 'all' | 'business' | 'technical';
   searchTerm: string;
   relationshipTypes: string[];
@@ -490,6 +1154,7 @@ type FilterAction =
   | { type: 'SET_ENTITY_TYPES'; payload: string[] }
   | { type: 'SET_RELATIONSHIP_TYPES'; payload: string[] }
   | { type: 'SET_SHOW_EXTERNAL'; payload: boolean }
+  | { type: 'SET_VIEW_MODE'; payload: 'developer' | 'executive' }
   | { type: 'SET_DEPENDENCY_VIEW'; payload: 'all' | 'business' | 'technical' }
   | { type: 'SET_SEARCH_TERM'; payload: string }
   | { type: 'SET_REL_TYPE_LIST'; payload: string[] };
@@ -500,6 +1165,7 @@ function filterReducer(state: FilterState, action: FilterAction): FilterState {
     case 'SET_ENTITY_TYPES':      return { ...state, selectedEntityTypes: action.payload };
     case 'SET_RELATIONSHIP_TYPES':return { ...state, selectedRelationshipTypes: action.payload };
     case 'SET_SHOW_EXTERNAL':     return { ...state, showExternal: action.payload };
+    case 'SET_VIEW_MODE':         return { ...state, graphViewMode: action.payload };
     case 'SET_DEPENDENCY_VIEW':   return { ...state, dependencyViewFilter: action.payload };
     case 'SET_SEARCH_TERM':       return { ...state, searchTerm: action.payload };
     case 'SET_REL_TYPE_LIST':     return { ...state, relationshipTypes: action.payload };
@@ -554,12 +1220,74 @@ interface ExtractionState {
   extractionError: string | null;
   repoSectionExpanded: boolean;
 }
+
+interface ContextReviewState {
+  open: boolean;
+  taskId: string | null;
+  repoKey: string | null;
+  pendingResults: any | null;
+  initialPayload: ContextFeedbackPayload | null;
+  submitting: boolean;
+  error: string | null;
+}
+
+type ContextReviewAction =
+  | { type: 'OPEN'; taskId: string; repoKey: string; results: any; payload: ContextFeedbackPayload }
+  | { type: 'CLOSE' }
+  | { type: 'SET_SUBMITTING'; payload: boolean }
+  | { type: 'SET_ERROR'; payload: string | null }
+  | { type: 'SET_PENDING_RESULTS'; payload: any | null };
+
+function contextReviewReducer(
+  state: ContextReviewState,
+  action: ContextReviewAction
+): ContextReviewState {
+  switch (action.type) {
+    case 'OPEN':
+      return {
+        open: true,
+        taskId: action.taskId,
+        repoKey: action.repoKey,
+        pendingResults: action.results,
+        initialPayload: action.payload,
+        submitting: false,
+        error: null,
+      };
+    case 'CLOSE':
+      return {
+        open: false,
+        taskId: null,
+        repoKey: null,
+        pendingResults: null,
+        initialPayload: null,
+        submitting: false,
+        error: null,
+      };
+    case 'SET_SUBMITTING':
+      return { ...state, submitting: action.payload };
+    case 'SET_ERROR':
+      return { ...state, error: action.payload };
+    case 'SET_PENDING_RESULTS':
+      return { ...state, pendingResults: action.payload };
+    default:
+      return state;
+  }
+}
 type ExtractionAction =
   | { type: 'SET_URL'; payload: string }
   | { type: 'SET_LOCAL_PATH'; payload: string }
   | { type: 'SET_EXTRACTING'; payload: boolean }
   | { type: 'SET_STATUS'; payload: string | null }
   | { type: 'SET_ERROR'; payload: string | null }
+  | {
+      type: 'SET_EXPORT_PREVIEW';
+      payload: {
+        open: boolean;
+        format: 'structurizr' | 'mermaid';
+        filename: string;
+        content: string;
+      };
+    }
   | { type: 'TOGGLE_REPO_SECTION' }
   | { type: 'SET_REPO_EXPANDED'; payload: boolean };
 
@@ -570,6 +1298,23 @@ function extractionReducer(state: ExtractionState, action: ExtractionAction): Ex
     case 'SET_EXTRACTING':   return { ...state, isExtracting: action.payload };
     case 'SET_STATUS':       return { ...state, extractionStatus: action.payload };
     case 'SET_ERROR':        return { ...state, extractionError: action.payload };
+    case 'SET_EXPORT_PREVIEW':
+      return {
+        ...state,
+        ...(action.payload.open
+          ? {
+              exportPreviewOpen: true,
+              exportPreviewFormat: action.payload.format,
+              exportPreviewFilename: action.payload.filename,
+              exportPreviewContent: action.payload.content,
+            }
+          : {
+              exportPreviewOpen: false,
+              exportPreviewFormat: state.exportPreviewFormat,
+              exportPreviewFilename: '',
+              exportPreviewContent: '',
+            }),
+      };
     case 'TOGGLE_REPO_SECTION': return { ...state, repoSectionExpanded: !state.repoSectionExpanded };
     case 'SET_REPO_EXPANDED':return { ...state, repoSectionExpanded: action.payload };
     default: return state;
@@ -593,13 +1338,14 @@ const CodeArchitectureViewerInner: React.FC = () => {
     selectedEntityTypes: [],
     selectedRelationshipTypes: [],
     showExternal: true,
+    graphViewMode: 'developer',
     dependencyViewFilter: 'business',
     searchTerm: '',
     relationshipTypes: [],
   });
   const {
     selectedLevel, selectedEntityTypes, selectedRelationshipTypes,
-    showExternal, dependencyViewFilter, searchTerm, relationshipTypes,
+    showExternal, graphViewMode, dependencyViewFilter, searchTerm, relationshipTypes,
   } = filterState;
 
   const [selState, selDispatch] = useReducer(selectionReducer, {
@@ -618,10 +1364,33 @@ const CodeArchitectureViewerInner: React.FC = () => {
     extractionStatus: null, extractionError: null,
     repoSectionExpanded: true,
     localPath: '',
+    exportPreviewOpen: false,
+    exportPreviewFormat: 'mermaid',
+    exportPreviewFilename: '',
+    exportPreviewContent: '',
   });
   const {
-    githubUrl, localPath, isExtracting, extractionStatus, extractionError, repoSectionExpanded,
+    githubUrl,
+    localPath,
+    isExtracting,
+    extractionStatus,
+    extractionError,
+    repoSectionExpanded,
+    exportPreviewOpen,
+    exportPreviewFormat,
+    exportPreviewFilename,
+    exportPreviewContent,
   } = exState;
+
+  const [ctxReviewState, ctxReviewDispatch] = useReducer(contextReviewReducer, {
+    open: false,
+    taskId: null,
+    repoKey: null,
+    pendingResults: null,
+    initialPayload: null,
+    submitting: false,
+    error: null,
+  });
 
   const pollIntervalRef = useRef<number | null>(null);
 
@@ -638,6 +1407,8 @@ const CodeArchitectureViewerInner: React.FC = () => {
     filterDispatch({ type: 'SET_RELATIONSHIP_TYPES', payload: v });
   const setShowExternal = (v: boolean) =>
     filterDispatch({ type: 'SET_SHOW_EXTERNAL', payload: v });
+  const setGraphViewMode = (v: 'developer' | 'executive') =>
+    filterDispatch({ type: 'SET_VIEW_MODE', payload: v });
   const setDependencyViewFilter = (v: 'all' | 'business' | 'technical') =>
     filterDispatch({ type: 'SET_DEPENDENCY_VIEW', payload: v });
   const setSearchTerm = (v: string) =>
@@ -672,6 +1443,12 @@ const CodeArchitectureViewerInner: React.FC = () => {
   const setIsExtracting = (v: boolean) => exDispatch({ type: 'SET_EXTRACTING', payload: v });
   const setExtractionStatus = (v: string | null) => exDispatch({ type: 'SET_STATUS', payload: v });
   const setExtractionError = (v: string | null) => exDispatch({ type: 'SET_ERROR', payload: v });
+  const setExportPreview = (v: {
+    open: boolean;
+    format: 'structurizr' | 'mermaid';
+    filename: string;
+    content: string;
+  }) => exDispatch({ type: 'SET_EXPORT_PREVIEW', payload: v });
   const setRepoSectionExpanded = (v: boolean) =>
     exDispatch({ type: 'SET_REPO_EXPANDED', payload: v });
 
@@ -855,27 +1632,72 @@ const CodeArchitectureViewerInner: React.FC = () => {
         return { dep_type: 'UNKNOWN', dep_confidence: 0.5 };
       };
 
-      const externalEntities = (
-        data.system_context?.external_dependencies || []
-      ).map((dep: any, idx: number) => {
-        const { dep_type, dep_confidence } = inferDepType(dep);
-        return {
-          id: `context_external_${idx}`,
-          name: dep.name || dep.url || `External ${idx + 1}`,
-          entity_type: dep.type || 'external_system',
-          language: 'Unknown',
-          file_path: dep.detected_from || '',
-          attributes: {
-            url: dep.url,
-            detected_from: dep.detected_from,
-            is_external: true,
-            protocol: dep.protocol,
-            dependency_type: dep_type,
-            classification_confidence: dep_confidence,
-            classification_reasoning: dep.classification_reasoning || '',
-          },
-        };
-      });
+      const deriveExternalDisplayName = (dep: any, index: number) => {
+        const rawName = String(dep.name || '').trim();
+        if (rawName && !/^:?\d{2,5}$/.test(rawName)) {
+          return rawName;
+        }
+
+        const detectedFrom = String(dep.detected_from || '');
+        const serviceMatch = detectedFrom.match(/([A-Za-z0-9_.-]+)\/Dockerfile/i);
+        if (serviceMatch?.[1]) {
+          return serviceMatch[1].replace(/\./g, '-');
+        }
+
+        return rawName || dep.url || `External ${index + 1}`;
+      };
+
+      const isInternalDockerDependency = (dep: any) => {
+        const detectedFrom = String(dep.detected_from || '').toLowerCase();
+        const depName = String(dep.name || '').toLowerCase();
+        const depUrl = String(dep.url || '').toLowerCase();
+        const depType = String(dep.type || '').toLowerCase();
+
+        const isLocalUrl =
+          depUrl.startsWith('http://localhost') ||
+          depUrl.startsWith('https://localhost') ||
+          depUrl.startsWith('http://127.0.0.1') ||
+          depUrl.startsWith('https://127.0.0.1') ||
+          depUrl.startsWith('http://0.0.0.0');
+
+        const hasNoPublicUrl = depUrl === '' || isLocalUrl;
+
+        const looksDockerDerived =
+          /dockerfile|docker-compose|compose\.ya?ml|containers?\//.test(
+            detectedFrom
+          ) || depType === 'container';
+
+        const looksInternalServiceName =
+          /^:?\d{2,5}$/.test(depName) ||
+          /(^|[._/-])(cms|wps|service|api|menu|products|pages|translations|milestones|tenants)([._/-]|$)/.test(
+            depName
+          ) ||
+          /\/(cms|wps)[^/]*\/dockerfile/.test(detectedFrom);
+
+        return hasNoPublicUrl && looksDockerDerived && looksInternalServiceName;
+      };
+
+      const externalEntities = (data.system_context?.external_dependencies || [])
+        .filter((dep: any) => !isInternalDockerDependency(dep))
+        .map((dep: any, idx: number) => {
+          const { dep_type, dep_confidence } = inferDepType(dep);
+          return {
+            id: `context_external_${idx}`,
+            name: deriveExternalDisplayName(dep, idx),
+            entity_type: dep.type || 'external_system',
+            language: 'Unknown',
+            file_path: dep.detected_from || '',
+            attributes: {
+              url: dep.url,
+              detected_from: dep.detected_from,
+              is_external: true,
+              protocol: dep.protocol,
+              dependency_type: dep_type,
+              classification_confidence: dep_confidence,
+              classification_reasoning: dep.classification_reasoning || '',
+            },
+          };
+        });
 
       contextEntities.push(...actorEntities, ...externalEntities);
 
@@ -1048,6 +1870,49 @@ const CodeArchitectureViewerInner: React.FC = () => {
     setError(null);
   }, []);
 
+  const handleCloseContextReview = useCallback(() => {
+    const pending = ctxReviewState.pendingResults;
+    ctxReviewDispatch({ type: 'CLOSE' });
+    if (pending) {
+      applyArchitecture(pending);
+      setSelectedLevel('context_level');
+    }
+  }, [ctxReviewState.pendingResults, applyArchitecture]);
+
+  const handleSubmitContextReview = useCallback(
+    async (payload: ContextFeedbackPayload) => {
+      const taskId = ctxReviewState.taskId;
+      const repoKey = ctxReviewState.repoKey;
+      if (!taskId || !repoKey) {
+        handleCloseContextReview();
+        return;
+      }
+
+      ctxReviewDispatch({ type: 'SET_ERROR', payload: null });
+      ctxReviewDispatch({ type: 'SET_SUBMITTING', payload: true });
+      persistStoredContextFeedback(repoKey, payload);
+
+      try {
+        const updated = await codeArchitectureAPI.submitContextFeedback(
+          taskId,
+          payload
+        );
+        ctxReviewDispatch({ type: 'SET_SUBMITTING', payload: false });
+        ctxReviewDispatch({ type: 'CLOSE' });
+        if (updated) {
+          applyArchitecture(updated);
+          setSelectedLevel('context_level');
+        }
+      } catch (e) {
+        const msg =
+          e instanceof Error ? e.message : 'Failed to apply context feedback';
+        ctxReviewDispatch({ type: 'SET_SUBMITTING', payload: false });
+        ctxReviewDispatch({ type: 'SET_ERROR', payload: msg });
+      }
+    },
+    [ctxReviewState.taskId, ctxReviewState.repoKey, applyArchitecture, handleCloseContextReview]
+  );
+
   // Load architecture data
   useEffect(() => {
     const loadArchitecture = async () => {
@@ -1125,8 +1990,20 @@ const CodeArchitectureViewerInner: React.FC = () => {
             const results =
               await codeArchitectureAPI.getExtractionResults(taskId);
             if (results) {
-              applyArchitecture(results);
-              setSelectedLevel('context_level');
+              const repoKey = makeContextFeedbackRepoKey(githubUrl.trim(), '');
+              if (needsHumanContextReview(results)) {
+                const payload = buildInitialContextFeedbackPayload(results, repoKey);
+                ctxReviewDispatch({
+                  type: 'OPEN',
+                  taskId,
+                  repoKey,
+                  results,
+                  payload,
+                });
+              } else {
+                applyArchitecture(results);
+                setSelectedLevel('context_level');
+              }
             }
           } else if (status.status === 'failed') {
             if (pollIntervalRef.current) {
@@ -1136,7 +2013,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
             setIsExtracting(false);
             setExtractionError(status.message || 'Extraction failed');
           }
-        } catch (pollError) {
+        } catch {
           if (pollIntervalRef.current) {
             clearInterval(pollIntervalRef.current);
             pollIntervalRef.current = null;
@@ -1151,7 +2028,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
         err instanceof Error ? err.message : 'Failed to start extraction'
       );
     }
-  }, [githubUrl, applyArchitecture]);
+  }, [githubUrl, applyArchitecture, ctxReviewDispatch]);
 
   // Local folder scan handler
   const handleScanLocalPath = useCallback(async () => {
@@ -1200,8 +2077,20 @@ const CodeArchitectureViewerInner: React.FC = () => {
 
             const results = await codeArchitectureAPI.getExtractionResults(taskId);
             if (results) {
-              applyArchitecture(results);
-              setSelectedLevel('context_level');
+              const repoKey = makeContextFeedbackRepoKey('', localPath.trim());
+              if (needsHumanContextReview(results)) {
+                const payload = buildInitialContextFeedbackPayload(results, repoKey);
+                ctxReviewDispatch({
+                  type: 'OPEN',
+                  taskId,
+                  repoKey,
+                  results,
+                  payload,
+                });
+              } else {
+                applyArchitecture(results);
+                setSelectedLevel('context_level');
+              }
             }
           } else if (status.status === 'failed') {
             if (pollIntervalRef.current) {
@@ -1226,7 +2115,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
         err instanceof Error ? err.message : 'Failed to start scan'
       );
     }
-  }, [localPath, applyArchitecture]);
+  }, [localPath, applyArchitecture, ctxReviewDispatch]);
 
   // Batch extraction handler
   const handleBatchExtract = useCallback(
@@ -1353,7 +2242,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
               setIsExtracting(false);
               setExtractionError(status.message || 'GitHub org scan failed');
             }
-          } catch (pollError) {
+          } catch {
             clearInterval(pollInterval);
             setIsExtracting(false);
             setExtractionError('Failed to poll extraction status');
@@ -1496,6 +2385,11 @@ const CodeArchitectureViewerInner: React.FC = () => {
       // NEW: Dependency type filter for C4 Context level
       let dependencyTypeMatch = true;
       if (selectedLevel === 'context_level' && e.attributes?.is_external) {
+        // Drop docker/compose-derived "externals" (they belong to container level).
+        if (isDockerDerivedContextExternal(e)) {
+          return false;
+        }
+
         const depType = e.attributes?.dependency_type;
         if (dependencyViewFilter === 'business') {
           dependencyTypeMatch = depType === 'BUSINESS_SYSTEM';
@@ -1508,20 +2402,86 @@ const CodeArchitectureViewerInner: React.FC = () => {
       return typeMatch && externalMatch && searchMatch && dependencyTypeMatch;
     });
 
-    // Create entity lookup
-    const entityIds = new Set(filteredEntities.map(e => e.id));
-
-    // Filter relationships
-    const filteredRelationships = allRelationships.filter(r => {
+    // Filter relationships by selected relationship types first
+    const relationshipTypeFiltered = allRelationships.filter(r => {
       const typeMatch =
         selectedRelationshipTypes.length === 0 ||
         selectedRelationshipTypes.includes(r.relationship_type);
-      const validSource = entityIds.has(r.source_entity_id);
-      const validTarget =
-        r.target_entity_id && entityIds.has(r.target_entity_id);
-
-      return typeMatch && validSource && validTarget;
+      return typeMatch;
     });
+
+    let collapsedRelationships: CodeRelationship[] | null = null;
+
+    // Executive view: collapse technical infra externals into one boundary node
+    if (selectedLevel === 'context_level' && graphViewMode === 'executive') {
+      const technicalEntities = filteredEntities.filter(
+        entity => entity.attributes?.is_external && isTechnicalContextEntity(entity)
+      );
+      if (technicalEntities.length > 0) {
+        const platformNodeId = 'context_platform_services';
+        const platformNode: CodeEntity = {
+          id: platformNodeId,
+          name: 'Platform Services',
+          entity_type: 'external_system',
+          language: 'Unknown',
+          file_path: '',
+          attributes: {
+            is_external: true,
+            platform_boundary: true,
+            dependency_type: 'TECHNICAL_INFRA',
+            collapsed_count: technicalEntities.length,
+            collapsed_services: technicalEntities.map(entity => entity.name).slice(0, 20),
+          },
+          level: selectedLevel,
+        };
+
+        const technicalIds = new Set(technicalEntities.map(entity => entity.id));
+        filteredEntities = filteredEntities.filter(
+          entity => !technicalIds.has(entity.id)
+        );
+        filteredEntities.push(platformNode);
+
+        const originalEntityIds = new Set([
+          ...filteredEntities.map(entity => entity.id),
+          ...technicalIds,
+        ]);
+
+        const remap = new Map<string, string>();
+        technicalIds.forEach(id => remap.set(id, platformNodeId));
+
+        const deduped = new Map<string, CodeRelationship>();
+        relationshipTypeFiltered.forEach(rel => {
+          if (!rel.target_entity_id) return;
+          if (!originalEntityIds.has(rel.source_entity_id)) return;
+          if (!originalEntityIds.has(rel.target_entity_id)) return;
+
+          const source = remap.get(rel.source_entity_id) || rel.source_entity_id;
+          const target = remap.get(rel.target_entity_id) || rel.target_entity_id;
+          if (source === target) return;
+
+          const key = `${source}|${target}|${rel.relationship_type}`;
+          if (!deduped.has(key)) {
+            deduped.set(key, {
+              ...rel,
+              source_entity_id: source,
+              target_entity_id: target,
+            });
+          }
+        });
+        collapsedRelationships = Array.from(deduped.values());
+      }
+    }
+
+    // Create entity lookup
+    const entityIds = new Set(filteredEntities.map(e => e.id));
+
+    // Filter relationships by visible entity IDs (and use executive collapsed set if available)
+    const filteredRelationships: CodeRelationship[] =
+      (collapsedRelationships || relationshipTypeFiltered).filter(r => {
+        const validSource = entityIds.has(r.source_entity_id);
+        const validTarget = r.target_entity_id && entityIds.has(r.target_entity_id);
+        return validSource && validTarget;
+      });
 
     // Convert to React Flow format
     const rfNodes: Node[] = [];
@@ -1839,25 +2799,48 @@ const CodeArchitectureViewerInner: React.FC = () => {
     }
 
     const isContextLevel = selectedLevel === 'context_level';
+    const entityById = new Map(filteredEntities.map(entity => [entity.id, entity]));
     const rfEdges: Edge[] = filteredRelationships
       .filter(r => r.target_entity_id)
-      .map((r, idx) => ({
-        id: `edge-${idx}`,
-        source: r.source_entity_id,
-        target: r.target_entity_id!,
-        type: isContextLevel ? 'C4Edge' : 'smoothstep',
-        animated: false,
-        interactionWidth: 16,
-        style: {
-          stroke: isContextLevel ? '#1168bd' : '#b0bec5',
-          strokeWidth: isContextLevel ? 2.8 : 2,
-        },
-        data: {
-          description: r.attributes?.description,
-          protocol: r.attributes?.protocol,
-          relationship_type: r.relationship_type,
-        },
-      }));
+      .map((r, idx) => {
+        const sourceEntity = entityById.get(r.source_entity_id);
+        const targetEntity = r.target_entity_id
+          ? entityById.get(r.target_entity_id)
+          : undefined;
+        const businessCopy = buildBusinessRelationshipCopy(
+          r.relationship_type,
+          r.attributes?.description,
+          sourceEntity?.name,
+          targetEntity?.name,
+          sourceEntity?.entity_type,
+          targetEntity?.entity_type
+        );
+
+        return {
+          id: `edge-${idx}`,
+          source: r.source_entity_id,
+          target: r.target_entity_id!,
+          type: isContextLevel ? 'C4Edge' : 'smoothstep',
+          animated: false,
+          interactionWidth: 16,
+          label: isContextLevel ? businessCopy.label : undefined,
+          style: {
+            stroke: isContextLevel ? '#1168bd' : '#b0bec5',
+            strokeWidth: isContextLevel ? 2.8 : 2,
+          },
+          data: {
+            description:
+              isContextLevel && businessCopy.sentence
+                ? businessCopy.sentence
+                : r.attributes?.description,
+            protocol: r.attributes?.protocol,
+            relationship_type: r.relationship_type,
+            business_label: businessCopy.label,
+            source_label: sourceEntity?.name,
+            target_label: targetEntity?.name,
+          },
+        };
+      });
 
     const dependencyEdges =
       selectedLevel === 'container_level' && filteredRelationships.length === 0
@@ -1873,10 +2856,14 @@ const CodeArchitectureViewerInner: React.FC = () => {
     let layoutedNodes: Node[];
     let layoutedEdges: Edge[];
     if (selectedLevel === 'context_level') {
-      layoutedNodes = layoutContextLevel([...rfNodes]);
+      layoutedNodes = layoutContextLevel([...rfNodes], graphViewMode);
       layoutedEdges = mergedEdges;
     } else {
-      const result = getLayoutedElements(rfNodes, mergedEdges);
+      const nodesForLayout =
+        selectedLevel === 'container_level' && graphViewMode === 'executive'
+          ? applyExecutiveContainerGrouping(rfNodes)
+          : rfNodes;
+      const result = getLayoutedElements(nodesForLayout, mergedEdges);
       layoutedNodes = result.nodes;
       layoutedEdges = result.edges;
     }
@@ -1902,7 +2889,15 @@ const CodeArchitectureViewerInner: React.FC = () => {
       return node;
     });
 
-    setNodes(nodesWithValidPositions);
+    const elevatedNodes = nodesWithValidPositions.map(node => ({
+      ...node,
+      zIndex: 10,
+    }));
+
+    // No group frames — use clean individual-node C4 layout (like image 2)
+    const finalNodes = elevatedNodes;
+
+    setNodes(finalNodes);
     setEdges(layoutedEdges);
 
     // Fit view after layout to show entire graph
@@ -1938,6 +2933,8 @@ const CodeArchitectureViewerInner: React.FC = () => {
     selectedEntityTypes,
     selectedRelationshipTypes,
     showExternal,
+    graphViewMode,
+    dependencyViewFilter,
     searchTerm,
     fitView,
   ]);
@@ -1987,7 +2984,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
         protocol: typeof edge.label === 'string' ? edge.label : undefined,
       });
       setEdgeDescription(response?.description || 'No description available.');
-    } catch (error) {
+    } catch {
       setEdgeDescription('Unable to generate description right now.');
     } finally {
       setIsEdgeLoading(false);
@@ -1996,6 +2993,54 @@ const CodeArchitectureViewerInner: React.FC = () => {
 
   const avgConnections =
     nodes.length > 0 ? (edges.length / nodes.length).toFixed(1) : '0';
+
+  const downloadTextFile = (filename: string, content: string) => {
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportStructurizr = async () => {
+    try {
+      const payload = await codeArchitectureAPI.exportStructurizr();
+      setExportPreview({
+        open: true,
+        format: 'structurizr',
+        filename: payload.filename,
+        content: payload.content,
+      });
+      setExtractionStatus('Structurizr export ready');
+      setExtractionError(null);
+    } catch (e) {
+      const msg =
+        e instanceof Error ? e.message : 'Failed to export Structurizr DSL';
+      setExtractionError(msg);
+    }
+  };
+
+  const handleExportMermaid = async () => {
+    try {
+      const payload = await codeArchitectureAPI.exportMermaid();
+      setExportPreview({
+        open: true,
+        format: 'mermaid',
+        filename: payload.filename,
+        content: payload.content,
+      });
+      setExtractionStatus('Mermaid export ready');
+      setExtractionError(null);
+    } catch (e) {
+      const msg =
+        e instanceof Error ? e.message : 'Failed to export Mermaid snippet';
+      setExtractionError(msg);
+    }
+  };
 
   const toggleLevel = (level: string) => {
     setSelectedLevel(level);
@@ -2033,10 +3078,40 @@ const CodeArchitectureViewerInner: React.FC = () => {
 
   return (
     <div className="code-architecture-viewer">
+      <ExportPreviewDialog
+        open={exportPreviewOpen}
+        format={exportPreviewFormat}
+        filename={exportPreviewFilename}
+        content={exportPreviewContent}
+        onClose={() =>
+          setExportPreview({
+            open: false,
+            format: exportPreviewFormat,
+            filename: '',
+            content: '',
+          })
+        }
+        onDownload={() =>
+          downloadTextFile(exportPreviewFilename, exportPreviewContent)
+        }
+      />
+      {ctxReviewState.open && ctxReviewState.initialPayload ? (
+        <ContextReviewDialog
+          open={ctxReviewState.open}
+          title="System Context Review"
+          submitting={ctxReviewState.submitting}
+          error={ctxReviewState.error}
+          initial={ctxReviewState.initialPayload}
+          onCancel={handleCloseContextReview}
+          onSubmit={handleSubmitContextReview}
+        />
+      ) : null}
       <ArchitectureHeader
         nodeCount={nodes.length}
         edgeCount={edges.length}
         avgConnections={avgConnections}
+        onExportStructurizr={handleExportStructurizr}
+        onExportMermaid={handleExportMermaid}
       />
 
       <div className="viewer-layout">
@@ -2050,6 +3125,8 @@ const CodeArchitectureViewerInner: React.FC = () => {
           toggleRelationshipType={toggleRelationshipType}
           showExternal={showExternal}
           setShowExternal={setShowExternal}
+          graphViewMode={graphViewMode}
+          setGraphViewMode={setGraphViewMode}
           dependencyViewFilter={dependencyViewFilter}
           setDependencyViewFilter={setDependencyViewFilter}
           repoSectionExpanded={repoSectionExpanded}
@@ -2072,35 +3149,47 @@ const CodeArchitectureViewerInner: React.FC = () => {
           extractionError={extractionError}
         />
 
-        <GraphView
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onNodeClick={onNodeClick}
-          onEdgeClick={onEdgeClick}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          selectedLevel={selectedLevel}
-        />
-
-        {selectedNode && (
-          <NodeDetailsPanel
-            selectedNode={selectedNode}
-            onClose={() => setSelectedNode(null)}
-            nodeDescription={nodeDescription}
-            isNodeLoading={isNodeLoading}
+        <div className="graph-main">
+          <GraphView
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onNodeClick={onNodeClick}
+            onEdgeClick={onEdgeClick}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            selectedLevel={selectedLevel}
+            isLoading={isExtracting}
+            loadingText={extractionStatus}
           />
-        )}
 
-        {selectedEdge && (
-          <EdgeDetailsPanel
-            selectedEdge={selectedEdge}
-            onClose={() => setSelectedEdge(null)}
-            edgeDescription={edgeDescription}
-            isEdgeLoading={isEdgeLoading}
-          />
-        )}
+          {selectedNode && (
+            <div className="node-inspector-overlay">
+              <NodeDetailsPanel
+                selectedNode={selectedNode}
+                onClose={() => setSelectedNode(null)}
+                nodeDescription={nodeDescription}
+                isNodeLoading={isNodeLoading}
+                variant="overlay"
+                showClose={true}
+              />
+            </div>
+          )}
+
+          {selectedEdge && !selectedNode && (
+            <div className="node-inspector-overlay">
+              <EdgeDetailsPanel
+                selectedEdge={selectedEdge}
+                onClose={() => setSelectedEdge(null)}
+                edgeDescription={edgeDescription}
+                isEdgeLoading={isEdgeLoading}
+                variant="overlay"
+                showClose={true}
+              />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

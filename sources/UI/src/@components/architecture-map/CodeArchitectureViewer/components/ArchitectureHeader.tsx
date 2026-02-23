@@ -4,12 +4,16 @@ interface ArchitectureHeaderProps {
   nodeCount: number;
   edgeCount: number;
   avgConnections: string;
+  onExportStructurizr?: () => void;
+  onExportMermaid?: () => void;
 }
 
 export default function ArchitectureHeader({
   nodeCount,
   edgeCount,
   avgConnections,
+  onExportStructurizr,
+  onExportMermaid,
 }: ArchitectureHeaderProps) {
   return (
     <div className="viewer-header">
@@ -21,6 +25,24 @@ export default function ArchitectureHeader({
         </p>
       </div>
       <div className="header-stats">
+        <div className="header-actions">
+          <button
+            type="button"
+            className="header-action-btn"
+            onClick={onExportStructurizr}
+            disabled={!onExportStructurizr}
+          >
+            Export Structurizr
+          </button>
+          <button
+            type="button"
+            className="header-action-btn"
+            onClick={onExportMermaid}
+            disabled={!onExportMermaid}
+          >
+            Export Mermaid
+          </button>
+        </div>
         <div className="header-stat">
           <span className="header-stat-value">{nodeCount}</span>
           <span className="header-stat-label">Entities</span>

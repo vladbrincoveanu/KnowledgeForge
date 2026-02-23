@@ -96,11 +96,11 @@ class GraphManager:
             logger.error("Cannot create constraints: not connected to database")
             return False
 
+        # Keep schema compatible with Neo4j Community Edition:
+        # property existence constraints (REQUIRE ... IS NOT NULL) require Enterprise Edition.
         constraints = [
             "CREATE CONSTRAINT entity_id IF NOT EXISTS FOR (e:Entity) REQUIRE e.id IS UNIQUE",
             "CREATE CONSTRAINT relationship_id IF NOT EXISTS FOR (r:Relationship) REQUIRE r.id IS UNIQUE",
-            "CREATE CONSTRAINT entity_name IF NOT EXISTS FOR (e:Entity) REQUIRE e.name IS NOT NULL",
-            "CREATE CONSTRAINT relationship_type IF NOT EXISTS FOR (r:Relationship) REQUIRE r.type IS NOT NULL",
         ]
 
         try:
@@ -111,7 +111,7 @@ class GraphManager:
             logger.info("Database constraints created successfully")
             return True
 
-        except (ConnectionError, RuntimeError) as e:
+        except Exception as e:
             logger.error(f"Failed to create constraints: {e}")
             return False
 

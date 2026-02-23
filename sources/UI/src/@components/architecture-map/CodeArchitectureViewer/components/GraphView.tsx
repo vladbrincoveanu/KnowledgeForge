@@ -17,6 +17,8 @@ interface GraphViewProps {
   nodeTypes: Record<string, any>;
   edgeTypes: Record<string, any>;
   selectedLevel: string;
+  isLoading?: boolean;
+  loadingText?: string | null;
 }
 
 export default function GraphView({
@@ -29,13 +31,26 @@ export default function GraphView({
   nodeTypes,
   edgeTypes,
   selectedLevel,
+  isLoading,
+  loadingText,
 }: GraphViewProps) {
   if (nodes.length === 0) {
     return (
       <main className="graph-container">
         <div className="empty-state">
-          <p>No entities match the current filters</p>
+          <p>{isLoading ? (loadingText || 'Scanning repository…') : 'No entities match the current filters'}</p>
         </div>
+        {isLoading && (
+          <div className="graph-loading-overlay" aria-live="polite">
+            <div className="graph-loading-card">
+              <div className="graph-loading-spinner" />
+              <div className="graph-loading-title">Scanning</div>
+              <div className="graph-loading-subtitle">
+                {loadingText || 'Extracting architecture…'}
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     );
   }
@@ -74,6 +89,17 @@ export default function GraphView({
           <Controls />
         </ReactFlow>
       </div>
+      {isLoading && (
+        <div className="graph-loading-overlay" aria-live="polite">
+          <div className="graph-loading-card">
+            <div className="graph-loading-spinner" />
+            <div className="graph-loading-title">Scanning</div>
+            <div className="graph-loading-subtitle">
+              {loadingText || 'Extracting architecture…'}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

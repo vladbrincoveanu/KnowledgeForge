@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Any, Optional
 
 from neo4j import Driver, GraphDatabase, Session, Transaction
-from neo4j.exceptions import AuthError, ServiceUnavailable
+from neo4j.exceptions import AuthError, ServiceUnavailable, Neo4jError
 
 from app.domain.models.entities import Entity, Relationship
 
@@ -126,8 +126,11 @@ class Neo4jGraphManager:
         except (ServiceUnavailable, AuthError) as e:
             logger.error(f"Failed to connect to Neo4j: {e}")
             return False
-        except (ConnectionError, RuntimeError) as e:
+        except (ConnectionError, RuntimeError, Neo4jError) as e:
             logger.error(f"Unexpected error connecting to Neo4j: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error connecting to Neo4j: {e}", exc_info=True)
             return False
 
     def _initialize_schema(self, session: Session):
@@ -191,21 +194,22 @@ class Neo4jGraphManager:
             # It's okay if this fails, the index might not exist under that name.
             logger.debug(f"Could not drop legacy index 'entity_id_index', may not exist: {e}")
 
+        # Keep schema compatible with Neo4j Community Edition:
+        # - Uniqueness constraints are supported.
+        # - Property existence constraints (REQUIRE ... IS NOT NULL) require Enterprise Edition.
         constraints = [
             "CREATE CONSTRAINT entity_id_unique IF NOT EXISTS FOR (e:Entity) REQUIRE e.id IS UNIQUE",
-            "CREATE CONSTRAINT entity_source_file IF NOT EXISTS FOR (e:Entity) REQUIRE e.source_file IS NOT NULL",
-            "CREATE CONSTRAINT entity_extraction_timestamp IF NOT EXISTS FOR (e:Entity) REQUIRE e.extraction_timestamp IS NOT NULL",
             "CREATE CONSTRAINT relationship_id_unique IF NOT EXISTS FOR (r:RELATES_TO) REQUIRE r.id IS UNIQUE",
-            "CREATE CONSTRAINT relationship_type_not_null IF NOT EXISTS FOR (r:RELATES_TO) REQUIRE r.type IS NOT NULL",
-            "CREATE CONSTRAINT relationship_confidence_range IF NOT EXISTS FOR (r:RELATES_TO) REQUIRE r.confidence >= 0.0 AND r.confidence <= 1.0",
         ]
 
         try:
             for constraint_query in constraints:
                 session.run(constraint_query)
             logger.info("Advanced constraints created successfully")
-        except (ConnectionError, RuntimeError) as e:
+        except (ConnectionError, RuntimeError, Neo4jError) as e:
             logger.warning(f"Failed to create some constraints: {e}")
+        except Exception as e:
+            logger.warning(f"Failed to create some constraints: {e}", exc_info=True)
 
     def begin_transaction(self, transaction_id: Optional[str] = None) -> str:
         """Begin a new transaction."""

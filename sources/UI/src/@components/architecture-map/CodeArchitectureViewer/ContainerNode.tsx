@@ -7,13 +7,21 @@ interface ContainerNodeProps {
     label: string;
     containerType?: string;
     technology?: string;
+    isGroup?: boolean;
+    groupKind?: 'actors' | 'system' | 'business' | 'technical';
   };
 }
 
 const ContainerNode: React.FC<ContainerNodeProps> = ({ data }) => {
+  const isGroup = Boolean(data.isGroup);
+
   return (
-    <div className="container-node">
-      <Handle type="target" position={Position.Left} />
+    <div
+      className={`container-node ${isGroup ? 'container-group' : ''} ${
+        isGroup && data.groupKind ? `group-${data.groupKind}` : ''
+      }`}
+    >
+      {!isGroup && <Handle type="target" position={Position.Left} />}
       <div className="container-header">
         <div className="container-label">{data.label}</div>
         {data.containerType && (
@@ -23,7 +31,7 @@ const ContainerNode: React.FC<ContainerNodeProps> = ({ data }) => {
           <div className="container-tech">{data.technology}</div>
         )}
       </div>
-      <Handle type="source" position={Position.Right} />
+      {!isGroup && <Handle type="source" position={Position.Right} />}
     </div>
   );
 };

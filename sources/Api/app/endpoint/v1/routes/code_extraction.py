@@ -8,7 +8,7 @@ import uuid
 import zipfile
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Literal
 
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
@@ -18,6 +18,11 @@ from app.infrastructure.graph.neo4j_manager import Neo4jGraphManager
 from app.infrastructure.storage.metadata_store import MetadataStore
 from app.infrastructure.llm.llm_manager import LLMManager
 from app.services.code_extraction.c4_extractor import C4ArchitectureExtractor
+from app.services.code_extraction.exporters import (
+    export_mermaid_c4,
+    export_structurizr_dsl,
+)
+from app.services.c4.context.feature_flags import C4FeatureFlags
 from app.services.service_extraction.github_downloader import GitHubDownloader
 from app.endpoint.v1.dependencies import get_neo4j_manager, get_llm_manager, get_metadata_store
 from app.utils.security import safe_extract_zip, validate_local_repo_path
@@ -152,6 +157,49 @@ class GitHubScanRequest(BaseModel):
             ]
         }
     }
+
+
+class ContextActorFeedback(BaseModel):
+    """Human feedback for an actor in the System Context diagram."""
+
+    index: int = Field(..., ge=0, description="Index in system_context.actors[]")
+    name: Optional[str] = Field(default=None, description="Business-friendly actor name")
+    description: Optional[str] = Field(default=None, description="Actor role / description")
+    ignore: bool = Field(default=False, description="Drop this actor from the context diagram")
+
+
+class ContextExternalDependencyFeedback(BaseModel):
+    """Human feedback for an external dependency in the System Context diagram."""
+
+    index: int = Field(..., ge=0, description="Index in system_context.external_dependencies[]")
+    name: Optional[str] = Field(default=None, description="Business-friendly system/platform name")
+    dependency_type: Optional[Literal["BUSINESS_SYSTEM", "TECHNICAL_INFRA", "UNKNOWN"]] = Field(
+        default=None,
+        description="Classify as business system vs technical platform/infrastructure",
+    )
+    url: Optional[str] = Field(default=None, description="Public URL if applicable")
+    protocol: Optional[str] = Field(default=None, description="HTTP/HTTPS/Kafka/etc, if known")
+    notes: Optional[str] = Field(default=None, description="Short reasoning notes")
+    ignore: bool = Field(default=False, description="Drop this dependency from the context diagram")
+
+
+class ContextRelationshipFeedback(BaseModel):
+    """Human feedback for a context relationship label/description."""
+
+    source: str = Field(..., description="Source node name as shown in the diagram")
+    destination: str = Field(..., description="Destination node name as shown in the diagram")
+    description: str = Field(..., description="Business-friendly relationship (e.g. 'Publishes content updates')")
+    relationship_type: str = Field(default="uses", description="C4 relationship type (kept mostly for filtering)")
+    protocol: Optional[str] = Field(default=None, description="HTTP/HTTPS/Kafka/etc, if known")
+
+
+class ContextFeedbackRequest(BaseModel):
+    """Human-in-the-loop corrections for the System Context (L1) output."""
+
+    system_name: Optional[str] = Field(default=None, description="Override system_context.name")
+    actors: list[ContextActorFeedback] = Field(default_factory=list)
+    external_dependencies: list[ContextExternalDependencyFeedback] = Field(default_factory=list)
+    relationships: list[ContextRelationshipFeedback] = Field(default_factory=list)
 
 
 class ScanResponse(BaseModel):
@@ -969,6 +1017,119 @@ async def get_scan_results(task_id: str):
     }
 
 
+@router.post(
+    "/scan/{task_id}/context-feedback",
+    summary="Apply human feedback to the System Context (L1) output",
+    description=(
+        "Updates `system_context` actors/external dependencies and replaces the Context-level relationships "
+        "with business-friendly labels provided by a human reviewer. The updated C4 JSON is persisted so "
+        "`GET /api/v1/code/architecture` reflects the corrected diagram."
+    ),
+)
+async def apply_context_feedback(task_id: str, request: ContextFeedbackRequest):
+    task = scan_tasks.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.get('status') != 'completed':
+        raise HTTPException(status_code=400, detail="Task not yet completed")
+
+    c4_architecture: Optional[dict[str, Any]] = task.get('c4_architecture')
+    if not c4_architecture:
+        raise HTTPException(status_code=404, detail="Results not found")
+
+    system_context = c4_architecture.get('system_context') or {}
+
+    # 1) System name override
+    if request.system_name and request.system_name.strip():
+        system_context['name'] = request.system_name.strip()
+
+    # 2) Actors overrides (by index)
+    actors: list[dict[str, Any]] = list(system_context.get('actors') or [])
+    actor_overrides = {ov.index: ov for ov in request.actors}
+    new_actors: list[dict[str, Any]] = []
+    for idx, actor in enumerate(actors):
+        ov = actor_overrides.get(idx)
+        if ov and ov.ignore:
+            continue
+        updated = dict(actor)
+        if ov and ov.name is not None:
+            updated['name'] = ov.name
+        if ov and ov.description is not None:
+            updated['description'] = ov.description
+        new_actors.append(updated)
+    system_context['actors'] = new_actors
+
+    # 3) External dependencies overrides (by index)
+    deps: list[dict[str, Any]] = list(system_context.get('external_dependencies') or [])
+    dep_overrides = {ov.index: ov for ov in request.external_dependencies}
+    new_deps: list[dict[str, Any]] = []
+    for idx, dep in enumerate(deps):
+        ov = dep_overrides.get(idx)
+        if ov and ov.ignore:
+            continue
+
+        updated = dict(dep)
+        if ov:
+            if ov.name is not None:
+                updated['name'] = ov.name
+            if ov.url is not None:
+                updated['url'] = ov.url
+            if ov.protocol is not None:
+                updated['protocol'] = ov.protocol
+            if ov.dependency_type is not None:
+                updated['dependency_type'] = ov.dependency_type
+
+            # Mark as human reviewed to avoid overwriting downstream.
+            updated['classification_confidence'] = 1.0
+            updated['classification_reasoning'] = (
+                f"Human review: {ov.notes.strip()}"
+                if ov.notes and ov.notes.strip()
+                else "Human review"
+            )
+
+        new_deps.append(updated)
+    system_context['external_dependencies'] = new_deps
+
+    # 4) Context relationships override (replace when provided)
+    if request.relationships:
+        rels: list[dict[str, Any]] = []
+        for rel in request.relationships:
+            rels.append(
+                {
+                    "source": rel.source,
+                    "destination": rel.destination,
+                    "description": rel.description,
+                    "relationship_type": rel.relationship_type or "uses",
+                    "protocol": rel.protocol,
+                }
+            )
+        c4_architecture.setdefault('relationships', {})['context'] = rels
+
+    system_context['human_context_feedback_applied_at'] = datetime.now().isoformat()
+    c4_architecture['system_context'] = system_context
+
+    # Update the in-memory task + persist to JSON so /architecture shows corrections.
+    task['c4_architecture'] = c4_architecture
+    _save_c4_to_json(task_id, c4_architecture)
+
+    return {
+        'task_id': task_id,
+        'extraction_mode': 'c4_model',
+        'system_context': c4_architecture['system_context'],
+        'containers': c4_architecture['containers'],
+        'components': c4_architecture['components'],
+        'relationships': c4_architecture.get('relationships', {}),
+        'statistics': {
+            'total_containers': len(c4_architecture['containers']),
+            'total_components': len(c4_architecture['components']),
+            'total_external_deps': len(c4_architecture['system_context'].get('external_dependencies', [])),
+        },
+        'metadata': c4_architecture.get('metadata', {}),
+        'errors': task.get('errors', []),
+    }
+
+
 @router.delete("/scan/{task_id}")
 async def delete_scan_task(task_id: str):
     """Delete a scan task and cleanup resources."""
@@ -1089,6 +1250,48 @@ async def get_code_architecture():
             status_code=500,
             detail=f"Failed to get architecture: {str(e)}"
         )
+
+
+@router.get(
+    "/architecture/export/structurizr",
+    summary="Export latest architecture as Structurizr DSL",
+)
+async def export_architecture_structurizr():
+    """Return Structurizr DSL generated from latest C4 architecture JSON."""
+    flags = C4FeatureFlags.from_env()
+    if not flags.enable_structurizr_export:
+        raise HTTPException(status_code=403, detail="Structurizr export is disabled by feature flag")
+
+    c4_data = _load_latest_c4_from_json()
+    if not c4_data:
+        raise HTTPException(status_code=404, detail="No architecture data available")
+    content = export_structurizr_dsl(c4_data)
+    return {
+        "format": "structurizr",
+        "filename": "knowledgeforge-workspace.dsl",
+        "content": content,
+    }
+
+
+@router.get(
+    "/architecture/export/mermaid",
+    summary="Export latest architecture as Mermaid C4 snippet",
+)
+async def export_architecture_mermaid():
+    """Return Mermaid C4 snippet generated from latest C4 architecture JSON."""
+    flags = C4FeatureFlags.from_env()
+    if not flags.enable_mermaid_export:
+        raise HTTPException(status_code=403, detail="Mermaid export is disabled by feature flag")
+
+    c4_data = _load_latest_c4_from_json()
+    if not c4_data:
+        raise HTTPException(status_code=404, detail="No architecture data available")
+    content = export_mermaid_c4(c4_data)
+    return {
+        "format": "mermaid",
+        "filename": "knowledgeforge-context.mmd",
+        "content": content,
+    }
 
 
 @router.post(

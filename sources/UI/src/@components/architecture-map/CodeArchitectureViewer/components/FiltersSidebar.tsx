@@ -27,6 +27,8 @@ interface FiltersSidebarProps {
   // Externals + dependency view
   showExternal: boolean;
   setShowExternal: (val: boolean) => void;
+  graphViewMode: 'developer' | 'executive';
+  setGraphViewMode: (val: 'developer' | 'executive') => void;
   dependencyViewFilter: 'all' | 'business' | 'technical';
   setDependencyViewFilter: (val: 'all' | 'business' | 'technical') => void;
 
@@ -64,6 +66,8 @@ export default function FiltersSidebar({
   toggleRelationshipType,
   showExternal,
   setShowExternal,
+  graphViewMode,
+  setGraphViewMode,
   dependencyViewFilter,
   setDependencyViewFilter,
   repoSectionExpanded,
@@ -133,6 +137,31 @@ export default function FiltersSidebar({
               <span>{type}</span>
             </label>
           ))}
+        </div>
+      </div>
+
+      {/* View Mode */}
+      <div className="filter-section">
+        <h3>View Mode</h3>
+        <div className="radio-group">
+          <label className="checkbox-label">
+            <input
+              type="radio"
+              name="graph-view-mode"
+              checked={graphViewMode === 'developer'}
+              onChange={() => setGraphViewMode('developer')}
+            />
+            <span>Developer (full detail)</span>
+          </label>
+          <label className="checkbox-label">
+            <input
+              type="radio"
+              name="graph-view-mode"
+              checked={graphViewMode === 'executive'}
+              onChange={() => setGraphViewMode('executive')}
+            />
+            <span>Executive (collapsed infra)</span>
+          </label>
         </div>
       </div>
 
@@ -274,7 +303,7 @@ export default function FiltersSidebar({
                       'All repositories cleared - ready for fresh extraction'
                     );
                     setExtractionError('');
-                  } catch (err) {
+                  } catch {
                     setExtractionError('Failed to clear data');
                   }
                 }

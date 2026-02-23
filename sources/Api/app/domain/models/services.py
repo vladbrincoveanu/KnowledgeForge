@@ -255,6 +255,30 @@ class Service(BaseModel):
         None,
         description="Business domain from fixed taxonomy (Payments, Identity, Logistics, etc.)"
     )
+    squad: Optional[str] = Field(
+        None,
+        description="Owning squad used for grouping and executive views."
+    )
+    data_steward: Optional[str] = Field(
+        None,
+        description="Data steward accountable for data governance and quality."
+    )
+    sensitivity_tags: List[str] = Field(
+        default_factory=list,
+        description="Normalized sensitivity tags (e.g., PII, PCI, Confidential)."
+    )
+    quality_score: Optional[int] = Field(
+        None, ge=0, le=100,
+        description="Asset quality score 0-100 from test and metadata quality signals."
+    )
+    usage_stats: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Usage metrics snapshot (window, access_count, percentile bucket, last_accessed_at)."
+    )
+    column_lineage: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Column-level lineage links with source, target, transform_hint, and confidence."
+    )
 
     # ═══════════════════════════════════════════════════════════════════════════
     # RISK & VULNERABILITY TRACKING (Manager-first view)
