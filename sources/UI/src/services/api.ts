@@ -561,6 +561,128 @@ interface WebSocketMessage {
   [key: string]: unknown;
 }
 
+const fallbackBusinessContextStore: Record<string, BusinessContextPayload> = {
+  wps: {
+    system_id: 'wps',
+    system_label: 'WPS',
+    review_status: 'draft',
+    snapshot: {
+      current_snapshot_id: 'snap-2026-02-19-001',
+      previous_snapshot_id: 'snap-2026-02-12-001',
+      extracted_at: '2026-02-19T12:10:00Z',
+    },
+    fields: [
+      {
+        field_path: 'owner',
+        label: 'Owner',
+        generated_value: 'Platform Engineering',
+        override_value: null,
+        effective_value: 'Platform Engineering',
+        state: 'generated',
+        confidence: 0.94,
+        provenance: {
+          source_type: 'codeowners',
+          source_path: '/repos/wps/.github/CODEOWNERS',
+          source_hash: 'sha256:7de215',
+          artifact_version: 'main@2f4ae8c',
+          extraction_rule: 'owner_from_codeowners',
+          confidence: 0.94,
+          last_seen: '2026-02-19T11:59:00Z',
+        },
+        override_meta: null,
+      },
+      {
+        field_path: 'domain',
+        label: 'Domain',
+        generated_value: 'Payments',
+        override_value: 'Global Payments',
+        effective_value: 'Global Payments',
+        state: 'overridden',
+        confidence: 0.76,
+        provenance: {
+          source_type: 'service_universe',
+          source_path: '/repos/wps/service-universe.yaml',
+          source_hash: 'sha256:c37d1f',
+          artifact_version: 'main@2f4ae8c',
+          extraction_rule: 'domain_from_service_universe',
+          confidence: 0.76,
+          last_seen: '2026-02-19T11:57:00Z',
+        },
+        override_meta: {
+          updated_by: 'business.sme',
+          field_updated_at: '2026-02-17T08:30:00Z',
+          override_reason: 'Official business taxonomy uses Global Payments.',
+          status: 'active',
+          needs_review: false,
+        },
+      },
+      {
+        field_path: 'experts',
+        label: 'Experts',
+        generated_value: null,
+        override_value: null,
+        effective_value: null,
+        state: 'missing',
+        confidence: null,
+        provenance: null,
+        override_meta: null,
+      },
+      {
+        field_path: 'lifecycle',
+        label: 'Lifecycle',
+        generated_value: 'Active-Dev',
+        override_value: null,
+        effective_value: 'Active-Dev',
+        state: 'generated',
+        confidence: 0.9,
+        provenance: {
+          source_type: 'service_universe',
+          source_path: '/repos/wps/service-universe.yaml',
+          source_hash: 'sha256:c37d1f',
+          artifact_version: 'main@2f4ae8c',
+          extraction_rule: 'lifecycle_from_service_universe',
+          confidence: 0.9,
+          last_seen: '2026-02-19T11:57:00Z',
+        },
+        override_meta: null,
+      },
+    ],
+  },
+};
+
+const fallbackBusinessDiffStore: Record<string, BusinessSnapshotDiffPayload> = {
+  wps: {
+    system_id: 'wps',
+    current_snapshot_id: 'snap-2026-02-19-001',
+    previous_snapshot_id: 'snap-2026-02-12-001',
+    changes: [
+      {
+        field_path: 'domain',
+        label: 'Domain',
+        previous_value: 'Payments Core',
+        current_value: 'Payments',
+        has_override_conflict: true,
+        override_value: 'Global Payments',
+      },
+      {
+        field_path: 'lifecycle',
+        label: 'Lifecycle',
+        previous_value: 'Maintenance-Only',
+        current_value: 'Active-Dev',
+        has_override_conflict: false,
+        override_value: null,
+      },
+    ],
+  },
+};
+
+/**
+ * Creates a safe JSON clone for local fallback adapters.
+ */
+function cloneFallbackValue<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
 // WebSocket service for real-time updates
 export class WebSocketService {
   private ws: WebSocket | null = null;
@@ -720,7 +842,6 @@ export const codeArchitectureAPI = {
       );
       return response.data;
     } catch (error) {
-
       throw error;
     }
   },
@@ -766,7 +887,6 @@ export const codeArchitectureAPI = {
       );
       return response.data;
     } catch (error) {
-
       throw error;
     }
   },
@@ -793,7 +913,6 @@ export const codeArchitectureAPI = {
       );
       return response.data;
     } catch (error) {
-
       throw error;
     }
   },
@@ -824,7 +943,6 @@ export const codeArchitectureAPI = {
       const response = await api.post('/api/v1/code/clear');
       return response.data;
     } catch (error) {
-
       throw error;
     }
   },
@@ -837,7 +955,6 @@ export const codeArchitectureAPI = {
       );
       return response.data;
     } catch (error) {
-
       throw error;
     }
   },
@@ -850,7 +967,6 @@ export const codeArchitectureAPI = {
       );
       return response.data;
     } catch (error) {
-
       throw error;
     }
   },
@@ -902,10 +1018,12 @@ export const codeArchitectureAPI = {
     file?: string;
   }): Promise<{ description: string; source: string }> => {
     try {
-      const response: AxiosResponse = await api.post('/api/v1/code/describe/node', payload);
+      const response: AxiosResponse = await api.post(
+        '/api/v1/code/describe/node',
+        payload
+      );
       return response.data;
     } catch (error) {
-
       throw error;
     }
   },
@@ -920,10 +1038,12 @@ export const codeArchitectureAPI = {
     protocol?: string;
   }): Promise<{ description: string; source: string }> => {
     try {
-      const response: AxiosResponse = await api.post('/api/v1/code/describe/edge', payload);
+      const response: AxiosResponse = await api.post(
+        '/api/v1/code/describe/edge',
+        payload
+      );
       return response.data;
     } catch (error) {
-
       throw error;
     }
   },
@@ -1050,7 +1170,6 @@ const fallbackBusinessDiffStore: Record<string, BusinessSnapshotDiffPayload> = {
 function cloneFallbackValue<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
-
 /**
  * Business context API adapter for generated/effective/override review flows.
  * Falls back to local data when backend contracts are unavailable.

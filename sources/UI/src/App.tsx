@@ -210,9 +210,15 @@ const MainContent: React.FC = () => {
     type: 'success' | 'error' | 'info';
   } | null>(null);
   const [isNavCollapsed, setIsNavCollapsed] = useState<boolean>(false);
-  const [extractionTasks, setExtractionTasks] = useState<Record<string, ExtractionTask>>({});
-  const [graphData, setGraphData] = useState<{ nodes: GraphNode[]; links: GraphLink[] }>({ nodes: [], links: [] });
-  const [activeTaskSummary, setActiveTaskSummary] = useState<IncrementalSummary | null>(null);
+  const [extractionTasks, setExtractionTasks] = useState<
+    Record<string, ExtractionTask>
+  >({});
+  const [graphData, setGraphData] = useState<{
+    nodes: GraphNode[];
+    links: GraphLink[];
+  }>({ nodes: [], links: [] });
+  const [activeTaskSummary, setActiveTaskSummary] =
+    useState<IncrementalSummary | null>(null);
 
   const showNotification = (
     message: string,
