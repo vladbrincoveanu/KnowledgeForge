@@ -7,6 +7,13 @@ from .compose_detector import ComposeDetector
 from .helm_detector import HelmDetector
 from .terraform_detector import TerraformDetector
 from .utils import is_deployable_service
+from .llm_enrichment import (
+    enrich_containers,
+    build_evidence_bundle,
+    build_enrichment_prompt,
+    parse_llm_enrichment_response,
+    apply_enrichments,
+)
 
 __all__ = [
     'ContainerManager',
@@ -16,4 +23,9 @@ __all__ = [
     'HelmDetector',
     'TerraformDetector',
     'is_deployable_service',
+    'enrich_containers',
+    'build_evidence_bundle',
+    'build_enrichment_prompt',
+    'parse_llm_enrichment_response',
+    'apply_enrichments',
 ]

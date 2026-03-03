@@ -1,16 +1,19 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { ontologyAPI, fileAPI, wsService, apiUtils } from '@/services/api';
-import { UploadedFile, IncrementalSummary } from '@/types';
+import React, { useState, useEffect, useCallback } from 'react';
+import { codeArchitectureAPI, wsService } from '@/services/api';
+import { UploadedFile } from '@/types';
 import {
-  Upload,
-  FileText,
-  Database,
-  Brain,
+  Github,
+  Plus,
+  X,
+  Play,
+  Trash2,
   CheckCircle,
   AlertCircle,
   Clock,
+  Loader,
+  Package,
+  Layers,
 } from 'lucide-react';
-import RecommendationModal from '@/@components/recommendation-modal/RecommendationModal/RecommendationModal';
 import './FileUploader.scss';
 
 interface FileUploaderProps {
@@ -23,593 +26,331 @@ interface FileUploaderProps {
   ) => void;
 }
 
-interface ExtractionTask {
-  taskId: string;
-  fileName: string;
-  status:
-    | 'pending'
-    | 'processing'
-    | 'completed'
-    | 'failed'
-    | 'awaiting_recommendations_approval';
+type RepoStatus =
+  | 'idle'
+  | 'pending'
+  | 'scanning'
+  | 'completed'
+  | 'failed';
+
+interface RepoEntry {
+  url: string;
+  taskId?: string;
+  status: RepoStatus;
   message: string;
-  progress?: number;
-  createdAt: string;
-  estimatedCompletion?: string;
-  startedAt?: string;
-  completedAt?: string;
-  processingTime?: number;
-  results?: unknown;
+  progress: number;
+  containersCount: number;
+  componentsCount: number;
   error?: string;
-  incrementalSummary?: IncrementalSummary;
 }
 
-interface ExtendedUploadedFile extends UploadedFile {
-  serverPath: string | null;
-}
-
-type UploadProgressStatus = 'uploading' | 'success' | 'error';
-type UploadProgress = Record<string, UploadProgressStatus>;
+const isValidGitHubUrl = (url: string): boolean => {
+  try {
+    const u = new URL(url);
+    return (
+      (u.hostname === 'github.com' || u.hostname === 'www.github.com') &&
+      u.pathname.split('/').filter(Boolean).length >= 2
+    );
+  } catch {
+    return false;
+  }
+};
 
 const FileUploader: React.FC<FileUploaderProps> = ({
-  onFilesUploaded,
-  isProcessing,
   onExtractionStarted,
   showNotification,
 }) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [dragActive, setDragActive] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState<ExtendedUploadedFile[]>(
-    []
-  );
-  const [uploadProgress, setUploadProgress] = useState<UploadProgress>({});
-  const [extractionTasks, setExtractionTasks] = useState<
-    Record<string, ExtractionTask>
-  >({});
-  const [recommendationModal, setRecommendationModal] = useState<{
-    isOpen: boolean;
-    taskId: string | null;
-  }>({ isOpen: false, taskId: null });
-  const [extractionConfig, setExtractionConfig] = useState({
-    confidence_threshold: 0.7,
-    max_entities_per_column: 100,
-    enable_semantic_similarity: true,
-    enable_hierarchical_discovery: true,
-  });
+  const [inputUrl, setInputUrl] = useState('');
+  const [inputError, setInputError] = useState('');
+  const [repos, setRepos] = useState<RepoEntry[]>([]);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const pollIntervalsRef = React.useRef<Record<string, ReturnType<typeof setInterval>>>({});
 
-  const handleWebSocketMessage = useCallback(
-    (data?: unknown) => {
-      const wsData = data as {
-        task_id?: string;
-        status?: string;
-        message?: string;
-        progress?: number;
-        timestamp?: string;
-        incremental_summary?: IncrementalSummary;
-      };
+  const handleWebSocketMessage = useCallback((data?: unknown) => {
+    const wsData = data as {
+      task_id?: string;
+      status?: string;
+      message?: string;
+      progress?: number;
+    };
+    if (!wsData?.task_id) return;
 
-      if (!wsData?.task_id) {
-        return;
-      }
-
-      const shouldOpenModal =
-        wsData.status === 'awaiting_recommendations_approval';
-
-      setExtractionTasks(prev => {
-        const existingTask = prev[wsData.task_id!];
-
-        const baseTask: ExtractionTask =
-          existingTask ||
-          ({
-            taskId: wsData.task_id!,
-            fileName: `Task ${wsData.task_id!.substring(0, 8)}...`,
-            status: 'pending',
-            message: wsData.message || 'Task update received',
-            progress: wsData.progress ?? 0,
-            createdAt: wsData.timestamp || new Date().toISOString(),
-            incrementalSummary: wsData.incremental_summary,
-          } as ExtractionTask);
-
-        const updatedTask: ExtractionTask = {
-          ...baseTask,
-          status:
-            (wsData.status as ExtractionTask['status']) || baseTask.status,
-          message: wsData.message || baseTask.message,
-          progress: wsData.progress ?? baseTask.progress,
-          incrementalSummary:
-            wsData.incremental_summary ?? baseTask.incrementalSummary,
-        };
-
+    setRepos(prev =>
+      prev.map(r => {
+        if (r.taskId !== wsData.task_id) return r;
         return {
-          ...prev,
-          [wsData.task_id!]: updatedTask,
+          ...r,
+          status: (wsData.status as RepoStatus) ?? r.status,
+          message: wsData.message ?? r.message,
+          progress: wsData.progress ?? r.progress,
         };
-      });
+      })
+    );
+  }, []);
 
-      if (shouldOpenModal) {
-        setRecommendationModal({
-          isOpen: true,
-          taskId: wsData.task_id,
-        });
-      }
-    },
-    [setRecommendationModal]
-  );
-
-  // WebSocket connection for real-time updates
   useEffect(() => {
     wsService.connect();
-
-    const handleConnected = () => {};
-    const handleDisconnected = () => {};
-
     wsService.on('message', handleWebSocketMessage);
-    wsService.on('connected', handleConnected);
-    wsService.on('disconnected', handleDisconnected);
-
     return () => {
       wsService.off('message', handleWebSocketMessage);
-      wsService.off('connected', handleConnected);
-      wsService.off('disconnected', handleDisconnected);
+      Object.values(pollIntervalsRef.current).forEach(clearInterval);
     };
   }, [handleWebSocketMessage]);
 
-  const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true);
-    } else if (e.type === 'dragleave') {
-      setDragActive(false);
+  const addRepo = () => {
+    const trimmed = inputUrl.trim().replace(/\.git\/?$/, '').replace(/\/$/, '');
+    if (!trimmed) {
+      setInputError('Please enter a GitHub URL.');
+      return;
     }
+    if (!isValidGitHubUrl(trimmed)) {
+      setInputError('Enter a valid GitHub repository URL (e.g. https://github.com/owner/repo).');
+      return;
+    }
+    if (repos.some(r => r.url === trimmed)) {
+      setInputError('This repository has already been added.');
+      return;
+    }
+    setInputError('');
+    setRepos(prev => [
+      ...prev,
+      {
+        url: trimmed,
+        status: 'idle',
+        message: 'Ready to extract',
+        progress: 0,
+        containersCount: 0,
+        componentsCount: 0,
+      },
+    ]);
+    setInputUrl('');
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFiles(e.dataTransfer.files);
-    }
+  const removeRepo = (url: string) => {
+    setRepos(prev => prev.filter(r => r.url !== url));
   };
 
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      handleFiles(e.target.files);
-    }
+  const clearAll = () => {
+    Object.values(pollIntervalsRef.current).forEach(clearInterval);
+    pollIntervalsRef.current = {};
+    setRepos([]);
+    setInputUrl('');
+    setInputError('');
   };
 
-  const handleFiles = async (fileList: FileList) => {
-    const supportedFiles = Array.from(fileList).filter(
-      (file: File) =>
-        file.type === 'text/csv' ||
-        file.name.endsWith('.csv') ||
-        file.type ===
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-        file.name.endsWith('.xlsx') ||
-        file.type === 'application/vnd.ms-excel' ||
-        file.name.endsWith('.xls')
-    );
+  const pollStatus = (taskId: string) => {
+    const interval = setInterval(async () => {
+      try {
+        const raw = await codeArchitectureAPI.getExtractionStatus(taskId) as any;
+        const rawStatus: string = raw.status ?? 'pending';
+        const newStatus: RepoStatus =
+          rawStatus === 'scanning' ? 'scanning' :
+          rawStatus === 'completed' ? 'completed' :
+          rawStatus === 'failed' ? 'failed' :
+          rawStatus === 'pending' ? 'pending' : 'pending';
+        setRepos(prev =>
+          prev.map(r => {
+            if (r.taskId !== taskId) return r;
+            return {
+              ...r,
+              status: newStatus,
+              message: raw.message ?? r.message,
+              progress: raw.progress ?? r.progress,
+              containersCount: raw.containers_count ?? r.containersCount,
+              componentsCount: raw.components_count ?? r.componentsCount,
+            };
+          })
+        );
+        if (rawStatus === 'completed' || rawStatus === 'failed') {
+          clearInterval(interval);
+          delete pollIntervalsRef.current[taskId];
+        }
+      } catch {
+        clearInterval(interval);
+        delete pollIntervalsRef.current[taskId];
+      }
+    }, 2000);
+    pollIntervalsRef.current[taskId] = interval;
+  };
 
-    if (supportedFiles.length === 0) {
-      alert('Please select CSV or Excel files only.');
+  const extractAll = async () => {
+    const idleRepos = repos.filter(r => r.status === 'idle' || r.status === 'failed');
+    if (idleRepos.length === 0) {
+      showNotification('No repositories to extract.', 'info');
       return;
     }
 
-    const newFiles = supportedFiles.filter(
-      (file: File) =>
-        !uploadedFiles.some(uploaded => uploaded.name === file.name)
-    );
+    setIsExtracting(true);
 
-    if (newFiles.length !== supportedFiles.length) {
-      alert('Some files were duplicates and have been ignored.');
-    }
-
-    // Add new files to the list immediately to show them in the UI
-    const newFilePlaceholders: ExtendedUploadedFile[] = newFiles.map(
-      (file: File) => ({
-        name: file.name,
-        size: file.size,
-        headers: [],
-        data: [],
-        type: file.type,
-        rowCount: 0,
-        serverPath: null,
-      })
-    );
-    setUploadedFiles(prev => [...prev, ...newFilePlaceholders]);
-
-    const successfullyProcessed: ExtendedUploadedFile[] = [];
-    for (const file of newFiles) {
-      try {
-        setUploadProgress(prev => ({ ...prev, [file.name]: 'uploading' }));
-
-        // First upload the file to the server
-        const uploadResult = await fileAPI.uploadFile(file);
-
-        if (!uploadResult.file_path) {
-          throw new Error('File upload failed: no file path returned');
-        }
-
-        // Process file locally for display purposes
-        const processedFile = await fileAPI.processLocalFile(file);
-        (processedFile as ExtendedUploadedFile).serverPath =
-          uploadResult.file_path;
-
-        setUploadedFiles(prev =>
-          prev.map(f =>
-            f.name === file.name ? (processedFile as ExtendedUploadedFile) : f
-          )
-        );
-        successfullyProcessed.push(processedFile as ExtendedUploadedFile);
-
-        setUploadProgress(prev => ({ ...prev, [file.name]: 'success' }));
-
-        // Start ontology extraction with the server file path
-        await startOntologyExtraction(processedFile as ExtendedUploadedFile);
-      } catch (error) {
-        console.error(`Error processing ${file.name}:`, error);
-        alert(`Error processing ${file.name}: ${(error as Error).message}`);
-        setUploadProgress(prev => ({ ...prev, [file.name]: 'error' }));
-      }
-    }
-
-    if (successfullyProcessed.length > 0) {
-      onFilesUploaded(successfullyProcessed);
-    }
-  };
-
-  const startOntologyExtraction = async (file: ExtendedUploadedFile) => {
-    try {
-      // Start extraction task with the uploaded file path
-      if (!file.serverPath) {
-        throw new Error('File server path is not available');
-      }
-      const extractionResult = await ontologyAPI.extractOntology(
-        file.serverPath,
-        extractionConfig
+    for (const repo of idleRepos) {
+      setRepos(prev =>
+        prev.map(r =>
+          r.url === repo.url
+            ? { ...r, status: 'pending', message: 'Queuing extraction...' }
+            : r
+        )
       );
 
-      if (extractionResult.task_id) {
-        // Track the extraction task
-        setExtractionTasks(prev => ({
-          ...prev,
-          [extractionResult.task_id]: {
-            taskId: extractionResult.task_id,
-            fileName: file.name,
-            status: 'pending',
-            message: 'Task created and queued',
-            progress: 0,
-            createdAt:
-              (extractionResult as any).created_at || new Date().toISOString(),
-            estimatedCompletion:
-              (extractionResult as any).estimated_completion || null,
-          },
-        }));
-
-        // Notify parent component
-        if (onExtractionStarted) {
-          onExtractionStarted(extractionResult.task_id, file);
-        }
-
-        // Start polling for status updates
-        pollExtractionStatus(extractionResult.task_id);
-      }
-    } catch (error) {
-      console.error('Failed to start ontology extraction:', error);
-      throw error;
-    }
-  };
-
-  const pollExtractionStatus = async (taskId: string) => {
-    const pollInterval = setInterval(async () => {
       try {
-        const status = await ontologyAPI.getExtractionStatus(taskId);
+        const result = await codeArchitectureAPI.extractFromGitHub(repo.url, true, true);
+        const taskId = result.task_id;
 
-        setExtractionTasks(prev => ({
-          ...prev,
-          [taskId]: {
-            ...prev[taskId],
-            status: status.status === 'running' ? 'processing' : status.status,
-            message: status.message || prev[taskId].message,
-            progress: status.progress || prev[taskId].progress || 0,
-            startedAt: (status as any).started_at,
-            completedAt: (status as any).completed_at,
-            processingTime: (status as any).processing_time,
-            results: status.result,
-            error: (status as any).error,
-          },
-        }));
+        setRepos(prev =>
+          prev.map(r =>
+            r.url === repo.url
+              ? { ...r, taskId, status: 'pending', message: 'Extraction queued', progress: 0 }
+              : r
+          )
+        );
 
-        // Stop polling if task is completed or failed
-        if (
-          status.status === 'completed' ||
-          status.status === 'failed' ||
-          status.status === 'awaiting_recommendations_approval'
-        ) {
-          clearInterval(pollInterval);
-        }
-      } catch (error) {
-        console.error('Failed to get extraction status:', error);
-        clearInterval(pollInterval);
+        // Notify parent with a synthetic file record so activeTaskId is tracked
+        onExtractionStarted(taskId, {
+          name: repo.url,
+          headers: [],
+          data: [],
+          size: 0,
+          rowCount: 0,
+          type: 'github',
+        });
+
+        pollStatus(taskId);
+        showNotification(`Extraction started for ${repo.url}`, 'success');
+      } catch (err: any) {
+        const msg = err?.response?.data?.detail ?? err?.message ?? 'Extraction failed';
+        setRepos(prev =>
+          prev.map(r =>
+            r.url === repo.url
+              ? { ...r, status: 'failed', message: msg }
+              : r
+          )
+        );
+        showNotification(`Failed to start extraction for ${repo.url}: ${msg}`, 'error');
       }
-    }, 2000); // Poll every 2 seconds
-  };
-
-  const handleUploadClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const clearFiles = () => {
-    setUploadedFiles([]);
-    setUploadProgress({});
-    setExtractionTasks({});
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
     }
+
+    setIsExtracting(false);
   };
 
-  const getFileIcon = (fileName: string) => {
-    if (fileName.endsWith('.csv')) return '📊';
-    if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) return '📈';
-    return '📁';
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') addRepo();
   };
 
-  const getProgressStatus = (fileName: string) => {
-    const status = uploadProgress[fileName];
-    switch (status) {
-      case 'uploading':
-        return (
-          <span className="status uploading">
-            <Clock size={16} /> Uploading...
-          </span>
-        );
-      case 'success':
-        return (
-          <span className="status success">
-            <CheckCircle size={16} /> Success
-          </span>
-        );
-      case 'error':
-        return (
-          <span className="status error">
-            <AlertCircle size={16} /> Error
-          </span>
-        );
-      default:
-        return null;
-    }
+  const statusConfig: Record<RepoStatus, { icon: JSX.Element; color: string; label: string }> = {
+    idle: { icon: <Clock size={14} />, color: '#6c757d', label: 'Ready' },
+    pending: { icon: <Clock size={14} />, color: '#ffc107', label: 'Queued' },
+    scanning: { icon: <Loader size={14} className="spin" />, color: '#007bff', label: 'Scanning' },
+    completed: { icon: <CheckCircle size={14} />, color: '#28a745', label: 'Done' },
+    failed: { icon: <AlertCircle size={14} />, color: '#dc3545', label: 'Failed' },
   };
 
-  const getExtractionStatus = (fileName: string) => {
-    const task = Object.values(extractionTasks).find(
-      t => t.fileName === fileName
-    );
-    if (!task) return null;
-
-    const statusColors: Record<string, string> = {
-      pending: '#ffc107',
-      processing: '#007bff',
-      completed: '#28a745',
-      failed: '#dc3545',
-      awaiting_recommendations_approval: '#17a2b8',
-    };
-
-    const statusIcons: Record<string, JSX.Element> = {
-      pending: <Clock size={16} />,
-      processing: <Database size={16} />,
-      completed: <CheckCircle size={16} />,
-      failed: <AlertCircle size={16} />,
-      awaiting_recommendations_approval: <Brain size={16} />,
-    };
-
-    return (
-      <div
-        className="extraction-status"
-        style={{ color: statusColors[task.status] }}
-      >
-        {statusIcons[task.status]}
-        <span>
-          {task.status === 'awaiting_recommendations_approval'
-            ? 'Recommendations ready for review'
-            : task.message}
-        </span>
-        {task.processingTime && <small>({task.processingTime}s)</small>}
-        {task.incrementalSummary && (
-          <small className="incremental-summary">
-            Entities +{task.incrementalSummary.added_entities} · Δ
-            {task.incrementalSummary.modified_entities} · -
-            {task.incrementalSummary.deleted_entities} | Relationships +
-            {task.incrementalSummary.added_relationships} · -
-            {task.incrementalSummary.deleted_relationships}
-          </small>
-        )}
-      </div>
-    );
-  };
-
-  const updateExtractionConfig = (key: string, value: unknown) => {
-    setExtractionConfig(prev => ({
-      ...prev,
-      [key]: value,
-    }));
-  };
-
-  const handleRecommendationApprove = (_approvedItems: any) => {
-    setRecommendationModal({ isOpen: false, taskId: null });
-  };
-
-  const handleRecommendationReject = () => {
-    setRecommendationModal({ isOpen: false, taskId: null });
-  };
+  const idleCount = repos.filter(r => r.status === 'idle' || r.status === 'failed').length;
 
   return (
-    <div className="file-uploader">
-      <RecommendationModal
-        isOpen={recommendationModal.isOpen}
-        onClose={() => setRecommendationModal({ isOpen: false, taskId: null })}
-        onApprove={handleRecommendationApprove}
-        onReject={handleRecommendationReject}
-        taskId={recommendationModal.taskId || ''}
-        showNotification={showNotification}
-      />
-      <h3>
-        <Upload size={20} /> Upload Data Files
-      </h3>
-
-      {/* Extraction Configuration */}
-      <div className="extraction-config">
-        <h4>
-          <Brain size={16} /> Extraction Configuration
-        </h4>
-        <div className="config-grid">
-          <div className="config-item">
-            <label>Confidence Threshold:</label>
+    <div className="repo-extractor">
+      {/* URL Input */}
+      <div className="url-input-section">
+        <div className="url-input-row">
+          <div className="url-input-wrapper">
+            <Github size={18} className="url-input-icon" />
             <input
-              type="range"
-              min="0.1"
-              max="1.0"
-              step="0.1"
-              value={extractionConfig.confidence_threshold}
-              onChange={e =>
-                updateExtractionConfig(
-                  'confidence_threshold',
-                  parseFloat(e.target.value)
-                )
-              }
-            />
-            <span>{extractionConfig.confidence_threshold}</span>
-          </div>
-
-          <div className="config-item">
-            <label>Max Entities per Column:</label>
-            <input
-              type="number"
-              min="10"
-              max="1000"
-              value={extractionConfig.max_entities_per_column}
-              onChange={e =>
-                updateExtractionConfig(
-                  'max_entities_per_column',
-                  parseInt(e.target.value)
-                )
-              }
+              type="url"
+              className={`url-input ${inputError ? 'url-input--error' : ''}`}
+              placeholder="https://github.com/owner/repository"
+              value={inputUrl}
+              onChange={e => {
+                setInputUrl(e.target.value);
+                if (inputError) setInputError('');
+              }}
+              onKeyDown={handleKeyDown}
             />
           </div>
-
-          <div className="config-item">
-            <label>
-              <input
-                type="checkbox"
-                checked={extractionConfig.enable_semantic_similarity}
-                onChange={e =>
-                  updateExtractionConfig(
-                    'enable_semantic_similarity',
-                    e.target.checked
-                  )
-                }
-              />
-              Enable Semantic Similarity
-            </label>
-          </div>
-
-          <div className="config-item">
-            <label>
-              <input
-                type="checkbox"
-                checked={extractionConfig.enable_hierarchical_discovery}
-                onChange={e =>
-                  updateExtractionConfig(
-                    'enable_hierarchical_discovery',
-                    e.target.checked
-                  )
-                }
-              />
-              Enable Hierarchical Discovery
-            </label>
-          </div>
+          <button className="btn-add" onClick={addRepo}>
+            <Plus size={18} />
+            Add
+          </button>
         </div>
+        {inputError && <p className="url-error">{inputError}</p>}
       </div>
 
-      <div
-        className={`upload-area ${dragActive ? 'drag-active' : ''}`}
-        onDragEnter={handleDrag}
-        onDragLeave={handleDrag}
-        onDragOver={handleDrag}
-        onDrop={handleDrop}
-        onClick={handleUploadClick}
-      >
-        <div className="upload-content">
-          <div className="upload-icon">
-            <Upload size={48} />
-          </div>
-          <p>Drag and drop CSV or Excel files here or click to browse</p>
-          <p className="upload-hint">Supports CSV, XLSX, and XLS files</p>
-          <p className="upload-hint">
-            Files will be processed for ontology extraction
-          </p>
-        </div>
-      </div>
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-        onChange={handleFileInput}
-        style={{ display: 'none' }}
-      />
-
-      {isProcessing && (
-        <div className="processing-indicator">
-          <div className="spinner"></div>
-          <p>Analyzing file connections and extracting ontology...</p>
-        </div>
-      )}
-
-      {uploadedFiles.length > 0 && (
-        <div className="upload-status">
-          <p>
-            <FileText size={16} /> {uploadedFiles.length} file(s) uploaded
-          </p>
-          <p className="upload-hint">Drag and drop more files to add them</p>
-        </div>
-      )}
-
-      {uploadedFiles.length > 0 && (
-        <div className="uploaded-files-list">
-          {uploadedFiles.map((file, index) => (
-            <div key={index} className="file-item">
-              <div className="file-info">
-                <span className="file-icon">{getFileIcon(file.name)}</span>
-                <div className="file-details">
-                  <strong>{file.name}</strong>
-                  <small>
-                    {file.headers.length} columns, {file.rowCount} rows
-                  </small>
-                  <small className="file-size">
-                    {apiUtils.formatFileSize(file.size)}
-                  </small>
+      {/* Repo List */}
+      {repos.length > 0 && (
+        <div className="repo-list">
+          {repos.map(repo => {
+            const cfg = statusConfig[repo.status];
+            return (
+              <div key={repo.url} className={`repo-item repo-item--${repo.status}`}>
+                <div className="repo-item__left">
+                  <Github size={16} className="repo-item__icon" />
+                  <div className="repo-item__info">
+                    <span className="repo-item__url">{repo.url}</span>
+                    <span className="repo-item__message">{repo.message}</span>
+                    {repo.status === 'scanning' && (
+                      <div className="repo-item__progress">
+                        <div
+                          className="repo-item__progress-fill"
+                          style={{ width: `${Math.round(repo.progress * 100)}%` }}
+                        />
+                      </div>
+                    )}
+                    {repo.status === 'completed' && (
+                      <div className="repo-item__stats">
+                        <span><Package size={12} /> {repo.containersCount} containers</span>
+                        <span><Layers size={12} /> {repo.componentsCount} components</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="repo-item__right">
+                  <span className="repo-item__status" style={{ color: cfg.color }}>
+                    {cfg.icon}
+                    {cfg.label}
+                  </span>
+                  {(repo.status === 'idle' || repo.status === 'failed') && (
+                    <button
+                      className="btn-remove"
+                      onClick={() => removeRepo(repo.url)}
+                      title="Remove"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
                 </div>
               </div>
-              <div className="file-status">
-                {getProgressStatus(file.name)}
-                {getExtractionStatus(file.name)}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      {uploadedFiles.length > 0 && (
-        <div className="upload-actions">
+      {/* Empty state */}
+      {repos.length === 0 && (
+        <div className="empty-state">
+          <Github size={48} className="empty-state__icon" />
+          <p>Add one or more GitHub repository URLs above</p>
+          <p className="empty-state__hint">Each repo will be cloned, scanned, and added to the architecture graph</p>
+        </div>
+      )}
+
+      {/* Actions */}
+      {repos.length > 0 && (
+        <div className="repo-actions">
           <button
-            className="btn-clear"
-            onClick={clearFiles}
-            disabled={isProcessing}
+            className="btn-extract"
+            onClick={extractAll}
+            disabled={isExtracting || idleCount === 0}
           >
-            Clear All Files
+            {isExtracting ? (
+              <><Loader size={16} className="spin" /> Extracting...</>
+            ) : (
+              <><Play size={16} /> Extract {idleCount > 0 ? `${idleCount} Repo${idleCount > 1 ? 's' : ''}` : 'All'}</>
+            )}
+          </button>
+          <button
+            className="btn-clear-repos"
+            onClick={clearAll}
+            disabled={isExtracting}
+          >
+            <Trash2 size={16} />
+            Clear All
           </button>
         </div>
       )}

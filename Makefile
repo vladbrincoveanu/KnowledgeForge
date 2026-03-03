@@ -215,7 +215,7 @@ tests:
 # Start API only (local development)
 api-only:
 	@echo "🔧 Starting API in local development mode..."
-	cd sources && source venv/bin/activate && cd api && python3 app.py
+	cd sources/Api && (test -d ../venv && . ../venv/bin/activate; true) && python3 main.py
 
 # Start UI only (local development)
 ui-only:

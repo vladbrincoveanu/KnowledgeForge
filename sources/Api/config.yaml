@@ -36,8 +36,8 @@ neo4j:
 
 # LM Studio LLM service configuration
 lmstudio:
-  base_url: "http://host.docker.internal:1234/v1"  # Docker -> host machine on Mac
-  model_name: "qwen/qwen2.5-vl-7b"  # User's local model
+  base_url: "http://localhost:1234/v1"
+  model_name: "qwen/qwen3-vl-8b"
   temperature: 0.7
   max_tokens: 100
   timeout: 30

@@ -8,6 +8,7 @@ from typing import Any, Optional, Tuple
 import yaml
 
 from . import utils
+from .llm_enrichment import enrich_containers
 
 from .structure_detector import StructureDetector
 from .compose_detector import ComposeDetector
@@ -80,9 +81,35 @@ class ContainerManager:
         
         # Map internal dependencies
         self._map_internal_dependencies()
-        
+
+        # Drop root-level structure placeholders when real compose/helm services exist.
+        # The structure detector registers the repo root (path=".") as a container when
+        # it finds a docker-compose.yml there, but the compose detector then registers
+        # the actual services. Keep the root placeholder only if it's the sole container.
+        self._drop_redundant_root_containers()
+
         logger.info(f"Container detection complete. Found {len(self.containers)} containers.")
         return self.containers
+
+    def enrich_containers_with_llm(self) -> dict[str, Any]:
+        """Run LLM enrichment as a second pass after rule-based detection.
+
+        Must be called after detect_all_containers().  Updates self.containers
+        in-place and returns enrichment stats.
+
+        Returns:
+            Stats dict from enrich_containers(): enriched, discarded,
+            inferred_relationships, skipped, error.
+        """
+        if not self.containers:
+            return {"enriched": 0, "discarded": 0, "inferred_relationships": 0,
+                    "skipped": True, "error": None}
+
+        # Build current relationships so the LLM can see existing signals
+        current_rels = self.build_container_relationships()
+        stats = enrich_containers(self.containers, current_rels, self.llm_manager)
+        logger.info("LLM enrichment stats: %s", stats)
+        return stats
     
     def _register_or_merge_container(self, container: dict[str, Any], source: str) -> None:
         """Register a new container or merge if an identity match exists."""
@@ -138,14 +165,24 @@ class ContainerManager:
         incoming_slugs = self._get_container_slugs(container)
         incoming_path = container.get("path")
 
+        # Don't use path-based matching for files that define multiple containers
+        # (docker-compose, helm values) — every service in the file shares the same path.
+        _multi_container_files = ("docker-compose", "values.yaml")
+        use_path_match = incoming_path and not any(
+            p in str(incoming_path) for p in _multi_container_files
+        )
+
         for key, existing in self.containers.items():
-            if incoming_path and existing.get("path") == incoming_path:
+            if use_path_match and existing.get("path") == incoming_path:
                 return key, existing
             existing_slugs = self._get_container_slugs(existing)
             if incoming_slugs & existing_slugs:
                 return key, existing
 
         return None, None
+
+    # Paths that define multiple containers — excluded from identity slugs
+    _MULTI_CONTAINER_PATHS = ("docker-compose", "values.yaml")
 
     def _get_container_slugs(self, container: dict[str, Any]) -> set[str]:
         """Build identity slugs from container name, path, and parent directory."""
@@ -157,7 +194,9 @@ class ContainerManager:
         if name:
             slugs.add(self._slugify(name))
 
-        if path:
+        # Skip path-derived slugs for files that define multiple containers —
+        # every service in the file shares the same path, causing false merges.
+        if path and not any(p in str(path) for p in self._MULTI_CONTAINER_PATHS):
             slugs.add(self._slugify(path))
             path_obj = Path(path)
             slugs.add(self._slugify(path_obj.name))
@@ -263,26 +302,95 @@ class ContainerManager:
         return root_container
     
     def build_container_relationships(self) -> list[dict[str, Any]]:
-        """Build relationships between containers for C4 diagram.
-        
-        Returns:
-            List of relationship dictionaries
+        """Build C4 container relationships, preferring detector-extracted rich data.
+
+        Phase 1: harvest 'relationships' lists embedded by each detector.
+        Phase 2: legacy fallback via 'dependencies_internal' for containers
+                 that have no detector-level relationships.
         """
-        relationships = []
-        
+        seen: set[tuple] = set()
+        result: list[dict] = []
+
+        # Phase 1: richer detector-extracted relationships
         for container_name, container in self.containers.items():
-            deps = container.get('dependencies_internal', [])
-            for dep_name in deps:
-                if dep_name in self.containers:
-                    relationships.append({
+            for rel in container.get("relationships", []):
+                resolved = self._resolve_relationship(rel, container_name)
+                if not resolved:
+                    continue
+                key = (resolved["from"], resolved["to"], resolved.get("type", ""), resolved.get("protocol", ""))
+                if key not in seen:
+                    seen.add(key)
+                    result.append(resolved)
+
+        # Phase 2: legacy fallback for containers with no detector-level rels
+        containers_with_rels = {r["from"] for r in result}
+        for container_name, container in self.containers.items():
+            if container_name in containers_with_rels:
+                continue
+            for dep_name in container.get("dependencies_internal", []):
+                if dep_name not in self.containers:
+                    continue
+                key = (container_name, dep_name, "uses", "")
+                if key not in seen:
+                    seen.add(key)
+                    result.append({
                         "from": container_name,
                         "to": dep_name,
                         "type": "uses",
-                        "protocol": container.get('protocol', 'HTTP'),
+                        "protocol": container.get("protocol", "HTTP"),
+                        "source": "runtime",
                     })
-        
-        return relationships
+
+        return result
+
+    def _resolve_relationship(self, rel: dict, source_container: str) -> Optional[dict]:
+        """Validate and resolve relationship endpoints. Returns None to discard."""
+        from_name = rel.get("from") or source_container
+        to_raw = rel.get("to", "")
+
+        if not from_name or not to_raw or from_name == to_raw:
+            return None
+
+        # Resolve 'to': known name → direct, else slug-match
+        if to_raw in self.containers:
+            to_name = to_raw
+        else:
+            to_name = self._resolve_container_by_token(to_raw)
+            if not to_name:
+                # Unresolved helm values or volume refs: discard
+                if rel.get("_unresolved") or rel.get("type") == "shares-volume":
+                    return None
+                to_name = to_raw  # keep for external/unknown targets (best-effort)
+
+        clean = {k: v for k, v in rel.items() if k != "_unresolved"}
+        clean["from"] = from_name
+        clean["to"] = to_name
+        return clean
     
+    def _drop_redundant_root_containers(self) -> None:
+        """Remove repo-root structure containers when explicit services exist.
+
+        The structure detector registers the repo root (path=".") as a fallback
+        container whenever it finds a framework manifest there (e.g. docker-compose.yml).
+        Once the compose/helm detectors have registered the real services, this root
+        node is just noise. Drop it unless it is the only container detected.
+        """
+        if len(self.containers) <= 1:
+            return  # nothing to drop — keep the lone container
+
+        # Collect keys of root-level structure containers (path == ".")
+        to_drop = [
+            key for key, c in self.containers.items()
+            if c.get("path") in {".", ""} and not c.get("deployment")
+        ]
+
+        # Only drop them when there are other non-root containers
+        real_services = [k for k in self.containers if k not in to_drop]
+        if real_services:
+            for key in to_drop:
+                logger.debug("Dropping redundant root container %r (superseded by compose/helm services)", key)
+                del self.containers[key]
+
     def _detect_gitops_paths(self) -> set[str]:
         """Detect GitOps/ArgoCD application paths that imply Kubernetes deployment."""
         gitops_paths: set[str] = set()

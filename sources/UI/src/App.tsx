@@ -322,11 +322,11 @@ const MainContent: React.FC = () => {
                 <div className="upload-section">
                   <div className="section-header">
                     <h1>
-                      <Upload size={32} /> Upload & Extract Ontology
+                      <Upload size={32} /> Extract GitHub Repositories
                     </h1>
                     <p>
-                      Upload CSV files and extract semantic ontology using
-                      AI-powered analysis
+                      Add GitHub repository URLs to extract C4 architecture
+                      and build the architecture graph
                     </p>
                   </div>
 

@@ -5,7 +5,7 @@ import logging
 import re
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import yaml
 
@@ -723,3 +723,72 @@ def _has_python_entrypoint(directory: Path) -> bool:
             continue
         return True
     return False
+
+
+# ---------------------------------------------------------------------------
+# Relationship extraction utilities
+# ---------------------------------------------------------------------------
+
+PORT_PROTOCOL_MAP = {
+    "5432": "PostgreSQL", "3306": "MySQL", "27017": "MongoDB",
+    "6379": "Redis", "5672": "AMQP", "15672": "AMQP",
+    "9092": "Kafka", "9200": "Elasticsearch", "50051": "gRPC",
+    "443": "HTTPS", "80": "HTTP", "8080": "HTTP", "8000": "HTTP",
+}
+
+EVENT_BUS_IMAGES = {
+    "kafka": ("Kafka", "publishes-to"),
+    "rabbitmq": ("AMQP", "publishes-to"),
+    "nats": ("NATS", "publishes-to"),
+    "pulsar": ("Pulsar", "publishes-to"),
+    "redis": ("Redis", "uses"),
+}
+
+
+def infer_protocol_from_port(port: str) -> str:
+    """Return protocol for a well-known port number, or 'TCP' if unknown."""
+    return PORT_PROTOCOL_MAP.get(str(port).strip(), "TCP")
+
+
+def normalize_depends_on(depends_on: Any) -> list[str]:
+    """Normalize docker-compose depends_on to flat list of service names.
+
+    Handles list form and dict form
+    (depends_on: {db: {condition: service_healthy}}).
+    """
+    if isinstance(depends_on, list):
+        return [str(s) for s in depends_on]
+    if isinstance(depends_on, dict):
+        return list(depends_on.keys())
+    return []
+
+
+def extract_named_volume(vol_spec: str) -> Optional[str]:
+    """Return named volume name from a compose volume spec, or None for bind mounts."""
+    if not vol_spec or not isinstance(vol_spec, str):
+        return None
+    source = vol_spec.split(':')[0].strip()
+    if source.startswith(('.', '/', '~')):
+        return None
+    return source or None
+
+
+def infer_relationship_type_from_image(image: str) -> tuple[str, str]:
+    """Return (protocol, relationship_type) for event-bus images, else ("HTTP", "uses")."""
+    image_lower = (image or "").lower()
+    for keyword, result in EVENT_BUS_IMAGES.items():
+        if keyword in image_lower:
+            return result
+    return "HTTP", "uses"
+
+
+def flatten_dict(d: dict, prefix: str = "") -> list[tuple[str, Any]]:
+    """Flatten nested dict to (dotted.key, value) pairs."""
+    result: list[tuple[str, Any]] = []
+    for k, v in d.items():
+        full_key = f"{prefix}.{k}" if prefix else k
+        if isinstance(v, dict):
+            result.extend(flatten_dict(v, full_key))
+        else:
+            result.append((full_key, v))
+    return result

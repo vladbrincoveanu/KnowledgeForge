@@ -17,7 +17,7 @@ class GitHubDownloader:
     @staticmethod
     def is_github_url(url: str) -> bool:
         """Validate if URL is a GitHub repository URL."""
-        github_pattern = r'^https://github\.com/[\w\-\.]+/[\w\-\.]+/?$'
+        github_pattern = r'^https://github\.com/[\w\-\.]+/[\w\-\.]+(\.git)?/?$'
         return bool(re.match(github_pattern, url.strip()))
 
     @staticmethod
@@ -46,7 +46,7 @@ class GitHubDownloader:
             raise ValueError(f"Invalid GitHub URL: {github_url}")
         
         owner, repo = match.groups()
-        repo = repo.rstrip('/')
+        repo = repo.rstrip('/').removesuffix('.git')
         
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)

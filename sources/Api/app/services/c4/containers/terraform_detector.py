@@ -76,6 +76,7 @@ class TerraformDetector(BaseContainerDetector):
                     "runtime_info": utils.extract_runtime_version(tf_file.parent),
                     "dependencies_internal": [],
                     "health_endpoint": "",
+                    "relationships": [],  # Terraform passive resources don't emit relationships in this phase
                 })
 
         return containers

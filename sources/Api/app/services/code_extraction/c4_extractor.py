@@ -155,6 +155,8 @@ class C4ArchitectureExtractor:
     def _extract_level2_containers(self):
         """Extract Level 2: Containers (Deployable Units)."""
         self.containers = self.container_manager.detect_all_containers()
+        # Second pass: LLM enrichment (no-op when llm_manager is None)
+        self.container_manager.enrich_containers_with_llm()
 
     def _group_by_domain(self):
         """Group components by domain if too many."""
