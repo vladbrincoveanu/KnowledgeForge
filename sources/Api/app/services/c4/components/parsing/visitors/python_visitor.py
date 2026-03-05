@@ -111,6 +111,7 @@ class PythonVisitor(BaseVisitor):
             file_path=file_path,
             language="python",
             annotations=annotations,
+            base_classes=base_classes,
             layer=layer,
         )
 

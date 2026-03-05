@@ -59,6 +59,8 @@ class CodeElement(BaseModel):
     language: str
     annotations: list[str] = Field(default_factory=list)
     imports: list[str] = Field(default_factory=list)
+    base_classes: list[str] = Field(default_factory=list)
+    method_calls: list[str] = Field(default_factory=list)
     layer: ArchitecturalLayer = ArchitecturalLayer.UNKNOWN
 
 
