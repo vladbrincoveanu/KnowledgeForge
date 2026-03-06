@@ -1,4 +1,4 @@
-"""Feature flags for C4 context extraction, quality gate, and exports."""
+"""Feature flags for C4 context extraction and exports."""
 
 from __future__ import annotations
 
@@ -15,9 +15,8 @@ def _env_bool(name: str, default: bool) -> bool:
 
 @dataclass(frozen=True)
 class C4FeatureFlags:
-    """Runtime feature flags controlling roadmap capability rollout and WPS quality gates."""
+    """Runtime feature flags controlling C4 context extraction."""
 
-    # Owner/steward detection
     enable_owner_steward: bool = True
     enable_sensitivity_tags: bool = True
     enable_quality_score: bool = False
@@ -27,37 +26,16 @@ class C4FeatureFlags:
     enable_structurizr_export: bool = True
     enable_mermaid_export: bool = True
 
-    # WPS quality gate
-    enable_wps_quality_gate: bool = True
-    enable_wps_only_rollout: bool = True
-
     @classmethod
     def from_env(cls) -> "C4FeatureFlags":
-        """Load feature flags from environment with roadmap defaults."""
+        """Load feature flags from environment."""
         return cls(
             enable_owner_steward=_env_bool("KF_ENABLE_OWNER_STEWARD", cls.enable_owner_steward),
-            enable_sensitivity_tags=_env_bool(
-                "KF_ENABLE_SENSITIVITY_TAGS",
-                cls.enable_sensitivity_tags,
-            ),
+            enable_sensitivity_tags=_env_bool("KF_ENABLE_SENSITIVITY_TAGS", cls.enable_sensitivity_tags),
             enable_quality_score=_env_bool("KF_ENABLE_QUALITY_SCORE", cls.enable_quality_score),
             enable_usage_stats=_env_bool("KF_ENABLE_USAGE_STATS", cls.enable_usage_stats),
-            enable_column_lineage=_env_bool(
-                "KF_ENABLE_COLUMN_LINEAGE",
-                cls.enable_column_lineage,
-            ),
-            enable_platform_collapse=_env_bool(
-                "KF_ENABLE_PLATFORM_COLLAPSE",
-                cls.enable_platform_collapse,
-            ),
-            enable_structurizr_export=_env_bool(
-                "KF_ENABLE_STRUCTURIZR_EXPORT",
-                cls.enable_structurizr_export,
-            ),
-            enable_mermaid_export=_env_bool(
-                "KF_ENABLE_MERMAID_EXPORT",
-                cls.enable_mermaid_export,
-            ),
-            enable_wps_quality_gate=_env_bool("C4_ENABLE_WPS_QUALITY_GATE", True),
-            enable_wps_only_rollout=_env_bool("C4_ENABLE_WPS_ONLY_ROLLOUT", True),
+            enable_column_lineage=_env_bool("KF_ENABLE_COLUMN_LINEAGE", cls.enable_column_lineage),
+            enable_platform_collapse=_env_bool("KF_ENABLE_PLATFORM_COLLAPSE", cls.enable_platform_collapse),
+            enable_structurizr_export=_env_bool("KF_ENABLE_STRUCTURIZR_EXPORT", cls.enable_structurizr_export),
+            enable_mermaid_export=_env_bool("KF_ENABLE_MERMAID_EXPORT", cls.enable_mermaid_export),
         )

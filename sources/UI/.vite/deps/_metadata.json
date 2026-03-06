@@ -1,0 +1,62 @@
+{
+  "hash": "103e3b32",
+  "browserHash": "9a9d2bb9",
+  "optimized": {
+    "react": {
+      "src": "../../../UI/node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "5335f449",
+      "needsInterop": true
+    },
+    "react-dom/client": {
+      "src": "../../../UI/node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "88c4a745",
+      "needsInterop": true
+    },
+    "react-router-dom": {
+      "src": "../../../UI/node_modules/react-router-dom/dist/index.js",
+      "file": "react-router-dom.js",
+      "fileHash": "565c0f37",
+      "needsInterop": false
+    },
+    "lucide-react": {
+      "src": "../../../UI/node_modules/lucide-react/dist/esm/lucide-react.mjs",
+      "file": "lucide-react.js",
+      "fileHash": "cc19dcb4",
+      "needsInterop": false
+    },
+    "react-force-graph-2d": {
+      "src": "../../../UI/node_modules/react-force-graph-2d/dist/react-force-graph-2d.mjs",
+      "file": "react-force-graph-2d.js",
+      "fileHash": "419b5713",
+      "needsInterop": false
+    },
+    "axios": {
+      "src": "../../../UI/node_modules/axios/index.js",
+      "file": "axios.js",
+      "fileHash": "440c33f2",
+      "needsInterop": false
+    },
+    "recharts": {
+      "src": "../../../UI/node_modules/recharts/es6/index.js",
+      "file": "recharts.js",
+      "fileHash": "9bc36d01",
+      "needsInterop": false
+    }
+  },
+  "chunks": {
+    "chunk-MAGNXXYD": {
+      "file": "chunk-MAGNXXYD.js"
+    },
+    "chunk-6P3TQNRK": {
+      "file": "chunk-6P3TQNRK.js"
+    },
+    "chunk-UOUQDXRZ": {
+      "file": "chunk-UOUQDXRZ.js"
+    },
+    "chunk-5WWUZCGV": {
+      "file": "chunk-5WWUZCGV.js"
+    }
+  }
+}
