@@ -58,12 +58,6 @@ class ContextManager:
         # System identification
         system_name = self.system_detector.detect_system_name()
         system_purpose = self.system_detector.generate_system_purpose()
-        system_environment = self.system_detector.detect_environments()
-        system_app_version = self.system_detector.detect_app_version()
-        system_tags = self.system_detector.detect_tags()
-        system_api_spec_url = self.system_detector.detect_api_spec_url()
-        system_documentation_url = self.system_detector.detect_documentation_url()
-        system_monitoring_url = self.system_detector.detect_monitoring_url()
         regulatory_frameworks = self.system_detector.detect_regulatory_frameworks()
 
         # External dependencies
@@ -144,12 +138,6 @@ class ContextManager:
             "repository_url": repository_url,
             "git": git_metadata,
             "context_sources": context_sources,
-            "environment": system_environment,
-            "app_version": system_app_version,
-            "tags": system_tags,
-            "api_spec_url": system_api_spec_url,
-            "documentation_url": system_documentation_url,
-            "monitoring_url": system_monitoring_url,
             "regulatory_frameworks": regulatory_frameworks,
 
             # Primary Service Fields
