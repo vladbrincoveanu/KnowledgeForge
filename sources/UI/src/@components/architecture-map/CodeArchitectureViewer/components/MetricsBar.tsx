@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 
 interface MetricsBarProps {
   // Search
@@ -82,8 +82,6 @@ export default function MetricsBar({
   extractionStatus,
   extractionError,
 }: MetricsBarProps) {
-  const [showRepoPanel, setShowRepoPanel] = useState(false);
-
   return (
     <div className="metrics-bar">
       <div className="metrics-row metrics-row-primary">
@@ -101,7 +99,7 @@ export default function MetricsBar({
           <div className="metrics-section extract-section">
             <button
               className="extract-btn"
-              onClick={() => setShowRepoPanel(!showRepoPanel)}
+              onClick={() => setRepoSectionExpanded(!repoSectionExpanded)}
             >
               <svg
                 width="16"
@@ -179,13 +177,13 @@ export default function MetricsBar({
       </div>
 
       {/* Repository Panel (expandable) */}
-      {showRepoPanel && (
+      {repoSectionExpanded && (
         <div className="repo-panel">
           <div className="repo-panel-header">
             <h4>Add Repository</h4>
             <button
               className="close-btn"
-              onClick={() => setShowRepoPanel(false)}
+              onClick={() => setRepoSectionExpanded(false)}
             >
               ×
             </button>
