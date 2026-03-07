@@ -1,5 +1,5 @@
-import axios, { AxiosInstance, AxiosResponse } from 'axios';
-import { IncrementalSummary, TaskStatus } from '@/types';
+import axios, { AxiosInstance, AxiosResponse } from "axios";
+import { IncrementalSummary, TaskStatus } from "@/types";
 
 // TypeScript interfaces
 interface ExtractConfig {
@@ -14,7 +14,7 @@ interface ExtractResponse {
 
 interface ExtractionStatus {
   task_id: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: "pending" | "running" | "completed" | "failed";
   progress?: number;
   message?: string;
   result?: unknown;
@@ -95,7 +95,7 @@ interface SystemMetrics {
 }
 
 interface HealthStatus {
-  status: 'healthy' | 'unhealthy';
+  status: "healthy" | "unhealthy";
   services: Record<string, boolean>;
   timestamp: string;
 }
@@ -117,8 +117,13 @@ interface UploadResponse {
   message: string;
 }
 
+export interface ArchitectureChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 interface FeedbackData {
-  type: 'positive' | 'negative';
+  type: "positive" | "negative";
   entity_id?: string;
   relationship_id?: string;
   comment?: string;
@@ -127,20 +132,20 @@ interface FeedbackData {
 // API configuration
 // Use empty string to leverage Vite proxy, or explicit URL for direct connection
 // Force empty string if VITE_API_URL contains 'api:' (Docker service name) which browser can't resolve
-let apiBaseUrl = import.meta.env.VITE_API_URL || '';
-if (apiBaseUrl.includes('api:') || apiBaseUrl.includes('://api')) {
+let apiBaseUrl = import.meta.env.VITE_API_URL || "";
+if (apiBaseUrl.includes("api:") || apiBaseUrl.includes("://api")) {
   // Browser can't resolve Docker service names, use relative URLs to go through Vite proxy
-  apiBaseUrl = '';
+  apiBaseUrl = "";
 }
 const API_BASE_URL = apiBaseUrl;
-const API_KEY = import.meta.env.VITE_API_KEY || 'test-api-key-12345';
+const API_KEY = import.meta.env.VITE_API_KEY || "test-api-key-12345";
 
 // Create axios instance with default configuration
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL, // Empty string uses relative URLs (works with Vite proxy)
   timeout: 30000,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
     Authorization: `Bearer ${API_KEY}`,
   },
 });
@@ -157,48 +162,48 @@ const fileUploadApi: AxiosInstance = axios.create({
 
 // Request interceptor to add API key
 api.interceptors.request.use(
-  config => {
+  (config) => {
     config.headers.Authorization = `Bearer ${API_KEY}`;
     return config;
   },
-  error => {
+  (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 // Request interceptor for file upload API
 fileUploadApi.interceptors.request.use(
-  config => {
+  (config) => {
     config.headers.Authorization = `Bearer ${API_KEY}`;
     return config;
   },
-  error => {
+  (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 // Response interceptor for error handling
 api.interceptors.response.use(
-  response => {
+  (response) => {
     return response;
   },
-  error => {
+  (error) => {
     if (error.response?.status === 401) {
-      console.error('API authentication failed. Please check your API key.');
+      console.error("API authentication failed. Please check your API key.");
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 // Response interceptor for file upload API
 fileUploadApi.interceptors.response.use(
-  response => response,
-  error => {
+  (response) => response,
+  (error) => {
     if (error.response?.status === 401) {
-      console.error('API authentication failed. Please check your API key.');
+      console.error("API authentication failed. Please check your API key.");
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 // Ontology Extraction API
@@ -206,14 +211,14 @@ export const ontologyAPI = {
   // Extract ontology from CSV file
   extractOntology: async (
     filePath: string,
-    extractionConfig: ExtractConfig = {}
+    extractionConfig: ExtractConfig = {},
   ): Promise<ExtractResponse> => {
     const response: AxiosResponse<ExtractResponse> = await api.post(
-      '/api/v1/extract/',
+      "/api/v1/extract/",
       {
         file_path: filePath,
         extraction_config: extractionConfig,
-      }
+      },
     );
     return response.data;
   },
@@ -221,7 +226,7 @@ export const ontologyAPI = {
   // Get extraction task status
   getExtractionStatus: async (taskId: string): Promise<ExtractionStatus> => {
     const response: AxiosResponse<ExtractionStatus> = await api.get(
-      `/api/v1/extract/${taskId}`
+      `/api/v1/extract/${taskId}`,
     );
     return response.data;
   },
@@ -230,14 +235,14 @@ export const ontologyAPI = {
   getEntities: async (
     taskId: string | null = null,
     limit = 100,
-    offset = 0
+    offset = 0,
   ): Promise<PaginatedResponse<Entity>> => {
     const params: Record<string, string | number> = { limit, offset };
     if (taskId) params.task_id = taskId;
 
     const response: AxiosResponse<PaginatedResponse<Entity>> = await api.get(
-      '/api/v1/entities',
-      { params }
+      "/api/v1/entities",
+      { params },
     );
     const data = response.data;
     // Normalize the response to match expected format
@@ -253,13 +258,13 @@ export const ontologyAPI = {
   getRelationships: async (
     taskId: string | null = null,
     limit = 100,
-    offset = 0
+    offset = 0,
   ): Promise<PaginatedResponse<Relationship>> => {
     const params: Record<string, string | number> = { limit, offset };
     if (taskId) params.task_id = taskId;
 
     const response: AxiosResponse<PaginatedResponse<Relationship>> =
-      await api.get('/api/v1/relationships', { params });
+      await api.get("/api/v1/relationships", { params });
     const data = response.data;
     // Normalize the response to match expected format
     return {
@@ -273,20 +278,20 @@ export const ontologyAPI = {
   // Submit feedback
   submitFeedback: async (feedbackData: FeedbackData): Promise<unknown> => {
     const response: AxiosResponse<unknown> = await api.post(
-      '/api/v1/feedback',
-      feedbackData
+      "/api/v1/feedback",
+      feedbackData,
     );
     return response.data;
   },
 
   // Get graph visualization
   getGraphVisualization: async (
-    taskId?: string
+    taskId?: string,
   ): Promise<GraphVisualization> => {
     const params = taskId ? { task_id: taskId } : {};
     const response: AxiosResponse<GraphVisualization> = await api.get(
-      '/api/v1/graph/visualize',
-      { params }
+      "/api/v1/graph/visualize",
+      { params },
     );
     return response.data;
   },
@@ -294,7 +299,7 @@ export const ontologyAPI = {
   // Get system metrics
   getMetrics: async (): Promise<SystemMetrics> => {
     const response: AxiosResponse<SystemMetrics> = await api.get(
-      '/api/v1/health/metrics'
+      "/api/v1/health/metrics",
     );
     return response.data;
   },
@@ -302,14 +307,14 @@ export const ontologyAPI = {
   // Health check
   healthCheck: async (): Promise<HealthStatus> => {
     const response: AxiosResponse<HealthStatus> =
-      await api.get('/api/v1/health/');
+      await api.get("/api/v1/health/");
     return response.data;
   },
 
   // Readiness check
   readinessCheck: async (): Promise<HealthStatus> => {
     const response: AxiosResponse<HealthStatus> = await api.get(
-      '/api/v1/health/ready'
+      "/api/v1/health/ready",
     );
     return response.data;
   },
@@ -320,13 +325,13 @@ export const serviceExtractionAPI = {
   // Extract services from GitHub repository
   extractFromGitHub: async (
     githubUrl: string,
-    useGit: boolean = true
+    useGit: boolean = true,
   ): Promise<ExtractResponse> => {
     // Runtime fix: Force empty baseURL if it contains Docker service name
-    const currentBaseURL = api.defaults.baseURL || '';
+    const currentBaseURL = api.defaults.baseURL || "";
     const fixedBaseURL =
-      currentBaseURL.includes('api:') || currentBaseURL.includes('://api')
-        ? ''
+      currentBaseURL.includes("api:") || currentBaseURL.includes("://api")
+        ? ""
         : currentBaseURL;
     if (fixedBaseURL !== currentBaseURL) {
       api.defaults.baseURL = fixedBaseURL;
@@ -335,11 +340,11 @@ export const serviceExtractionAPI = {
 
     try {
       const response: AxiosResponse<ExtractResponse> = await api.post(
-        '/api/v1/services/extract-from-github',
+        "/api/v1/services/extract-from-github",
         {
           github_url: githubUrl,
           use_git: useGit,
-        }
+        },
       );
       return response.data;
     } catch (error: any) {
@@ -350,10 +355,10 @@ export const serviceExtractionAPI = {
   // Extract services from ZIP file
   extractFromZip: async (file: File): Promise<ExtractResponse> => {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append("file", file);
     const response: AxiosResponse<ExtractResponse> = await fileUploadApi.post(
-      '/api/v1/services/extract-from-zip',
-      formData
+      "/api/v1/services/extract-from-zip",
+      formData,
     );
     return response.data;
   },
@@ -361,10 +366,10 @@ export const serviceExtractionAPI = {
   // Extract services from local path
   extractFromPath: async (repoPath: string): Promise<ExtractResponse> => {
     const response: AxiosResponse<ExtractResponse> = await api.post(
-      '/api/v1/services/extract-from-path',
+      "/api/v1/services/extract-from-path",
       {
         repo_path: repoPath,
-      }
+      },
     );
     return response.data;
   },
@@ -373,7 +378,7 @@ export const serviceExtractionAPI = {
   getExtractionStatus: async (taskId: string): Promise<ExtractionStatus> => {
     try {
       const response: AxiosResponse<ExtractionStatus> = await api.get(
-        `/api/v1/services/extraction/${taskId}`
+        `/api/v1/services/extraction/${taskId}`,
       );
       return response.data;
     } catch (error: any) {
@@ -383,7 +388,7 @@ export const serviceExtractionAPI = {
 
   // Get extraction results
   getExtractionResults: async (
-    taskId: string
+    taskId: string,
   ): Promise<{
     task_id: string;
     repository: { url?: string; name?: string };
@@ -394,7 +399,7 @@ export const serviceExtractionAPI = {
     warnings: string[];
   }> => {
     const response = await api.get(
-      `/api/v1/services/extraction/${taskId}/results`
+      `/api/v1/services/extraction/${taskId}/results`,
     );
     return response.data;
   },
@@ -407,19 +412,19 @@ export const fileAPI = {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
 
-      reader.onload = event => {
+      reader.onload = (event) => {
         try {
           const csvContent = event.target?.result as string;
-          const lines = csvContent.split('\n');
-          const headers = lines[0].split(',').map(h => h.trim());
+          const lines = csvContent.split("\n");
+          const headers = lines[0].split(",").map((h) => h.trim());
           const data = lines
             .slice(1)
-            .filter(line => line.trim())
-            .map(line => {
-              const values = line.split(',').map(v => v.trim());
+            .filter((line) => line.trim())
+            .map((line) => {
+              const values = line.split(",").map((v) => v.trim());
               const row: Record<string, string> = {};
               headers.forEach((header, index) => {
-                row[header] = values[index] || '';
+                row[header] = values[index] || "";
               });
               return row;
             });
@@ -430,14 +435,14 @@ export const fileAPI = {
             data,
             size: file.size,
             rowCount: data.length,
-            type: 'csv',
+            type: "csv",
           });
         } catch (error) {
           reject(error);
         }
       };
 
-      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.onerror = () => reject(new Error("Failed to read file"));
       reader.readAsText(file);
     });
   },
@@ -445,13 +450,13 @@ export const fileAPI = {
   // Upload file to server
   uploadFile: async (file: File): Promise<UploadResponse> => {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append("file", file);
 
     // For file uploads, we need to remove the default Content-Type header
     // and let the browser set it automatically with the boundary
     const response: AxiosResponse<UploadResponse> = await fileUploadApi.post(
-      '/api/v1/extract/upload',
-      formData
+      "/api/v1/extract/upload",
+      formData,
     );
 
     return response.data;
@@ -491,37 +496,37 @@ export class WebSocketService {
 
       // Use direct WebSocket connection to backend since proxy doesn't handle WebSocket
       const wsUrl =
-        API_BASE_URL === '/api'
-          ? 'ws://localhost:8000/ws'
-          : API_BASE_URL.replace('http', 'ws') + '/ws';
+        API_BASE_URL === "/api"
+          ? "ws://localhost:8000/ws"
+          : API_BASE_URL.replace("http", "ws") + "/ws";
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
         this.reconnectAttempts = 0;
-        this.emit('connected');
+        this.emit("connected");
       };
 
-      this.ws.onmessage = event => {
+      this.ws.onmessage = (event) => {
         try {
           const data: WebSocketMessage = JSON.parse(event.data);
-          this.emit('message', data);
+          this.emit("message", data);
         } catch (error) {
-          console.error('Failed to parse WebSocket message:', error);
+          console.error("Failed to parse WebSocket message:", error);
         }
       };
 
       this.ws.onclose = () => {
         this.ws = null;
-        this.emit('disconnected');
+        this.emit("disconnected");
         this.attemptReconnect();
       };
 
-      this.ws.onerror = error => {
-        console.error('WebSocket error:', error);
-        this.emit('error', error);
+      this.ws.onerror = (error) => {
+        console.error("WebSocket error:", error);
+        this.emit("error", error);
       };
     } catch (error) {
-      console.error('Failed to create WebSocket connection:', error);
+      console.error("Failed to create WebSocket connection:", error);
     }
   }
 
@@ -539,8 +544,8 @@ export class WebSocketService {
         this.connect();
       }, this.reconnectDelay * this.reconnectAttempts);
     } else {
-      console.error('Max reconnection attempts reached');
-      this.emit('reconnect_failed');
+      console.error("Max reconnection attempts reached");
+      this.emit("reconnect_failed");
     }
   }
 
@@ -563,11 +568,11 @@ export class WebSocketService {
 
   private emit(event: string, data?: unknown): void {
     if (this.listeners.has(event)) {
-      this.listeners.get(event)?.forEach(callback => {
+      this.listeners.get(event)?.forEach((callback) => {
         try {
           callback(data);
         } catch (error) {
-          console.error('Error in event listener:', error);
+          console.error("Error in event listener:", error);
         }
       });
     }
@@ -587,23 +592,23 @@ export const wsService = new WebSocketService();
 export const apiUtils = {
   // Format file size
   formatFileSize: (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) return "0 Bytes";
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   },
 
   // Format confidence score
   formatConfidence: (confidence: number): string => {
-    return Math.round(confidence * 100) + '%';
+    return Math.round(confidence * 100) + "%";
   },
 
   // Get confidence color
   getConfidenceColor: (confidence: number): string => {
-    if (confidence >= 0.8) return '#28a745';
-    if (confidence >= 0.6) return '#ffc107';
-    return '#dc3545';
+    if (confidence >= 0.8) return "#28a745";
+    if (confidence >= 0.6) return "#ffc107";
+    return "#dc3545";
   },
 
   // Format timestamp
@@ -613,8 +618,8 @@ export const apiUtils = {
 
   // Validate API response
   validateResponse: (response: unknown): unknown => {
-    if (!response || typeof response !== 'object') {
-      throw new Error('Invalid response format');
+    if (!response || typeof response !== "object") {
+      throw new Error("Invalid response format");
     }
     return response;
   },
@@ -626,11 +631,10 @@ export const codeArchitectureAPI = {
   getArchitecture: async (): Promise<any> => {
     try {
       const response: AxiosResponse = await api.get(
-        '/api/v1/code/architecture'
+        "/api/v1/code/architecture",
       );
       return response.data;
     } catch (error) {
-
       throw error;
     }
   },
@@ -639,20 +643,19 @@ export const codeArchitectureAPI = {
   extractFromGitHub: async (
     githubUrl: string,
     useGit: boolean = true,
-    appendMode: boolean = true
+    appendMode: boolean = true,
   ): Promise<ExtractResponse> => {
     try {
       const response: AxiosResponse<ExtractResponse> = await api.post(
-        '/api/v1/code/extract-from-github',
+        "/api/v1/code/extract-from-github",
         {
           github_url: githubUrl,
           use_git: useGit,
           append_mode: appendMode,
-        }
+        },
       );
       return response.data;
     } catch (error) {
-
       throw error;
     }
   },
@@ -662,11 +665,11 @@ export const codeArchitectureAPI = {
     username: string,
     includeForks: boolean = false,
     maxRepos: number = 10,
-    appendMode: boolean = true
+    appendMode: boolean = true,
   ): Promise<ExtractResponse> => {
     try {
       const response: AxiosResponse<ExtractResponse> = await api.post(
-        '/api/v1/code/extract-from-github-org',
+        "/api/v1/code/extract-from-github-org",
         {
           github_username: username,
           include_forks: includeForks,
@@ -675,11 +678,10 @@ export const codeArchitectureAPI = {
         },
         {
           timeout: 60000, // 60 seconds for org scanning
-        }
+        },
       );
       return response.data;
     } catch (error) {
-
       throw error;
     }
   },
@@ -687,15 +689,15 @@ export const codeArchitectureAPI = {
   // Trigger code extraction from a local folder path
   scanLocalPath: async (
     repoPath: string,
-    appendMode: boolean = true
+    appendMode: boolean = true,
   ): Promise<ExtractResponse> => {
     const response: AxiosResponse<ExtractResponse> = await api.post(
-      '/api/v1/code/scan',
+      "/api/v1/code/scan",
       {
         repo_path: repoPath,
         use_c4_model: true,
         append_mode: appendMode,
-      }
+      },
     );
     return response.data;
   },
@@ -707,10 +709,9 @@ export const codeArchitectureAPI = {
     deleted_count: number;
   }> => {
     try {
-      const response = await api.post('/api/v1/code/clear');
+      const response = await api.post("/api/v1/code/clear");
       return response.data;
     } catch (error) {
-
       throw error;
     }
   },
@@ -719,11 +720,10 @@ export const codeArchitectureAPI = {
   getExtractionStatus: async (taskId: string): Promise<TaskStatus> => {
     try {
       const response: AxiosResponse<TaskStatus> = await api.get(
-        `/api/v1/code/scan/${taskId}`
+        `/api/v1/code/scan/${taskId}`,
       );
       return response.data;
     } catch (error) {
-
       throw error;
     }
   },
@@ -732,11 +732,10 @@ export const codeArchitectureAPI = {
   getExtractionResults: async (taskId: string): Promise<any> => {
     try {
       const response: AxiosResponse = await api.get(
-        `/api/v1/code/scan/${taskId}/results`
+        `/api/v1/code/scan/${taskId}/results`,
       );
       return response.data;
     } catch (error) {
-
       throw error;
     }
   },
@@ -752,10 +751,12 @@ export const codeArchitectureAPI = {
     file?: string;
   }): Promise<{ description: string; source: string }> => {
     try {
-      const response: AxiosResponse = await api.post('/api/v1/code/describe/node', payload);
+      const response: AxiosResponse = await api.post(
+        "/api/v1/code/describe/node",
+        payload,
+      );
       return response.data;
     } catch (error) {
-
       throw error;
     }
   },
@@ -770,10 +771,30 @@ export const codeArchitectureAPI = {
     protocol?: string;
   }): Promise<{ description: string; source: string }> => {
     try {
-      const response: AxiosResponse = await api.post('/api/v1/code/describe/edge', payload);
+      const response: AxiosResponse = await api.post(
+        "/api/v1/code/describe/edge",
+        payload,
+      );
       return response.data;
     } catch (error) {
+      throw error;
+    }
+  },
 
+  // Chat with the local model using the current architecture context
+  chatWithContext: async (payload: {
+    message: string;
+    history?: ArchitectureChatMessage[];
+    selection?: Record<string, unknown>;
+    architecture?: Record<string, unknown>;
+  }): Promise<{ message: string; source: string }> => {
+    try {
+      const response: AxiosResponse = await api.post(
+        "/api/v1/code/chat/context",
+        payload,
+      );
+      return response.data;
+    } catch (error) {
       throw error;
     }
   },

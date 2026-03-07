@@ -1,11 +1,11 @@
-import React from 'react';
+import React from "react";
 import ReactFlow, {
   Node,
   Edge,
   Controls,
   Background,
   BackgroundVariant,
-} from 'reactflow';
+} from "reactflow";
 
 interface GraphViewProps {
   nodes: Node[];
@@ -42,7 +42,7 @@ export default function GraphView({
 
   return (
     <main className="graph-container">
-      <div style={{ width: '100%', height: '100%' }}>
+      <div style={{ width: "100%", height: "100%", minHeight: 0 }}>
         <ReactFlow
           key={`${selectedLevel}-${nodes.length}-${edges.length}`}
           nodes={nodes}
