@@ -46,6 +46,8 @@ class ExtractionMethod(str, Enum):
 
     FRAMEWORK_DETECTION = "framework_detection"
     COMMUNITY_DETECTION = "community_detection"
+    LLM_DIRECT = "llm_direct"
+    LLM_REFINED = "llm_refined"
     HYBRID = "hybrid"
     MANUAL = "manual"
 
@@ -62,6 +64,10 @@ class CodeElement(BaseModel):
     base_classes: list[str] = Field(default_factory=list)
     method_calls: list[str] = Field(default_factory=list)
     layer: ArchitecturalLayer = ArchitecturalLayer.UNKNOWN
+    role: str = ""
+    filtered: bool = False
+    filter_reason: str = ""
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class DependencyEdge(BaseModel):
