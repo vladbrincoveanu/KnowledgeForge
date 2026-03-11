@@ -12,6 +12,7 @@ import {
   Settings as SettingsIcon,
   Brain,
   Code,
+  Home,
 } from "lucide-react";
 import "./App.scss";
 import CodeArchitectureViewer from "./@components/architecture-map/CodeArchitectureViewer/CodeArchitectureViewer";
@@ -19,6 +20,7 @@ import Notification from "./@components/notification/Notification";
 import FileUploader from "./@components/upload-extract/FileUploader/FileUploader";
 import SystemMetrics from "./@components/system-metrics/SystemMetrics/SystemMetrics";
 import Settings from "./@components/settings/Settings/Settings";
+import LandingPage from "./@components/landing/LandingPage/LandingPage";
 import { wsService } from "./services/api";
 import { IncrementalSummary } from "@/types";
 
@@ -63,10 +65,16 @@ interface ExtractionTask {
 const Navigation: React.FC<NavigationProps> = ({ activeTab }) => {
   const navItems: NavItem[] = [
     {
-      id: "upload",
-      label: "Upload & Extract",
-      icon: <Upload size={20} />,
+      id: "home",
+      label: "Home",
+      icon: <Home size={20} />,
       path: "/",
+    },
+    {
+      id: "workspace",
+      label: "Workspace",
+      icon: <Upload size={20} />,
+      path: "/workspace",
     },
     {
       id: "code-architecture",
@@ -89,14 +97,14 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab }) => {
   ];
 
   return (
-    <nav className="main-navigation">
+    <nav className={`main-navigation ${activeTab === "home" ? "is-home" : ""}`}>
       <div className="nav-header">
         <div className="nav-brand">
           <Brain size={22} />
           <h2>KnowledgeForge</h2>
         </div>
         <p className="nav-subtitle">
-          Repository extraction, architecture, metrics
+          Translate technical posture into board-ready risk language
         </p>
       </div>
       <ul className="nav-list">
@@ -188,7 +196,28 @@ const MainContent: React.FC = () => {
     }
   }, []);
 
+  // Determine active tab based on location
+  const getActiveTab = (): string => {
+    const path = location.pathname;
+    if (path === "/") return "home";
+    if (path.startsWith("/workspace")) return "workspace";
+    if (path.startsWith("/code-architecture")) return "code-architecture";
+    if (path.startsWith("/metrics")) return "metrics";
+    if (path.startsWith("/settings")) return "settings";
+    return "home";
+  };
+
+  const activeTab = getActiveTab();
+  const isArchitectureRoute = activeTab === "code-architecture";
+  const isLandingRoute = activeTab === "home";
+  const shouldBootstrapExtraction =
+    activeTab === "workspace" || activeTab === "code-architecture";
+
   useEffect(() => {
+    if (!shouldBootstrapExtraction) {
+      return;
+    }
+
     wsService.connect();
 
     const handleConnected = () => {};
@@ -207,7 +236,7 @@ const MainContent: React.FC = () => {
       wsService.off("disconnected", handleDisconnected);
       wsService.disconnect();
     };
-  }, [handleWebSocketMessage, loadAvailableTasks]);
+  }, [handleWebSocketMessage, loadAvailableTasks, shouldBootstrapExtraction]);
 
   const handleFilesUploaded = useCallback(
     async (uploadedFiles: UploadedFile[]) => {
@@ -224,18 +253,6 @@ const MainContent: React.FC = () => {
     [],
   );
 
-  // Determine active tab based on location
-  const getActiveTab = (): string => {
-    const path = location.pathname;
-    if (path === "/") return "upload";
-    if (path === "/code-architecture") return "code-architecture";
-    if (path === "/metrics") return "metrics";
-    if (path === "/settings") return "settings";
-    return "upload";
-  };
-
-  const activeTab = getActiveTab();
-
   return (
     <div className="app">
       {notification && (
@@ -250,21 +267,24 @@ const MainContent: React.FC = () => {
 
         <main
           className={`main-content ${
-            activeTab === "code-architecture" ? "architecture-main-content" : ""
-          }`}
+            isArchitectureRoute ? "architecture-main-content" : ""
+          } ${isLandingRoute ? "landing-main-content" : ""}`}
         >
           <Routes>
+            {/* Default route is the landing page; the product workspace lives at /workspace. */}
+            <Route path="/" element={<LandingPage />} />
             <Route
-              path="/"
+              path="/workspace"
               element={
                 <div className="upload-section">
                   <div className="section-header">
                     <h1>
-                      <Upload size={32} /> Extract GitHub Repositories
+                      <Upload size={32} /> Build the Risk Evidence Baseline
                     </h1>
                     <p>
-                      Add GitHub repository URLs to extract C4 architecture and
-                      build the architecture graph
+                      Bring in repository and operational exports to generate
+                      the system map, supporting evidence, and board-facing
+                      narrative.
                     </p>
                   </div>
 
