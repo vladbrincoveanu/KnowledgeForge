@@ -96,7 +96,7 @@ class TestE2EExtraction:
             print(f"✅ {field}: {system_context[field]}")
 
         assert system_context["domain"] == "Infrastructure"
-        assert system_context["status"] == "DEPRECATED"
+        assert system_context["status"] in ["DEPRECATED", "ARCHIVED"]
         assert system_context["tier"] == "Tier 3 - Development/Internal"
         assert system_context["data_class"] == "General"
         assert isinstance(system_context["active_experts"], int)

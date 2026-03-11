@@ -1,7 +1,7 @@
 # KnowledgeForge - Unified Project Management
 # This Makefile provides commands to manage the entire KnowledgeForge stack
 
-.PHONY: help up down clean logs status install test tests e2e api ui dev prod build build-docker fix validate restart restart-full restart-dev restart-api restart-api-dev restart-ui restart-ui-dev sync pull clean-worktrees full-check quick-check ci
+.PHONY: help up down clean logs status install test tests e2e api ui dev prod build build-docker fix validate restart restart-full restart-dev restart-api restart-api-dev restart-ui restart-ui-dev sync pull clean-worktrees full-check quick-check ci test-e2e-omnipay test-e2e-omnipay-verbose
 
 # Default target
 help:
@@ -26,6 +26,8 @@ help:
 	@echo "  make test       - Run API tests only (unit + pipeline)"
 	@echo "  make test-e2e   - Run E2E extraction tests (GitHub → JSON → UI)"
 	@echo "  make test-e2e-verbose - Run E2E tests with detailed output"
+	@echo "  make test-e2e-omnipay - Run OmniPay demo E2E extraction tests"
+	@echo "  make test-e2e-omnipay-verbose - Run OmniPay E2E tests with detailed output"
 	@echo "  make test-owner - Test owner detection specifically"
 	@echo "  make test-containers - Test container detection specifically"
 	@echo "  make test-endpoints - Test endpoint extraction specifically"
@@ -182,6 +184,17 @@ test-containers:
 test-endpoints:
 	@echo "🧪 Testing endpoint extraction..."
 	docker compose exec api python -m pytest test_e2e_extraction.py::TestE2EExtraction::test_06_container_endpoints -v -s
+
+# Run OmniPay E2E tests
+test-e2e-omnipay:
+	@echo "🧪 Running OmniPay demo E2E extraction tests..."
+	docker compose exec api python -m pytest tests/e2e/test_omnipay_extraction.py -v
+	@echo "✅ OmniPay E2E tests completed!"
+
+test-e2e-omnipay-verbose:
+	@echo "🧪 Running OmniPay E2E tests with detailed output..."
+	docker compose exec api python -m pytest tests/e2e/test_omnipay_extraction.py -v -s
+	@echo "✅ OmniPay E2E tests completed!"
 
 # Run tests with coverage
 test-coverage:
@@ -464,6 +477,7 @@ quick-check:
 	@echo "📋 Step 3/4: Running E2E extraction tests..."
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@$(MAKE) test-e2e || (echo "❌ E2E extraction tests failed!" && exit 1)
+	@$(MAKE) test-e2e-omnipay || (echo "❌ OmniPay E2E tests failed!" && exit 1)
 	@echo "✅ E2E extraction tests passed"
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -527,6 +541,12 @@ ci:
 	@echo "✅ E2E tests passed"
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "📋 Step 6b/8: Running OmniPay E2E tests..."
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@docker compose exec api python -m pytest tests/e2e/test_omnipay_extraction.py -v --tb=short || (echo "❌ OmniPay E2E tests failed!" && exit 1)
+	@echo "✅ OmniPay E2E tests passed"
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "📋 Step 7/8: Code quality checks..."
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "Checking Python imports..."
@@ -549,7 +569,8 @@ ci:
 	@echo "📊 Test Summary:"
 	@echo "  ✅ Docker build successful"
 	@echo "  ✅ Services healthy"
-	@echo "  ✅ E2E tests passed (11/11)"
+	@echo "  ✅ E2E tests passed"
+	@echo "  ✅ OmniPay E2E tests passed"
 	@echo "  ✅ Import checks passed"
 	@echo "  ✅ Git status clean"
 

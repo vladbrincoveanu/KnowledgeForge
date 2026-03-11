@@ -29,6 +29,7 @@ import GraphView from "./components/GraphView";
 import NodeDetailsPanel from "./components/NodeDetailsPanel";
 import EdgeDetailsPanel from "./components/EdgeDetailsPanel";
 import MetricsBar from "./components/MetricsBar";
+import { buildRenderedEdges } from "./edgeRendering";
 
 interface CodeEntity {
   id: string;
@@ -88,7 +89,13 @@ interface C4Architecture {
   context_level?: C4Level;
   container_level?: C4Level; // Transformed format
   component_level?: C4Level; // Transformed format
-  code_level?: C4Level;
+}
+
+interface DependencyReviewDecision {
+  nodeId: string;
+  value: string;
+  label: string;
+  description?: string;
 }
 
 const edgeTypes = {
@@ -233,18 +240,18 @@ const getLayoutedElements = (
 
   // Layout child nodes within their parent containers
   if (containerNodes.length > 0) {
-    // Position containers
-    const containerSpacing = 60;
-    let currentX = 100;
+    // Position containers with MUCH more spacing
+    const containerSpacing = 180;
+    let currentX = 200;
 
-    const childNodeWidth = 220;
-    const childNodeHeight = 100;
-    const childSpacing = 30;
-    const childStartX = 40;
-    const childStartY = 80;
+    const childNodeWidth = 240;
+    const childNodeHeight = 120;
+    const childSpacing = 50;
+    const childStartX = 60;
+    const childStartY = 100;
 
     containerNodes.forEach((container) => {
-      container.position = { x: currentX, y: 100 };
+      container.position = { x: currentX, y: 150 };
 
       // Get children of this container
       const children = childNodes.filter((n) => n.parentNode === container.id);
@@ -280,13 +287,13 @@ const getLayoutedElements = (
 
         container.style = {
           ...container.style,
-          width: Math.max(640, contentWidth),
-          height: Math.max(420, contentHeight),
+          width: Math.max(800, contentWidth),
+          height: Math.max(520, contentHeight),
         };
       }
 
       currentX +=
-        ((container.style?.width as number) || 700) + containerSpacing;
+        ((container.style?.width as number) || 850) + containerSpacing;
     });
 
     return {
@@ -349,21 +356,23 @@ const getLayoutedElements = (
     const dagreGraph = new dagre.graphlib.Graph();
     dagreGraph.setDefaultEdgeLabel(() => ({}));
 
+    // Enhanced dagre config - MUCH larger spacing to prevent overlapping
     dagreGraph.setGraph({
       rankdir: direction,
       align: "UL",
-      ranksep: 100,
-      nodesep: 50,
-      edgesep: 10,
-      marginx: 100,
-      marginy: 100,
+      ranksep: 240,      // More room for context labels and edge curves
+      nodesep: 155,      // Keep neighboring nodes from pinching labels
+      edgesep: 70,       // Give parallel edges enough breathing room
+      marginx: 150,      // Larger margins
+      marginy: 150,      // Larger margins
       ranker: "network-simplex",
     });
 
+    // Increased node dimensions to match the visual size
     nodes.forEach((node) => {
       dagreGraph.setNode(node.id, {
-        width: 220,
-        height: 100,
+        width: 240,
+        height: 130,
       });
     });
 
@@ -397,11 +406,12 @@ const getLayoutedElements = (
     return { nodes: layoutedNodes, edges };
   }
 
-  // If no edges, use a simple grid layout
-  const nodesPerRow = Math.ceil(Math.sqrt(nodes.length));
-  const nodeWidth = 220;
-  const nodeHeight = 100;
-  const spacing = 50;
+  // If no edges, use an improved grid layout with much better spacing
+  const nodesPerRow = Math.max(1, Math.ceil(Math.sqrt(nodes.length)));
+  const nodeWidth = 260;
+  const nodeHeight = 140;
+  const spacingX = 140;  // Major increase
+  const spacingY = 120;  // Major increase
 
   const layoutedNodes = nodes.map((node, index) => {
     const row = Math.floor(index / nodesPerRow);
@@ -410,8 +420,8 @@ const getLayoutedElements = (
     return {
       ...node,
       position: {
-        x: col * (nodeWidth + spacing) + 100,
-        y: row * (nodeHeight + spacing) + 100,
+        x: col * (nodeWidth + spacingX) + 180,
+        y: row * (nodeHeight + spacingY) + 180,
       },
       sourcePosition: Position.Right,
       targetPosition: Position.Left,
@@ -421,39 +431,58 @@ const getLayoutedElements = (
   return { nodes: layoutedNodes, edges };
 };
 
-// Star layout for C4 Context level: system centred, actors on left, externals in ring
+// Improved layout for C4 Context level: users/persons left, system center, externals right
 function layoutContextLevel(nodes: Node[]): Node[] {
-  const cx = 650,
-    cy = 380;
+  // Center of the canvas
+  const cx = 800;
+  const cy = 450;
+
+  // Categorize nodes
   const system = nodes.find((n) => n.data?.type === "system");
   const persons = nodes.filter((n) => n.data?.type === "person");
   const externals = nodes.filter(
-    (n) => n.data?.type !== "system" && n.data?.type !== "person",
+    (n) => n.data?.type !== "system" && n.data?.type !== "person" && n.data?.is_external
+  );
+  const otherExternals = nodes.filter(
+    (n) => n.data?.type !== "system" && n.data?.type !== "person" && !n.data?.is_external
   );
 
+  // Node dimensions for spacing calculations
+  const nodeWidth = 260;
+  const nodeHeight = 140;
+  const personsX = 80;              // Far left
+  const externalsX = cx + 400;       // Far right
+  const systemX = cx - nodeWidth / 2; // Center
+  const systemY = cy - nodeHeight / 2;
+
+  // Place system in the center
   if (system) {
-    system.position = { x: cx - 110, y: cy - 45 };
+    system.position = { x: systemX, y: systemY };
     system.sourcePosition = Position.Right;
     system.targetPosition = Position.Left;
   }
 
-  // Actors stacked vertically on the left
+  // Place persons/users on the LEFT side - stacked vertically with good spacing
+  const personSpacingY = 180;
   persons.forEach((n, i) => {
-    n.position = { x: cx - 520, y: cy - 80 + i * 190 };
+    n.position = {
+      x: personsX,
+      y: cy - (persons.length - 1) * personSpacingY / 2 + i * personSpacingY
+    };
     n.sourcePosition = Position.Right;
     n.targetPosition = Position.Left;
   });
 
-  // External systems in a ring clockwise from top-right
-  const count = externals.length;
-  externals.forEach((n, i) => {
-    const angle = -Math.PI / 2 + (i * 2 * Math.PI) / Math.max(count, 1);
+  // Place external systems on the RIGHT side - stacked vertically
+  const allExternals = [...externals, ...otherExternals];
+  const externalSpacingY = 180;
+  allExternals.forEach((n, i) => {
     n.position = {
-      x: cx + 380 * Math.cos(angle) - 80,
-      y: cy + 380 * Math.sin(angle) - 35,
+      x: externalsX,
+      y: cy - (allExternals.length - 1) * externalSpacingY / 2 + i * externalSpacingY
     };
-    n.sourcePosition = Position.Right;
-    n.targetPosition = Position.Left;
+    n.sourcePosition = Position.Left;
+    n.targetPosition = Position.Right;
   });
 
   return nodes;
@@ -698,6 +727,9 @@ const CodeArchitectureViewerInner: React.FC = () => {
     [],
   );
   const [isChatLoading, setIsChatLoading] = useState(false);
+  const [reviewOverrides, setReviewOverrides] = useState<
+    Record<string, Record<string, unknown>>
+  >({});
 
   const [exState, exDispatch] = useReducer(extractionReducer, {
     githubUrl: "",
@@ -820,28 +852,8 @@ const CodeArchitectureViewerInner: React.FC = () => {
         }),
       );
 
-      // Create relationships from containers to their code entities
+      // Create relationships from containers
       const containerRelationships: CodeRelationship[] = [];
-      if (data.code_level?.entities) {
-        containerEntities.forEach((container) => {
-          const containerPath = container.file_path || "";
-          // Find code entities that belong to this container
-          data.code_level.entities
-            .filter((entity: CodeEntity) => {
-              const entityPath = entity.file_path || "";
-              return entityPath.startsWith(containerPath);
-            })
-            .forEach((entity: CodeEntity) => {
-              containerRelationships.push({
-                id: `rel_${container.id}_${entity.id}`,
-                source_entity_id: container.id,
-                target_entity_id: entity.id,
-                relationship_type: "contains",
-                attributes: {},
-              });
-            });
-        });
-      }
 
       // Merge container-level relationships from C4 JSON
       if (data.relationships?.containers?.length) {
@@ -945,6 +957,9 @@ const CodeArchitectureViewerInner: React.FC = () => {
           attributes: {
             description: actor.description || actor.role || "",
             role: actor.role || actor.type || "person",
+            detected_from: actor.detected_from,
+            detection_method: actor.detection_method,
+            evidence: actor.evidence,
           },
         }),
       );
@@ -981,27 +996,59 @@ const CodeArchitectureViewerInner: React.FC = () => {
         const { dep_type, dep_confidence } = inferDepType(dep);
         return {
           id: `context_external_${idx}`,
-          name: dep.name || dep.url || `External ${idx + 1}`,
+          name:
+            dep.context_name ||
+            dep.company ||
+            dep.provider ||
+            dep.name ||
+            dep.url ||
+            `External ${idx + 1}`,
           entity_type: dep.type || "external_system",
           language: "Unknown",
           file_path: dep.detected_from || "",
           attributes: {
+            raw_name: dep.name,
+            context_name: dep.context_name,
+            provider: dep.provider,
+            company: dep.company,
             url: dep.url,
             detected_from: dep.detected_from,
             is_external: true,
             protocol: dep.protocol,
+            integration_surface: dep.integration_surface,
             dependency_type: dep_type,
             classification_confidence: dep_confidence,
             classification_reasoning: dep.classification_reasoning || "",
+            decision_mode: dep.decision_mode || dep.decision?.decision_mode,
+            review_status: dep.review_status || dep.decision?.review_status,
+            requires_human_review:
+              dep.requires_human_review ||
+              dep.review_status === "needs_review",
+            review_threshold: dep.review_threshold,
+            review_item: dep.review_item,
+            review_options: dep.review_options,
+            suggested_prompts: dep.suggested_prompts,
+            provider_alternatives: dep.provider_alternatives,
+            evidence: dep.evidence,
           },
         };
       });
 
       contextEntities.push(...actorEntities, ...externalEntities);
 
-      const contextIdByName = new Map(
-        contextEntities.map((entity) => [entity.name, entity.id]),
-      );
+      const contextIdByName = new Map<string, string>();
+      contextEntities.forEach((entity) => {
+        contextIdByName.set(entity.name, entity.id);
+      });
+      externalEntities.forEach((entity, idx) => {
+        const rawDependency = data.system_context?.external_dependencies?.[idx];
+        if (rawDependency?.name) {
+          contextIdByName.set(String(rawDependency.name), entity.id);
+        }
+        if (rawDependency?.context_name) {
+          contextIdByName.set(String(rawDependency.context_name), entity.id);
+        }
+      });
 
       if (data.relationships?.context?.length) {
         data.relationships.context.forEach(
@@ -1017,7 +1064,6 @@ const CodeArchitectureViewerInner: React.FC = () => {
                 relationship_type: rel.relationship_type || "uses",
                 attributes: {
                   description: rel.description,
-                  protocol: (rel as any).protocol,
                 },
               });
             }
@@ -1145,7 +1191,6 @@ const CodeArchitectureViewerInner: React.FC = () => {
       "context_level",
       "container_level",
       "component_level",
-      "code_level",
     ];
 
     levelsForFilters.forEach((level) => {
@@ -1622,8 +1667,23 @@ const CodeArchitectureViewerInner: React.FC = () => {
       });
     }
 
+    const effectiveEntities = allEntities.map((entity) => {
+      const override = reviewOverrides[entity.id];
+      if (!override) {
+        return entity;
+      }
+
+      return {
+        ...entity,
+        attributes: {
+          ...(entity.attributes || {}),
+          ...override,
+        },
+      };
+    });
+
     // Filter entities
-    let filteredEntities = allEntities.filter((e) => {
+    let filteredEntities = effectiveEntities.filter((e) => {
       const typeMatch =
         selectedEntityTypes.length === 0 ||
         selectedEntityTypes.includes(e.entity_type);
@@ -1954,12 +2014,21 @@ const CodeArchitectureViewerInner: React.FC = () => {
             attributes: e.attributes,
             containerMeta: containerInfo
               ? {
+                  owner: containerInfo.owner,
+                  owner_team: containerInfo.owner_team,
                   container_type: containerInfo.container_type,
                   technology: containerInfo.technology,
                   protocol: containerInfo.protocol,
                   runtime_info: containerInfo.runtime_info,
                   runtime_environment: containerInfo.runtime_environment,
                   deployment: containerInfo.deployment,
+                  tier: containerInfo.tier,
+                  data_class: containerInfo.data_class,
+                  status: containerInfo.status,
+                  active_experts: containerInfo.active_experts,
+                  compliance: containerInfo.compliance,
+                  compliance_confidence: containerInfo.compliance_confidence,
+                  compliance_factors: containerInfo.compliance_factors,
                   description: containerInfo.description,
                   llm_description: containerInfo.llm_description,
                   health_endpoint: containerInfo.health_endpoint,
@@ -1983,25 +2052,11 @@ const CodeArchitectureViewerInner: React.FC = () => {
     }
 
     const isContextLevel = selectedLevel === "context_level";
-    const rfEdges: Edge[] = filteredRelationships
-      .filter((r) => r.target_entity_id)
-      .map((r, idx) => ({
-        id: `edge-${idx}`,
-        source: r.source_entity_id,
-        target: r.target_entity_id!,
-        type: isContextLevel ? "C4Edge" : "smoothstep",
-        animated: false,
-        interactionWidth: 16,
-        style: {
-          stroke: isContextLevel ? "#1168bd" : "#b0bec5",
-          strokeWidth: isContextLevel ? 2.8 : 2,
-        },
-        data: {
-          description: r.attributes?.description,
-          protocol: r.attributes?.protocol,
-          relationship_type: r.relationship_type,
-        },
-      }));
+    const rfEdges = buildRenderedEdges(
+      filteredRelationships,
+      isContextLevel,
+      filteredEntities,
+    );
 
     const dependencyEdges =
       selectedLevel === "container_level" && filteredRelationships.length === 0
@@ -2087,6 +2142,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
     showExternal,
     dependencyViewFilter,
     searchTerm,
+    reviewOverrides,
     fitView,
   ]);
 
@@ -2133,8 +2189,42 @@ const CodeArchitectureViewerInner: React.FC = () => {
     };
   }, [architecture, edges.length, nodes.length, selectedLevel]);
 
+  const getNodeReviewOverride = useCallback(
+    (nodeId?: string | null) => {
+      if (!nodeId) {
+        return undefined;
+      }
+      return reviewOverrides[nodeId];
+    },
+    [reviewOverrides],
+  );
+
+  const mergeNodeReviewOverride = useCallback(
+    (node: any) => {
+      if (!node) {
+        return node;
+      }
+
+      const override = getNodeReviewOverride(node.id);
+      if (!override) {
+        return node;
+      }
+
+      return {
+        ...node,
+        attributes: {
+          ...(node.attributes || {}),
+          ...override,
+        },
+      };
+    },
+    [getNodeReviewOverride],
+  );
+
   const buildSelectionChatContext = useCallback(() => {
-    if (selectedEdge && !selectedNode) {
+    const reviewedSelectedNode = mergeNodeReviewOverride(selectedNode);
+
+    if (selectedEdge && !reviewedSelectedNode) {
       return {
         kind: "edge",
         edge: {
@@ -2154,29 +2244,35 @@ const CodeArchitectureViewerInner: React.FC = () => {
       };
     }
 
-    if (selectedNode) {
+    if (reviewedSelectedNode) {
       return {
         kind: "node",
         node: {
-          id: selectedNode.id,
-          name: selectedNode.name,
-          label: selectedNode.label,
-          type: selectedNode.type,
-          level: selectedNode.level,
-          file: selectedNode.file,
-          attributes: selectedNode.attributes,
-          containerMeta: selectedNode.containerMeta,
+          id: reviewedSelectedNode.id,
+          name: reviewedSelectedNode.name,
+          label: reviewedSelectedNode.label,
+          type: reviewedSelectedNode.type,
+          level: reviewedSelectedNode.level,
+          file: reviewedSelectedNode.file,
+          attributes: reviewedSelectedNode.attributes,
+          containerMeta: reviewedSelectedNode.containerMeta,
           description:
             nodeDescription ||
-            selectedNode?.attributes?.purpose ||
-            selectedNode?.attributes?.description ||
-            selectedNode?.containerMeta?.description,
+            reviewedSelectedNode?.attributes?.purpose ||
+            reviewedSelectedNode?.attributes?.description ||
+            reviewedSelectedNode?.containerMeta?.description,
         },
       };
     }
 
     return { kind: "overview" };
-  }, [edgeDescription, nodeDescription, selectedEdge, selectedNode]);
+  }, [
+    edgeDescription,
+    mergeNodeReviewOverride,
+    nodeDescription,
+    selectedEdge,
+    selectedNode,
+  ]);
 
   const handleArchitectureChat = useCallback(
     async (message: string) => {
@@ -2193,20 +2289,44 @@ const CodeArchitectureViewerInner: React.FC = () => {
       setIsChatLoading(true);
 
       try {
-        const response = await codeArchitectureAPI.chatWithContext({
+        let streamedReply = "";
+        let receivedDelta = false;
+
+        await codeArchitectureAPI.streamChatWithContext({
           message: trimmedMessage,
           history: historyForRequest,
           selection: buildSelectionChatContext(),
           architecture: buildArchitectureChatContext(),
-        });
-
-        setChatMessages((currentMessages) => [
-          ...currentMessages,
-          {
-            role: "assistant",
-            content: response?.message || "No response available.",
+        }, {
+          onDelta: (delta) => {
+            if (!delta) {
+              return;
+            }
+            receivedDelta = true;
+            streamedReply += delta;
           },
-        ]);
+          onComplete: () => {
+            setChatMessages((currentMessages) => {
+              if (!receivedDelta) {
+                return [
+                  ...currentMessages,
+                  {
+                    role: "assistant",
+                    content: "No response available.",
+                  },
+                ];
+              }
+
+              return [
+                ...currentMessages,
+                {
+                  role: "assistant",
+                  content: streamedReply.trim() || "No response available.",
+                },
+              ];
+            });
+          },
+        });
       } catch (error) {
         setChatMessages((currentMessages) => [
           ...currentMessages,
@@ -2220,6 +2340,43 @@ const CodeArchitectureViewerInner: React.FC = () => {
       }
     },
     [buildArchitectureChatContext, buildSelectionChatContext, chatMessages],
+  );
+
+  const handleApplyReviewDecision = useCallback(
+    (decision: DependencyReviewDecision) => {
+      const reviewedNodeName =
+        selectedNode?.id === decision.nodeId
+          ? selectedNode.name
+          : decision.nodeId;
+      const reviewerSummary =
+        decision.description ||
+        `Human review classified ${reviewedNodeName} as ${decision.label}.`;
+
+      setReviewOverrides((current) => ({
+        ...current,
+        [decision.nodeId]: {
+          dependency_type: decision.value,
+          decision_mode: "human_reviewed",
+          review_status: "approved",
+          requires_human_review: false,
+          human_review_choice: decision.label,
+          human_review_summary: reviewerSummary,
+        },
+      }));
+
+      setChatMessages((currentMessages) => [
+        ...currentMessages,
+        {
+          role: "user",
+          content: `Review decision: ${decision.label}`,
+        },
+        {
+          role: "assistant",
+          content: `${reviewedNodeName}: ${reviewerSummary}`,
+        },
+      ]);
+    },
+    [selectedNode],
   );
 
   const onEdgeClick = useCallback(
@@ -2367,13 +2524,14 @@ const CodeArchitectureViewerInner: React.FC = () => {
             />
           ) : (
             <NodeDetailsPanel
-              selectedNode={selectedNode}
+              selectedNode={mergeNodeReviewOverride(selectedNode)}
               onClose={() => setSelectedNode(null)}
               nodeDescription={nodeDescription}
               isNodeLoading={isNodeLoading}
               chatMessages={chatMessages}
               isChatLoading={isChatLoading}
               onSendChat={handleArchitectureChat}
+              onApplyReviewDecision={handleApplyReviewDecision}
             />
           )}
         </div>

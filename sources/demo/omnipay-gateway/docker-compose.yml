@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  omnipay-gateway:
+    build: .
+    ports:
+      - "8085:3000"
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      LEDGER_BASE_URL: http://omnipay-ledger:8080
+      FRAUD_BASE_URL: http://omnipay-fraud-ml:8090
+      CARD_ROUTER_BASE_URL: http://omnipay-card-router:8088
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7.4-alpine
+    ports:
+      - "6379:6379"

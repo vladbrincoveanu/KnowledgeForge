@@ -3,6 +3,8 @@
 import io
 import json
 import zipfile
+from datetime import datetime, timezone
+
 import pytest
 from unittest.mock import patch, Mock
 from fastapi.testclient import TestClient
@@ -163,6 +165,58 @@ class TestDeleteScan:
         assert response.status_code == 404
 
 
+class TestArchitectureEndpoint:
+    """Test GET /api/v1/code/architecture."""
+
+    def test_returns_bundled_demo_by_default(self, client):
+        """Cold starts should return the bundled OmniPay demo payload."""
+        from app.endpoint.v1.routes import code_extraction as route_module
+
+        route_module.scan_tasks.clear()
+
+        response = client.get("/api/v1/code/architecture")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["system_context"]["name"] == "OmniPay Platform"
+        assert any(
+            container["owner"] == "Vlad"
+            for container in data["containers"]
+            if container["name"] == "omnipay-gateway"
+        )
+
+    def test_runtime_extraction_overrides_bundled_demo(self, client):
+        """Completed runtime scans should take precedence over the default demo."""
+        from app.endpoint.v1.routes import code_extraction as route_module
+
+        route_module.scan_tasks.clear()
+        route_module.scan_tasks["runtime-task"] = {
+            "task_id": "runtime-task",
+            "status": "completed",
+            "created_at": datetime.now(timezone.utc),
+            "completed_at": datetime.now(timezone.utc),
+            "c4_architecture": {
+                "c4_model_version": "1.0",
+                "system_context": {
+                    "name": "Runtime Extraction",
+                    "purpose": "Loaded from a completed scan task",
+                    "external_dependencies": [],
+                },
+                "containers": [],
+                "components": [],
+                "relationships": {},
+                "metadata": {},
+            },
+        }
+
+        response = client.get("/api/v1/code/architecture")
+
+        route_module.scan_tasks.clear()
+
+        assert response.status_code == 200
+        assert response.json()["system_context"]["name"] == "Runtime Extraction"
+
+
 class TestNodeDescription:
     """Test POST /api/v1/code/describe/node."""
 
@@ -199,3 +253,128 @@ class TestNodeDescription:
         assert response.status_code == 200
         data = response.json()
         assert "description" in data
+
+
+class TestArchitectureChat:
+    """Test POST /api/v1/code/chat/context."""
+
+    def test_chat_context_returns_heuristic_fallback(self, client):
+        """Should answer from viewer context when no LLM is available."""
+        with patch(
+            "app.endpoint.v1.routes.code_extraction.get_llm_manager",
+            return_value=None,
+        ):
+            response = client.post(
+                "/api/v1/code/chat/context",
+                json={
+                    "preferHeuristic": True,
+                    "message": "Can you compare alternatives here?",
+                    "selection": {
+                        "kind": "node",
+                        "node": {
+                            "name": "SignalForge",
+                            "type": "external_system",
+                            "description": "SignalForge helps with merchant risk scoring.",
+                            "attributes": {
+                                "provider_alternatives": [
+                                    {
+                                        "provider": "Sift",
+                                        "price_tier": "High",
+                                        "performance_tier": "Enterprise",
+                                        "profile": "Network effects for fraud detection.",
+                                    }
+                                ]
+                            },
+                        },
+                    },
+                    "architecture": {
+                        "selectedLevel": "context",
+                        "system": {"name": "OmniPay Platform"},
+                    },
+                },
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["source"] == "heuristic"
+        assert "Known alternatives for SignalForge" in data["message"]
+        assert "Sift" in data["message"]
+
+    def test_chat_context_uses_llm_when_available(self, client):
+        """Should return the LLM response when a model is configured."""
+        mock_llm = Mock()
+        mock_llm.generate_text.return_value = "GlobalBank should stay at context level."
+
+        with patch(
+            "app.endpoint.v1.routes.code_extraction.get_llm_manager",
+            return_value=mock_llm,
+        ):
+            response = client.post(
+                "/api/v1/code/chat/context",
+                json={
+                    "message": "Should GlobalBank stay at context level?",
+                    "history": [
+                        {"role": "user", "content": "What does GlobalBank do?"}
+                    ],
+                    "selection": {
+                        "kind": "node",
+                        "node": {
+                            "name": "GlobalBank",
+                            "type": "external_system",
+                            "description": "GlobalBank handles settlement for OmniPay.",
+                        },
+                    },
+                    "architecture": {
+                        "selectedLevel": "context",
+                        "system": {"name": "OmniPay Platform"},
+                    },
+                },
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["source"] == "llm"
+        assert data["message"] == "GlobalBank should stay at context level."
+        mock_llm.generate_text.assert_called_once()
+        assert mock_llm.generate_text.call_args.kwargs["max_tokens"] == 1024
+
+    def test_chat_context_can_stream_ndjson(self, client):
+        """Should stream incremental chat deltas when requested."""
+        mock_llm = Mock()
+        mock_llm.stream_text.return_value = iter(
+            ["GlobalBank ", "should ", "stay at context level."]
+        )
+
+        with patch(
+            "app.endpoint.v1.routes.code_extraction.get_llm_manager",
+            return_value=mock_llm,
+        ):
+            response = client.post(
+                "/api/v1/code/chat/context",
+                json={
+                    "stream": True,
+                    "message": "Should GlobalBank stay at context level?",
+                    "selection": {
+                        "kind": "node",
+                        "node": {
+                            "name": "GlobalBank",
+                            "type": "external_system",
+                        },
+                    },
+                    "architecture": {
+                        "selectedLevel": "context",
+                        "system": {"name": "OmniPay Platform"},
+                    },
+                },
+            )
+
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("application/x-ndjson")
+        lines = [json.loads(line) for line in response.text.strip().splitlines()]
+        assert lines[:-1] == [
+            {"type": "delta", "delta": "GlobalBank ", "source": "llm"},
+            {"type": "delta", "delta": "should ", "source": "llm"},
+            {"type": "delta", "delta": "stay at context level.", "source": "llm"},
+        ]
+        assert lines[-1] == {"type": "done", "source": "llm"}
+        assert mock_llm.stream_text.call_args.kwargs["max_tokens"] == 1024

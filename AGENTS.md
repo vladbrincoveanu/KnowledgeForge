@@ -31,6 +31,16 @@ When creating new API endpoints:
 4. Add/update endpoint in the .http file, including documenting endpoint and payloads
 5. Test the .http file using: `docker run --rm -i -t -v $PWD:/workdir jetbrains/intellij-http-client <http_file_name>`
 
+### Discovering Package Docs
+
+When working with an unfamiliar package or third-party API, first use `chub` to discover relevant docs and packages before writing code:
+
+```sh
+chub search "stripe payments"        # find relevant docs
+chub get stripe/api --lang js        # fetch the doc
+# Agent reads the doc, writes correct code. Done.
+```
+
 ## Coding Style & Naming Conventions
 - Python: Black (88 cols), Ruff, MyPy, strict type hints, and Pydantic models for API/domain schemas.
 - TypeScript/React: ESLint + Prettier (`singleQuote: true`, `tabWidth: 2`, `printWidth: 80`).

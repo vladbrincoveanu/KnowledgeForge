@@ -36,11 +36,15 @@ def get_llm_manager() -> Optional[LLMManager]:
             if hasattr(config, "lmstudio")
             else 3
         )
-        return LLMManager(
+        manager = LLMManager(
             lmstudio_url=base_url,
             default_model=model,
             max_retries=max_retries,
         )
+        if not getattr(manager, "is_available", True):
+            logger.warning("LLM manager initialized but provider is unreachable")
+            return None
+        return manager
     except (ConnectionError, RuntimeError) as e:
         logger.warning("LLM manager not available: %s", e)
         return None

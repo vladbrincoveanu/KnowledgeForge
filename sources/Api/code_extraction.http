@@ -1,0 +1,43 @@
+### Architecture chat with the current viewer context
+POST http://host.docker.internal:8000/api/v1/code/chat/context
+Content-Type: application/json
+
+{
+  "preferHeuristic": true,
+  "stream": true,
+  "message": "Should GlobalBank stay at context level?",
+  "history": [
+    {
+      "role": "user",
+      "content": "What does GlobalBank do in OmniPay?"
+    }
+  ],
+  "selection": {
+    "kind": "node",
+    "node": {
+      "id": "context_external_2",
+      "name": "GlobalBank",
+      "type": "external_system",
+      "description": "GlobalBank is the settlement partner used for fallback captures and settlement flows.",
+      "attributes": {
+        "dependency_type": "BUSINESS_SYSTEM",
+        "integration_surface": "Settlement API"
+      }
+    }
+  },
+  "architecture": {
+    "selectedLevel": "context",
+    "system": {
+      "name": "OmniPay Platform",
+      "purpose": "Payments platform demo"
+    },
+    "counts": {
+      "nodes": 12,
+      "edges": 10,
+      "containers": 6,
+      "components": 0,
+      "context_relationships": 8,
+      "container_relationships": 5
+    }
+  }
+}

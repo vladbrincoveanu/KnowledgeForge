@@ -62,6 +62,7 @@ class ContextManager:
 
         # External dependencies
         external_deps = self.dependency_detector.detect_external_dependencies()
+        external_dep_reviews = self.dependency_detector.get_last_review_items()
         deployment_deps = self.dependency_detector.detect_deployment_dependencies()
         dependency_freshness_alerts = self.dependency_detector.detect_dependency_freshness_alerts()
 
@@ -78,7 +79,7 @@ class ContextManager:
         context_sources = self.system_detector.collect_context_sources(frameworks)
 
         # IT Landscape metadata
-        owner_team = self.metadata_detector.detect_owner_team()
+        owner_team, owner_provenance = self.metadata_detector.detect_owner_team()
         business_domain = self.metadata_detector.infer_business_domain()
         criticality = self.metadata_detector.determine_criticality()
         data_class = self.metadata_detector.infer_data_classification()
@@ -130,6 +131,7 @@ class ContextManager:
             "purpose": system_purpose,
             "description": llm_description or system_purpose,
             "external_dependencies": external_deps,
+            "external_dependency_review_items": external_dep_reviews,
             "deployment_dependencies": deployment_deps,
             "dependency_freshness_alerts": dependency_freshness_alerts,
             "actors": actors,
@@ -143,6 +145,7 @@ class ContextManager:
             # Primary Service Fields
             "domain": business_domain,
             "owner": owner_team,
+            "owner_provenance": owner_provenance,
             "owner_contributors": contributor_stats.get("owner_contributors", []),
             "owner_contributor_stats": contributor_stats.get("owner_contributor_stats", []),
             "contributor_count": git_activity.get("contributor_count", 0),
@@ -194,24 +197,71 @@ class ContextManager:
             relationships.append({
                 "source": actor.get('name', 'User'),
                 "destination": system_name,
-                "description": "uses",
+                "description": self._relationship_description_from_actor(actor),
                 "relationship_type": "uses",
             })
 
         # System -> External dependency relationships
         for dep in system_context.get('external_dependencies', []):
+            if dep.get("review_status") == "needs_review":
+                continue
+            if dep.get("dependency_type") == "TECHNICAL_INFRA":
+                continue
             dep_name = self._normalize_logical_name(
-                dep.get('name') or dep.get('service') or 'External Service'
+                dep.get('context_name')
+                or dep.get('name')
+                or dep.get('service')
+                or 'External Service'
             )
-            dep_type = dep.get('type') or dep.get('category') or 'external'
             relationships.append({
                 "source": system_name,
                 "destination": dep_name,
-                "description": f"uses {dep_type}",
+                "description": self._relationship_description_from_dependency(
+                    dep, dep_name,
+                ),
                 "relationship_type": "uses",
             })
 
         return relationships
+
+    def _relationship_description_from_actor(self, actor: dict[str, Any]) -> str:
+        """Return a business-focused sentence for an actor relationship."""
+        description = self._clean_relationship_sentence(
+            actor.get("description") or actor.get("role") or ""
+        )
+        return description or "Uses the system"
+
+    def _relationship_description_from_dependency(
+        self, dep: dict[str, Any], dep_name: str,
+    ) -> str:
+        """Return a business-focused sentence for an external dependency."""
+        description = self._clean_relationship_sentence(dep.get("description"))
+        if description:
+            return description
+
+        category = str(dep.get("category") or dep.get("type") or "").strip().lower()
+        category_descriptions = {
+            "ai": f"Uses {dep_name} for AI-powered capabilities",
+            "analytics": f"Uses {dep_name} for analytics and insights",
+            "authentication": f"Uses {dep_name} for authentication and identity",
+            "communication": f"Uses {dep_name} for communication workflows",
+            "crm": f"Uses {dep_name} for customer data workflows",
+            "developer-platform": f"Uses {dep_name} for developer platform workflows",
+            "edge": f"Uses {dep_name} for edge delivery",
+            "email": f"Uses {dep_name} for email delivery",
+            "incident-management": f"Uses {dep_name} for incident management",
+            "maps": f"Uses {dep_name} for mapping and geolocation",
+            "payment": f"Uses {dep_name} for payment processing",
+            "project-management": f"Uses {dep_name} for project coordination",
+            "search": f"Uses {dep_name} for search and discovery",
+            "support": f"Uses {dep_name} for customer support workflows",
+        }
+        return category_descriptions.get(category, f"Integrates with {dep_name}")
+
+    def _clean_relationship_sentence(self, value: Any) -> str:
+        """Normalize relationship copy for edge labels."""
+        text = re.sub(r"\s+", " ", str(value or "")).strip()
+        return text.rstrip(".")
 
     def _normalize_logical_name(self, value: str) -> str:
         """Normalize raw endpoint/container-style names to a logical label."""
@@ -225,6 +275,8 @@ class ContextManager:
         label = re.sub(r":\d{2,5}$", "", label)
         label = label.split(".", 1)[0]
         label = label.replace("_", " ").replace("-", " ").strip()
+        label = re.sub(r"\s+\(([^)]+)\)$", "", label).strip()
+        label = re.sub(r"\s+(api|sdk|client|endpoint|webhook)$", "", label, flags=re.IGNORECASE)
         if not label:
             return "External Service"
 

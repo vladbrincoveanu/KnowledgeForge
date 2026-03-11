@@ -120,6 +120,21 @@ interface UploadResponse {
 export interface ArchitectureChatMessage {
   role: "user" | "assistant";
   content: string;
+  streaming?: boolean;
+}
+
+interface ArchitectureChatPayload {
+  message: string;
+  history?: ArchitectureChatMessage[];
+  selection?: Record<string, unknown>;
+  architecture?: Record<string, unknown>;
+}
+
+interface ArchitectureChatStreamChunk {
+  type: "delta" | "done" | "error";
+  delta?: string;
+  source?: string;
+  message?: string;
 }
 
 interface FeedbackData {
@@ -782,12 +797,9 @@ export const codeArchitectureAPI = {
   },
 
   // Chat with the local model using the current architecture context
-  chatWithContext: async (payload: {
-    message: string;
-    history?: ArchitectureChatMessage[];
-    selection?: Record<string, unknown>;
-    architecture?: Record<string, unknown>;
-  }): Promise<{ message: string; source: string }> => {
+  chatWithContext: async (
+    payload: ArchitectureChatPayload,
+  ): Promise<{ message: string; source: string }> => {
     try {
       const response: AxiosResponse = await api.post(
         "/api/v1/code/chat/context",
@@ -796,6 +808,113 @@ export const codeArchitectureAPI = {
       return response.data;
     } catch (error) {
       throw error;
+    }
+  },
+
+  streamChatWithContext: async (
+    payload: ArchitectureChatPayload,
+    handlers: {
+      onDelta: (delta: string) => void;
+      onComplete?: (source: string) => void;
+      signal?: AbortSignal;
+    },
+  ): Promise<void> => {
+    const controller = new AbortController();
+    const signal = handlers.signal ?? controller.signal;
+
+    // Listen for abort signal from caller
+    if (handlers.signal) {
+      handlers.signal.addEventListener("abort", () => {
+        controller.abort();
+      });
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/code/chat/context`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${API_KEY}`,
+        },
+        body: JSON.stringify({
+          ...payload,
+          stream: true,
+        }),
+        signal,
+      },
+    );
+
+    if (!response.ok || !response.body) {
+      throw new Error(`Architecture chat failed with status ${response.status}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let source = "heuristic";
+    let completed = false;
+
+    try {
+      while (true) {
+        if (signal.aborted) {
+          reader.cancel();
+          break;
+        }
+
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        let newlineIndex = buffer.indexOf("\n");
+
+        while (newlineIndex >= 0) {
+          const line = buffer.slice(0, newlineIndex).trim();
+          buffer = buffer.slice(newlineIndex + 1);
+
+          if (line) {
+            const chunk = JSON.parse(line) as ArchitectureChatStreamChunk;
+            if (chunk.source) {
+              source = chunk.source;
+            }
+            if (chunk.type === "delta" && chunk.delta) {
+              handlers.onDelta(chunk.delta);
+            } else if (chunk.type === "done") {
+              completed = true;
+              handlers.onComplete?.(source);
+            } else if (chunk.type === "error") {
+              throw new Error(chunk.message || "Architecture chat stream failed");
+            }
+          }
+
+          newlineIndex = buffer.indexOf("\n");
+        }
+      }
+
+      if (buffer.trim()) {
+        const chunk = JSON.parse(buffer.trim()) as ArchitectureChatStreamChunk;
+        if (chunk.source) {
+          source = chunk.source;
+        }
+        if (chunk.type === "delta" && chunk.delta) {
+          handlers.onDelta(chunk.delta);
+        } else if (chunk.type === "done") {
+          completed = true;
+          handlers.onComplete?.(source);
+        }
+      }
+
+      if (!completed) {
+        handlers.onComplete?.(source);
+      }
+    } catch (err) {
+      if ((err as Error).name === "AbortError") {
+        // Clean cancellation - don't propagate
+        return;
+      }
+      throw err;
     }
   },
 };

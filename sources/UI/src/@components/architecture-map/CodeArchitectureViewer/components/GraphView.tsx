@@ -57,7 +57,7 @@ export default function GraphView({
           edgesFocusable
           fitView
           fitViewOptions={{
-            padding: 0.15,
+            padding: 0.18,
             minZoom: 0.5,
             maxZoom: 1.5,
           }}
@@ -67,9 +67,9 @@ export default function GraphView({
         >
           <Background
             variant={BackgroundVariant.Dots}
-            gap={20}
-            size={1}
-            color="#e0e0e0"
+            gap={24}
+            size={1.15}
+            color="#d7dfeb"
           />
           <Controls />
         </ReactFlow>

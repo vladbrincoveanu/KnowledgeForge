@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import type { ArchitectureChatMessage } from "../../../../services/api";
 import FormattedDetailValue from "./FormattedDetailValue";
 
@@ -21,6 +21,28 @@ const complianceFactorLabels: Record<string, string> = {
   single_point_of_failure: "Single maintainer for a Tier 1 service",
 };
 
+const decisionModeLabels: Record<string, string> = {
+  deterministic: "Deterministic",
+  llm_adjudicated: "LLM Adjudicated",
+  human_reviewed: "Human Reviewed",
+};
+
+const reviewStatusLabels: Record<string, string> = {
+  auto_accepted: "Auto Accepted",
+  needs_review: "Needs Human Review",
+  approved: "Approved",
+  rejected: "Rejected",
+};
+
+const nodeTypeLabels: Record<string, string> = {
+  system: "System",
+  container: "Container",
+  component: "Component",
+  person: "Actor",
+  external_system: "External System",
+  external_service: "External Dependency",
+};
+
 function formatComplianceStatus(status?: string) {
   if (!status) return "";
   return complianceStatusLabels[status] || status.replace(/_/g, " ");
@@ -38,6 +60,30 @@ function formatComplianceFactors(factors?: string[]): string[] {
   return (factors || [])
     .map(formatComplianceFactor)
     .filter((v): v is string => Boolean(v));
+}
+
+function formatDecisionMode(mode?: string) {
+  if (!mode) return "";
+  return decisionModeLabels[mode] || mode.replace(/_/g, " ");
+}
+
+function formatReviewStatus(status?: string) {
+  if (!status) return "";
+  return reviewStatusLabels[status] || status.replace(/_/g, " ");
+}
+
+function humanizeIdentifier(value?: string) {
+  if (!value) return "";
+  return value
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+function formatNodeTypeLabel(type?: string) {
+  if (!type) return "";
+  return nodeTypeLabels[type] || humanizeIdentifier(type);
 }
 
 function formatDocQuality(dq: any): {
@@ -67,14 +113,18 @@ interface RowProps {
 function DetailRow({ label, tooltip, children, className = "" }: RowProps) {
   return (
     <div className={`detail-row ${className}`}>
-      <span className="detail-label">
-        {label}
+      <div className="detail-heading">
+        <span className="detail-label">{label}</span>
         {tooltip && (
-          <span className="tooltip-hint">
-            ⓘ<span className="tooltip-content">{tooltip}</span>
+          <span
+            className="tooltip-hint"
+            tabIndex={0}
+            aria-label={`Help for ${label}`}
+          >
+            i<span className="tooltip-content">{tooltip}</span>
           </span>
         )}
-      </span>
+      </div>
       {children}
     </div>
   );
@@ -90,6 +140,12 @@ interface NodeDetailsPanelProps {
   chatMessages: ArchitectureChatMessage[];
   isChatLoading: boolean;
   onSendChat: (message: string) => Promise<void>;
+  onApplyReviewDecision?: (decision: {
+    nodeId: string;
+    value: string;
+    label: string;
+    description?: string;
+  }) => void;
 }
 
 export default function NodeDetailsPanel({
@@ -100,13 +156,45 @@ export default function NodeDetailsPanel({
   chatMessages,
   isChatLoading,
   onSendChat,
+  onApplyReviewDecision,
 }: NodeDetailsPanelProps) {
   const [chatInput, setChatInput] = useState("");
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const lastChatMessage = chatMessages[chatMessages.length - 1];
+  const chatStatusLabel = isChatLoading ? "Preparing a response..." : null;
+  const chatStatus = chatStatusLabel ? (
+    <div className="chat-status" role="status" aria-live="polite">
+      <span className="chat-status-indicator" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </span>
+      <span>{chatStatusLabel}</span>
+    </div>
+  ) : null;
+
+  useEffect(() => {
+    if (typeof chatEndRef.current?.scrollIntoView === "function") {
+      chatEndRef.current.scrollIntoView({ block: "end" });
+    }
+  }, [
+    chatMessages.length,
+    isChatLoading,
+    lastChatMessage?.content,
+    lastChatMessage?.streaming,
+  ]);
 
   const handleSendChat = async () => {
-    if (!chatInput.trim()) return;
-    await onSendChat(chatInput);
+    const nextMessage = chatInput.trim();
+    if (!nextMessage) return;
     setChatInput("");
+    await onSendChat(nextMessage);
+  };
+
+  const handlePromptSuggestionClick = async (prompt: string) => {
+    if (isChatLoading) return;
+    setChatInput("");
+    await onSendChat(prompt);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -119,22 +207,103 @@ export default function NodeDetailsPanel({
   const nodeType = selectedNode?.type;
   const attrs = selectedNode?.attributes || {};
   const systemAttributes = nodeType === "system" ? attrs : null;
+  const containerMeta = selectedNode?.containerMeta || {};
+  const ownerValue =
+    systemAttributes?.owner_team ||
+    systemAttributes?.owner ||
+    containerMeta.owner_team ||
+    containerMeta.owner ||
+    attrs.owner;
+  const statusValue =
+    systemAttributes?.status || containerMeta.status || attrs.status;
+  const tierValue =
+    systemAttributes?.criticality ||
+    systemAttributes?.tier ||
+    containerMeta.tier ||
+    attrs.tier;
+  const dataClassValue =
+    systemAttributes?.data_class ||
+    containerMeta.data_class ||
+    attrs.data_class;
+  const activeExpertsValue =
+    systemAttributes?.active_experts ??
+    containerMeta.active_experts ??
+    attrs.active_experts;
 
-  const complianceStatus = systemAttributes?.compliance ?? attrs.compliance;
+  const complianceStatus =
+    systemAttributes?.compliance ??
+    containerMeta.compliance ??
+    attrs.compliance;
   const complianceStatusLabel = formatComplianceStatus(complianceStatus);
   const complianceConfidence =
-    systemAttributes?.compliance_confidence ?? attrs.compliance_confidence;
+    systemAttributes?.compliance_confidence ??
+    containerMeta.compliance_confidence ??
+    attrs.compliance_confidence;
   const complianceConfidencePercent =
     complianceConfidence != null
       ? Math.round(100 * complianceConfidence)
       : undefined;
   const complianceFactors = formatComplianceFactors(
-    systemAttributes?.compliance_factors ?? attrs.compliance_factors,
+    systemAttributes?.compliance_factors ??
+      containerMeta.compliance_factors ??
+      attrs.compliance_factors,
   );
 
   const docQuality = formatDocQuality(systemAttributes?.documentation_quality);
   const deploymentTargets: string[] =
     systemAttributes?.deployment_targets || [];
+  const reviewStatusLabel = formatReviewStatus(attrs.review_status);
+  const decisionModeLabel = formatDecisionMode(attrs.decision_mode);
+  const reviewThresholdPercent =
+    attrs.review_threshold != null
+      ? Math.round(Number(attrs.review_threshold) * 100)
+      : undefined;
+  const evidenceItems: string[] = Array.isArray(attrs.evidence)
+    ? attrs.evidence
+        .map((item: any) =>
+          [item?.source, item?.snippet].filter(Boolean).join(" — "),
+        )
+        .filter((item: string) => Boolean(item))
+    : [];
+  const promptSuggestions: string[] = Array.isArray(attrs.suggested_prompts)
+    ? attrs.suggested_prompts.filter(
+        (item: unknown): item is string => typeof item === "string",
+      )
+    : [];
+  const providerAlternatives: any[] = Array.isArray(attrs.provider_alternatives)
+    ? attrs.provider_alternatives
+    : [];
+  const reviewOptions: any[] = Array.isArray(attrs.review_options)
+    ? attrs.review_options
+    : [];
+  const selectedNodeLabel =
+    selectedNode?.name ||
+    selectedNode?.label ||
+    selectedNode?.id ||
+    "this dependency";
+  const isExternalDependencyNode =
+    String(nodeType || "").startsWith("external") || Boolean(attrs.is_external);
+  const nodeTypeLabel = isExternalDependencyNode
+    ? "External Dependency"
+    : formatNodeTypeLabel(nodeType);
+  const needsHumanReview =
+    Boolean(attrs.requires_human_review) ||
+    reviewStatusLabel === "Needs Human Review";
+  const normalizedSelectedName = String(selectedNode?.name || "")
+    .trim()
+    .toLowerCase();
+  const normalizedContextName = String(attrs.context_name || "")
+    .trim()
+    .toLowerCase();
+  const normalizedRawName = String(attrs.raw_name || "")
+    .trim()
+    .toLowerCase();
+  const showRawIntegrationLabel =
+    Boolean(attrs.raw_name) &&
+    normalizedRawName !== normalizedSelectedName &&
+    normalizedRawName !== normalizedContextName;
+  const showDetectedFrom =
+    Boolean(attrs.detected_from) && attrs.detected_from !== selectedNode?.file;
 
   // Person/actor node — dedicated panel
   if (nodeType === "person") {
@@ -176,7 +345,7 @@ export default function NodeDetailsPanel({
           {chatMessages.map((message, index) => (
             <div
               key={`${message.role}-${index}`}
-              className={`chat-message ${message.role}`}
+              className={`chat-message ${message.role}${message.streaming ? " streaming" : ""}`}
             >
               <div className="message-content">
                 <FormattedDetailValue
@@ -186,11 +355,6 @@ export default function NodeDetailsPanel({
               </div>
             </div>
           ))}
-          {isChatLoading && (
-            <div className="chat-message assistant">
-              <div className="message-content">Thinking...</div>
-            </div>
-          )}
           <div className="chat-properties">
             <DetailRow
               label="Type"
@@ -203,11 +367,28 @@ export default function NodeDetailsPanel({
                 <span className="detail-value">{attrs.role}</span>
               </DetailRow>
             )}
+            {attrs.detected_from && (
+              <DetailRow label="Detected From">
+                <span className="detail-value">{attrs.detected_from}</span>
+              </DetailRow>
+            )}
+            {attrs.detection_method && (
+              <DetailRow label="Detection Method">
+                <span className="detail-value">{attrs.detection_method}</span>
+              </DetailRow>
+            )}
+            {attrs.evidence && (
+              <DetailRow label="Evidence">
+                <FormattedDetailValue value={attrs.evidence} preserveWhitespace />
+              </DetailRow>
+            )}
           </div>
+          <div ref={chatEndRef} aria-hidden="true" />
         </div>
 
         {/* Chat Input */}
         <div className="chat-input-container">
+          {chatStatus}
           <div className="chat-input-wrapper">
             <textarea
               placeholder="Ask about this node..."
@@ -218,6 +399,7 @@ export default function NodeDetailsPanel({
             />
             <button
               className="send-btn"
+              aria-label="Send chat message"
               onClick={handleSendChat}
               disabled={!chatInput.trim() || isChatLoading}
             >
@@ -264,7 +446,7 @@ export default function NodeDetailsPanel({
           {chatMessages.map((message, index) => (
             <div
               key={`${message.role}-${index}`}
-              className={`chat-message ${message.role}`}
+              className={`chat-message ${message.role}${message.streaming ? " streaming" : ""}`}
             >
               <div className="message-content">
                 <FormattedDetailValue
@@ -274,15 +456,12 @@ export default function NodeDetailsPanel({
               </div>
             </div>
           ))}
-          {isChatLoading && (
-            <div className="chat-message assistant">
-              <div className="message-content">Thinking...</div>
-            </div>
-          )}
+          <div ref={chatEndRef} aria-hidden="true" />
         </div>
 
         {/* Chat Input */}
         <div className="chat-input-container">
+          {chatStatus}
           <div className="chat-input-wrapper">
             <textarea
               placeholder="Ask me anything..."
@@ -293,6 +472,7 @@ export default function NodeDetailsPanel({
             />
             <button
               className="send-btn"
+              aria-label="Send chat message"
               onClick={handleSendChat}
               disabled={!chatInput.trim() || isChatLoading}
             >
@@ -323,7 +503,9 @@ export default function NodeDetailsPanel({
               ? "📦"
               : nodeType === "component"
                 ? "⚙️"
-                : "📄"}
+                : isExternalDependencyNode
+                  ? "🌐"
+                  : "📄"}
         </div>
         <div className="chat-title">
           <h3>
@@ -332,7 +514,7 @@ export default function NodeDetailsPanel({
               selectedNode?.id ||
               "Node Details"}
           </h3>
-          <span className="chat-subtitle">{nodeType}</span>
+          <span className="chat-subtitle">{nodeTypeLabel || "Node Details"}</span>
         </div>
         <button className="close-btn" onClick={onClose}>
           ×
@@ -373,18 +555,13 @@ export default function NodeDetailsPanel({
         {(systemAttributes ||
           attrs.owner != null ||
           attrs.owner_contributors != null ||
-          selectedNode?.containerMeta?.owner) && (
+          containerMeta.owner ||
+          containerMeta.owner_team) && (
           <DetailRow
             label="Owner Team"
             tooltip="The team or individual responsible for this system. If unassigned, add a CODEOWNERS file or specify the team in the README."
           >
-            <span className="detail-value">
-              {systemAttributes?.owner_team ||
-                systemAttributes?.owner ||
-                selectedNode?.containerMeta?.owner ||
-                attrs.owner ||
-                "Unassigned"}
-            </span>
+            <span className="detail-value">{ownerValue || "Unassigned"}</span>
             {(
               (systemAttributes?.owner_contributors ||
                 attrs.owner_contributors) ??
@@ -456,57 +633,49 @@ export default function NodeDetailsPanel({
         )}
 
         {/* Status field */}
-        {nodeType === "system" && (
+        {(nodeType === "system" || statusValue != null) && (
           <DetailRow
             label="Lifecycle Status"
             tooltip="Lifecycle stage: Active-Dev = new features being developed. Maintenance-Only = bugfixes only, no new features. Deprecated = scheduled for shutdown."
           >
             <span
-              className={`detail-value${systemAttributes?.status || attrs.status ? " status-badge" : ""}`}
+              className={`detail-value${statusValue ? " status-badge" : ""}`}
             >
-              {systemAttributes?.status || attrs.status || "Unknown"}
+              {statusValue || "Unknown"}
             </span>
           </DetailRow>
         )}
 
         {/* Tier field */}
-        {nodeType === "system" && (
+        {(nodeType === "system" || tierValue != null) && (
           <DetailRow
             label="Criticality Tier"
             tooltip="Tier 1 = Production Critical (site-wide outage if down). Tier 2 = Standard (specific journey broken). Tier 3 = Internal/Development (minor impact)."
           >
-            <span className="detail-value">
-              {systemAttributes?.criticality ||
-                systemAttributes?.tier ||
-                attrs.tier ||
-                "Unknown"}
-            </span>
+            <span className="detail-value">{tierValue || "Unknown"}</span>
           </DetailRow>
         )}
 
         {/* Data class field */}
-        {nodeType === "system" && (
+        {(nodeType === "system" || dataClassValue != null) && (
           <DetailRow
             label="Data Sensitivity"
             tooltip="PII = names, emails, addresses. Credit-Card = Payment data. Legal/Security = Compliance, audit, encryption. General = Non-sensitive data."
           >
             <span className="detail-value">
-              {systemAttributes?.data_class ||
-                attrs.data_class ||
-                "Not classified"}
+              {dataClassValue || "Not classified"}
             </span>
           </DetailRow>
         )}
 
         {/* Active experts */}
-        {nodeType === "system" && (
+        {(nodeType === "system" || activeExpertsValue != null) && (
           <DetailRow
             label="Active Experts (Bus Factor)"
             tooltip="Bus factor: contributors with 3+ commits in last 90 days. 0 = high risk (no active maintainers). 1 = single point of failure. Higher is better."
           >
             {(() => {
-              const rawValue =
-                systemAttributes?.active_experts ?? attrs.active_experts;
+              const rawValue = activeExpertsValue;
               const isZero = rawValue === 0;
               const label =
                 rawValue == null
@@ -557,7 +726,7 @@ export default function NodeDetailsPanel({
         )}
 
         {/* Compliance status */}
-        {nodeType === "system" && (
+        {(nodeType === "system" || complianceStatus) && (
           <DetailRow
             label="Architectural Compliance"
             tooltip="Calculated from: tier-data alignment, ownership, bus factor, and lifecycle. COMPLIANT = proper governance. AT_RISK = ownership/maintenance gaps. NON_COMPLIANT = sensitive data mishandled or abandoned."
@@ -573,7 +742,7 @@ export default function NodeDetailsPanel({
         )}
 
         {/* Compliance confidence */}
-        {nodeType === "system" &&
+        {(nodeType === "system" || complianceStatus) &&
           complianceConfidencePercent !== undefined &&
           complianceStatus !== "UNKNOWN" && (
             <DetailRow
@@ -629,13 +798,15 @@ export default function NodeDetailsPanel({
         )}
 
         {/* Node type metadata */}
-        {selectedNode?.type && (
+        {selectedNode?.type && !isExternalDependencyNode && (
           <DetailRow
             label="Type"
             tooltip="Node type: system (entire service), container (API/UI/DB), component (class/module), or external_system (third-party service)."
             className="metadata-row"
           >
-            <span className="detail-value">{selectedNode.type}</span>
+            <span className="detail-value">
+              {formatNodeTypeLabel(selectedNode.type)}
+            </span>
           </DetailRow>
         )}
 
@@ -819,6 +990,35 @@ export default function NodeDetailsPanel({
           </DetailRow>
         )}
 
+        {showRawIntegrationLabel && (
+          <DetailRow
+            label="Integration Surface"
+            tooltip="Technical integration label detected in code or config. Context level should prefer the business-facing company/system name."
+          >
+            <span className="detail-value">{attrs.raw_name}</span>
+          </DetailRow>
+        )}
+
+        {attrs.integration_surface && (
+          <DetailRow
+            label="Technical Surface"
+            tooltip="Protocol, SDK, or interface detail stripped from the context-level business name."
+          >
+            <span className="detail-value">{attrs.integration_surface}</span>
+          </DetailRow>
+        )}
+
+        {(attrs.company || attrs.provider) && (
+          <DetailRow
+            label="Company"
+            tooltip="Resolved provider or company behind this external dependency."
+          >
+            <span className="detail-value">
+              {attrs.company || attrs.provider}
+            </span>
+          </DetailRow>
+        )}
+
         {/* Access endpoint */}
         {(selectedNode?.containerMeta?.endpoint ||
           attrs.endpoint ||
@@ -838,13 +1038,31 @@ export default function NodeDetailsPanel({
         )}
 
         {/* Detected from */}
-        {attrs.detected_from && (
+        {showDetectedFrom && (
           <DetailRow
             label="Detected From"
             tooltip="Configuration file where this dependency was found: package.json, requirements.txt, docker-compose.yml, Helm charts, etc."
             className="metadata-row"
           >
             <span className="detail-value">{attrs.detected_from}</span>
+          </DetailRow>
+        )}
+
+        {decisionModeLabel && (
+          <DetailRow
+            label="Decision Mode"
+            tooltip="How this dependency classification was produced: rule-based, LLM-adjudicated, or human-reviewed."
+          >
+            <span className="detail-value">{decisionModeLabel}</span>
+          </DetailRow>
+        )}
+
+        {reviewStatusLabel && (
+          <DetailRow
+            label="Review Status"
+            tooltip="Whether this dependency was auto-accepted or still requires a human decision."
+          >
+            <span className="detail-value">{reviewStatusLabel}</span>
           </DetailRow>
         )}
 
@@ -880,9 +1098,18 @@ export default function NodeDetailsPanel({
             </DetailRow>
           )}
 
+        {attrs.requires_human_review && reviewThresholdPercent !== undefined && (
+          <DetailRow
+            label="Human Review Threshold"
+            tooltip="Threshold below which the classifier requires manual confirmation before the dependency is trusted."
+          >
+            <span className="detail-value">{reviewThresholdPercent}%</span>
+          </DetailRow>
+        )}
+
         {/* Classification reasoning */}
         {attrs.classification_reasoning &&
-          attrs.dependency_type !== "UNKNOWN" && (
+          (attrs.dependency_type !== "UNKNOWN" || attrs.requires_human_review) && (
             <DetailRow
               label="Classification Reasoning"
               tooltip="Explanation of why this dependency was classified as business or technical."
@@ -893,10 +1120,140 @@ export default function NodeDetailsPanel({
               />
             </DetailRow>
           )}
+
+        {attrs.human_review_summary && (
+          <DetailRow
+            label="Human Review Outcome"
+            tooltip="Latest manual decision captured from the reviewer in this session."
+          >
+            <FormattedDetailValue
+              value={attrs.human_review_summary}
+              preserveWhitespace
+            />
+          </DetailRow>
+        )}
+
+        {evidenceItems.length > 0 && (
+          <DetailRow
+            label="Evidence"
+            tooltip="Supporting traces used to derive this external dependency."
+          >
+            <FormattedDetailValue value={evidenceItems} />
+          </DetailRow>
+        )}
+
+        {needsHumanReview && reviewOptions.length > 0 && (
+          <div className="chat-message assistant review-message">
+            <div className="message-content assistant-workbench">
+              <p className="assistant-callout-title">
+                I am not fully confident where {selectedNodeLabel} belongs in
+                the context diagram.
+              </p>
+              <p>
+                Tell me what you think by clicking one option below. I will mark
+                the dependency as human reviewed for this session.
+              </p>
+              <div className="review-option-grid">
+                {reviewOptions.map((option: any) => (
+                  <button
+                    key={`${selectedNode?.id}-${option.id || option.value}`}
+                    type="button"
+                    className="review-option-btn"
+                    onClick={() =>
+                      onApplyReviewDecision?.({
+                        nodeId: selectedNode?.id,
+                        value: option.value,
+                        label: option.label,
+                        description: option.description,
+                      })
+                    }
+                  >
+                    <span className="review-option-label">{option.label}</span>
+                    {option.description && (
+                      <span className="review-option-description">
+                        {option.description}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              {reviewThresholdPercent !== undefined && (
+                <div className="assistant-workbench-footnote">
+                  Review threshold: {reviewThresholdPercent}% confidence.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {(providerAlternatives.length > 0 || promptSuggestions.length > 0) && (
+          <div className="chat-message assistant">
+            <div className="message-content assistant-workbench">
+              <p className="assistant-callout-title">
+                {providerAlternatives.length > 0
+                  ? `Possible alternatives for ${selectedNodeLabel}`
+                  : `Ask the model for a recommendation about ${selectedNodeLabel}`}
+              </p>
+              {providerAlternatives.length > 0 && (
+                <p>
+                  These are business-facing provider choices you may want to
+                  compare before keeping the dependency in the architecture.
+                </p>
+              )}
+              {providerAlternatives.length > 0 && (
+                <div className="provider-alternative-list">
+                  {providerAlternatives.map((alternative: any) => (
+                    <div
+                      key={`${selectedNode?.id}-${alternative.provider}`}
+                      className="provider-alternative-card"
+                    >
+                      <div className="provider-alternative-header">
+                        <span className="provider-alternative-name">
+                          {alternative.provider}
+                        </span>
+                        {(alternative.price_tier ||
+                          alternative.performance_tier) && (
+                          <span className="provider-alternative-meta">
+                            {[
+                              alternative.price_tier,
+                              alternative.performance_tier,
+                            ]
+                              .filter(Boolean)
+                              .join(" / ")}
+                          </span>
+                        )}
+                      </div>
+                      {(alternative.profile || alternative.notes) && (
+                        <div className="provider-alternative-description">
+                          {alternative.profile || alternative.notes}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {promptSuggestions.length > 0 && (
+                <div className="prompt-chip-row">
+                  {promptSuggestions.map((prompt) => (
+                    <button
+                      key={`${selectedNode?.id}-${prompt}`}
+                      type="button"
+                      className="prompt-chip"
+                      onClick={() => void handlePromptSuggestionClick(prompt)}
+                      disabled={isChatLoading}
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {chatMessages.map((message, index) => (
           <div
             key={`${message.role}-${index}`}
-            className={`chat-message ${message.role}`}
+            className={`chat-message ${message.role}${message.streaming ? " streaming" : ""}`}
           >
             <div className="message-content">
               <FormattedDetailValue
@@ -906,15 +1263,12 @@ export default function NodeDetailsPanel({
             </div>
           </div>
         ))}
-        {isChatLoading && (
-          <div className="chat-message assistant">
-            <div className="message-content">Thinking...</div>
-          </div>
-        )}
+        <div ref={chatEndRef} aria-hidden="true" />
       </div>
 
       {/* Chat Input */}
       <div className="chat-input-container">
+        {chatStatus}
         <div className="chat-input-wrapper">
           <textarea
             placeholder="Ask about this node..."
@@ -925,6 +1279,7 @@ export default function NodeDetailsPanel({
           />
           <button
             className="send-btn"
+            aria-label="Send chat message"
             onClick={handleSendChat}
             disabled={!chatInput.trim() || isChatLoading}
           >

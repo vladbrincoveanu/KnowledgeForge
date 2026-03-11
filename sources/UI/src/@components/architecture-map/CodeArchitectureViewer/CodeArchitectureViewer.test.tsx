@@ -1,7 +1,7 @@
 /* @vitest-environment jsdom */
 
 import React from "react";
-import { render, screen, waitFor, cleanup } from "@testing-library/react";
+import { act, render, screen, waitFor, cleanup } from "@testing-library/react";
 import * as matchers from "@testing-library/jest-dom/matchers";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
@@ -48,11 +48,19 @@ vi.mock("./components/ArchitectureHeader", () => ({
 vi.mock("./components/MetricsBar", () => ({
   default: () => <div data-testid="metrics-bar">MetricsBar</div>,
 }));
+let capturedGraphViewProps: any = null;
 vi.mock("./components/GraphView", () => ({
-  default: () => <div data-testid="graph-view">GraphView</div>,
+  default: (props: any) => {
+    capturedGraphViewProps = props;
+    return <div data-testid="graph-view">GraphView</div>;
+  },
 }));
+let capturedNodeDetailsPanelProps: any = null;
 vi.mock("./components/NodeDetailsPanel", () => ({
-  default: () => <div data-testid="node-details-panel">NodeDetailsPanel</div>,
+  default: (props: any) => {
+    capturedNodeDetailsPanelProps = props;
+    return <div data-testid="node-details-panel">NodeDetailsPanel</div>;
+  },
 }));
 vi.mock("./components/EdgeDetailsPanel", () => ({
   default: () => <div data-testid="edge-details-panel">EdgeDetailsPanel</div>,
@@ -63,6 +71,7 @@ vi.mock("dagre", () => ({
 
 // Mock the API
 const mockGetArchitecture = vi.fn();
+const mockStreamChatWithContext = vi.fn();
 vi.mock("../../../services/api", () => ({
   codeArchitectureAPI: {
     getArchitecture: (...args: any[]) => mockGetArchitecture(...args),
@@ -72,6 +81,7 @@ vi.mock("../../../services/api", () => ({
     extractFromGitHubOrg: vi.fn(),
     describeEdge: vi.fn(),
     chatWithContext: vi.fn(),
+    streamChatWithContext: (...args: any[]) => mockStreamChatWithContext(...args),
     clearArchitecture: vi.fn(),
   },
 }));
@@ -88,6 +98,8 @@ const emptyArchitecture = {
 describe("CodeArchitectureViewer", () => {
   afterEach(() => {
     vi.clearAllMocks();
+    capturedGraphViewProps = null;
+    capturedNodeDetailsPanelProps = null;
     cleanup();
   });
 
@@ -148,6 +160,84 @@ describe("CodeArchitectureViewer", () => {
     render(<CodeArchitectureViewer />);
     await waitFor(() => expect(mockGetArchitecture).toHaveBeenCalled());
     expect(screen.getByTestId("graph-view")).toBeInTheDocument();
+  });
+
+  test("buffers streamed chat until the final assistant answer is ready", async () => {
+    mockGetArchitecture.mockResolvedValueOnce(emptyArchitecture);
+
+    let resolveStream: (() => void) | undefined;
+    let pendingHandlers:
+      | {
+          onDelta: (delta: string) => void;
+          onComplete?: (source: string) => void;
+        }
+      | undefined;
+
+    mockStreamChatWithContext.mockImplementation(
+      async (
+        _payload: unknown,
+        handlers: {
+          onDelta: (delta: string) => void;
+          onComplete?: (source: string) => void;
+        },
+      ) =>
+        new Promise<void>((resolve) => {
+          pendingHandlers = handlers;
+          resolveStream = resolve;
+        }),
+    );
+
+    render(<CodeArchitectureViewer />);
+    await waitFor(() => expect(mockGetArchitecture).toHaveBeenCalled());
+
+    await act(async () => {
+      capturedGraphViewProps.onNodeClick(
+        {} as React.MouseEvent,
+        {
+          data: {
+            id: "globalbank",
+            name: "GlobalBank",
+            type: "external_system",
+            attributes: {},
+          },
+        },
+      );
+    });
+
+    await waitFor(() =>
+      expect(capturedNodeDetailsPanelProps.selectedNode?.name).toBe("GlobalBank"),
+    );
+
+    await act(async () => {
+      void capturedNodeDetailsPanelProps.onSendChat("What does GlobalBank do?");
+    });
+
+    await waitFor(() =>
+      expect(capturedNodeDetailsPanelProps.chatMessages).toEqual([
+        { role: "user", content: "What does GlobalBank do?" },
+      ]),
+    );
+
+    act(() => {
+      pendingHandlers?.onDelta("GlobalBank ");
+      pendingHandlers?.onDelta("handles settlement.");
+    });
+
+    expect(capturedNodeDetailsPanelProps.chatMessages).toEqual([
+      { role: "user", content: "What does GlobalBank do?" },
+    ]);
+
+    await act(async () => {
+      pendingHandlers?.onComplete?.("llm");
+      resolveStream?.();
+    });
+
+    await waitFor(() =>
+      expect(capturedNodeDetailsPanelProps.chatMessages).toEqual([
+        { role: "user", content: "What does GlobalBank do?" },
+        { role: "assistant", content: "GlobalBank handles settlement." },
+      ]),
+    );
   });
 
   // Smoke tests

@@ -1,0 +1,14 @@
+global:
+  environment: production
+
+gateway:
+  image: ghcr.io/knowledgeforge-demos/omnipay-gateway:1.0.0
+  replicas: 3
+  service:
+    port: 3000
+
+ledger:
+  image: ghcr.io/knowledgeforge-demos/omnipay-ledger:1.0.0
+  replicas: 2
+  service:
+    port: 8080

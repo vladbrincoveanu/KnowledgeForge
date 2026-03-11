@@ -3,541 +3,864 @@
   "system_context": {
     "c4_level": 1,
     "type": "system",
-    "name": "ai-factory-monorepo",
-    "purpose": "curl -LsSf https://astral.",
-    "external_dependencies": [
-      {
-        "name": "Ac",
-        "type": "external_service",
-        "url": "https://harbor.ai-factory.datalab.tuwien.ac.at",
-        "detected_from": "projects/harbor/chart/values.yaml"
-      },
-      {
-        "name": "Letsencrypt",
-        "type": "external_service",
-        "url": "https://acme-v02.api.letsencrypt.org/directory",
-        "detected_from": "projects/cert-manager/chart/values.yaml"
-      },
-      {
-        "name": "Default",
-        "type": "external_service",
-        "url": "https://kubernetes.default.svc",
-        "detected_from": "gitops/platform-apps/gitlab-runner.yaml"
-      },
-      {
-        "name": "Github",
-        "type": "external_service",
-        "url": "https://clearml.github.io/clearml-helm-charts",
-        "detected_from": "gitops/platform-apps/clearml.yaml"
-      }
+    "name": "OmniPay Platform",
+    "purpose": "A curated default demo that shows how KnowledgeForge maps a modern payments platform from context through components.",
+    "description": "OmniPay is the default KnowledgeForge architecture demo. It combines a Spring ledger, FastAPI fraud engine, NestJS gateway, Go notifier, Terraform and Helm infrastructure, and a PCI-scoped ASP.NET Core card router.",
+    "owner_team": "KnowledgeForge Demo Platform",
+    "business_domain": "Payments Platform",
+    "criticality": "Tier 1 - Production Critical",
+    "data_class": "Credit-Card",
+    "status": "ACTIVE",
+    "active_experts": 3,
+    "compliance": "AT_RISK",
+    "compliance_confidence": 0.96,
+    "compliance_factors": [
+      "single_point_of_failure"
     ],
     "actors": [
       {
-        "name": "User",
-        "type": "person"
+        "name": "Customer",
+        "type": "person",
+        "description": "Pays with the OmniPay mobile app.",
+        "detected_from": "sources/demo/README.md",
+        "detection_method": "demo_seeded",
+        "evidence": "Customer uses OmniPay checkout and tracks payment state from the mobile app."
+      },
+      {
+        "name": "Fraud Analyst",
+        "type": "person",
+        "description": "Reviews flagged transactions and feeds labels back into the model.",
+        "detected_from": "sources/demo/omnipay-fraud-ml/README.md",
+        "detection_method": "documentation_heading",
+        "evidence": "## Fraud Analyst"
+      },
+      {
+        "name": "Finance Operator",
+        "type": "person",
+        "description": "Monitors settlements, receipts, and card capture health.",
+        "detected_from": "sources/demo/README.md",
+        "detection_method": "demo_seeded",
+        "evidence": "Finance operations owns settlement visibility and receipt delivery health."
+      },
+      {
+        "name": "Risk Operations Manager",
+        "type": "person",
+        "description": "Reviews provider onboarding tradeoffs and resolves low-confidence dependency classifications.",
+        "detected_from": "sources/demo/omnipay-gateway/README.md",
+        "detection_method": "documentation_heading",
+        "evidence": "## Risk Operations Manager"
+      }
+    ],
+    "external_dependencies": [
+      {
+        "name": "Visa Network",
+        "context_name": "Visa Network",
+        "type": "external_system",
+        "url": "https://sandbox.api.visa.com",
+        "detected_from": "omnipay-card-router/appsettings.json",
+        "provider": "Visa Network",
+        "company": "Visa",
+        "dependency_type": "BUSINESS_SYSTEM",
+        "classification_confidence": 0.99,
+        "classification_reasoning": "Card-network endpoint used for live authorization flows.",
+        "decision_mode": "deterministic",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7
+      },
+      {
+        "name": "Mastercard Network",
+        "context_name": "Mastercard Network",
+        "type": "external_system",
+        "url": "https://sandbox.api.mastercard.com",
+        "detected_from": "omnipay-card-router/appsettings.json",
+        "provider": "Mastercard Network",
+        "company": "Mastercard",
+        "dependency_type": "BUSINESS_SYSTEM",
+        "classification_confidence": 0.99,
+        "classification_reasoning": "Card-network endpoint used for live authorization flows.",
+        "decision_mode": "deterministic",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7
+      },
+      {
+        "name": "GlobalBank",
+        "context_name": "GlobalBank",
+        "type": "external_service",
+        "url": "https://api.globalbank.test/v1",
+        "detected_from": "omnipay-card-router/appsettings.json",
+        "integration_surface": "Settlement API",
+        "provider": "GlobalBank",
+        "company": "GlobalBank",
+        "dependency_type": "BUSINESS_SYSTEM",
+        "classification_confidence": 0.98,
+        "classification_reasoning": "Banking partner endpoint used for settlement and fallback captures.",
+        "decision_mode": "deterministic",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7
+      },
+      {
+        "name": "Auth0",
+        "context_name": "Auth0",
+        "type": "authentication",
+        "url": "https://omnipay-demo.us.auth0.com",
+        "detected_from": "omnipay-gateway/README.md",
+        "provider": "Auth0",
+        "company": "Okta",
+        "dependency_type": "BUSINESS_SYSTEM",
+        "classification_confidence": 0.98,
+        "classification_reasoning": "Hosted identity is a business-critical SaaS dependency for customer login and session flows.",
+        "decision_mode": "deterministic",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7
+      },
+      {
+        "name": "Redis Cache",
+        "context_name": "Redis",
+        "type": "cache",
+        "url": "redis://redis:6379/0",
+        "detected_from": "omnipay-gateway/docker-compose.yml",
+        "dependency_type": "TECHNICAL_INFRA",
+        "classification_confidence": 0.99,
+        "classification_reasoning": "Gateway compose file provisions a Redis sidecar for technical caching.",
+        "decision_mode": "deterministic",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7
+      },
+      {
+        "name": "Twilio",
+        "context_name": "Twilio",
+        "type": "sms",
+        "url": "https://api.twilio.com/2010-04-01/Accounts",
+        "detected_from": "omnipay-notifier/internal/dispatch/receipt_dispatcher.go",
+        "provider": "Twilio",
+        "company": "Twilio",
+        "dependency_type": "BUSINESS_SYSTEM",
+        "classification_confidence": 0.97,
+        "classification_reasoning": "SMS delivery is a customer-facing notification capability.",
+        "decision_mode": "deterministic",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7
+      },
+      {
+        "name": "SendGrid",
+        "context_name": "SendGrid",
+        "type": "email",
+        "url": "https://api.sendgrid.com/v3/mail/send",
+        "detected_from": "omnipay-notifier/internal/dispatch/receipt_dispatcher.go",
+        "provider": "SendGrid",
+        "company": "Twilio",
+        "dependency_type": "BUSINESS_SYSTEM",
+        "classification_confidence": 0.97,
+        "classification_reasoning": "Email delivery is a customer-facing notification capability.",
+        "decision_mode": "deterministic",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7
+      },
+      {
+        "name": "SignalForge Risk API",
+        "context_name": "SignalForge",
+        "type": "external_service",
+        "url": "https://risk.signalforge.test/graphql",
+        "detected_from": "omnipay-gateway/README.md",
+        "integration_surface": "Risk GraphQL API",
+        "provider": "SignalForge",
+        "company": "SignalForge",
+        "dependency_type": "BUSINESS_SYSTEM",
+        "classification_confidence": 0.64,
+        "classification_reasoning": "The gateway README describes SignalForge as a possible partner for merchant risk orchestration, but the evidence does not prove whether OmniPay uses it as a true external business service or only as an implementation detail.",
+        "decision_mode": "llm_adjudicated",
+        "review_status": "needs_review",
+        "requires_human_review": true,
+        "review_threshold": 0.7,
+        "review_options": [
+          {
+            "id": "signalforge-business",
+            "label": "Keep At Context Level",
+            "value": "BUSINESS_SYSTEM",
+            "description": "Treat SignalForge as an external risk-decisioning company contracted by OmniPay."
+          },
+          {
+            "id": "signalforge-technical",
+            "label": "Move To Container Level",
+            "value": "TECHNICAL_INFRA",
+            "description": "Treat SignalForge as a technical integration detail that should not stay on the context diagram."
+          }
+        ],
+        "suggested_prompts": [
+          "We use SignalForge for merchant risk scoring. Compare whether it belongs at C4 context level or container level, and explain the tradeoffs.",
+          "We use SignalForge for merchant risk scoring. Compare it with Sift, Sardine, and Featurespace on price, model quality, and integration cost."
+        ],
+        "provider_alternatives": [
+          {
+            "provider": "Sift",
+            "price_tier": "High",
+            "performance_tier": "Enterprise",
+            "profile": "Mature fraud network effects and strong chargeback workflows."
+          },
+          {
+            "provider": "Sardine",
+            "price_tier": "Medium",
+            "performance_tier": "High",
+            "profile": "Fast integration and strong AML plus fraud orchestration for fintech teams."
+          },
+          {
+            "provider": "Featurespace",
+            "price_tier": "High",
+            "performance_tier": "High",
+            "profile": "Behavioral analytics depth with heavier integration overhead."
+          }
+        ]
+      },
+      {
+        "name": "LedgerShield Compliance Gateway",
+        "context_name": "LedgerShield",
+        "type": "external_service",
+        "url": "https://screening.ledgershield.test/v1",
+        "detected_from": "omnipay-fraud-ml/README.md",
+        "integration_surface": "Compliance Screening API",
+        "provider": "LedgerShield",
+        "company": "LedgerShield",
+        "dependency_type": "BUSINESS_SYSTEM",
+        "classification_confidence": 0.61,
+        "classification_reasoning": "The fraud workspace references LedgerShield for sanctions and merchant onboarding checks, but the documentation is still exploratory and lacks a confirmed vendor contract or runtime integration proof.",
+        "decision_mode": "llm_adjudicated",
+        "review_status": "needs_review",
+        "requires_human_review": true,
+        "review_threshold": 0.7,
+        "review_options": [
+          {
+            "id": "ledgershield-business",
+            "label": "Keep At Context Level",
+            "value": "BUSINESS_SYSTEM",
+            "description": "Treat LedgerShield as an external compliance company that OmniPay depends on for regulated workflows."
+          },
+          {
+            "id": "ledgershield-technical",
+            "label": "Move To Container Level",
+            "value": "TECHNICAL_INFRA",
+            "description": "Treat LedgerShield as a technical screening component or library and remove it from the context diagram."
+          }
+        ],
+        "suggested_prompts": [
+          "We may use LedgerShield for sanctions screening and merchant onboarding. Compare whether it belongs at context level or container level.",
+          "Compare LedgerShield with Alloy, Persona, and ComplyAdvantage on compliance breadth, pricing, and integration effort."
+        ],
+        "provider_alternatives": [
+          {
+            "provider": "Alloy",
+            "price_tier": "Medium",
+            "performance_tier": "High",
+            "profile": "Flexible identity and fraud orchestration for onboarding-heavy fintech flows."
+          },
+          {
+            "provider": "Persona",
+            "price_tier": "Medium",
+            "performance_tier": "Medium",
+            "profile": "Good identity verification UX with broader KYC workflow tooling."
+          },
+          {
+            "provider": "ComplyAdvantage",
+            "price_tier": "High",
+            "performance_tier": "High",
+            "profile": "Deep sanctions and AML coverage with stronger compliance analyst tooling."
+          }
+        ]
+      },
+      {
+        "name": "AWS RDS Postgres",
+        "context_name": "AWS RDS Postgres",
+        "type": "database",
+        "url": "postgresql://omnipay-ledger.cluster-demo.rds.amazonaws.com:5432/ledger",
+        "detected_from": "omnipay-infra/main.tf",
+        "dependency_type": "TECHNICAL_INFRA",
+        "classification_confidence": 0.99,
+        "classification_reasoning": "Terraform defines the managed Postgres instance for ledger persistence.",
+        "decision_mode": "deterministic",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7
+      },
+      {
+        "name": "AWS S3",
+        "context_name": "AWS S3",
+        "type": "storage",
+        "url": "https://omnipay-raw-events-demo.s3.amazonaws.com",
+        "detected_from": "omnipay-infra/main.tf",
+        "dependency_type": "TECHNICAL_INFRA",
+        "classification_confidence": 0.99,
+        "classification_reasoning": "Terraform defines an S3 bucket used for raw payment events.",
+        "decision_mode": "deterministic",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7
+      },
+      {
+        "name": "OpenAI",
+        "context_name": "OpenAI",
+        "type": "ai",
+        "url": "https://api.openai.com/v1",
+        "detected_from": "omnipay-fraud-ml/.env.example",
+        "provider": "OpenAI",
+        "company": "OpenAI",
+        "dependency_type": "BUSINESS_SYSTEM",
+        "classification_confidence": 0.92,
+        "classification_reasoning": "The fraud service contains an OpenAI API key placeholder for model-assisted triage workflows.",
+        "decision_mode": "llm_adjudicated",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7
+      },
+      {
+        "name": "Datadog",
+        "context_name": "Datadog",
+        "type": "monitoring",
+        "url": "https://api.datadoghq.com",
+        "detected_from": "omnipay-fraud-ml/.env.example",
+        "dependency_type": "TECHNICAL_INFRA",
+        "classification_confidence": 0.95,
+        "classification_reasoning": "Datadog is an observability integration referenced from environment configuration.",
+        "decision_mode": "deterministic",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7
       }
     ],
     "languages": [
-      {
-        "language": "Python",
-        "file_count": 21
-      }
+      "Java",
+      "Python",
+      "TypeScript",
+      "Go",
+      "C#",
+      "HCL"
     ],
     "frameworks": [
-      {
-        "language": "Python",
-        "framework": "FastAPI",
-        "detected_from": "pyproject.toml"
-      }
+      "Spring Boot",
+      "FastAPI",
+      "NestJS",
+      "Terraform",
+      "Helm",
+      "ASP.NET Core",
+      "Entity Framework Core"
     ],
-    "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo",
-    "git": {
-      "branch": "feature/add-apisix-with-metrics",
-      "commit_hash": "8e8528610b9b202248d901454005f04128eb6bd2",
-      "last_commit_date": "2025-11-18T10:35:14+01:00",
-      "first_commit_date": "2025-11-18T10:35:14+01:00",
-      "total_commits": 183,
-      "commits_30d": 0,
-      "commits_90d": 48,
-      "commits_180d": 183,
-      "top_contributors": [
-        {
-          "name": "gentrexha",
-          "email": "",
-          "commit_count": 166
-        },
-        {
-          "name": "Rexha, Gent",
-          "email": "",
-          "commit_count": 29
-        },
-        {
-          "name": "Iulia Georgiana Rinea",
-          "email": "",
-          "commit_count": 4
-        },
-        {
-          "name": "iuliarinea17",
-          "email": "",
-          "commit_count": 2
-        }
-      ]
+    "repository_url": "https://github.com/knowledgeforge-demos/omnipay-platform",
+    "documentation_quality": {
+      "score": 86,
+      "tier": "EXCELLENT"
     },
-    "context_sources": {
-      "readme_files": [
-        "README.md"
-      ],
-      "deployment_files": [
-        "projects/slurm_gateway_api/Dockerfile",
-        "projects/apisix/chart/templates/slurm-route.yaml",
-        "projects/apisix/chart/templates/servicemonitor.yaml",
-        "projects/apisix/chart/templates/metrics-service.yaml",
-        "projects/cert-manager/chart/templates/clusterissuer.yaml",
-        "projects/slurm_gateway_api/chart/templates/deployment.yaml",
-        "projects/slurm_gateway_api/chart/templates/ingress.yaml",
-        "projects/slurm_gateway_api/chart/templates/service.yaml",
-        "projects/kubeflow-pipelines/kustomize/ui-patch.yaml"
-      ],
-      "framework_files": [
-        "pyproject.toml"
-      ]
-    },
-    "owner_team": "tuwien-ac-at-team",
-    "business_domain": "API Gateway",
-    "criticality": "Tier 1 - Production Critical",
-    "data_class": "PII",
-    "description": "curl -LsSf https://astral.",
-    "llm_description": "This node is a system-level placeholder or stub with no functional deployment or technology specification, serving only as a metadata anchor for the string \"curl -LsSf https://astral.\"."
+    "deployment_targets": [
+      "Container",
+      "Kubernetes",
+      "AWS"
+    ],
+    "last_commit_date": "2026-03-05T10:12:00Z",
+    "commit_count_30d": 18,
+    "commit_count_90d": 47
   },
   "containers": [
     {
       "c4_level": 2,
       "type": "container",
-      "name": "apisix",
-      "container_type": "Helm Deployed Service",
-      "technology": "Kubernetes",
+      "name": "omnipay-ledger",
+      "container_type": "Java Service",
+      "technology": "Java / Spring Boot",
       "protocol": "HTTP",
-      "path": "projects/apisix",
-      "runtime_environment": "Kubernetes",
-      "deployment": "Helm",
-      "description": "APISIX API Gateway for AI Factory",
-      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/apisix",
-      "runtime_info": "Unknown",
+      "path": "sources/demo/omnipay-ledger",
+      "runtime_environment": "Container",
+      "deployment": "Docker",
+      "description": "Source of truth for user balances, holds, and transaction postings.",
+      "repository_url": "https://github.com/knowledgeforge-demos/omnipay-ledger",
+      "runtime_info": "Java 21",
       "dependencies_internal": [
-        "cert-manager"
+        "omnipay-notifier"
       ],
-      "health_endpoint": "",
-      "llm_description": "This node represents an APISIX API Gateway deployed via Helm on Kubernetes, serving as the entry point for API traffic within the AI Factory project."
+      "health_endpoint": "/actuator/health",
+      "endpoint": "https://ledger.omnipay.internal",
+      "owner": "Iulia",
+      "tier": "Tier 1 - Production Critical",
+      "data_class": "PII",
+      "status": "ACTIVE",
+      "active_experts": 2,
+      "compliance": "COMPLIANT",
+      "compliance_confidence": 0.95,
+      "llm_description": "A Spring Boot ledger service whose controllers, services, and repositories map cleanly into the Level 3 component view."
     },
     {
       "c4_level": 2,
       "type": "container",
-      "name": "harbor",
-      "container_type": "Helm Deployed Service",
-      "technology": "Kubernetes",
-      "protocol": "HTTP",
-      "path": "projects/harbor",
-      "runtime_environment": "Kubernetes",
-      "deployment": "Helm",
-      "description": "Helm chart for Harbor container registry",
-      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/harbor",
-      "runtime_info": "Unknown",
-      "dependencies_internal": [
-        "cert-manager"
-      ],
-      "health_endpoint": "",
-      "llm_description": "This node represents a Helm-deployed Kubernetes service for Harbor, a container registry, managed via its Helm chart in the projects/harbor path."
-    },
-    {
-      "c4_level": 2,
-      "type": "container",
-      "name": "cert-manager",
-      "container_type": "Helm Deployed Service",
-      "technology": "Kubernetes",
-      "protocol": "HTTP",
-      "path": "projects/cert-manager",
-      "runtime_environment": "Kubernetes",
-      "deployment": "Helm",
-      "description": "Helm chart for cert-manager certificate management",
-      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/cert-manager",
-      "runtime_info": "Unknown",
-      "dependencies_internal": [],
-      "health_endpoint": "",
-      "components": [
-        {
-          "id": "infra_cert-manager_clusterissuer",
-          "name": "Clusterissuer",
-          "type": "Infrastructure"
-        }
-      ],
-      "llm_description": "This node represents a Helm-deployed cert-manager service in Kubernetes, used for automated certificate management via its Helm chart."
-    },
-    {
-      "c4_level": 2,
-      "type": "container",
-      "name": "clearml",
-      "container_type": "Helm Deployed Service",
-      "technology": "Kubernetes",
-      "protocol": "HTTP",
-      "path": "projects/clearml",
-      "runtime_environment": "Kubernetes",
-      "deployment": "Helm",
-      "description": "Helm chart for ClearML platform deployment",
-      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/clearml",
-      "runtime_info": "Unknown",
-      "dependencies_internal": [],
-      "health_endpoint": "",
-      "llm_description": "This node is a Helm chart used to deploy the ClearML platform on Kubernetes."
-    },
-    {
-      "c4_level": 2,
-      "type": "container",
-      "name": "slurm_gateway_api",
+      "name": "omnipay-fraud-ml",
       "container_type": "Python Service",
-      "technology": "Python",
+      "technology": "Python / FastAPI",
       "protocol": "HTTP",
-      "path": "projects/slurm_gateway_api",
-      "runtime_environment": "Kubernetes",
-      "deployment": "Helm",
-      "description": "Helm chart for slurm_gateway_api",
-      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/slurm_gateway_api",
-      "runtime_info": "Python 3.11",
-      "dependencies_internal": [
-        "harbor"
+      "path": "sources/demo/omnipay-fraud-ml",
+      "runtime_environment": "Container",
+      "deployment": "Docker",
+      "description": "Real-time fraud scoring engine that mixes FastAPI routing with pandas feature engineering and single-owner risk.",
+      "repository_url": "https://github.com/knowledgeforge-demos/omnipay-fraud-ml",
+      "runtime_info": "Python 3.12",
+      "dependencies_internal": [],
+      "health_endpoint": "/healthz",
+      "endpoint": "https://fraud.omnipay.internal",
+      "owner": "Vlas",
+      "tier": "Tier 1 - Production Critical",
+      "data_class": "PII",
+      "status": "ACTIVE",
+      "active_experts": 1,
+      "compliance": "AT_RISK",
+      "compliance_confidence": 0.97,
+      "compliance_factors": [
+        "single_point_of_failure"
       ],
-      "health_endpoint": "http://localhost:8080/health",
-      "components": [
-        {
-          "id": "endpoint_code_eaa187b4210a7c8a",
-          "name": "GET /api/health-check",
-          "type": "API Endpoint"
-        },
-        {
-          "id": "endpoint_code_d7cb098c812350d3",
-          "name": "POST /api/submit-job",
-          "type": "API Endpoint"
-        },
-        {
-          "id": "endpoint_code_30eca68b54bba1c9",
-          "name": "POST /api/submit-hello-world-job",
-          "type": "API Endpoint"
-        },
-        {
-          "id": "endpoint_code_43331cfd0c25ab21",
-          "name": "GET /api/get-job",
-          "type": "API Endpoint"
-        },
-        {
-          "id": "endpoint_code_abe94170b848479e",
-          "name": "DELETE /api/delete-job",
-          "type": "API Endpoint"
-        },
-        {
-          "id": "endpoint_code_0393211e59c1fd60",
-          "name": "POST /api/submit-container-job",
-          "type": "API Endpoint"
-        }
-      ],
-      "llm_description": "This node is a Helm chart for deploying the slurm_gateway_api as a Python service container."
+      "llm_description": "A FastAPI-based fraud engine whose demo metadata emphasizes criticality, high sensitivity, and a bus factor of one."
     },
     {
       "c4_level": 2,
       "type": "container",
-      "name": "kubeflow-pipelines",
-      "container_type": "Service",
-      "technology": "Unknown",
+      "name": "omnipay-gateway",
+      "container_type": "Node Service",
+      "technology": "TypeScript / NestJS",
       "protocol": "HTTP",
-      "path": "projects/kubeflow-pipelines",
-      "runtime_environment": "Kubernetes",
-      "deployment": "Kustomize",
-      "description": "Kubernetes workload deployed via Kustomize.",
-      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/kubeflow-pipelines",
-      "runtime_info": "Unknown",
+      "path": "sources/demo/omnipay-gateway",
+      "runtime_environment": "Container",
+      "deployment": "Docker Compose",
+      "description": "Backend-for-frontend for the mobile clients, with Redis-backed orchestration of payment flows.",
+      "repository_url": "https://github.com/knowledgeforge-demos/omnipay-gateway",
+      "runtime_info": "Node.js 22",
       "dependencies_internal": [
-        "cert-manager"
+        "omnipay-ledger",
+        "omnipay-fraud-ml",
+        "omnipay-card-router"
       ],
-      "health_endpoint": "",
-      "components": [
-        {
-          "id": "infra_kubeflow-pipelines_ui_patch",
-          "name": "Ui Patch",
-          "type": "Infrastructure"
-        },
-        {
-          "id": "infra_kubeflow-pipelines_ingress",
-          "name": "Ingress",
-          "type": "Ingress"
-        },
-        {
-          "id": "infra_kubeflow-pipelines_network_policy",
-          "name": "Network Policy",
-          "type": "Infrastructure"
-        }
-      ],
-      "llm_description": "This node represents a Kubernetes service deployed via Kustomize, specifically for Kubeflow Pipelines, and is used to manage machine learning workflows in a Kubernetes environment."
+      "health_endpoint": "/health",
+      "endpoint": "https://gateway.omnipay.internal",
+      "owner": "Vlad",
+      "tier": "Tier 2 - Production Standard",
+      "data_class": "General",
+      "status": "ACTIVE",
+      "active_experts": 2,
+      "compliance": "COMPLIANT",
+      "compliance_confidence": 0.94,
+      "llm_description": "A NestJS gateway that shows module and controller extraction plus a compose-defined Redis dependency."
     },
     {
       "c4_level": 2,
       "type": "container",
-      "name": "gitlab-runner",
-      "container_type": "Helm Deployed Service",
-      "technology": "Kubernetes",
-      "protocol": "HTTP",
-      "path": "projects/gitlab-runner",
-      "runtime_environment": "Kubernetes",
-      "deployment": "Helm",
-      "description": "Helm chart for GitLab Runner CI/CD",
-      "repository_url": "https://gitlab.tuwien.ac.at/ai-factory/monorepo/-/tree/main/projects/gitlab-runner",
-      "runtime_info": "Unknown",
+      "name": "omnipay-notifier",
+      "container_type": "Go Service",
+      "technology": "Go",
+      "protocol": "Event",
+      "path": "sources/demo/omnipay-notifier",
+      "runtime_environment": "Container",
+      "deployment": "Docker",
+      "description": "Worker that listens to payment events and dispatches SMS and email receipts.",
+      "repository_url": "https://github.com/knowledgeforge-demos/omnipay-notifier",
+      "runtime_info": "Go 1.23",
       "dependencies_internal": [],
       "health_endpoint": "",
-      "llm_description": "This node represents a Helm-deployed Kubernetes service for GitLab Runner, used to manage CI/CD execution environments via a Helm chart."
+      "endpoint": "queue://omnipay.receipts",
+      "owner": "Iulia",
+      "tier": "Tier 2 - Production Standard",
+      "data_class": "PII",
+      "status": "ACTIVE",
+      "active_experts": 2,
+      "compliance": "COMPLIANT",
+      "compliance_confidence": 0.92,
+      "llm_description": "A compact Go worker whose code and provider references highlight notification boundaries such as Twilio and SendGrid."
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "omnipay-infra",
+      "container_type": "Infrastructure as Code",
+      "technology": "Terraform / Helm",
+      "protocol": "Provisioning",
+      "path": "sources/demo/omnipay-infra",
+      "runtime_environment": "AWS / Kubernetes",
+      "deployment": "Terraform + Helm",
+      "description": "Infrastructure and orchestration workspace for the platform's AWS and Kubernetes footprint.",
+      "repository_url": "https://github.com/knowledgeforge-demos/omnipay-infra",
+      "runtime_info": "Terraform 1.7 / Helm 3",
+      "dependencies_internal": [
+        "omnipay-gateway",
+        "omnipay-ledger",
+        "omnipay-card-router"
+      ],
+      "health_endpoint": "",
+      "endpoint": "",
+      "owner": "Iulia",
+      "tier": "Tier 1 - Production Critical",
+      "data_class": "General",
+      "status": "ACTIVE",
+      "active_experts": 2,
+      "compliance": "COMPLIANT",
+      "compliance_confidence": 0.93,
+      "llm_description": "A Terraform and Helm workspace that anchors infrastructure detection for databases, storage, and Kubernetes deployments."
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "omnipay-card-router",
+      "container_type": ".NET Service",
+      "technology": "C# / ASP.NET Core",
+      "protocol": "HTTPS",
+      "path": "sources/demo/omnipay-card-router",
+      "runtime_environment": "Container",
+      "deployment": "Docker",
+      "description": "PCI-scoped card-network integration service for authorizations, captures, and settlement fallbacks.",
+      "repository_url": "https://github.com/knowledgeforge-demos/omnipay-card-router",
+      "runtime_info": ".NET 8",
+      "dependencies_internal": [
+        "omnipay-ledger"
+      ],
+      "health_endpoint": "/health",
+      "endpoint": "https://card-router.omnipay.internal",
+      "owner": "Vlad",
+      "tier": "Tier 1 - Production Critical",
+      "data_class": "Credit-Card",
+      "status": "ACTIVE",
+      "active_experts": 1,
+      "compliance": "AT_RISK",
+      "compliance_confidence": 0.98,
+      "compliance_factors": [
+        "single_point_of_failure"
+      ],
+      "llm_description": "A highly critical ASP.NET Core service with Entity Framework Core and external banking endpoints, built to surface PCI-heavy metadata."
     }
   ],
   "components": [
     {
       "c4_level": 3,
       "type": "component",
-      "name": "GET /api/health-check",
+      "name": "GET /api/v1/balances/{accountId}",
       "component_type": "API Endpoint",
-      "container": "slurm_gateway_api",
-      "file": "components/ai_factory/slurm/__init__.py",
-      "line_start": 19,
-      "signature": "health_check()",
-      "documentation": null,
-      "endpoint_path": "/api/health-check",
+      "container": "omnipay-ledger",
+      "file": "sources/demo/omnipay-ledger/src/main/java/com/omnipay/ledger/api/LedgerController.java",
+      "technology": "Spring Boot",
       "endpoint_method": "GET",
-      "functional_group": "Job Management",
-      "container_id": "slurm_gateway_api",
-      "llm_description": "This node is a GET endpoint at `/api/health-check` used to verify the operational status of the AI Factory SLURM component."
+      "endpoint_path": "/api/v1/balances/{accountId}"
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "POST /api/submit-job",
+      "name": "POST /api/v1/transactions",
       "component_type": "API Endpoint",
-      "container": "slurm_gateway_api",
-      "file": "components/ai_factory/slurm/__init__.py",
-      "line_start": 24,
-      "signature": "submit_job(job_request, x_slurm_user_name, x_slurm_user_token)",
-      "documentation": "Submit a job request to Slurm.\n\nArgs:\n    job_request: User's job request\n    x_slurm_user_name: Slurm username\n    x_slurm_user_token: Slurm JWT token\n\nReturns:\n    Slurm API response",
-      "endpoint_path": "/api/submit-job",
+      "container": "omnipay-ledger",
+      "file": "sources/demo/omnipay-ledger/src/main/java/com/omnipay/ledger/api/LedgerController.java",
+      "technology": "Spring Boot",
       "endpoint_method": "POST",
-      "functional_group": "Health Monitoring",
-      "container_id": "slurm_gateway_api",
-      "llm_description": "This node is an endpoint for submitting AI jobs, likely to a Slurm job scheduler, as indicated by its file path and HTTP POST method."
+      "endpoint_path": "/api/v1/transactions"
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "POST /api/submit-hello-world-job",
+      "name": "LedgerService",
+      "component_type": "Service",
+      "container": "omnipay-ledger",
+      "file": "sources/demo/omnipay-ledger/src/main/java/com/omnipay/ledger/service/LedgerService.java",
+      "technology": "Spring Boot"
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "BalanceRepository",
+      "component_type": "Repository",
+      "container": "omnipay-ledger",
+      "file": "sources/demo/omnipay-ledger/src/main/java/com/omnipay/ledger/repository/BalanceRepository.java",
+      "technology": "Spring Data"
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "POST /v1/risk/score",
       "component_type": "API Endpoint",
-      "container": "slurm_gateway_api",
-      "file": "components/ai_factory/slurm/__init__.py",
-      "line_start": 76,
-      "signature": "submit_hello_world_job(x_slurm_user_name, x_slurm_user_token)",
-      "documentation": "Submit a hello world job with minimal configuration.\n\nArgs:\n    partition: Slurm partition to use\n    x_slurm_user_name: Slurm username (from header)\n    x_slurm_user_token: Slurm JWT token (from header)\n\nReturns:\n    Slurm API response",
-      "endpoint_path": "/api/submit-hello-world-job",
+      "container": "omnipay-fraud-ml",
+      "file": "sources/demo/omnipay-fraud-ml/app/main.py",
+      "technology": "FastAPI",
       "endpoint_method": "POST",
-      "functional_group": "Container Operations",
-      "container_id": "slurm_gateway_api",
-      "llm_description": "This node is an endpoint for submitting a \"hello-world\" job, likely for testing or initializing AI workflows within a Slurm-managed system."
+      "endpoint_path": "/v1/risk/score"
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "GET /api/get-job",
+      "name": "POST /v1/risk/feedback",
       "component_type": "API Endpoint",
-      "container": "slurm_gateway_api",
-      "file": "components/ai_factory/slurm/__init__.py",
-      "line_start": 109,
-      "signature": "get_job(job_id)",
-      "documentation": null,
-      "endpoint_path": "/api/get-job",
-      "endpoint_method": "GET",
-      "functional_group": "Job Management",
-      "container_id": "slurm_gateway_api",
-      "llm_description": "This node is a GET endpoint at `/api/get-job` used to retrieve job information, likely within an AI factory system integrated with Slurm."
-    },
-    {
-      "c4_level": 3,
-      "type": "component",
-      "name": "DELETE /api/delete-job",
-      "component_type": "API Endpoint",
-      "container": "slurm_gateway_api",
-      "file": "components/ai_factory/slurm/__init__.py",
-      "line_start": 117,
-      "signature": "delete_job(job_id)",
-      "documentation": null,
-      "endpoint_path": "/api/delete-job",
-      "endpoint_method": "DELETE",
-      "functional_group": "Health Monitoring",
-      "container_id": "slurm_gateway_api",
-      "llm_description": "This node is a DELETE endpoint at \"/api/delete-job\" used to remove a job, likely within an AI factory or Slurm job management context."
-    },
-    {
-      "c4_level": 3,
-      "type": "component",
-      "name": "POST /api/submit-container-job",
-      "component_type": "API Endpoint",
-      "container": "slurm_gateway_api",
-      "file": "components/ai_factory/slurm/__init__.py",
-      "line_start": 125,
-      "signature": "submit_container_job(container_request, x_slurm_user_name, x_slurm_user_token)",
-      "documentation": "Submit a containerized job request using Apptainer.\n\nArgs:\n    container_request: Container job configuration\n    x_slurm_user_name: Slurm username\n    x_slurm_user_token: Slurm JWT token\n\nReturns:\n    Slurm API response\n\nRaises:\n    HTTPException: If the container request is invalid or Slurm API call fails",
-      "endpoint_path": "/api/submit-container-job",
+      "container": "omnipay-fraud-ml",
+      "file": "sources/demo/omnipay-fraud-ml/app/main.py",
+      "technology": "FastAPI",
       "endpoint_method": "POST",
-      "functional_group": "Container Operations",
-      "container_id": "slurm_gateway_api",
-      "llm_description": "This node is a POST endpoint at `/api/submit-container-job` used to submit containerized jobs, likely within an AI Factory system leveraging SLURM for job orchestration."
+      "endpoint_path": "/v1/risk/feedback"
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "Clusterissuer",
-      "component_type": "Infrastructure",
-      "container": "cert-manager",
-      "file": "projects/cert-manager/chart/templates/clusterissuer.yaml",
-      "line_start": null,
-      "signature": null,
-      "documentation": null,
-      "component_kind": "Manifest",
-      "container_id": "cert-manager",
-      "llm_description": "This node represents a ClusterIssuer resource in cert-manager, used to define a cluster-wide issuer for automatically issuing and managing TLS certificates."
+      "name": "FeatureFrameBuilder",
+      "component_type": "Data Pipeline",
+      "container": "omnipay-fraud-ml",
+      "file": "sources/demo/omnipay-fraud-ml/app/scoring/features.py",
+      "technology": "pandas"
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "Ui Patch",
-      "component_type": "Infrastructure",
-      "container": "kubeflow-pipelines",
-      "file": "projects/kubeflow-pipelines/kustomize/ui-patch.yaml",
-      "line_start": null,
-      "signature": null,
-      "documentation": null,
-      "component_kind": "Manifest",
-      "container_id": "kubeflow-pipelines",
-      "llm_description": "This node, named \"Ui Patch,\" is a component defined in the Kubeflow Pipelines project's Kustomize configuration, likely intended to customize or extend the UI behavior or appearance for the pipeline interface."
+      "name": "VelocityScoreModel",
+      "component_type": "Model",
+      "container": "omnipay-fraud-ml",
+      "file": "sources/demo/omnipay-fraud-ml/app/scoring/model.py",
+      "technology": "Python"
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "Ingress",
-      "component_type": "Ingress",
-      "container": "kubeflow-pipelines",
-      "file": "projects/kubeflow-pipelines/kustomize/ingress.yaml",
-      "line_start": null,
-      "signature": null,
-      "documentation": null,
-      "component_kind": "Manifest",
-      "container_id": "kubeflow-pipelines",
-      "llm_description": "This node represents an Ingress component, typically used to manage and route external traffic to services within a Kubernetes cluster, as defined in the Kubeflow Pipelines Kustomize configuration."
+      "name": "PaymentsModule",
+      "component_type": "Module",
+      "container": "omnipay-gateway",
+      "file": "sources/demo/omnipay-gateway/src/payments/payments.module.ts",
+      "technology": "NestJS"
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "Network Policy",
-      "component_type": "Infrastructure",
-      "container": "kubeflow-pipelines",
-      "file": "projects/kubeflow-pipelines/kustomize/network-policy.yaml",
-      "line_start": null,
-      "signature": null,
-      "documentation": null,
-      "component_kind": "Manifest",
-      "container_id": "kubeflow-pipelines",
-      "llm_description": "This node defines a Kubernetes Network Policy for the Kubeflow Pipelines project, as specified in the kustomize configuration file."
+      "name": "PaymentsController",
+      "component_type": "Controller",
+      "container": "omnipay-gateway",
+      "file": "sources/demo/omnipay-gateway/src/payments/payments.controller.ts",
+      "technology": "NestJS"
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "PaymentsService",
+      "component_type": "Service",
+      "container": "omnipay-gateway",
+      "file": "sources/demo/omnipay-gateway/src/payments/payments.service.ts",
+      "technology": "NestJS"
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "ReceiptDispatcher",
+      "component_type": "Worker",
+      "container": "omnipay-notifier",
+      "file": "sources/demo/omnipay-notifier/internal/dispatch/receipt_dispatcher.go",
+      "technology": "Go"
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "GatewayDeployment",
+      "component_type": "Deployment",
+      "container": "omnipay-infra",
+      "file": "sources/demo/omnipay-infra/chart/templates/gateway-deployment.yaml",
+      "technology": "Helm"
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "LedgerPostgres",
+      "component_type": "Database Resource",
+      "container": "omnipay-infra",
+      "file": "sources/demo/omnipay-infra/main.tf",
+      "technology": "Terraform"
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "RawEventsBucket",
+      "component_type": "Storage Resource",
+      "container": "omnipay-infra",
+      "file": "sources/demo/omnipay-infra/main.tf",
+      "technology": "Terraform"
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "POST /api/authorizations",
+      "component_type": "API Endpoint",
+      "container": "omnipay-card-router",
+      "file": "sources/demo/omnipay-card-router/Controllers/AuthorizationsController.cs",
+      "technology": "ASP.NET Core",
+      "endpoint_method": "POST",
+      "endpoint_path": "/api/authorizations"
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "CardRouterDbContext",
+      "component_type": "DbContext",
+      "container": "omnipay-card-router",
+      "file": "sources/demo/omnipay-card-router/Data/CardRouterDbContext.cs",
+      "technology": "Entity Framework Core"
     }
   ],
   "relationships": {
     "context": [
       {
-        "source": "User",
-        "destination": "ai-factory-monorepo",
-        "description": "uses",
+        "source": "Customer",
+        "destination": "OmniPay Platform",
         "relationship_type": "uses",
-        "llm_description": "The User uses the ai-factory-monorepo without a specified protocol."
+        "description": "Initiates authorizations and checks payment status through the mobile app.",
+        "protocol": "HTTPS"
       },
       {
-        "source": "ai-factory-monorepo",
-        "destination": "Ac",
-        "description": "uses external_service",
+        "source": "Fraud Analyst",
+        "destination": "OmniPay Platform",
         "relationship_type": "uses",
-        "llm_description": "The ai-factory-monorepo uses Ac without a specified protocol."
+        "description": "Investigates suspicious transactions and posts analyst feedback.",
+        "protocol": "HTTPS"
       },
       {
-        "source": "ai-factory-monorepo",
-        "destination": "Letsencrypt",
-        "description": "uses external_service",
+        "source": "Finance Operator",
+        "destination": "OmniPay Platform",
         "relationship_type": "uses",
-        "llm_description": "The ai-factory-monorepo uses Let's Encrypt to obtain and manage SSL/TLS certificates for its services."
+        "description": "Monitors settlement issues and receipt delivery health.",
+        "protocol": "HTTPS"
       },
       {
-        "source": "ai-factory-monorepo",
-        "destination": "Default",
-        "description": "uses external_service",
+        "source": "Risk Operations Manager",
+        "destination": "OmniPay Platform",
         "relationship_type": "uses",
-        "llm_description": "The ai-factory-monorepo uses Default without a specified protocol."
+        "description": "Reviews provider onboarding decisions and resolves ambiguous external dependency reviews.",
+        "protocol": "HTTPS"
       },
       {
-        "source": "ai-factory-monorepo",
-        "destination": "Github",
-        "description": "uses external_service",
+        "source": "OmniPay Platform",
+        "destination": "Visa Network",
         "relationship_type": "uses",
-        "llm_description": "The ai-factory-monorepo uses GitHub to manage and version its codebase, though no specific protocol is defined for this interaction."
+        "description": "Routes card authorizations to Visa.",
+        "protocol": "HTTPS"
+      },
+      {
+        "source": "OmniPay Platform",
+        "destination": "Mastercard Network",
+        "relationship_type": "uses",
+        "description": "Routes card authorizations to Mastercard.",
+        "protocol": "HTTPS"
+      },
+      {
+        "source": "OmniPay Platform",
+        "destination": "GlobalBank",
+        "relationship_type": "uses",
+        "description": "Performs banking fallback captures and settlement checks.",
+        "protocol": "HTTPS"
+      },
+      {
+        "source": "OmniPay Platform",
+        "destination": "Auth0",
+        "relationship_type": "uses",
+        "description": "Delegates customer login and session management to Auth0.",
+        "protocol": "HTTPS"
+      },
+      {
+        "source": "OmniPay Platform",
+        "destination": "Twilio",
+        "relationship_type": "uses",
+        "description": "Sends receipt SMS messages.",
+        "protocol": "HTTPS"
+      },
+      {
+        "source": "OmniPay Platform",
+        "destination": "SendGrid",
+        "relationship_type": "uses",
+        "description": "Sends receipt emails.",
+        "protocol": "HTTPS"
+      },
+      {
+        "source": "OmniPay Platform",
+        "destination": "SignalForge",
+        "relationship_type": "uses",
+        "description": "May orchestrate merchant risk scoring, but the boundary still requires human review.",
+        "protocol": "HTTPS"
+      },
+      {
+        "source": "OmniPay Platform",
+        "destination": "LedgerShield",
+        "relationship_type": "uses",
+        "description": "May support compliance screening and onboarding checks, but the boundary still requires human review.",
+        "protocol": "HTTPS"
+      },
+      {
+        "source": "OmniPay Platform",
+        "destination": "OpenAI",
+        "relationship_type": "uses",
+        "description": "Supports fraud-ops triage experiments in the ML workspace.",
+        "protocol": "HTTPS"
       }
     ],
     "containers": [
       {
-        "from": "apisix",
-        "to": "cert-manager",
-        "type": "uses",
-        "protocol": "HTTP",
-        "description": "APISIX uses cert-manager over HTTP to manage and provision TLS certificates for its services.",
-        "llm_description": "APISIX uses cert-manager over HTTP to manage and provision TLS certificates for its services."
+        "from": "omnipay-gateway",
+        "to": "omnipay-ledger",
+        "relationship_type": "calls",
+        "description": "Reads balances and reserves funds before authorization.",
+        "protocol": "http"
       },
       {
-        "from": "harbor",
-        "to": "cert-manager",
-        "type": "uses",
-        "protocol": "HTTP",
-        "description": "Harbor uses cert-manager over HTTP to manage TLS certificates for its services.",
-        "llm_description": "Harbor uses cert-manager over HTTP to manage TLS certificates for its services."
+        "from": "omnipay-gateway",
+        "to": "omnipay-fraud-ml",
+        "relationship_type": "calls",
+        "description": "Requests a fraud score before routing to the card network.",
+        "protocol": "http"
       },
       {
-        "from": "slurm_gateway_api",
-        "to": "harbor",
-        "type": "uses",
-        "protocol": "HTTP",
-        "description": "The slurm_gateway_api uses HTTP to interact with harbor.",
-        "llm_description": "The slurm_gateway_api uses HTTP to interact with harbor."
+        "from": "omnipay-gateway",
+        "to": "omnipay-card-router",
+        "relationship_type": "calls",
+        "description": "Submits authorization and capture requests to the PCI-scoped router.",
+        "protocol": "https"
       },
       {
-        "from": "kubeflow-pipelines",
-        "to": "cert-manager",
-        "type": "uses",
-        "protocol": "HTTP",
-        "description": "kubeflow-pipelines uses cert-manager via HTTP to manage TLS certificates for its pipeline components.",
-        "llm_description": "kubeflow-pipelines uses cert-manager via HTTP to manage TLS certificates for its pipeline components."
+        "from": "omnipay-card-router",
+        "to": "omnipay-ledger",
+        "relationship_type": "updates",
+        "description": "Persists authorization outcomes and hold identifiers.",
+        "protocol": "grpc"
+      },
+      {
+        "from": "omnipay-ledger",
+        "to": "omnipay-notifier",
+        "relationship_type": "publishes",
+        "description": "Emits posted-transaction events for customer receipts.",
+        "protocol": "event"
+      },
+      {
+        "from": "omnipay-infra",
+        "to": "omnipay-gateway",
+        "relationship_type": "deploys",
+        "description": "Deploys the gateway stack and its Redis dependency.",
+        "protocol": "helm"
+      },
+      {
+        "from": "omnipay-infra",
+        "to": "omnipay-ledger",
+        "relationship_type": "provisions",
+        "description": "Creates the managed Postgres instance and deployable runtime configuration.",
+        "protocol": "terraform"
+      },
+      {
+        "from": "omnipay-infra",
+        "to": "omnipay-card-router",
+        "relationship_type": "deploys",
+        "description": "Deploys the PCI-scoped card-routing service into Kubernetes.",
+        "protocol": "helm"
       }
     ]
   },
-  "code_level": {
-    "entities": [],
-    "relationships": []
-  },
   "metadata": {
-    "total_containers": 7,
-    "total_components": 10,
-    "total_code_entities": 0,
-    "extraction_approach": "c4_model_hybrid",
+    "total_containers": 6,
+    "total_components": 17,
+    "extraction_approach": "bundled_demo",
+    "default_demo": true,
+    "demo_source_path": "sources/demo",
     "runtime": {
       "platform": "Kubernetes",
       "cluster": {
-        "gitops_files_count": 10,
-        "gitops_directories": [
-          "gitops/platform-apps",
-          "gitops/applicationsets"
-        ]
+        "name": "omnipay-prod-eu"
       }
     }
   }

@@ -9,7 +9,6 @@ Supports both OpenAI and local LLM (LM Studio).
 """
 
 import logging
-import os
 from enum import Enum
 from typing import Any, Optional
 
@@ -39,6 +38,14 @@ class DependencyClassification(BaseModel):
     )
     reasoning: str = Field(
         description="Brief explanation of the classification decision"
+    )
+    decision_mode: str = Field(
+        default="deterministic",
+        description="How the classification was produced"
+    )
+    detection_source: str = Field(
+        default="rule_based_classifier",
+        description="Primary source behind the classification"
     )
 
 
@@ -188,7 +195,9 @@ Return ONLY valid JSON:
         classification = DependencyClassification(
             type=DependencyType(result_json["type"]),
             confidence=result_json["confidence"],
-            reasoning=result_json["reasoning"]
+            reasoning=result_json["reasoning"],
+            decision_mode="llm_adjudicated",
+            detection_source="llm_classifier",
         )
         
         logger.info(
@@ -241,14 +250,16 @@ Return ONLY valid JSON:
                 return DependencyClassification(
                     type=DependencyType.TECHNICAL_INFRA,
                     confidence=0.9,
-                    reasoning=f"'{name}' is technical infrastructure (matched pattern: {pattern})"
+                    reasoning=f"'{name}' is technical infrastructure (matched pattern: {pattern})",
+                    detection_source="rule_based_classifier",
                 )
         
         if type_lower in technical_types:
             return DependencyClassification(
                 type=DependencyType.TECHNICAL_INFRA,
                 confidence=0.85,
-                reasoning=f"Type '{dep_type}' indicates technical infrastructure"
+                reasoning=f"Type '{dep_type}' indicates technical infrastructure",
+                detection_source="rule_based_classifier",
             )
         
         # Check for business systems
@@ -257,21 +268,24 @@ Return ONLY valid JSON:
                 return DependencyClassification(
                     type=DependencyType.BUSINESS_SYSTEM,
                     confidence=0.9,
-                    reasoning=f"'{name}' is an external business service (matched pattern: {pattern})"
+                    reasoning=f"'{name}' is an external business service (matched pattern: {pattern})",
+                    detection_source="rule_based_classifier",
                 )
         
         if type_lower in business_types:
             return DependencyClassification(
                 type=DependencyType.BUSINESS_SYSTEM,
                 confidence=0.85,
-                reasoning=f"Type '{dep_type}' indicates business system"
+                reasoning=f"Type '{dep_type}' indicates business system",
+                detection_source="rule_based_classifier",
             )
         
         # Unknown - cannot determine
         return DependencyClassification(
             type=DependencyType.UNKNOWN,
             confidence=0.5,
-            reasoning=f"Could not determine classification for '{name}' with type '{dep_type}'"
+            reasoning=f"Could not determine classification for '{name}' with type '{dep_type}'",
+            detection_source="rule_based_classifier",
         )
     
     def classify_batch(

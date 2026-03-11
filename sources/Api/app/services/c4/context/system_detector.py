@@ -17,7 +17,10 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Optional
 
-import tomli
+try:
+    import tomllib as tomli
+except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 fallback
+    import tomli
 import yaml
 
 from app.utils.fs_utils import limited_rglob
@@ -381,7 +384,7 @@ Your answer:"""
 
     def detect_context_actors(self) -> list[dict[str, Any]]:
         """Detect human/system actors for Context diagram."""
-        actor_candidates: dict[str, str] = {}  # name -> description
+        actor_candidates: dict[str, dict[str, str]] = {}
         role_keywords = {
             # Generic roles
             'user': ('User', 'Uses the system'),
@@ -408,6 +411,37 @@ Your answer:"""
             'shopper': ('Shopper', 'Browses and purchases products'),
         }
 
+        def normalize_heading_actor_name(heading: str, fallback: str) -> str:
+            cleaned = re.sub(r'^[#\-\*\s]+', '', heading).strip(" :")
+            if not cleaned:
+                return fallback
+            return cleaned if len(cleaned) <= 60 else fallback
+
+        def clean_actor_description(text: str, fallback: str) -> str:
+            cleaned = re.sub(r'[`*_#>-]', '', str(text or '')).strip()
+            cleaned = re.sub(r'\s+', ' ', cleaned)
+            if not cleaned:
+                return fallback
+            sentence = re.split(r'(?<=[.!?])\s+', cleaned, maxsplit=1)[0].strip()
+            return sentence or fallback
+
+        def remember_actor(
+            name: str,
+            description: str,
+            *,
+            detected_from: str,
+            detection_method: str,
+            evidence: str,
+        ) -> None:
+            actor_candidates[name] = {
+                "name": name,
+                "type": "person",
+                "description": description,
+                "detected_from": detected_from,
+                "detection_method": detection_method,
+                "evidence": evidence,
+            }
+
         candidate_files = []
         for name in ["README.md", "README.rst", "README.txt"]:
             path = self.repo_path / name
@@ -424,42 +458,110 @@ Your answer:"""
 
         for doc in candidate_files:
             try:
+                rel_path = str(doc.relative_to(self.repo_path))
                 with open(doc, 'r', encoding='utf-8', errors='ignore') as f:
-                    for line in f:
-                        line_lower = line.lower()
-                        # Prefer headings for roles/personas
-                        if line.strip().startswith('#'):
-                            for key, (label, desc) in role_keywords.items():
-                                if key in line_lower:
-                                    actor_candidates[label] = desc
-                        # Catch inline mentions of CLI or SDK usage
-                        if 'cli' in line_lower:
-                            actor_candidates['CLI User'] = 'Uses the command-line interface'
-                        if 'sdk' in line_lower or 'api client' in line_lower:
-                            actor_candidates['API Client'] = 'Consumes the system API'
-                        # CMS-specific inline patterns
-                        if any(p in line_lower for p in ('content editor', 'content manager', 'cms user')):
-                            actor_candidates['Content Editor'] = 'Creates and manages CMS content'
-                        if any(p in line_lower for p in ('marketing user', 'marketing team', 'marketer')):
-                            actor_candidates['Marketing User'] = 'Creates and manages marketing content'
+                    lines = f.readlines()
+
+                for idx, line in enumerate(lines):
+                    line_lower = line.lower()
+                    supporting_line = ""
+                    for candidate in lines[idx + 1: idx + 4]:
+                        candidate_text = candidate.strip()
+                        if candidate_text and not candidate_text.startswith('#'):
+                            supporting_line = candidate_text
+                            break
+
+                    # Prefer headings for roles/personas
+                    if line.strip().startswith('#'):
+                        heading_text = line.strip()
+                        for key, (label, desc) in role_keywords.items():
+                            if key in line_lower:
+                                remember_actor(
+                                    normalize_heading_actor_name(heading_text, label),
+                                    clean_actor_description(supporting_line, desc),
+                                    detected_from=rel_path,
+                                    detection_method="documentation_heading",
+                                    evidence=heading_text,
+                                )
+                    # Catch inline mentions of CLI or SDK usage
+                    if 'cli' in line_lower:
+                        remember_actor(
+                            'CLI User',
+                            'Uses the command-line interface',
+                            detected_from=rel_path,
+                            detection_method="documentation_mention",
+                            evidence=line.strip(),
+                        )
+                    if 'sdk' in line_lower or 'api client' in line_lower:
+                        remember_actor(
+                            'API Client',
+                            'Consumes the system API',
+                            detected_from=rel_path,
+                            detection_method="documentation_mention",
+                            evidence=line.strip(),
+                        )
+                    # CMS-specific inline patterns
+                    if any(p in line_lower for p in ('content editor', 'content manager', 'cms user')):
+                        remember_actor(
+                            'Content Editor',
+                            'Creates and manages CMS content',
+                            detected_from=rel_path,
+                            detection_method="documentation_mention",
+                            evidence=line.strip(),
+                        )
+                    if any(p in line_lower for p in ('marketing user', 'marketing team', 'marketer')):
+                        remember_actor(
+                            'Marketing User',
+                            'Creates and manages marketing content',
+                            detected_from=rel_path,
+                            detection_method="documentation_mention",
+                            evidence=line.strip(),
+                        )
             except Exception:
                 continue
 
         # Domain-aware fallback when nothing detected from documentation
         if not actor_candidates:
             if is_cms:
-                actor_candidates['Content Editor'] = 'Creates and manages CMS content'
-                actor_candidates['Administrator'] = 'Administers and configures the system'
+                remember_actor(
+                    'Content Editor',
+                    'Creates and manages CMS content',
+                    detected_from='repo_name',
+                    detection_method='domain_fallback',
+                    evidence=self.repo_path.name,
+                )
+                remember_actor(
+                    'Administrator',
+                    'Administers and configures the system',
+                    detected_from='repo_name',
+                    detection_method='domain_fallback',
+                    evidence=self.repo_path.name,
+                )
             elif is_commerce:
-                actor_candidates['Shopper'] = 'Browses and purchases products'
-                actor_candidates['Merchant'] = 'Manages product catalogue and pricing'
+                remember_actor(
+                    'Shopper',
+                    'Browses and purchases products',
+                    detected_from='repo_name',
+                    detection_method='domain_fallback',
+                    evidence=self.repo_path.name,
+                )
+                remember_actor(
+                    'Merchant',
+                    'Manages product catalogue and pricing',
+                    detected_from='repo_name',
+                    detection_method='domain_fallback',
+                    evidence=self.repo_path.name,
+                )
             else:
-                actor_candidates['User'] = 'Uses the system'
+                remember_actor(
+                    'User',
+                    'Uses the system',
+                    detected_from='repo_name',
+                    detection_method='generic_fallback',
+                    evidence=self.repo_path.name,
+                )
 
-        return [
-            {"name": name, "type": "person", "description": desc}
-            for name, desc in sorted(actor_candidates.items())
-        ]
+        return sorted(actor_candidates.values(), key=lambda actor: actor["name"])
 
     def detect_environments(self) -> list[str]:
         """Detect deployment environments from values files."""

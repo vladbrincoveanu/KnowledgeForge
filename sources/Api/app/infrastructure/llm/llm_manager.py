@@ -11,7 +11,7 @@ from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Iterator, Optional
 
 import requests
 from pydantic import BaseModel
@@ -159,8 +159,8 @@ class LLMManager:
         # Prompt templates
         self.prompt_templates = self._initialize_prompt_templates()
 
-        # Test LM Studio connection
-        self._test_connection()
+        # Track provider reachability so callers can fail fast when no model is up.
+        self.is_available = self._test_connection()
 
     def _initialize_prompt_templates(self) -> dict[str, str]:
         """Initialize prompt templates with few-shot examples."""
@@ -569,6 +569,70 @@ Create ontology mappings in JSON format:
             return response
 
         return None
+
+    def stream_text(
+        self,
+        prompt: str,
+        model: Optional[str] = None,
+        max_tokens: int = 100,
+        temperature: float = 0.7,
+    ) -> Iterator[str]:
+        """Stream text deltas from the active provider."""
+        model = model or self.default_model
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "stream": True,
+        }
+        headers = {}
+        if self.use_openai:
+            headers["Authorization"] = f"Bearer {self.openai_api_key}"
+
+        try:
+            self._wait_for_rate_limit()
+            with self.session.post(
+                self._build_url("/chat/completions"),
+                json=payload,
+                headers=headers,
+                timeout=self.timeout,
+                stream=True,
+            ) as response:
+                if response.status_code != 200:
+                    logger.warning(
+                        "Streaming chat request failed with status %s",
+                        response.status_code,
+                    )
+                    return
+
+                for raw_line in response.iter_lines(decode_unicode=True):
+                    if not raw_line:
+                        continue
+                    line = raw_line.strip()
+                    if not line:
+                        continue
+                    if line.startswith("data:"):
+                        line = line[5:].strip()
+                    if line == "[DONE]":
+                        break
+
+                    try:
+                        chunk = json.loads(line)
+                    except json.JSONDecodeError:
+                        logger.debug("Skipping non-JSON streaming chunk: %s", line)
+                        continue
+
+                    choice = (chunk.get("choices") or [{}])[0]
+                    delta = (
+                        choice.get("delta", {}).get("content")
+                        or choice.get("message", {}).get("content")
+                    )
+                    if delta:
+                        yield delta
+        except requests.exceptions.RequestException as exc:
+            logger.warning("Streaming text request failed: %s", exc)
+            return
 
     def extract_entities(
         self, text: str, schema: dict[str, Any]

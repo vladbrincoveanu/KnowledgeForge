@@ -54,6 +54,7 @@ def env_file_repo(temp_repo):
 DATABASE_URL=postgresql://user:pass@db.example.com:5432/mydb
 REDIS_URL=redis://cache.example.com:6379
 STRIPE_API_KEY=sk_live_xxxx
+OPENAI_API_KEY=sk-openai-test
 AWS_REGION=us-east-1
 SENDGRID_API_KEY=SG.xxx
 """
@@ -78,6 +79,21 @@ services:
     image: redis:7
 """
     (temp_repo / "docker-compose.yml").write_text(compose)
+    return temp_repo
+
+
+@pytest.fixture
+def appsettings_repo(temp_repo):
+    """Repo with appsettings.json containing ambiguous internal endpoints."""
+    appsettings = {
+        "Payments": {
+            "BaseUrl": "https://gateway.internal.example/api"
+        },
+        "Messaging": {
+            "RedisUrl": "redis://cache:6379/0"
+        }
+    }
+    (temp_repo / "appsettings.json").write_text(json.dumps(appsettings, indent=2))
     return temp_repo
 
 
@@ -130,6 +146,16 @@ class TestDependencyDetectorDetect:
         for dep in result:
             assert "detected_from" in dep
 
+    def test_dependency_has_decision_metadata(self, env_file_repo):
+        detector = DependencyDetector(env_file_repo, enable_classification=False)
+        result = detector.detect_external_dependencies()
+        assert result
+        for dep in result:
+            assert "decision" in dep
+            assert "review_status" in dep
+            assert "confidence" in dep
+            assert "evidence" in dep
+
     def test_detects_from_package_json(self, node_project_repo):
         detector = DependencyDetector(node_project_repo, enable_classification=False)
         result = detector.detect_external_dependencies()
@@ -142,6 +168,18 @@ class TestDependencyDetectorDetect:
         detector = DependencyDetector(env_file_repo, enable_classification=False)
         result = detector.detect_external_dependencies()
         assert isinstance(result, list)
+        names = {dep["name"] for dep in result}
+        assert "OpenAI" in names
+        assert "Stripe" in names
+
+    def test_dependency_decision_includes_catalog_match_metadata(self, env_file_repo):
+        detector = DependencyDetector(env_file_repo, enable_classification=False)
+        result = detector.detect_external_dependencies()
+        openai_dep = next(dep for dep in result if dep["name"] == "OpenAI")
+        catalog_match = openai_dep["decision"]["metadata"]["catalog_match"]
+        assert catalog_match is not None
+        assert catalog_match["alias_field"] == "env_aliases"
+        assert catalog_match["matched_alias"] == "OPENAI_API_KEY"
 
     def test_detects_from_docker_compose(self, docker_compose_repo):
         detector = DependencyDetector(docker_compose_repo, enable_classification=False)
@@ -168,6 +206,18 @@ class TestDependencyDetectorDetect:
         alerts = detector.detect_dependency_freshness_alerts()
         assert any(alert.get("dependency") == "requests" for alert in alerts)
 
+    def test_ambiguous_internal_url_emits_review_item(self, appsettings_repo):
+        detector = DependencyDetector(appsettings_repo, enable_classification=False)
+        result = detector.detect_external_dependencies()
+        reviews = [dep for dep in result if dep.get("review_status") == "needs_review"]
+        assert reviews
+        assert any(dep.get("review_item") for dep in reviews)
+
+    def test_detects_deployment_dependencies(self, appsettings_repo):
+        detector = DependencyDetector(appsettings_repo, enable_classification=False)
+        result = detector.detect_deployment_dependencies()
+        assert isinstance(result, list)
+
 
 class TestDependencyDetectorClassification:
     """Test dependency type classification."""
@@ -180,3 +230,38 @@ class TestDependencyDetectorClassification:
                    or "database" in d.get("type", "").lower()]
         # Not strictly required (depends on implementation), just verify structure
         assert isinstance(result, list)
+
+    def test_enriched_dependency_exposes_business_context_name(self, temp_repo):
+        detector = DependencyDetector(temp_repo, enable_classification=False)
+
+        dep = detector._enrich_dependency(
+            {
+                "name": "GlobalBank API",
+                "type": "external_service",
+                "detected_from": "appsettings.json",
+            }
+        )
+
+        assert dep["name"] == "GlobalBank API"
+        assert dep["context_name"] == "GlobalBank"
+        assert dep["integration_surface"] == "API"
+
+    def test_unknown_dependency_emits_review_options_for_human_loop(self, temp_repo):
+        detector = DependencyDetector(temp_repo, enable_classification=False)
+
+        dep = detector._enrich_dependency(
+            {
+                "name": "SignalForge Risk API",
+                "type": "external_service",
+                "detected_from": "README.md",
+            }
+        )
+
+        assert dep["review_status"] == "needs_review"
+        assert dep["requires_human_review"] is True
+        assert dep["review_threshold"] == 0.70
+        assert [option["value"] for option in dep["review_options"]] == [
+            "BUSINESS_SYSTEM",
+            "TECHNICAL_INFRA",
+        ]
+        assert dep["suggested_prompts"]

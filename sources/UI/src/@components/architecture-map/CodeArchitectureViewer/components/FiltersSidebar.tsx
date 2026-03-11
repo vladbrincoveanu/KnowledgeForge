@@ -7,7 +7,6 @@ const AVAILABLE_LEVELS = [
   'context_level',
   'container_level',
   'component_level',
-  'code_level',
 ];
 
 interface FiltersSidebarProps {

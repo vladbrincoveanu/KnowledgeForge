@@ -15,6 +15,11 @@ logger = logging.getLogger(__name__)
 _URL_HOST_REGEX = re.compile(r"https?://([^/\s:]+)(?::\d+)?", re.IGNORECASE)
 _HOST_PORT_REGEX = re.compile(r"\b([a-zA-Z0-9][a-zA-Z0-9-]*)(?:\.[a-zA-Z0-9.-]+)?:(\d{2,5})\b")
 _HOSTNAME_REGEX = re.compile(r"\b([a-zA-Z0-9][a-zA-Z0-9-]{1,63})\b")
+_OWNER_PATTERNS = (
+    re.compile(r"^\s*owner\s*:\s*(.+?)\s*$", re.IGNORECASE),
+    re.compile(r"^\s*team\s*:\s*(.+?)\s*$", re.IGNORECASE),
+)
+_CODEOWNERS_HANDLE_PATTERN = re.compile(r"@([a-zA-Z0-9_.-]+(?:/[a-zA-Z0-9_.-]+)?)")
 
 
 def infer_container_type(project_dir: Path) -> str:
@@ -81,16 +86,107 @@ def detect_technology_stack(project_dir: Path) -> str:
     """Detect primary technology stack."""
     if (project_dir / "package.json").exists():
         return "Node.js"
-    elif (project_dir / "pyproject.toml").exists():
+    elif (project_dir / "pyproject.toml").exists() or (project_dir / "requirements.txt").exists():
         return "Python"
     elif (project_dir / "pom.xml").exists():
         return "Java"
+    elif (project_dir / "build.gradle").exists() or (project_dir / "build.gradle.kts").exists():
+        return "Java"
     elif (project_dir / "go.mod").exists():
         return "Go"
+    elif list(project_dir.glob("*.csproj")) or list(project_dir.glob("*.sln")):
+        return ".NET"
     elif (project_dir / "Cargo.toml").exists():
         return "Rust"
+    elif list(project_dir.glob("*.tf")):
+        return "Terraform"
+    elif (project_dir / "chart" / "Chart.yaml").exists() or (project_dir / "Chart.yaml").exists():
+        return "Helm"
     
     return "Unknown"
+
+
+def detect_service_owner(repo_path: Path, project_dir: Path) -> tuple[Optional[str], Optional[str]]:
+    """Detect an owner and optional team for a single service directory."""
+    readme_owner = _extract_owner_from_readme(project_dir)
+    if readme_owner:
+        codeowners_owner, codeowners_team = _extract_owner_from_codeowners(project_dir)
+        return readme_owner, codeowners_team or codeowners_owner
+
+    codeowners_owner, codeowners_team = _extract_owner_from_codeowners(project_dir)
+    if codeowners_owner or codeowners_team:
+        return codeowners_owner, codeowners_team
+
+    root_readme_owner = _extract_owner_from_root_readme(repo_path, project_dir.name)
+    if root_readme_owner:
+        return root_readme_owner, None
+
+    return None, None
+
+
+def _extract_owner_from_readme(project_dir: Path) -> Optional[str]:
+    for readme_name in ("README.md", "README.rst", "README.txt"):
+        readme_path = project_dir / readme_name
+        if not readme_path.exists():
+            continue
+
+        try:
+            lines = readme_path.read_text(encoding='utf-8', errors='ignore').splitlines()
+        except Exception:
+            continue
+
+        for line in lines[:80]:
+            for pattern in _OWNER_PATTERNS:
+                match = pattern.match(line)
+                if match:
+                    value = match.group(1).strip()
+                    if value:
+                        return value
+
+    return None
+
+
+def _extract_owner_from_codeowners(project_dir: Path) -> tuple[Optional[str], Optional[str]]:
+    codeowners_path = project_dir / "CODEOWNERS"
+    if not codeowners_path.exists():
+        return None, None
+
+    try:
+        content = codeowners_path.read_text(encoding='utf-8', errors='ignore')
+    except Exception:
+        return None, None
+
+    handles = _CODEOWNERS_HANDLE_PATTERN.findall(content)
+    if not handles:
+        return None, None
+
+    owner = handles[0]
+    team = handles[1] if len(handles) > 1 else None
+    return owner, team
+
+
+def _extract_owner_from_root_readme(repo_path: Path, service_name: str) -> Optional[str]:
+    for readme_name in ("README.md", "README.rst", "README.txt"):
+        readme_path = repo_path / readme_name
+        if not readme_path.exists():
+            continue
+
+        try:
+            content = readme_path.read_text(encoding='utf-8', errors='ignore')
+        except Exception:
+            continue
+
+        match = re.search(
+            rf"`?{re.escape(service_name)}`?\s+owned by\s+([^\n]+)",
+            content,
+            flags=re.IGNORECASE,
+        )
+        if match:
+            owner = match.group(1).strip()
+            if owner:
+                return owner
+
+    return None
 
 
 def infer_protocol(project_dir: Path) -> str:

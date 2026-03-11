@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -5,13 +6,22 @@ import {
   getBezierPath,
 } from 'reactflow';
 
-const getEdgeOffset = (id: string) => {
-  let hash = 0;
-  for (let i = 0; i < id.length; i += 1) {
-    hash = (hash * 31 + id.charCodeAt(i)) | 0;
-  }
-  const bucket = Math.abs(hash) % 5; // 0..4
-  return (bucket - 2) * 10; // -20..20 px
+import { getC4EdgeGeometry } from './c4EdgeGeometry';
+
+// Color palette for different relationship types
+const EDGE_COLORS: Record<string, string> = {
+  uses: '#6366f1',
+  calls: '#10b981',
+  async: '#f59e0b',
+  contains: '#8b5cf6',
+  depends: '#ec4899',
+  triggers: '#14b8a6',
+};
+
+const getEdgeColor = (data?: Record<string, unknown>): string => {
+  if (!data?.relationship_type) return '#64748b';
+  const relType = String(data.relationship_type).toLowerCase();
+  return EDGE_COLORS[relType] || '#64748b';
 };
 
 const C4Edge = ({
@@ -27,22 +37,49 @@ const C4Edge = ({
   data,
   interactionWidth,
 }: EdgeProps) => {
-  const offset = getEdgeOffset(id);
-  const [edgePath, labelX, labelY] = getBezierPath({
+  const edgeColor = getEdgeColor(data as Record<string, unknown>);
+  const labelPlacement =
+    data?.label_placement === 'source' ||
+    data?.label_placement === 'target' ||
+    data?.label_placement === 'center'
+      ? data.label_placement
+      : undefined;
+  const geometry = getC4EdgeGeometry({
+    id,
     sourceX,
-    sourceY: sourceY + offset,
+    sourceY,
     targetX,
-    targetY: targetY + offset,
+    targetY,
+    labelPlacement,
+  });
+
+  const [edgePath] = getBezierPath({
+    sourceX,
+    sourceY: sourceY + geometry.sourceYOffset,
+    targetX,
+    targetY: targetY + geometry.targetYOffset,
     sourcePosition,
     targetPosition,
+    curvature: 0.28,
   });
 
   const protocol = data?.protocol as string | undefined;
-  const description = data?.description as string | undefined;
-  const fallbackLabel = label as string | undefined;
+  const description =
+    typeof data?.description === 'string' ? data.description.trim() : undefined;
+  const fallbackLabel =
+    typeof label === 'string' ? label.trim() : undefined;
+  const labelTitle =
+    typeof data?.label_title === 'string' ? data.label_title.trim() : undefined;
+  const contextRole =
+    typeof data?.context_role === 'string' ? data.context_role : undefined;
+  const primaryLabel = fallbackLabel || description || protocol;
+  const secondaryDescription =
+    protocol && protocol !== primaryLabel ? protocol : undefined;
 
-  // Show label box if we have protocol, description, or a plain label
-  const hasContent = protocol || description || fallbackLabel;
+  const hasContent = primaryLabel || secondaryDescription;
+  const edgeLabelStyle = {
+    '--edge-accent': edgeColor,
+  } as CSSProperties;
 
   return (
     <>
@@ -50,45 +87,55 @@ const C4Edge = ({
         id={id}
         path={edgePath}
         markerEnd={markerEnd}
-        interactionWidth={interactionWidth ?? 16}
-        style={{ stroke: '#1168bd', strokeWidth: 2.8, cursor: 'pointer' }}
+        interactionWidth={interactionWidth ?? 20}
+        style={{
+          stroke: 'rgba(248, 250, 252, 0.96)',
+          strokeWidth: 8,
+          strokeLinecap: 'round',
+          strokeLinejoin: 'round',
+        }}
+        className="c4-edge-halo"
+      />
+      <BaseEdge
+        id={`${id}-foreground`}
+        path={edgePath}
+        markerEnd={markerEnd}
+        interactionWidth={interactionWidth ?? 20}
+        style={{
+          stroke: edgeColor,
+          strokeOpacity: 0.78,
+          strokeWidth: 2.4,
+          strokeLinecap: 'round',
+          strokeLinejoin: 'round',
+          cursor: 'pointer',
+          transition: 'stroke 0.2s ease, stroke-width 0.2s ease, stroke-opacity 0.2s ease',
+        }}
+        className="c4-edge-line"
       />
       {hasContent ? (
         <EdgeLabelRenderer>
           <div
+            className={`c4-edge-label${
+              contextRole ? ` c4-edge-label--${contextRole}` : ''
+            }`}
             style={{
-              position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY + offset}px)`,
-              background: '#ffffff',
-              border: '1px solid #e2e8f0',
-              borderRadius: 6,
-              padding: '3px 8px',
-              fontSize: 11,
-              fontFamily: 'sans-serif',
-              color: '#0f172a',
-              pointerEvents: 'none',
-              textAlign: 'center',
-              maxWidth: 160,
+              transform: `translate(-50%, -50%) translate(${geometry.labelX}px,${geometry.labelY}px)`,
             }}
           >
-            {protocol ? (
-              <div style={{ fontWeight: 700 }}>[{protocol}]</div>
-            ) : fallbackLabel ? (
-              <div style={{ fontWeight: 600 }}>{fallbackLabel}</div>
-            ) : null}
-            {description && (
-              <div
-                style={{
-                  fontStyle: 'italic',
-                  color: '#64748b',
-                  marginTop: (protocol || fallbackLabel) ? 2 : 0,
-                  fontSize: 10,
-                  lineHeight: '1.3',
-                }}
-              >
-                {description}
+            <div className="c4-edge-label-inner" style={edgeLabelStyle}>
+              <span className="c4-edge-label-accent" aria-hidden="true" />
+              <div className="c4-edge-label-copy">
+                {labelTitle && labelTitle !== primaryLabel ? (
+                  <span className="c4-edge-title-chip">{labelTitle}</span>
+                ) : null}
+                {primaryLabel ? (
+                  <span className="c4-edge-primary">{primaryLabel}</span>
+                ) : null}
+                {secondaryDescription && (
+                  <span className="c4-edge-desc">{secondaryDescription}</span>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </EdgeLabelRenderer>
       ) : null}

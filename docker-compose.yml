@@ -109,6 +109,7 @@ services:
       - ./sources/Api:/app
       - ./sources/Api/config.yaml:/app/config.yaml:ro
       - ./sources/data:/app/data
+      - ./sources/demo:/app/sources/demo:ro
       - ./cms:/cms:ro
       - ./logs:/app/logs
       - ./uploads:/app/uploads

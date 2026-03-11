@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import type { ArchitectureChatMessage } from "../../../../services/api";
 import FormattedDetailValue from "./FormattedDetailValue";
 
@@ -22,11 +22,36 @@ export default function EdgeDetailsPanel({
   onSendChat,
 }: EdgeDetailsPanelProps) {
   const [chatInput, setChatInput] = useState("");
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const lastChatMessage = chatMessages[chatMessages.length - 1];
+  const chatStatusLabel = isChatLoading ? "Preparing a response..." : null;
+  const chatStatus = chatStatusLabel ? (
+    <div className="chat-status" role="status" aria-live="polite">
+      <span className="chat-status-indicator" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </span>
+      <span>{chatStatusLabel}</span>
+    </div>
+  ) : null;
+
+  useEffect(() => {
+    if (typeof chatEndRef.current?.scrollIntoView === "function") {
+      chatEndRef.current.scrollIntoView({ block: "end" });
+    }
+  }, [
+    chatMessages.length,
+    isChatLoading,
+    lastChatMessage?.content,
+    lastChatMessage?.streaming,
+  ]);
 
   const handleSendChat = async () => {
-    if (!chatInput.trim()) return;
-    await onSendChat(chatInput);
+    const nextMessage = chatInput.trim();
+    if (!nextMessage) return;
     setChatInput("");
+    await onSendChat(nextMessage);
   };
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
@@ -100,7 +125,7 @@ export default function EdgeDetailsPanel({
         {chatMessages.map((message, index) => (
           <div
             key={`${message.role}-${index}`}
-            className={`chat-message ${message.role}`}
+            className={`chat-message ${message.role}${message.streaming ? " streaming" : ""}`}
           >
             <div className="message-content">
               <FormattedDetailValue
@@ -110,14 +135,11 @@ export default function EdgeDetailsPanel({
             </div>
           </div>
         ))}
-        {isChatLoading && (
-          <div className="chat-message assistant">
-            <div className="message-content">Thinking...</div>
-          </div>
-        )}
+        <div ref={chatEndRef} aria-hidden="true" />
       </div>
 
       <div className="chat-input-container">
+        {chatStatus}
         <div className="chat-input-wrapper">
           <textarea
             placeholder="Ask about this relationship..."
@@ -128,6 +150,7 @@ export default function EdgeDetailsPanel({
           />
           <button
             className="send-btn"
+            aria-label="Send chat message"
             onClick={handleSendChat}
             disabled={!chatInput.trim() || isChatLoading}
           >

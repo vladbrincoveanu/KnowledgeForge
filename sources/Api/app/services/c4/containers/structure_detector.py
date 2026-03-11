@@ -153,18 +153,24 @@ class StructureDetector(BaseContainerDetector):
 
         runtime_environment = None
         deployment = None
+        dockerfile_path = rel_path / "Dockerfile" if (project_dir / "Dockerfile").exists() else None
+        has_terraform = bool(list(project_dir.glob("*.tf")))
+        has_helm = (project_dir / "chart" / "Chart.yaml").exists() or (project_dir / "Chart.yaml").exists()
+        has_kubernetes = self._directory_has_k8s_manifest(project_dir)
         if (project_dir / "chart" / "Chart.yaml").exists():
             runtime_environment = "Kubernetes"
             deployment = "Helm"
         elif (project_dir / "kustomize" / "kustomization.yaml").exists():
             runtime_environment = "Kubernetes"
             deployment = "Kustomize"
-        elif self._directory_has_k8s_manifest(project_dir):
+        elif has_kubernetes:
             runtime_environment = "Kubernetes"
             deployment = "Manifest"
         elif self._path_matches_gitops(rel_path_str):
             runtime_environment = "Kubernetes"
             deployment = "GitOps"
+
+        owner, team = utils.detect_service_owner(self.repo_path, project_dir)
         
         container = {
             "c4_level": 2,
@@ -184,6 +190,13 @@ class StructureDetector(BaseContainerDetector):
             "dependencies_internal": [],  # Will be populated later
             "health_endpoint": utils.extract_health_endpoint(project_dir),
             "endpoint": utils.extract_service_endpoint(project_dir),
+            "dockerfile": str(dockerfile_path) if dockerfile_path else None,
+            "terraform": has_terraform,
+            "helm": has_helm,
+            "kubernetes": runtime_environment == "Kubernetes" or has_kubernetes,
+            "owner": owner,
+            "team": team,
+            "owner_team": team or owner,
         }
 
         if not container.get("description") and runtime_environment:

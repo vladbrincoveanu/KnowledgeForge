@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: omnipay-gateway
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: omnipay-gateway
+  template:
+    metadata:
+      labels:
+        app: omnipay-gateway
+    spec:
+      containers:
+        - name: omnipay-gateway
+          image: ghcr.io/knowledgeforge-demos/omnipay-gateway:1.0.0
+          ports:
+            - containerPort: 3000

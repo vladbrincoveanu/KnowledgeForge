@@ -6,7 +6,7 @@ Detects:
 - Criticality tier (Tier 1/2/3)
 - Data classification (PII, Credit-Card, Legal, General)
 - Service status (ACTIVE, MAINTENANCE, DEPRECATED, ARCHIVED)
-- Active experts count (bus factor indicator)
+- Bus factor (code ownership spread)
 - Compliance risk level
 - Git activity metrics
 - Contributor statistics
@@ -21,8 +21,10 @@ from typing import Any, Optional
 
 from app.utils.fs_utils import limited_rglob
 
-import tomli
-from app.utils.fs_utils import limited_rglob
+try:
+    import tomllib as tomli
+except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 fallback
+    import tomli
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +44,15 @@ class MetadataDetector:
         self.llm_manager = llm_manager
         self.containers = containers or {}
 
-    def detect_owner_team(self) -> str:
-        """Detect owner team from CODEOWNERS, README, or git contributors."""
+    def detect_owner_team(self) -> tuple[str, dict[str, Any]]:
+        """Detect owner team from CODEOWNERS, README, or git contributors.
+
+        Returns:
+            Tuple of (owner_value, provenance_dict)
+            provenance_dict contains: detection_source, confidence, evidence
+        """
         logger.info(f"Detecting owner team for repository at {self.repo_path}")
-        
+
         # Check CODEOWNERS file
         codeowners_paths = [
             self.repo_path / "CODEOWNERS",
@@ -66,7 +73,11 @@ class MetadataDetector:
 
                     if teams:
                         logger.info(f"Found team in CODEOWNERS: {teams[0]}")
-                        return teams[0]
+                        return (teams[0], {
+                            "detection_source": "codeowners",
+                            "confidence": 0.95,
+                            "evidence": [{"type": "codeowners_file", "source": str(codeowners_file), "snippet": teams[0]}]
+                        })
 
                 except (OSError, ValueError) as e:
                     logger.warning(f"Failed to read CODEOWNERS: {e}")
@@ -101,7 +112,11 @@ class MetadataDetector:
                             team_info = match.group(1).strip()
                             if len(team_info) < 50:
                                 logger.info(f"Found team in README: {team_info}")
-                                return team_info
+                                return (team_info, {
+                                    "detection_source": "readme",
+                                    "confidence": 0.80,
+                                    "evidence": [{"type": "readme", "source": str(readme), "snippet": team_info[:100]}]
+                                })
 
                 except (OSError, ValueError) as e:
                     logger.warning(f"Failed to read README: {e}")
@@ -117,13 +132,19 @@ class MetadataDetector:
             suggested_team = self._suggest_team_name_from_contributors(top_contributors)
             if suggested_team and suggested_team != "Unknown":
                 logger.info(f"LLM suggested team: {suggested_team}")
-                return suggested_team
+                contributor_list = ", ".join([f"{email} ({count} commits)" for email, count in top_contributors[:3]])
+                return (suggested_team, {
+                    "detection_source": "llm_adjudicated",
+                    "confidence": 0.70,
+                    "evidence": [{"type": "git_contributors", "source": "git_shortlog", "snippet": contributor_list[:200]}]
+                })
 
         # If git contributors found but no LLM, use top contributor
         if top_contributors:
             logger.info(f"Using top contributor from git: {top_contributors[0]}")
             first_contributor = top_contributors[0]
             first_email = first_contributor[0]
+            commit_count = first_contributor[1]
 
             # Try to extract name from git log
             try:
@@ -137,7 +158,11 @@ class MetadataDetector:
                 if result.returncode == 0 and result.stdout.strip():
                     author_name = result.stdout.strip()
                     logger.info(f"Found author name from git: {author_name}")
-                    return author_name
+                    return (author_name, {
+                        "detection_source": "git_author",
+                        "confidence": 0.60,
+                        "evidence": [{"type": "git_log", "source": first_email, "snippet": f"{author_name} ({commit_count} commits)"}]
+                    })
             except (subprocess.SubprocessError, OSError) as e:
                 logger.warning(f"Failed to get author name: {e}")
                 pass
@@ -148,13 +173,25 @@ class MetadataDetector:
                 domain = email_match.group(1)
                 domain = domain.replace('-', ' ').replace('_', ' ').title()
                 logger.info(f"Extracted domain from email: {domain}")
-                return domain
+                return (domain, {
+                    "detection_source": "git_email_domain",
+                    "confidence": 0.40,
+                    "evidence": [{"type": "git_email", "source": first_email, "snippet": f"@{domain}"}]
+                })
 
             logger.info(f"Returning email as owner: {first_email}")
-            return first_email
+            return (first_email, {
+                "detection_source": "git_email",
+                "confidence": 0.30,
+                "evidence": [{"type": "git_email", "source": "git_shortlog", "snippet": first_email}]
+            })
 
         logger.warning("No owner detected, returning 'Unassigned'")
-        return "Unassigned"
+        return ("Unassigned", {
+            "detection_source": "none",
+            "confidence": 0.0,
+            "evidence": []
+        })
 
     def _get_git_roots(self) -> list[Path]:
         """Return effective git roots for this repo path.
@@ -692,6 +729,8 @@ Team name:"""
 
             if commits_30d >= 5 or commits_90d >= 10:
                 return ("ACTIVE", evidence)
+            elif days_since_last_commit and days_since_last_commit > 365:
+                return ("ARCHIVED", evidence)
             elif days_since_last_commit and days_since_last_commit > 180:
                 return ("DEPRECATED", evidence)
             elif commits_180d > 0:

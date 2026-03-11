@@ -2,15 +2,18 @@
 
 import json
 import logging
+import os
+import re
 import shutil
 import tempfile
 import uuid
 import zipfile
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Iterator, Optional
 
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.infrastructure.llm.llm_manager import LLMManager
@@ -22,6 +25,7 @@ from app.utils.security import safe_extract_zip, validate_local_repo_path
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["code-extraction"])
+ARCHITECTURE_CHAT_MAX_TOKENS = int(os.getenv("ARCHITECTURE_CHAT_MAX_TOKENS", "1024"))
 
 # In-memory storage for scan tasks (use Redis in production)
 scan_tasks: dict[str, dict[str, Any]] = {}
@@ -52,28 +56,15 @@ def _load_latest_c4_from_json() -> dict:
     try:
         api_root = Path(__file__).resolve().parents[4]
         output_dir = api_root / "sources" / "data" / "c4_extractions"
-        fallback_file = api_root / "c4_architecture.json"
 
         if not output_dir.exists():
             logger.warning(f"C4 extractions directory does not exist: {output_dir}")
-            if fallback_file.exists():
-                try:
-                    with open(fallback_file, 'r', encoding='utf-8') as f:
-                        return json.load(f)
-                except (OSError, json.JSONDecodeError, ValueError) as e:
-                    logger.error(f"Failed to load fallback C4 JSON: {e}", exc_info=True)
             return {}
 
         json_files = sorted(output_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
 
         if not json_files:
             logger.warning("No C4 extraction JSON files found")
-            if fallback_file.exists():
-                try:
-                    with open(fallback_file, 'r', encoding='utf-8') as f:
-                        return json.load(f)
-                except (OSError, json.JSONDecodeError, ValueError) as e:
-                    logger.error(f"Failed to load fallback C4 JSON: {e}", exc_info=True)
             return {}
 
         latest_file = json_files[0]
@@ -91,6 +82,38 @@ def _load_latest_c4_from_json() -> dict:
     except (OSError, json.JSONDecodeError, ValueError) as e:
         logger.error(f"Failed to load C4 architecture from JSON: {e}", exc_info=True)
         return {}
+
+
+def _load_default_c4_from_json() -> dict:
+    """Load the bundled demo architecture used for cold starts."""
+    try:
+        api_root = Path(__file__).resolve().parents[4]
+        demo_file = api_root / "c4_architecture.json"
+        if not demo_file.exists():
+            logger.warning(f"Default demo file does not exist: {demo_file}")
+            return {}
+
+        with open(demo_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError, ValueError) as e:
+        logger.error(f"Failed to load bundled demo C4 JSON: {e}", exc_info=True)
+        return {}
+
+
+def _load_latest_runtime_c4() -> dict:
+    """Return the latest completed runtime extraction kept in memory."""
+    completed_tasks = [
+        task for task in scan_tasks.values()
+        if task.get('status') == 'completed' and task.get('c4_architecture')
+    ]
+    if not completed_tasks:
+        return {}
+
+    latest_task = max(
+        completed_tasks,
+        key=lambda task: task.get('completed_at') or task.get('created_at') or datetime.min,
+    )
+    return latest_task.get('c4_architecture') or {}
 
 
 class ScanRequest(BaseModel):
@@ -207,6 +230,43 @@ class EdgeDescribeRequest(BaseModel):
         allow_population_by_field_name = True
 
 
+class ArchitectureChatMessage(BaseModel):
+    """Conversation turn for architecture chat."""
+
+    role: str = Field(..., description="Chat role, usually user or assistant.")
+    content: str = Field(..., description="Message text.")
+
+
+class ArchitectureChatRequest(BaseModel):
+    """Request model for architecture-aware chat."""
+
+    message: str = Field(..., description="Latest user message for the chat.")
+    history: list[ArchitectureChatMessage] = Field(
+        default_factory=list,
+        description="Recent chat history, oldest to newest.",
+    )
+    selection: Optional[dict[str, Any]] = Field(
+        default=None,
+        description="Currently selected node or edge context from the viewer.",
+    )
+    architecture: Optional[dict[str, Any]] = Field(
+        default=None,
+        description="High-level architecture summary from the viewer state.",
+    )
+    prefer_heuristic: bool = Field(
+        default=False,
+        alias="preferHeuristic",
+        description="Skip the LLM and return the deterministic fallback immediately.",
+    )
+    stream: bool = Field(
+        default=False,
+        description="Return newline-delimited JSON deltas instead of a single message.",
+    )
+
+    class Config:
+        allow_population_by_field_name = True
+
+
 def _build_node_prompt(payload: NodeDescribeRequest) -> str:
     context = {
         "name": payload.name,
@@ -242,6 +302,177 @@ def _build_edge_prompt(payload: EdgeDescribeRequest) -> str:
         "If protocol is provided, mention it.\n\n"
         f"Edge details: {json.dumps(context, ensure_ascii=False)}"
     )
+
+
+def _compact_json(value: Any, max_chars: int = 2500) -> str:
+    """Serialize context payloads without letting prompts grow unbounded."""
+    try:
+        text = json.dumps(value, ensure_ascii=False, default=str)
+    except (TypeError, ValueError):
+        text = str(value)
+
+    if len(text) <= max_chars:
+        return text
+    return f"{text[: max_chars - 3]}..."
+
+
+def _format_alternatives_for_fallback(alternatives: list[dict[str, Any]]) -> str:
+    """Render provider alternatives for heuristic chat answers."""
+    formatted: list[str] = []
+    for alternative in alternatives[:3]:
+        provider = alternative.get("provider") or "Unknown provider"
+        tiers = " / ".join(
+            str(value)
+            for value in [
+                alternative.get("price_tier"),
+                alternative.get("performance_tier"),
+            ]
+            if value
+        )
+        profile = alternative.get("profile") or alternative.get("notes")
+        parts = [provider]
+        if tiers:
+            parts.append(f"({tiers})")
+        if profile:
+            parts.append(f"- {profile}")
+        formatted.append(" ".join(parts))
+    return "; ".join(formatted)
+
+
+def _build_architecture_chat_prompt(payload: ArchitectureChatRequest) -> str:
+    """Create a compact prompt for architecture-aware chat."""
+    recent_history = [
+        {"role": item.role, "content": item.content}
+        for item in payload.history[-6:]
+        if item.content
+    ]
+
+    return (
+        "You are a concise software architecture assistant embedded in a C4 viewer. "
+        "Answer the user's question using only the provided architecture context. "
+        "Prefer business-facing language at context level. "
+        "If the answer is not supported by the supplied data, say that directly. "
+        "Keep answers short and practical.\n\n"
+        f"Architecture summary: {_compact_json(payload.architecture or {})}\n"
+        f"Current selection: {_compact_json(payload.selection or {})}\n"
+        f"Recent conversation: {_compact_json(recent_history)}\n"
+        f"User question: {payload.message.strip()}"
+    )
+
+
+def _build_architecture_chat_fallback(payload: ArchitectureChatRequest) -> str:
+    """Return a deterministic fallback when no LLM is available."""
+    architecture = payload.architecture or {}
+    selection = payload.selection or {}
+    system = architecture.get("system") or {}
+    system_name = system.get("name") or "the system"
+    selected_level = architecture.get("selectedLevel") or "current"
+    message_lower = payload.message.strip().lower()
+
+    if selection.get("kind") == "node":
+        node = selection.get("node") or {}
+        attrs = node.get("attributes") or {}
+        node_name = node.get("name") or node.get("label") or "This node"
+        description = (
+            node.get("description")
+            or attrs.get("description")
+            or attrs.get("purpose")
+        )
+        alternatives = attrs.get("provider_alternatives") or []
+
+        if alternatives and any(
+            keyword in message_lower
+            for keyword in ["alternative", "alternatives", "compare", "cheaper", "price", "performance"]
+        ):
+            return (
+                f"Known alternatives for {node_name}: "
+                f"{_format_alternatives_for_fallback(alternatives)}. "
+                "I do not have a model-backed recommendation right now, but these are the seeded review options."
+            )
+
+        if description:
+            return f"{node_name} belongs to {system_name}. {description}"
+
+        node_type = node.get("type") or "node"
+        return (
+            f"{node_name} is a {node_type} in {system_name}. "
+            "Ask about its responsibilities, ownership, or relationships for more detail."
+        )
+
+    if selection.get("kind") == "edge":
+        edge = selection.get("edge") or {}
+        description = edge.get("description")
+        if description:
+            return str(description)
+
+        source = edge.get("source") or "Source"
+        target = edge.get("target") or "Target"
+        label = edge.get("label") or "interacts with"
+        return f"{source} {label} {target}."
+
+    counts = architecture.get("counts") or {}
+    node_count = counts.get("nodes")
+    edge_count = counts.get("edges")
+    count_summary = []
+    if node_count is not None:
+        count_summary.append(f"{node_count} nodes")
+    if edge_count is not None:
+        count_summary.append(f"{edge_count} relationships")
+    suffix = f" It currently shows {', '.join(count_summary)}." if count_summary else ""
+
+    return (
+        f"You are looking at {system_name} on the {selected_level} level."
+        f"{suffix} Select a node or edge to get more specific answers."
+    )
+
+
+def _iter_text_deltas(text: str) -> Iterator[str]:
+    """Yield small word-like chunks for typing-style streaming."""
+    for match in re.finditer(r"\S+\s*", text):
+        yield match.group(0)
+
+
+def _stream_architecture_chat_response(
+    payload: ArchitectureChatRequest,
+) -> Iterator[str]:
+    """Stream architecture chat as newline-delimited JSON chunks."""
+    prompt = _build_architecture_chat_prompt(payload)
+    llm_manager = get_llm_manager()
+
+    if llm_manager and not payload.prefer_heuristic:
+        try:
+            received_llm_delta = False
+            for delta in llm_manager.stream_text(
+                prompt,
+                max_tokens=ARCHITECTURE_CHAT_MAX_TOKENS,
+                temperature=0.2,
+            ):
+                if not delta:
+                    continue
+                received_llm_delta = True
+                yield json.dumps(
+                    {"type": "delta", "delta": delta, "source": "llm"},
+                    ensure_ascii=False,
+                ) + "\n"
+            if received_llm_delta:
+                yield json.dumps(
+                    {"type": "done", "source": "llm"},
+                    ensure_ascii=False,
+                ) + "\n"
+                return
+        except Exception as exc:  # pragma: no cover - defensive fallback
+            logger.warning("Architecture chat streaming failed: %s", exc)
+
+    fallback_message = _build_architecture_chat_fallback(payload)
+    for delta in _iter_text_deltas(fallback_message):
+        yield json.dumps(
+            {"type": "delta", "delta": delta, "source": "heuristic"},
+            ensure_ascii=False,
+        ) + "\n"
+    yield json.dumps(
+        {"type": "done", "source": "heuristic"},
+        ensure_ascii=False,
+    ) + "\n"
 
 
 @router.post(
@@ -801,7 +1032,10 @@ async def delete_scan_task(task_id: str):
     "/architecture",
     summary="Retrieve the latest C4 architecture model",
     description=(
-        "Returns the most recently extracted C4 architecture from the JSON file store.\n\n"
+        "Returns the current C4 architecture model.\n\n"
+        "On a cold start, the bundled OmniPay demo is returned by default. "
+        "Once a user runs a scan in the current backend session, the latest "
+        "completed extraction is returned instead.\n\n"
         "**Response shape:**\n"
         "```\n"
         "{\n"
@@ -813,7 +1047,7 @@ async def delete_scan_task(task_id: str):
         "  relationships: { … }\n"
         "}\n"
         "```\n\n"
-        "Returns an empty skeleton when no extraction has been run yet."
+        "Returns an empty skeleton only if both the bundled demo and runtime data are unavailable."
     ),
     responses={
         200: {"description": "C4 architecture model (may be empty skeleton)"},
@@ -822,14 +1056,17 @@ async def delete_scan_task(task_id: str):
 )
 async def get_code_architecture():
     """
-    Get the C4 architecture data from JSON file.
+    Get the active C4 architecture payload.
 
-    Returns the most recently extracted C4 architecture.
-    This replaces Neo4j querying with simple JSON file reading for easier debugging.
+    Runtime extractions take precedence. When the server has not yet processed
+    an extraction in the current session, return the bundled OmniPay demo.
     """
     try:
-        # Load from JSON file
-        c4_data = _load_latest_c4_from_json()
+        c4_data = _load_latest_runtime_c4()
+        if not c4_data:
+            c4_data = _load_default_c4_from_json()
+        if not c4_data:
+            c4_data = _load_latest_c4_from_json()
 
         if not c4_data:
             # Return empty structure if no data
@@ -926,3 +1163,45 @@ async def describe_edge(request: EdgeDescribeRequest):
     protocol_text = f" over {protocol}" if protocol else ""
     description = f"{source} {rel} {target}{protocol_text}."
     return {"description": description, "source": "heuristic"}
+
+
+@router.post(
+    "/chat/context",
+    summary="Chat with the current architecture context",
+    description=(
+        "Uses the current architecture summary, current viewer selection, and recent "
+        "chat turns to answer a question about the diagram. Falls back to a deterministic "
+        "response when no LLM is configured."
+    ),
+    responses={
+        200: {"description": "Architecture chat response (`source`: llm | heuristic)"},
+    },
+)
+async def chat_with_architecture_context(request: ArchitectureChatRequest):
+    """Answer a chat question using the current viewer context."""
+    if request.stream:
+        return StreamingResponse(
+            _stream_architecture_chat_response(request),
+            media_type="application/x-ndjson",
+        )
+
+    prompt = _build_architecture_chat_prompt(request)
+    llm_manager = get_llm_manager()
+
+    if llm_manager and not request.prefer_heuristic:
+        try:
+            response = llm_manager.generate_text(
+                prompt,
+                max_tokens=ARCHITECTURE_CHAT_MAX_TOKENS,
+                temperature=0.2,
+                use_cache=False,
+            )
+            if response:
+                return {"message": response.strip(), "source": "llm"}
+        except Exception as exc:  # pragma: no cover - defensive fallback
+            logger.warning("Architecture chat LLM call failed: %s", exc)
+
+    return {
+        "message": _build_architecture_chat_fallback(request),
+        "source": "heuristic",
+    }
