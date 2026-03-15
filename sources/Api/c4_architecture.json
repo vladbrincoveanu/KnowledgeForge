@@ -3,450 +3,2620 @@
   "system_context": {
     "c4_level": 1,
     "type": "system",
-    "name": "OmniPay Platform",
-    "purpose": "A curated default demo that shows how KnowledgeForge maps a modern payments platform from context through components.",
-    "description": "OmniPay is the default KnowledgeForge architecture demo. It combines a Spring ledger, FastAPI fraud engine, NestJS gateway, Go notifier, Terraform and Helm infrastructure, and a PCI-scoped ASP.NET Core card router.",
-    "owner_team": "KnowledgeForge Demo Platform",
-    "business_domain": "Payments Platform",
-    "criticality": "Tier 1 - Production Critical",
-    "data_class": "Credit-Card",
-    "status": "ACTIVE",
-    "active_experts": 3,
-    "compliance": "AT_RISK",
-    "compliance_confidence": 0.96,
-    "compliance_factors": [
-      "single_point_of_failure"
-    ],
-    "actors": [
-      {
-        "name": "Customer",
-        "type": "person",
-        "description": "Pays with the OmniPay mobile app.",
-        "detected_from": "sources/demo/README.md",
-        "detection_method": "demo_seeded",
-        "evidence": "Customer uses OmniPay checkout and tracks payment state from the mobile app."
-      },
-      {
-        "name": "Fraud Analyst",
-        "type": "person",
-        "description": "Reviews flagged transactions and feeds labels back into the model.",
-        "detected_from": "sources/demo/omnipay-fraud-ml/README.md",
-        "detection_method": "documentation_heading",
-        "evidence": "## Fraud Analyst"
-      },
-      {
-        "name": "Finance Operator",
-        "type": "person",
-        "description": "Monitors settlements, receipts, and card capture health.",
-        "detected_from": "sources/demo/README.md",
-        "detection_method": "demo_seeded",
-        "evidence": "Finance operations owns settlement visibility and receipt delivery health."
-      },
-      {
-        "name": "Risk Operations Manager",
-        "type": "person",
-        "description": "Reviews provider onboarding tradeoffs and resolves low-confidence dependency classifications.",
-        "detected_from": "sources/demo/omnipay-gateway/README.md",
-        "detection_method": "documentation_heading",
-        "evidence": "## Risk Operations Manager"
-      }
-    ],
+    "name": "OmniPay Demo Repositories",
+    "purpose": "OmniPay is a curated demo workspace for KnowledgeForge.",
+    "description": "Thinking Process:\n\n1.  Analyze the Request:\n    *   Task: Generate a concise 2-3 sentence description for the given system.\n    *   System Name: OmniPay Demo Repositories\n    *   Purpose: Curated demo workspace for KnowledgeForge.\n    *   Domain: AI/ML Processing\n    *   Owner: iuliarinea17\n    *   Tier: Tier 1 - Production Critical\n    *   Status: ACTIVE\n    *   Languages/Frameworks: C#, Python,.",
     "external_dependencies": [
       {
-        "name": "Visa Network",
-        "context_name": "Visa Network",
-        "type": "external_system",
-        "url": "https://sandbox.api.visa.com",
-        "detected_from": "omnipay-card-router/appsettings.json",
-        "provider": "Visa Network",
-        "company": "Visa",
-        "dependency_type": "BUSINESS_SYSTEM",
-        "classification_confidence": 0.99,
-        "classification_reasoning": "Card-network endpoint used for live authorization flows.",
+        "name": "Redis",
+        "type": "cache",
+        "detected_from": "omnipay-gateway/package.json",
+        "context": "Dependency: ioredis",
+        "evidence_type": "package_reference",
+        "package_name": "ioredis",
+        "context_name": "Redis",
+        "integration_surface": null,
+        "provider": "Redis",
+        "company": "Redis",
+        "category": "cache",
+        "dependency_type": "TECHNICAL_INFRA",
+        "classification_confidence": 0.98,
+        "classification_reasoning": "Matched provider catalog entry for Redis",
         "decision_mode": "deterministic",
+        "decision": {
+          "value": "Redis",
+          "confidence": 0.98,
+          "detection_source": "provider_catalog",
+          "decision_mode": "deterministic",
+          "review_status": "auto_accepted",
+          "evidence": [
+            {
+              "type": "package_reference",
+              "source": "omnipay-gateway/package.json",
+              "snippet": "Dependency: ioredis"
+            },
+            {
+              "type": "package_reference",
+              "source": "omnipay-disputes/package.json",
+              "snippet": "Dependency: redis"
+            },
+            {
+              "type": "package_reference",
+              "source": "omnipay-auth/package.json",
+              "snippet": "Dependency: redis"
+            },
+            {
+              "type": "package_reference",
+              "source": "omnipay-payment-processor/requirements.txt",
+              "snippet": "Dependency: redis"
+            },
+            {
+              "type": "package_reference",
+              "source": "omnipay-database/requirements.txt",
+              "snippet": "Dependency: redis"
+            },
+            {
+              "type": "config_reference",
+              "source": "omnipay-settlement-orchestrator/appsettings.json",
+              "snippet": "SettlementInfrastructure.RedisUrl=redis://settlement-cache.omnipay.internal:6379/4"
+            },
+            {
+              "type": "config_reference",
+              "source": "omnipay-event-projections/appsettings.json",
+              "snippet": "ProjectionInfrastructure.RedisUrl=redis://projection-cache.omnipay.internal:6379/6"
+            },
+            {
+              "type": "deployment_reference",
+              "source": "omnipay-gateway/docker-compose.yml",
+              "snippet": "redis:7.4-alpine"
+            },
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "Pattern match: redis"
+            },
+            {
+              "type": "package_reference",
+              "source": "omnipay-settlement-orchestrator/OmniPay.SettlementOrchestrator.csproj",
+              "snippet": "NuGet package: AspNetCore.HealthChecks.Redis"
+            },
+            {
+              "type": "package_reference",
+              "source": "omnipay-settlement-orchestrator/OmniPay.SettlementOrchestrator.csproj",
+              "snippet": "NuGet package: StackExchange.Redis"
+            },
+            {
+              "type": "package_reference",
+              "source": "omnipay-event-projections/OmniPay.EventProjections.csproj",
+              "snippet": "NuGet package: StackExchange.Redis"
+            }
+          ],
+          "metadata": {
+            "provider": "Redis",
+            "company": "Redis",
+            "category": "cache",
+            "boundary": "TECHNICAL_INFRA",
+            "catalog_match": {
+              "provider": "Redis",
+              "company": "Redis",
+              "category": "cache",
+              "alias_field": "package_aliases",
+              "matched_alias": "ioredis",
+              "input_value": "ioredis",
+              "normalized_value": "ioredis",
+              "match_strategy": "contains"
+            }
+          }
+        },
+        "confidence": 0.98,
+        "detection_source": "provider_catalog",
         "review_status": "auto_accepted",
         "requires_human_review": false,
-        "review_threshold": 0.7
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "package_reference",
+            "source": "omnipay-gateway/package.json",
+            "snippet": "Dependency: ioredis"
+          },
+          {
+            "type": "package_reference",
+            "source": "omnipay-disputes/package.json",
+            "snippet": "Dependency: redis"
+          },
+          {
+            "type": "package_reference",
+            "source": "omnipay-auth/package.json",
+            "snippet": "Dependency: redis"
+          },
+          {
+            "type": "package_reference",
+            "source": "omnipay-payment-processor/requirements.txt",
+            "snippet": "Dependency: redis"
+          },
+          {
+            "type": "package_reference",
+            "source": "omnipay-database/requirements.txt",
+            "snippet": "Dependency: redis"
+          },
+          {
+            "type": "config_reference",
+            "source": "omnipay-settlement-orchestrator/appsettings.json",
+            "snippet": "SettlementInfrastructure.RedisUrl=redis://settlement-cache.omnipay.internal:6379/4"
+          },
+          {
+            "type": "config_reference",
+            "source": "omnipay-event-projections/appsettings.json",
+            "snippet": "ProjectionInfrastructure.RedisUrl=redis://projection-cache.omnipay.internal:6379/6"
+          },
+          {
+            "type": "deployment_reference",
+            "source": "omnipay-gateway/docker-compose.yml",
+            "snippet": "redis:7.4-alpine"
+          },
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "Pattern match: redis"
+          },
+          {
+            "type": "package_reference",
+            "source": "omnipay-settlement-orchestrator/OmniPay.SettlementOrchestrator.csproj",
+            "snippet": "NuGet package: AspNetCore.HealthChecks.Redis"
+          },
+          {
+            "type": "package_reference",
+            "source": "omnipay-settlement-orchestrator/OmniPay.SettlementOrchestrator.csproj",
+            "snippet": "NuGet package: StackExchange.Redis"
+          },
+          {
+            "type": "package_reference",
+            "source": "omnipay-event-projections/OmniPay.EventProjections.csproj",
+            "snippet": "NuGet package: StackExchange.Redis"
+          }
+        ],
+        "detected_from_all": [
+          "README.md",
+          "omnipay-auth/package.json",
+          "omnipay-database/requirements.txt",
+          "omnipay-disputes/package.json",
+          "omnipay-event-projections/OmniPay.EventProjections.csproj",
+          "omnipay-event-projections/appsettings.json",
+          "omnipay-gateway/docker-compose.yml",
+          "omnipay-gateway/package.json",
+          "omnipay-payment-processor/requirements.txt",
+          "omnipay-settlement-orchestrator/OmniPay.SettlementOrchestrator.csproj",
+          "omnipay-settlement-orchestrator/appsettings.json"
+        ]
       },
       {
-        "name": "Mastercard Network",
-        "context_name": "Mastercard Network",
-        "type": "external_system",
-        "url": "https://sandbox.api.mastercard.com",
-        "detected_from": "omnipay-card-router/appsettings.json",
-        "provider": "Mastercard Network",
-        "company": "Mastercard",
-        "dependency_type": "BUSINESS_SYSTEM",
-        "classification_confidence": 0.99,
-        "classification_reasoning": "Card-network endpoint used for live authorization flows.",
+        "name": "PostgreSQL",
+        "type": "database",
+        "detected_from": "omnipay-disputes/package.json",
+        "context": "Dependency: pg",
+        "evidence_type": "package_reference",
+        "package_name": "pg",
+        "context_name": "PostgreSQL",
+        "integration_surface": null,
+        "provider": "PostgreSQL",
+        "company": "PostgreSQL Global Development Group",
+        "category": "database",
+        "dependency_type": "TECHNICAL_INFRA",
+        "classification_confidence": 0.98,
+        "classification_reasoning": "Matched provider catalog entry for PostgreSQL",
         "decision_mode": "deterministic",
+        "decision": {
+          "value": "PostgreSQL",
+          "confidence": 0.98,
+          "detection_source": "provider_catalog",
+          "decision_mode": "deterministic",
+          "review_status": "auto_accepted",
+          "evidence": [
+            {
+              "type": "package_reference",
+              "source": "omnipay-disputes/package.json",
+              "snippet": "Dependency: pg"
+            },
+            {
+              "type": "package_reference",
+              "source": "omnipay-analytics/package.json",
+              "snippet": "Dependency: pg"
+            },
+            {
+              "type": "package_reference",
+              "source": "omnipay-billing-llm/requirements.txt",
+              "snippet": "Dependency: sqlalchemy"
+            },
+            {
+              "type": "package_reference",
+              "source": "omnipay-database/requirements.txt",
+              "snippet": "Dependency: psycopg2-binary"
+            },
+            {
+              "type": "package_reference",
+              "source": "omnipay-database/requirements.txt",
+              "snippet": "Dependency: sqlalchemy"
+            },
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "Pattern match: postgres"
+            },
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "Pattern match: postgresql"
+            }
+          ],
+          "metadata": {
+            "provider": "PostgreSQL",
+            "company": "PostgreSQL Global Development Group",
+            "category": "database",
+            "boundary": "TECHNICAL_INFRA",
+            "catalog_match": {
+              "provider": "PostgreSQL",
+              "company": "PostgreSQL Global Development Group",
+              "category": "database",
+              "alias_field": "package_aliases",
+              "matched_alias": "pg",
+              "input_value": "pg",
+              "normalized_value": "pg",
+              "match_strategy": "contains"
+            }
+          }
+        },
+        "confidence": 0.98,
+        "detection_source": "provider_catalog",
         "review_status": "auto_accepted",
         "requires_human_review": false,
-        "review_threshold": 0.7
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "package_reference",
+            "source": "omnipay-disputes/package.json",
+            "snippet": "Dependency: pg"
+          },
+          {
+            "type": "package_reference",
+            "source": "omnipay-analytics/package.json",
+            "snippet": "Dependency: pg"
+          },
+          {
+            "type": "package_reference",
+            "source": "omnipay-billing-llm/requirements.txt",
+            "snippet": "Dependency: sqlalchemy"
+          },
+          {
+            "type": "package_reference",
+            "source": "omnipay-database/requirements.txt",
+            "snippet": "Dependency: psycopg2-binary"
+          },
+          {
+            "type": "package_reference",
+            "source": "omnipay-database/requirements.txt",
+            "snippet": "Dependency: sqlalchemy"
+          },
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "Pattern match: postgres"
+          },
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "Pattern match: postgresql"
+          }
+        ],
+        "detected_from_all": [
+          "README.md",
+          "omnipay-analytics/package.json",
+          "omnipay-billing-llm/requirements.txt",
+          "omnipay-database/requirements.txt",
+          "omnipay-disputes/package.json"
+        ]
       },
       {
-        "name": "GlobalBank",
-        "context_name": "GlobalBank",
-        "type": "external_service",
-        "url": "https://api.globalbank.test/v1",
-        "detected_from": "omnipay-card-router/appsettings.json",
-        "integration_surface": "Settlement API",
-        "provider": "GlobalBank",
-        "company": "GlobalBank",
+        "name": "Mixpanel",
+        "type": "analytics",
+        "detected_from": "omnipay-analytics/package.json",
+        "context": "Dependency: mixpanel",
+        "evidence_type": "package_reference",
+        "package_name": "mixpanel",
+        "context_name": "Mixpanel",
+        "integration_surface": null,
+        "provider": "Mixpanel",
+        "company": "Mixpanel",
+        "category": "analytics",
         "dependency_type": "BUSINESS_SYSTEM",
         "classification_confidence": 0.98,
-        "classification_reasoning": "Banking partner endpoint used for settlement and fallback captures.",
+        "classification_reasoning": "Matched provider catalog entry for Mixpanel",
         "decision_mode": "deterministic",
+        "decision": {
+          "value": "Mixpanel",
+          "confidence": 0.98,
+          "detection_source": "provider_catalog",
+          "decision_mode": "deterministic",
+          "review_status": "auto_accepted",
+          "evidence": [
+            {
+              "type": "package_reference",
+              "source": "omnipay-analytics/package.json",
+              "snippet": "Dependency: mixpanel"
+            }
+          ],
+          "metadata": {
+            "provider": "Mixpanel",
+            "company": "Mixpanel",
+            "category": "analytics",
+            "boundary": "BUSINESS_SYSTEM",
+            "catalog_match": {
+              "provider": "Mixpanel",
+              "company": "Mixpanel",
+              "category": "analytics",
+              "alias_field": "package_aliases",
+              "matched_alias": "mixpanel",
+              "input_value": "mixpanel",
+              "normalized_value": "mixpanel",
+              "match_strategy": "contains"
+            }
+          }
+        },
+        "confidence": 0.98,
+        "detection_source": "provider_catalog",
         "review_status": "auto_accepted",
         "requires_human_review": false,
-        "review_threshold": 0.7
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "package_reference",
+            "source": "omnipay-analytics/package.json",
+            "snippet": "Dependency: mixpanel"
+          }
+        ],
+        "detected_from_all": [
+          "omnipay-analytics/package.json"
+        ]
       },
       {
         "name": "Auth0",
-        "context_name": "Auth0",
         "type": "authentication",
-        "url": "https://omnipay-demo.us.auth0.com",
-        "detected_from": "omnipay-gateway/README.md",
+        "detected_from": "omnipay-auth/package.json",
+        "context": "Dependency: @auth0/auth0-spa-js",
+        "evidence_type": "package_reference",
+        "package_name": "@auth0/auth0-spa-js",
+        "context_name": "Auth0",
+        "integration_surface": null,
         "provider": "Auth0",
         "company": "Okta",
+        "category": "authentication",
         "dependency_type": "BUSINESS_SYSTEM",
         "classification_confidence": 0.98,
-        "classification_reasoning": "Hosted identity is a business-critical SaaS dependency for customer login and session flows.",
+        "classification_reasoning": "Matched provider catalog entry for Auth0",
         "decision_mode": "deterministic",
+        "decision": {
+          "value": "Auth0",
+          "confidence": 0.98,
+          "detection_source": "provider_catalog",
+          "decision_mode": "deterministic",
+          "review_status": "auto_accepted",
+          "evidence": [
+            {
+              "type": "package_reference",
+              "source": "omnipay-auth/package.json",
+              "snippet": "Dependency: @auth0/auth0-spa-js"
+            },
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "Pattern match: auth0"
+            }
+          ],
+          "metadata": {
+            "provider": "Auth0",
+            "company": "Okta",
+            "category": "authentication",
+            "boundary": "BUSINESS_SYSTEM",
+            "catalog_match": {
+              "provider": "Auth0",
+              "company": "Okta",
+              "category": "authentication",
+              "alias_field": "package_aliases",
+              "matched_alias": "@auth0/auth0-spa-js",
+              "input_value": "@auth0/auth0-spa-js",
+              "normalized_value": "@auth0/auth0-spa-js",
+              "match_strategy": "contains"
+            }
+          }
+        },
+        "confidence": 0.98,
+        "detection_source": "provider_catalog",
         "review_status": "auto_accepted",
         "requires_human_review": false,
-        "review_threshold": 0.7
-      },
-      {
-        "name": "Redis Cache",
-        "context_name": "Redis",
-        "type": "cache",
-        "url": "redis://redis:6379/0",
-        "detected_from": "omnipay-gateway/docker-compose.yml",
-        "dependency_type": "TECHNICAL_INFRA",
-        "classification_confidence": 0.99,
-        "classification_reasoning": "Gateway compose file provisions a Redis sidecar for technical caching.",
-        "decision_mode": "deterministic",
-        "review_status": "auto_accepted",
-        "requires_human_review": false,
-        "review_threshold": 0.7
-      },
-      {
-        "name": "Twilio",
-        "context_name": "Twilio",
-        "type": "sms",
-        "url": "https://api.twilio.com/2010-04-01/Accounts",
-        "detected_from": "omnipay-notifier/internal/dispatch/receipt_dispatcher.go",
-        "provider": "Twilio",
-        "company": "Twilio",
-        "dependency_type": "BUSINESS_SYSTEM",
-        "classification_confidence": 0.97,
-        "classification_reasoning": "SMS delivery is a customer-facing notification capability.",
-        "decision_mode": "deterministic",
-        "review_status": "auto_accepted",
-        "requires_human_review": false,
-        "review_threshold": 0.7
-      },
-      {
-        "name": "SendGrid",
-        "context_name": "SendGrid",
-        "type": "email",
-        "url": "https://api.sendgrid.com/v3/mail/send",
-        "detected_from": "omnipay-notifier/internal/dispatch/receipt_dispatcher.go",
-        "provider": "SendGrid",
-        "company": "Twilio",
-        "dependency_type": "BUSINESS_SYSTEM",
-        "classification_confidence": 0.97,
-        "classification_reasoning": "Email delivery is a customer-facing notification capability.",
-        "decision_mode": "deterministic",
-        "review_status": "auto_accepted",
-        "requires_human_review": false,
-        "review_threshold": 0.7
-      },
-      {
-        "name": "SignalForge Risk API",
-        "context_name": "SignalForge",
-        "type": "external_service",
-        "url": "https://risk.signalforge.test/graphql",
-        "detected_from": "omnipay-gateway/README.md",
-        "integration_surface": "Risk GraphQL API",
-        "provider": "SignalForge",
-        "company": "SignalForge",
-        "dependency_type": "BUSINESS_SYSTEM",
-        "classification_confidence": 0.64,
-        "classification_reasoning": "The gateway README describes SignalForge as a possible partner for merchant risk orchestration, but the evidence does not prove whether OmniPay uses it as a true external business service or only as an implementation detail.",
-        "decision_mode": "llm_adjudicated",
-        "review_status": "needs_review",
-        "requires_human_review": true,
         "review_threshold": 0.7,
-        "review_options": [
+        "evidence": [
           {
-            "id": "signalforge-business",
-            "label": "Keep At Context Level",
-            "value": "BUSINESS_SYSTEM",
-            "description": "Treat SignalForge as an external risk-decisioning company contracted by OmniPay."
+            "type": "package_reference",
+            "source": "omnipay-auth/package.json",
+            "snippet": "Dependency: @auth0/auth0-spa-js"
           },
           {
-            "id": "signalforge-technical",
-            "label": "Move To Container Level",
-            "value": "TECHNICAL_INFRA",
-            "description": "Treat SignalForge as a technical integration detail that should not stay on the context diagram."
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "Pattern match: auth0"
           }
         ],
-        "suggested_prompts": [
-          "We use SignalForge for merchant risk scoring. Compare whether it belongs at C4 context level or container level, and explain the tradeoffs.",
-          "We use SignalForge for merchant risk scoring. Compare it with Sift, Sardine, and Featurespace on price, model quality, and integration cost."
-        ],
-        "provider_alternatives": [
-          {
-            "provider": "Sift",
-            "price_tier": "High",
-            "performance_tier": "Enterprise",
-            "profile": "Mature fraud network effects and strong chargeback workflows."
-          },
-          {
-            "provider": "Sardine",
-            "price_tier": "Medium",
-            "performance_tier": "High",
-            "profile": "Fast integration and strong AML plus fraud orchestration for fintech teams."
-          },
-          {
-            "provider": "Featurespace",
-            "price_tier": "High",
-            "performance_tier": "High",
-            "profile": "Behavioral analytics depth with heavier integration overhead."
-          }
+        "detected_from_all": [
+          "README.md",
+          "omnipay-auth/package.json"
         ]
-      },
-      {
-        "name": "LedgerShield Compliance Gateway",
-        "context_name": "LedgerShield",
-        "type": "external_service",
-        "url": "https://screening.ledgershield.test/v1",
-        "detected_from": "omnipay-fraud-ml/README.md",
-        "integration_surface": "Compliance Screening API",
-        "provider": "LedgerShield",
-        "company": "LedgerShield",
-        "dependency_type": "BUSINESS_SYSTEM",
-        "classification_confidence": 0.61,
-        "classification_reasoning": "The fraud workspace references LedgerShield for sanctions and merchant onboarding checks, but the documentation is still exploratory and lacks a confirmed vendor contract or runtime integration proof.",
-        "decision_mode": "llm_adjudicated",
-        "review_status": "needs_review",
-        "requires_human_review": true,
-        "review_threshold": 0.7,
-        "review_options": [
-          {
-            "id": "ledgershield-business",
-            "label": "Keep At Context Level",
-            "value": "BUSINESS_SYSTEM",
-            "description": "Treat LedgerShield as an external compliance company that OmniPay depends on for regulated workflows."
-          },
-          {
-            "id": "ledgershield-technical",
-            "label": "Move To Container Level",
-            "value": "TECHNICAL_INFRA",
-            "description": "Treat LedgerShield as a technical screening component or library and remove it from the context diagram."
-          }
-        ],
-        "suggested_prompts": [
-          "We may use LedgerShield for sanctions screening and merchant onboarding. Compare whether it belongs at context level or container level.",
-          "Compare LedgerShield with Alloy, Persona, and ComplyAdvantage on compliance breadth, pricing, and integration effort."
-        ],
-        "provider_alternatives": [
-          {
-            "provider": "Alloy",
-            "price_tier": "Medium",
-            "performance_tier": "High",
-            "profile": "Flexible identity and fraud orchestration for onboarding-heavy fintech flows."
-          },
-          {
-            "provider": "Persona",
-            "price_tier": "Medium",
-            "performance_tier": "Medium",
-            "profile": "Good identity verification UX with broader KYC workflow tooling."
-          },
-          {
-            "provider": "ComplyAdvantage",
-            "price_tier": "High",
-            "performance_tier": "High",
-            "profile": "Deep sanctions and AML coverage with stronger compliance analyst tooling."
-          }
-        ]
-      },
-      {
-        "name": "AWS RDS Postgres",
-        "context_name": "AWS RDS Postgres",
-        "type": "database",
-        "url": "postgresql://omnipay-ledger.cluster-demo.rds.amazonaws.com:5432/ledger",
-        "detected_from": "omnipay-infra/main.tf",
-        "dependency_type": "TECHNICAL_INFRA",
-        "classification_confidence": 0.99,
-        "classification_reasoning": "Terraform defines the managed Postgres instance for ledger persistence.",
-        "decision_mode": "deterministic",
-        "review_status": "auto_accepted",
-        "requires_human_review": false,
-        "review_threshold": 0.7
-      },
-      {
-        "name": "AWS S3",
-        "context_name": "AWS S3",
-        "type": "storage",
-        "url": "https://omnipay-raw-events-demo.s3.amazonaws.com",
-        "detected_from": "omnipay-infra/main.tf",
-        "dependency_type": "TECHNICAL_INFRA",
-        "classification_confidence": 0.99,
-        "classification_reasoning": "Terraform defines an S3 bucket used for raw payment events.",
-        "decision_mode": "deterministic",
-        "review_status": "auto_accepted",
-        "requires_human_review": false,
-        "review_threshold": 0.7
       },
       {
         "name": "OpenAI",
-        "context_name": "OpenAI",
         "type": "ai",
-        "url": "https://api.openai.com/v1",
-        "detected_from": "omnipay-fraud-ml/.env.example",
+        "detected_from": "omnipay-fraud-ml/requirements.txt",
+        "context": "Dependency: openai",
+        "evidence_type": "package_reference",
+        "package_name": "openai",
+        "context_name": "OpenAI",
+        "integration_surface": null,
         "provider": "OpenAI",
         "company": "OpenAI",
+        "category": "ai",
         "dependency_type": "BUSINESS_SYSTEM",
-        "classification_confidence": 0.92,
-        "classification_reasoning": "The fraud service contains an OpenAI API key placeholder for model-assisted triage workflows.",
-        "decision_mode": "llm_adjudicated",
+        "classification_confidence": 0.98,
+        "classification_reasoning": "Matched provider catalog entry for OpenAI",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "OpenAI",
+          "confidence": 0.98,
+          "detection_source": "provider_catalog",
+          "decision_mode": "deterministic",
+          "review_status": "auto_accepted",
+          "evidence": [
+            {
+              "type": "package_reference",
+              "source": "omnipay-fraud-ml/requirements.txt",
+              "snippet": "Dependency: openai"
+            }
+          ],
+          "metadata": {
+            "provider": "OpenAI",
+            "company": "OpenAI",
+            "category": "ai",
+            "boundary": "BUSINESS_SYSTEM",
+            "catalog_match": {
+              "provider": "OpenAI",
+              "company": "OpenAI",
+              "category": "ai",
+              "alias_field": "package_aliases",
+              "matched_alias": "openai",
+              "input_value": "openai",
+              "normalized_value": "openai",
+              "match_strategy": "contains"
+            }
+          }
+        },
+        "confidence": 0.98,
+        "detection_source": "provider_catalog",
         "review_status": "auto_accepted",
         "requires_human_review": false,
-        "review_threshold": 0.7
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "package_reference",
+            "source": "omnipay-fraud-ml/requirements.txt",
+            "snippet": "Dependency: openai"
+          }
+        ],
+        "detected_from_all": [
+          "omnipay-fraud-ml/requirements.txt"
+        ]
       },
       {
         "name": "Datadog",
-        "context_name": "Datadog",
         "type": "monitoring",
-        "url": "https://api.datadoghq.com",
-        "detected_from": "omnipay-fraud-ml/.env.example",
+        "detected_from": "omnipay-fraud-ml/requirements.txt",
+        "context": "Dependency: datadog",
+        "evidence_type": "package_reference",
+        "package_name": "datadog",
+        "context_name": "Datadog",
+        "integration_surface": null,
+        "provider": "Datadog",
+        "company": "Datadog",
+        "category": "monitoring",
         "dependency_type": "TECHNICAL_INFRA",
-        "classification_confidence": 0.95,
-        "classification_reasoning": "Datadog is an observability integration referenced from environment configuration.",
+        "classification_confidence": 0.98,
+        "classification_reasoning": "Matched provider catalog entry for Datadog",
         "decision_mode": "deterministic",
+        "decision": {
+          "value": "Datadog",
+          "confidence": 0.98,
+          "detection_source": "provider_catalog",
+          "decision_mode": "deterministic",
+          "review_status": "auto_accepted",
+          "evidence": [
+            {
+              "type": "package_reference",
+              "source": "omnipay-fraud-ml/requirements.txt",
+              "snippet": "Dependency: datadog"
+            }
+          ],
+          "metadata": {
+            "provider": "Datadog",
+            "company": "Datadog",
+            "category": "monitoring",
+            "boundary": "TECHNICAL_INFRA",
+            "catalog_match": {
+              "provider": "Datadog",
+              "company": "Datadog",
+              "category": "monitoring",
+              "alias_field": "package_aliases",
+              "matched_alias": "datadog",
+              "input_value": "datadog",
+              "normalized_value": "datadog",
+              "match_strategy": "contains"
+            }
+          }
+        },
+        "confidence": 0.98,
+        "detection_source": "provider_catalog",
         "review_status": "auto_accepted",
         "requires_human_review": false,
-        "review_threshold": 0.7
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "package_reference",
+            "source": "omnipay-fraud-ml/requirements.txt",
+            "snippet": "Dependency: datadog"
+          }
+        ],
+        "detected_from_all": [
+          "omnipay-fraud-ml/requirements.txt"
+        ]
+      },
+      {
+        "name": "Stripe",
+        "type": "payment",
+        "detected_from": "omnipay-payment-processor/requirements.txt",
+        "context": "Dependency: stripe",
+        "evidence_type": "package_reference",
+        "package_name": "stripe",
+        "context_name": "Stripe",
+        "integration_surface": null,
+        "provider": "Stripe",
+        "company": "Stripe",
+        "category": "payment",
+        "dependency_type": "BUSINESS_SYSTEM",
+        "classification_confidence": 0.98,
+        "classification_reasoning": "Matched provider catalog entry for Stripe",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "Stripe",
+          "confidence": 0.98,
+          "detection_source": "provider_catalog",
+          "decision_mode": "deterministic",
+          "review_status": "auto_accepted",
+          "evidence": [
+            {
+              "type": "package_reference",
+              "source": "omnipay-payment-processor/requirements.txt",
+              "snippet": "Dependency: stripe"
+            },
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "Pattern match: stripe"
+            }
+          ],
+          "metadata": {
+            "provider": "Stripe",
+            "company": "Stripe",
+            "category": "payment",
+            "boundary": "BUSINESS_SYSTEM",
+            "catalog_match": {
+              "provider": "Stripe",
+              "company": "Stripe",
+              "category": "payment",
+              "alias_field": "package_aliases",
+              "matched_alias": "stripe",
+              "input_value": "stripe",
+              "normalized_value": "stripe",
+              "match_strategy": "contains"
+            }
+          }
+        },
+        "confidence": 0.98,
+        "detection_source": "provider_catalog",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "package_reference",
+            "source": "omnipay-payment-processor/requirements.txt",
+            "snippet": "Dependency: stripe"
+          },
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "Pattern match: stripe"
+          }
+        ],
+        "detected_from_all": [
+          "README.md",
+          "omnipay-payment-processor/requirements.txt"
+        ]
+      },
+      {
+        "name": "RabbitMQ",
+        "type": "messaging",
+        "detected_from": "omnipay-settlement-orchestrator/appsettings.json",
+        "context": "SettlementInfrastructure.RabbitMqUrl=amqps://settlement-bus.omnipay.internal:5671/settlements",
+        "evidence_type": "config_reference",
+        "url": "amqps://settlement-bus.omnipay.internal:5671/settlements",
+        "context_name": "RabbitMQ",
+        "integration_surface": null,
+        "provider": "RabbitMQ",
+        "company": "VMware",
+        "category": "messaging",
+        "dependency_type": "TECHNICAL_INFRA",
+        "classification_confidence": 0.98,
+        "classification_reasoning": "Matched provider catalog entry for RabbitMQ",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "RabbitMQ",
+          "confidence": 0.98,
+          "detection_source": "provider_catalog",
+          "decision_mode": "deterministic",
+          "review_status": "auto_accepted",
+          "evidence": [
+            {
+              "type": "config_reference",
+              "source": "omnipay-settlement-orchestrator/appsettings.json",
+              "snippet": "SettlementInfrastructure.RabbitMqUrl=amqps://settlement-bus.omnipay.internal:5671/settlements"
+            },
+            {
+              "type": "config_reference",
+              "source": "omnipay-settlement-orchestrator/appsettings.json",
+              "snippet": "Messaging.ConnectionString=amqps://settlement-bus.omnipay.internal:5671/settlements"
+            },
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "Pattern match: rabbitmq"
+            },
+            {
+              "type": "package_reference",
+              "source": "omnipay-settlement-orchestrator/OmniPay.SettlementOrchestrator.csproj",
+              "snippet": "NuGet package: RabbitMQ.Client"
+            }
+          ],
+          "metadata": {
+            "provider": "RabbitMQ",
+            "company": "VMware",
+            "category": "messaging",
+            "boundary": "TECHNICAL_INFRA",
+            "catalog_match": {
+              "provider": "RabbitMQ",
+              "company": "VMware",
+              "category": "messaging",
+              "alias_field": "scheme_aliases",
+              "matched_alias": "amqps",
+              "input_value": "amqps://settlement-bus.omnipay.internal:5671/settlements",
+              "normalized_value": "amqps",
+              "match_strategy": "exact"
+            }
+          }
+        },
+        "confidence": 0.98,
+        "detection_source": "provider_catalog",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "config_reference",
+            "source": "omnipay-settlement-orchestrator/appsettings.json",
+            "snippet": "SettlementInfrastructure.RabbitMqUrl=amqps://settlement-bus.omnipay.internal:5671/settlements"
+          },
+          {
+            "type": "config_reference",
+            "source": "omnipay-settlement-orchestrator/appsettings.json",
+            "snippet": "Messaging.ConnectionString=amqps://settlement-bus.omnipay.internal:5671/settlements"
+          },
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "Pattern match: rabbitmq"
+          },
+          {
+            "type": "package_reference",
+            "source": "omnipay-settlement-orchestrator/OmniPay.SettlementOrchestrator.csproj",
+            "snippet": "NuGet package: RabbitMQ.Client"
+          }
+        ],
+        "internal_hint": "URL host 'settlement-bus.omnipay.internal' looks internal",
+        "detected_from_all": [
+          "README.md",
+          "omnipay-settlement-orchestrator/OmniPay.SettlementOrchestrator.csproj",
+          "omnipay-settlement-orchestrator/appsettings.json"
+        ]
+      },
+      {
+        "name": "Visa",
+        "type": "external_service",
+        "detected_from": "omnipay-card-router/appsettings.json",
+        "context": "Networks.VisaBaseUrl=https://sandbox.api.visa.com",
+        "evidence_type": "config_reference",
+        "url": "https://sandbox.api.visa.com",
+        "context_name": "Visa",
+        "integration_surface": null,
+        "provider": "Visa",
+        "company": null,
+        "category": "external_service",
+        "dependency_type": "UNKNOWN",
+        "classification_confidence": 0.5,
+        "classification_reasoning": "Could not determine classification for 'Visa' with type 'external_service'",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "Visa",
+          "confidence": 0.5,
+          "detection_source": "rule_based_classifier",
+          "decision_mode": "deterministic",
+          "review_status": "needs_review",
+          "evidence": [
+            {
+              "type": "config_reference",
+              "source": "omnipay-card-router/appsettings.json",
+              "snippet": "Networks.VisaBaseUrl=https://sandbox.api.visa.com"
+            }
+          ],
+          "metadata": {
+            "provider": "Visa",
+            "company": null,
+            "category": "external_service",
+            "boundary": "UNKNOWN",
+            "catalog_match": null
+          }
+        },
+        "confidence": 0.5,
+        "detection_source": "rule_based_classifier",
+        "review_status": "needs_review",
+        "requires_human_review": true,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "config_reference",
+            "source": "omnipay-card-router/appsettings.json",
+            "snippet": "Networks.VisaBaseUrl=https://sandbox.api.visa.com"
+          }
+        ],
+        "review_item": {
+          "field": "external_dependencies",
+          "candidate_value": "Visa",
+          "confidence": 0.5,
+          "reason": "Could not determine classification for 'Visa' with type 'external_service'",
+          "repo_path": "/Users/iuliarinea/Desktop/Coding/KnowledgeForge/sources/demo",
+          "evidence": [
+            {
+              "type": "config_reference",
+              "source": "omnipay-card-router/appsettings.json",
+              "snippet": "Networks.VisaBaseUrl=https://sandbox.api.visa.com"
+            }
+          ],
+          "recommended_action": "human_review"
+        },
+        "review_options": [
+          {
+            "id": "context-business-system",
+            "label": "Keep At Context Level",
+            "value": "BUSINESS_SYSTEM",
+            "description": "Treat Visa as an external business company or SaaS that belongs in the system context."
+          },
+          {
+            "id": "container-technical-infra",
+            "label": "Move To Container Level",
+            "value": "TECHNICAL_INFRA",
+            "description": "Treat Visa as technical infrastructure or an implementation detail that should not stay in the context diagram."
+          }
+        ],
+        "suggested_prompts": [
+          "We currently use Visa for external_service. Compare whether it belongs at C4 context level or container level, and explain the tradeoffs.",
+          "We use Visa for a payment-platform workflow. Suggest up to three alternative providers and compare them on price, performance, and integration cost."
+        ],
+        "detected_from_all": [
+          "omnipay-card-router/appsettings.json"
+        ]
+      },
+      {
+        "name": "Mastercard",
+        "type": "external_service",
+        "detected_from": "omnipay-card-router/appsettings.json",
+        "context": "Networks.MastercardBaseUrl=https://sandbox.api.mastercard.com",
+        "evidence_type": "config_reference",
+        "url": "https://sandbox.api.mastercard.com",
+        "context_name": "Mastercard",
+        "integration_surface": null,
+        "provider": "Mastercard",
+        "company": null,
+        "category": "external_service",
+        "dependency_type": "UNKNOWN",
+        "classification_confidence": 0.5,
+        "classification_reasoning": "Could not determine classification for 'Mastercard' with type 'external_service'",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "Mastercard",
+          "confidence": 0.5,
+          "detection_source": "rule_based_classifier",
+          "decision_mode": "deterministic",
+          "review_status": "needs_review",
+          "evidence": [
+            {
+              "type": "config_reference",
+              "source": "omnipay-card-router/appsettings.json",
+              "snippet": "Networks.MastercardBaseUrl=https://sandbox.api.mastercard.com"
+            }
+          ],
+          "metadata": {
+            "provider": "Mastercard",
+            "company": null,
+            "category": "external_service",
+            "boundary": "UNKNOWN",
+            "catalog_match": null
+          }
+        },
+        "confidence": 0.5,
+        "detection_source": "rule_based_classifier",
+        "review_status": "needs_review",
+        "requires_human_review": true,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "config_reference",
+            "source": "omnipay-card-router/appsettings.json",
+            "snippet": "Networks.MastercardBaseUrl=https://sandbox.api.mastercard.com"
+          }
+        ],
+        "review_item": {
+          "field": "external_dependencies",
+          "candidate_value": "Mastercard",
+          "confidence": 0.5,
+          "reason": "Could not determine classification for 'Mastercard' with type 'external_service'",
+          "repo_path": "/Users/iuliarinea/Desktop/Coding/KnowledgeForge/sources/demo",
+          "evidence": [
+            {
+              "type": "config_reference",
+              "source": "omnipay-card-router/appsettings.json",
+              "snippet": "Networks.MastercardBaseUrl=https://sandbox.api.mastercard.com"
+            }
+          ],
+          "recommended_action": "human_review"
+        },
+        "review_options": [
+          {
+            "id": "context-business-system",
+            "label": "Keep At Context Level",
+            "value": "BUSINESS_SYSTEM",
+            "description": "Treat Mastercard as an external business company or SaaS that belongs in the system context."
+          },
+          {
+            "id": "container-technical-infra",
+            "label": "Move To Container Level",
+            "value": "TECHNICAL_INFRA",
+            "description": "Treat Mastercard as technical infrastructure or an implementation detail that should not stay in the context diagram."
+          }
+        ],
+        "suggested_prompts": [
+          "We currently use Mastercard for external_service. Compare whether it belongs at C4 context level or container level, and explain the tradeoffs.",
+          "We use Mastercard for a payment-platform workflow. Suggest up to three alternative providers and compare them on price, performance, and integration cost."
+        ],
+        "detected_from_all": [
+          "omnipay-card-router/appsettings.json"
+        ]
+      },
+      {
+        "name": "Globalbank",
+        "type": "external_service",
+        "detected_from": "omnipay-card-router/appsettings.json",
+        "context": "Networks.GlobalBankBaseUrl=https://api.globalbank.test/v1",
+        "evidence_type": "config_reference",
+        "url": "https://api.globalbank.test/v1",
+        "context_name": "Globalbank",
+        "integration_surface": null,
+        "provider": "Globalbank",
+        "company": null,
+        "category": "external_service",
+        "dependency_type": "UNKNOWN",
+        "classification_confidence": 0.5,
+        "classification_reasoning": "Could not determine classification for 'Globalbank' with type 'external_service'",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "Globalbank",
+          "confidence": 0.5,
+          "detection_source": "rule_based_classifier",
+          "decision_mode": "deterministic",
+          "review_status": "needs_review",
+          "evidence": [
+            {
+              "type": "config_reference",
+              "source": "omnipay-card-router/appsettings.json",
+              "snippet": "Networks.GlobalBankBaseUrl=https://api.globalbank.test/v1"
+            }
+          ],
+          "metadata": {
+            "provider": "Globalbank",
+            "company": null,
+            "category": "external_service",
+            "boundary": "UNKNOWN",
+            "catalog_match": null
+          }
+        },
+        "confidence": 0.5,
+        "detection_source": "rule_based_classifier",
+        "review_status": "needs_review",
+        "requires_human_review": true,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "config_reference",
+            "source": "omnipay-card-router/appsettings.json",
+            "snippet": "Networks.GlobalBankBaseUrl=https://api.globalbank.test/v1"
+          }
+        ],
+        "review_item": {
+          "field": "external_dependencies",
+          "candidate_value": "Globalbank",
+          "confidence": 0.5,
+          "reason": "Could not determine classification for 'Globalbank' with type 'external_service'",
+          "repo_path": "/Users/iuliarinea/Desktop/Coding/KnowledgeForge/sources/demo",
+          "evidence": [
+            {
+              "type": "config_reference",
+              "source": "omnipay-card-router/appsettings.json",
+              "snippet": "Networks.GlobalBankBaseUrl=https://api.globalbank.test/v1"
+            }
+          ],
+          "recommended_action": "human_review"
+        },
+        "review_options": [
+          {
+            "id": "context-business-system",
+            "label": "Keep At Context Level",
+            "value": "BUSINESS_SYSTEM",
+            "description": "Treat Globalbank as an external business company or SaaS that belongs in the system context."
+          },
+          {
+            "id": "container-technical-infra",
+            "label": "Move To Container Level",
+            "value": "TECHNICAL_INFRA",
+            "description": "Treat Globalbank as technical infrastructure or an implementation detail that should not stay in the context diagram."
+          }
+        ],
+        "suggested_prompts": [
+          "We currently use Globalbank for external_service. Compare whether it belongs at C4 context level or container level, and explain the tradeoffs.",
+          "We use Globalbank for a payment-platform workflow. Suggest up to three alternative providers and compare them on price, performance, and integration cost."
+        ],
+        "detected_from_all": [
+          "omnipay-card-router/appsettings.json"
+        ]
+      },
+      {
+        "name": "Ledgershield",
+        "type": "external_service",
+        "detected_from": "omnipay-card-router/appsettings.json",
+        "context": "Networks.LedgerShieldBaseUrl=https://screening.ledgershield.test/v1",
+        "evidence_type": "config_reference",
+        "url": "https://screening.ledgershield.test/v1",
+        "context_name": "Ledgershield",
+        "integration_surface": null,
+        "provider": "Ledgershield",
+        "company": null,
+        "category": "external_service",
+        "dependency_type": "UNKNOWN",
+        "classification_confidence": 0.5,
+        "classification_reasoning": "Could not determine classification for 'Ledgershield' with type 'external_service'",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "Ledgershield",
+          "confidence": 0.5,
+          "detection_source": "rule_based_classifier",
+          "decision_mode": "deterministic",
+          "review_status": "needs_review",
+          "evidence": [
+            {
+              "type": "config_reference",
+              "source": "omnipay-card-router/appsettings.json",
+              "snippet": "Networks.LedgerShieldBaseUrl=https://screening.ledgershield.test/v1"
+            }
+          ],
+          "metadata": {
+            "provider": "Ledgershield",
+            "company": null,
+            "category": "external_service",
+            "boundary": "UNKNOWN",
+            "catalog_match": null
+          }
+        },
+        "confidence": 0.5,
+        "detection_source": "rule_based_classifier",
+        "review_status": "needs_review",
+        "requires_human_review": true,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "config_reference",
+            "source": "omnipay-card-router/appsettings.json",
+            "snippet": "Networks.LedgerShieldBaseUrl=https://screening.ledgershield.test/v1"
+          }
+        ],
+        "review_item": {
+          "field": "external_dependencies",
+          "candidate_value": "Ledgershield",
+          "confidence": 0.5,
+          "reason": "Could not determine classification for 'Ledgershield' with type 'external_service'",
+          "repo_path": "/Users/iuliarinea/Desktop/Coding/KnowledgeForge/sources/demo",
+          "evidence": [
+            {
+              "type": "config_reference",
+              "source": "omnipay-card-router/appsettings.json",
+              "snippet": "Networks.LedgerShieldBaseUrl=https://screening.ledgershield.test/v1"
+            }
+          ],
+          "recommended_action": "human_review"
+        },
+        "review_options": [
+          {
+            "id": "context-business-system",
+            "label": "Keep At Context Level",
+            "value": "BUSINESS_SYSTEM",
+            "description": "Treat Ledgershield as an external business company or SaaS that belongs in the system context."
+          },
+          {
+            "id": "container-technical-infra",
+            "label": "Move To Container Level",
+            "value": "TECHNICAL_INFRA",
+            "description": "Treat Ledgershield as technical infrastructure or an implementation detail that should not stay in the context diagram."
+          }
+        ],
+        "suggested_prompts": [
+          "We currently use Ledgershield for external_service. Compare whether it belongs at C4 context level or container level, and explain the tradeoffs.",
+          "We use Ledgershield for a payment-platform workflow. Suggest up to three alternative providers and compare them on price, performance, and integration cost."
+        ],
+        "detected_from_all": [
+          "omnipay-card-router/appsettings.json"
+        ]
+      },
+      {
+        "name": "Kafka",
+        "type": "messaging",
+        "detected_from": "omnipay-event-projections/appsettings.json",
+        "context": "ProjectionInfrastructure.KafkaBootstrapServers=kafka://risk-streams.omnipay.internal:9092",
+        "evidence_type": "config_reference",
+        "url": "kafka://risk-streams.omnipay.internal:9092",
+        "context_name": "Kafka",
+        "integration_surface": null,
+        "provider": "Kafka",
+        "company": "Confluent",
+        "category": "messaging",
+        "dependency_type": "TECHNICAL_INFRA",
+        "classification_confidence": 0.98,
+        "classification_reasoning": "Matched provider catalog entry for Kafka",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "Kafka",
+          "confidence": 0.98,
+          "detection_source": "provider_catalog",
+          "decision_mode": "deterministic",
+          "review_status": "auto_accepted",
+          "evidence": [
+            {
+              "type": "config_reference",
+              "source": "omnipay-event-projections/appsettings.json",
+              "snippet": "ProjectionInfrastructure.KafkaBootstrapServers=kafka://risk-streams.omnipay.internal:9092"
+            },
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "Pattern match: kafka"
+            },
+            {
+              "type": "package_reference",
+              "source": "omnipay-event-projections/OmniPay.EventProjections.csproj",
+              "snippet": "NuGet package: Confluent.Kafka"
+            }
+          ],
+          "metadata": {
+            "provider": "Kafka",
+            "company": "Confluent",
+            "category": "messaging",
+            "boundary": "TECHNICAL_INFRA",
+            "catalog_match": {
+              "provider": "Kafka",
+              "company": "Confluent",
+              "category": "messaging",
+              "alias_field": "scheme_aliases",
+              "matched_alias": "kafka",
+              "input_value": "kafka://risk-streams.omnipay.internal:9092",
+              "normalized_value": "kafka",
+              "match_strategy": "exact"
+            }
+          }
+        },
+        "confidence": 0.98,
+        "detection_source": "provider_catalog",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "config_reference",
+            "source": "omnipay-event-projections/appsettings.json",
+            "snippet": "ProjectionInfrastructure.KafkaBootstrapServers=kafka://risk-streams.omnipay.internal:9092"
+          },
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "Pattern match: kafka"
+          },
+          {
+            "type": "package_reference",
+            "source": "omnipay-event-projections/OmniPay.EventProjections.csproj",
+            "snippet": "NuGet package: Confluent.Kafka"
+          }
+        ],
+        "internal_hint": "URL host 'risk-streams.omnipay.internal' looks internal",
+        "detected_from_all": [
+          "README.md",
+          "omnipay-event-projections/OmniPay.EventProjections.csproj",
+          "omnipay-event-projections/appsettings.json"
+        ]
+      },
+      {
+        "name": "MongoDB",
+        "type": "database",
+        "detected_from": "omnipay-event-projections/appsettings.json",
+        "context": "ProjectionInfrastructure.MongoDbUrl=mongodb://projection-read-model.omnipay.internal:27017/event-projections",
+        "evidence_type": "config_reference",
+        "url": "mongodb://projection-read-model.omnipay.internal:27017/event-projections",
+        "context_name": "MongoDB",
+        "integration_surface": null,
+        "provider": "MongoDB",
+        "company": "MongoDB",
+        "category": "database",
+        "dependency_type": "TECHNICAL_INFRA",
+        "classification_confidence": 0.98,
+        "classification_reasoning": "Matched provider catalog entry for MongoDB",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "MongoDB",
+          "confidence": 0.98,
+          "detection_source": "provider_catalog",
+          "decision_mode": "deterministic",
+          "review_status": "auto_accepted",
+          "evidence": [
+            {
+              "type": "config_reference",
+              "source": "omnipay-event-projections/appsettings.json",
+              "snippet": "ProjectionInfrastructure.MongoDbUrl=mongodb://projection-read-model.omnipay.internal:27017/event-projections"
+            },
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "Pattern match: mongodb"
+            },
+            {
+              "type": "package_reference",
+              "source": "omnipay-event-projections/OmniPay.EventProjections.csproj",
+              "snippet": "NuGet package: MongoDB.Driver"
+            }
+          ],
+          "metadata": {
+            "provider": "MongoDB",
+            "company": "MongoDB",
+            "category": "database",
+            "boundary": "TECHNICAL_INFRA",
+            "catalog_match": {
+              "provider": "MongoDB",
+              "company": "MongoDB",
+              "category": "database",
+              "alias_field": "scheme_aliases",
+              "matched_alias": "mongodb",
+              "input_value": "mongodb://projection-read-model.omnipay.internal:27017/event-projections",
+              "normalized_value": "mongodb",
+              "match_strategy": "exact"
+            }
+          }
+        },
+        "confidence": 0.98,
+        "detection_source": "provider_catalog",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "config_reference",
+            "source": "omnipay-event-projections/appsettings.json",
+            "snippet": "ProjectionInfrastructure.MongoDbUrl=mongodb://projection-read-model.omnipay.internal:27017/event-projections"
+          },
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "Pattern match: mongodb"
+          },
+          {
+            "type": "package_reference",
+            "source": "omnipay-event-projections/OmniPay.EventProjections.csproj",
+            "snippet": "NuGet package: MongoDB.Driver"
+          }
+        ],
+        "internal_hint": "URL host 'projection-read-model.omnipay.internal' looks internal",
+        "detected_from_all": [
+          "README.md",
+          "omnipay-event-projections/OmniPay.EventProjections.csproj",
+          "omnipay-event-projections/appsettings.json"
+        ]
+      },
+      {
+        "name": "SQL Server",
+        "type": "database",
+        "detected_from": "omnipay-settlement-orchestrator/OmniPay.SettlementOrchestrator.csproj",
+        "context": "NuGet package: AspNetCore.HealthChecks.SqlServer",
+        "evidence_type": "package_reference",
+        "package_name": "AspNetCore.HealthChecks.SqlServer",
+        "context_name": "SQL Server",
+        "integration_surface": null,
+        "provider": "SQL Server",
+        "company": "Microsoft",
+        "category": "database",
+        "dependency_type": "TECHNICAL_INFRA",
+        "classification_confidence": 0.98,
+        "classification_reasoning": "Matched provider catalog entry for SQL Server",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "SQL Server",
+          "confidence": 0.98,
+          "detection_source": "provider_catalog",
+          "decision_mode": "deterministic",
+          "review_status": "auto_accepted",
+          "evidence": [
+            {
+              "type": "package_reference",
+              "source": "omnipay-settlement-orchestrator/OmniPay.SettlementOrchestrator.csproj",
+              "snippet": "NuGet package: AspNetCore.HealthChecks.SqlServer"
+            },
+            {
+              "type": "package_reference",
+              "source": "omnipay-settlement-orchestrator/OmniPay.SettlementOrchestrator.csproj",
+              "snippet": "NuGet package: Microsoft.Data.SqlClient"
+            },
+            {
+              "type": "package_reference",
+              "source": "omnipay-settlement-orchestrator/OmniPay.SettlementOrchestrator.csproj",
+              "snippet": "NuGet package: Microsoft.EntityFrameworkCore.SqlServer"
+            },
+            {
+              "type": "package_reference",
+              "source": "omnipay-card-router/OmniPay.CardRouter.csproj",
+              "snippet": "NuGet package: Microsoft.EntityFrameworkCore.SqlServer"
+            }
+          ],
+          "metadata": {
+            "provider": "SQL Server",
+            "company": "Microsoft",
+            "category": "database",
+            "boundary": "TECHNICAL_INFRA",
+            "catalog_match": {
+              "provider": "SQL Server",
+              "company": "Microsoft",
+              "category": "database",
+              "alias_field": "package_aliases",
+              "matched_alias": "aspnetcore.healthchecks.sqlserver",
+              "input_value": "AspNetCore.HealthChecks.SqlServer",
+              "normalized_value": "aspnetcore.healthchecks.sqlserver",
+              "match_strategy": "contains"
+            }
+          }
+        },
+        "confidence": 0.98,
+        "detection_source": "provider_catalog",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "package_reference",
+            "source": "omnipay-settlement-orchestrator/OmniPay.SettlementOrchestrator.csproj",
+            "snippet": "NuGet package: AspNetCore.HealthChecks.SqlServer"
+          },
+          {
+            "type": "package_reference",
+            "source": "omnipay-settlement-orchestrator/OmniPay.SettlementOrchestrator.csproj",
+            "snippet": "NuGet package: Microsoft.Data.SqlClient"
+          },
+          {
+            "type": "package_reference",
+            "source": "omnipay-settlement-orchestrator/OmniPay.SettlementOrchestrator.csproj",
+            "snippet": "NuGet package: Microsoft.EntityFrameworkCore.SqlServer"
+          },
+          {
+            "type": "package_reference",
+            "source": "omnipay-card-router/OmniPay.CardRouter.csproj",
+            "snippet": "NuGet package: Microsoft.EntityFrameworkCore.SqlServer"
+          }
+        ],
+        "detected_from_all": [
+          "omnipay-card-router/OmniPay.CardRouter.csproj",
+          "omnipay-settlement-orchestrator/OmniPay.SettlementOrchestrator.csproj"
+        ]
+      }
+    ],
+    "external_dependency_review_items": [
+      {
+        "field": "external_dependencies",
+        "candidate_value": "Visa",
+        "confidence": 0.5,
+        "reason": "Could not determine classification for 'Visa' with type 'external_service'",
+        "repo_path": "/Users/iuliarinea/Desktop/Coding/KnowledgeForge/sources/demo",
+        "evidence": [
+          {
+            "type": "config_reference",
+            "source": "omnipay-card-router/appsettings.json",
+            "snippet": "Networks.VisaBaseUrl=https://sandbox.api.visa.com"
+          }
+        ],
+        "recommended_action": "human_review"
+      },
+      {
+        "field": "external_dependencies",
+        "candidate_value": "Mastercard",
+        "confidence": 0.5,
+        "reason": "Could not determine classification for 'Mastercard' with type 'external_service'",
+        "repo_path": "/Users/iuliarinea/Desktop/Coding/KnowledgeForge/sources/demo",
+        "evidence": [
+          {
+            "type": "config_reference",
+            "source": "omnipay-card-router/appsettings.json",
+            "snippet": "Networks.MastercardBaseUrl=https://sandbox.api.mastercard.com"
+          }
+        ],
+        "recommended_action": "human_review"
+      },
+      {
+        "field": "external_dependencies",
+        "candidate_value": "Globalbank",
+        "confidence": 0.5,
+        "reason": "Could not determine classification for 'Globalbank' with type 'external_service'",
+        "repo_path": "/Users/iuliarinea/Desktop/Coding/KnowledgeForge/sources/demo",
+        "evidence": [
+          {
+            "type": "config_reference",
+            "source": "omnipay-card-router/appsettings.json",
+            "snippet": "Networks.GlobalBankBaseUrl=https://api.globalbank.test/v1"
+          }
+        ],
+        "recommended_action": "human_review"
+      },
+      {
+        "field": "external_dependencies",
+        "candidate_value": "Ledgershield",
+        "confidence": 0.5,
+        "reason": "Could not determine classification for 'Ledgershield' with type 'external_service'",
+        "repo_path": "/Users/iuliarinea/Desktop/Coding/KnowledgeForge/sources/demo",
+        "evidence": [
+          {
+            "type": "config_reference",
+            "source": "omnipay-card-router/appsettings.json",
+            "snippet": "Networks.LedgerShieldBaseUrl=https://screening.ledgershield.test/v1"
+          }
+        ],
+        "recommended_action": "human_review"
+      }
+    ],
+    "deployment_dependencies": [
+      {
+        "name": "RabbitMQ",
+        "type": "messaging",
+        "detected_from": "omnipay-settlement-orchestrator/appsettings.json",
+        "context": "SettlementInfrastructure.RabbitMqUrl=amqps://settlement-bus.omnipay.internal:5671/settlements",
+        "evidence_type": "config_reference",
+        "url": "amqps://settlement-bus.omnipay.internal:5671/settlements",
+        "context_name": "RabbitMQ",
+        "integration_surface": null,
+        "provider": "RabbitMQ",
+        "company": "VMware",
+        "category": "messaging",
+        "dependency_type": "TECHNICAL_INFRA",
+        "classification_confidence": 0.98,
+        "classification_reasoning": "Matched provider catalog entry for RabbitMQ",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "RabbitMQ",
+          "confidence": 0.98,
+          "detection_source": "provider_catalog",
+          "decision_mode": "deterministic",
+          "review_status": "auto_accepted",
+          "evidence": [
+            {
+              "type": "config_reference",
+              "source": "omnipay-settlement-orchestrator/appsettings.json",
+              "snippet": "SettlementInfrastructure.RabbitMqUrl=amqps://settlement-bus.omnipay.internal:5671/settlements"
+            },
+            {
+              "type": "config_reference",
+              "source": "omnipay-settlement-orchestrator/appsettings.json",
+              "snippet": "Messaging.ConnectionString=amqps://settlement-bus.omnipay.internal:5671/settlements"
+            }
+          ],
+          "metadata": {
+            "provider": "RabbitMQ",
+            "company": "VMware",
+            "category": "messaging",
+            "boundary": "TECHNICAL_INFRA",
+            "catalog_match": {
+              "provider": "RabbitMQ",
+              "company": "VMware",
+              "category": "messaging",
+              "alias_field": "scheme_aliases",
+              "matched_alias": "amqps",
+              "input_value": "amqps://settlement-bus.omnipay.internal:5671/settlements",
+              "normalized_value": "amqps",
+              "match_strategy": "exact"
+            }
+          }
+        },
+        "confidence": 0.98,
+        "detection_source": "provider_catalog",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "config_reference",
+            "source": "omnipay-settlement-orchestrator/appsettings.json",
+            "snippet": "SettlementInfrastructure.RabbitMqUrl=amqps://settlement-bus.omnipay.internal:5671/settlements"
+          },
+          {
+            "type": "config_reference",
+            "source": "omnipay-settlement-orchestrator/appsettings.json",
+            "snippet": "Messaging.ConnectionString=amqps://settlement-bus.omnipay.internal:5671/settlements"
+          }
+        ],
+        "internal_hint": "URL host 'settlement-bus.omnipay.internal' looks internal",
+        "detected_from_all": [
+          "omnipay-settlement-orchestrator/appsettings.json"
+        ]
+      },
+      {
+        "name": "Redis",
+        "type": "cache",
+        "detected_from": "omnipay-settlement-orchestrator/appsettings.json",
+        "context": "SettlementInfrastructure.RedisUrl=redis://settlement-cache.omnipay.internal:6379/4",
+        "evidence_type": "config_reference",
+        "url": "redis://settlement-cache.omnipay.internal:6379/4",
+        "context_name": "Redis",
+        "integration_surface": null,
+        "provider": "Redis",
+        "company": "Redis",
+        "category": "cache",
+        "dependency_type": "TECHNICAL_INFRA",
+        "classification_confidence": 0.98,
+        "classification_reasoning": "Matched provider catalog entry for Redis",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "Redis",
+          "confidence": 0.98,
+          "detection_source": "provider_catalog",
+          "decision_mode": "deterministic",
+          "review_status": "auto_accepted",
+          "evidence": [
+            {
+              "type": "config_reference",
+              "source": "omnipay-settlement-orchestrator/appsettings.json",
+              "snippet": "SettlementInfrastructure.RedisUrl=redis://settlement-cache.omnipay.internal:6379/4"
+            },
+            {
+              "type": "config_reference",
+              "source": "omnipay-event-projections/appsettings.json",
+              "snippet": "ProjectionInfrastructure.RedisUrl=redis://projection-cache.omnipay.internal:6379/6"
+            },
+            {
+              "type": "deployment_reference",
+              "source": "omnipay-gateway/docker-compose.yml",
+              "snippet": "redis:7.4-alpine"
+            }
+          ],
+          "metadata": {
+            "provider": "Redis",
+            "company": "Redis",
+            "category": "cache",
+            "boundary": "TECHNICAL_INFRA",
+            "catalog_match": {
+              "provider": "Redis",
+              "company": "Redis",
+              "category": "cache",
+              "alias_field": "scheme_aliases",
+              "matched_alias": "redis",
+              "input_value": "redis://settlement-cache.omnipay.internal:6379/4",
+              "normalized_value": "redis",
+              "match_strategy": "exact"
+            }
+          }
+        },
+        "confidence": 0.98,
+        "detection_source": "provider_catalog",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "config_reference",
+            "source": "omnipay-settlement-orchestrator/appsettings.json",
+            "snippet": "SettlementInfrastructure.RedisUrl=redis://settlement-cache.omnipay.internal:6379/4"
+          },
+          {
+            "type": "config_reference",
+            "source": "omnipay-event-projections/appsettings.json",
+            "snippet": "ProjectionInfrastructure.RedisUrl=redis://projection-cache.omnipay.internal:6379/6"
+          },
+          {
+            "type": "deployment_reference",
+            "source": "omnipay-gateway/docker-compose.yml",
+            "snippet": "redis:7.4-alpine"
+          }
+        ],
+        "internal_hint": "URL host 'settlement-cache.omnipay.internal' looks internal",
+        "detected_from_all": [
+          "omnipay-event-projections/appsettings.json",
+          "omnipay-gateway/docker-compose.yml",
+          "omnipay-settlement-orchestrator/appsettings.json"
+        ]
+      },
+      {
+        "name": "Visa",
+        "type": "external_service",
+        "detected_from": "omnipay-card-router/appsettings.json",
+        "context": "Networks.VisaBaseUrl=https://sandbox.api.visa.com",
+        "evidence_type": "config_reference",
+        "url": "https://sandbox.api.visa.com",
+        "context_name": "Visa",
+        "integration_surface": null,
+        "provider": "Visa",
+        "company": null,
+        "category": "external_service",
+        "dependency_type": "UNKNOWN",
+        "classification_confidence": 0.5,
+        "classification_reasoning": "Could not determine classification for 'Visa' with type 'external_service'",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "Visa",
+          "confidence": 0.5,
+          "detection_source": "rule_based_classifier",
+          "decision_mode": "deterministic",
+          "review_status": "needs_review",
+          "evidence": [
+            {
+              "type": "config_reference",
+              "source": "omnipay-card-router/appsettings.json",
+              "snippet": "Networks.VisaBaseUrl=https://sandbox.api.visa.com"
+            }
+          ],
+          "metadata": {
+            "provider": "Visa",
+            "company": null,
+            "category": "external_service",
+            "boundary": "UNKNOWN",
+            "catalog_match": null
+          }
+        },
+        "confidence": 0.5,
+        "detection_source": "rule_based_classifier",
+        "review_status": "needs_review",
+        "requires_human_review": true,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "config_reference",
+            "source": "omnipay-card-router/appsettings.json",
+            "snippet": "Networks.VisaBaseUrl=https://sandbox.api.visa.com"
+          }
+        ],
+        "review_item": {
+          "field": "external_dependencies",
+          "candidate_value": "Visa",
+          "confidence": 0.5,
+          "reason": "Could not determine classification for 'Visa' with type 'external_service'",
+          "repo_path": "/Users/iuliarinea/Desktop/Coding/KnowledgeForge/sources/demo",
+          "evidence": [
+            {
+              "type": "config_reference",
+              "source": "omnipay-card-router/appsettings.json",
+              "snippet": "Networks.VisaBaseUrl=https://sandbox.api.visa.com"
+            }
+          ],
+          "recommended_action": "human_review"
+        },
+        "review_options": [
+          {
+            "id": "context-business-system",
+            "label": "Keep At Context Level",
+            "value": "BUSINESS_SYSTEM",
+            "description": "Treat Visa as an external business company or SaaS that belongs in the system context."
+          },
+          {
+            "id": "container-technical-infra",
+            "label": "Move To Container Level",
+            "value": "TECHNICAL_INFRA",
+            "description": "Treat Visa as technical infrastructure or an implementation detail that should not stay in the context diagram."
+          }
+        ],
+        "suggested_prompts": [
+          "We currently use Visa for external_service. Compare whether it belongs at C4 context level or container level, and explain the tradeoffs.",
+          "We use Visa for a payment-platform workflow. Suggest up to three alternative providers and compare them on price, performance, and integration cost."
+        ],
+        "detected_from_all": [
+          "omnipay-card-router/appsettings.json"
+        ]
+      },
+      {
+        "name": "Mastercard",
+        "type": "external_service",
+        "detected_from": "omnipay-card-router/appsettings.json",
+        "context": "Networks.MastercardBaseUrl=https://sandbox.api.mastercard.com",
+        "evidence_type": "config_reference",
+        "url": "https://sandbox.api.mastercard.com",
+        "context_name": "Mastercard",
+        "integration_surface": null,
+        "provider": "Mastercard",
+        "company": null,
+        "category": "external_service",
+        "dependency_type": "UNKNOWN",
+        "classification_confidence": 0.5,
+        "classification_reasoning": "Could not determine classification for 'Mastercard' with type 'external_service'",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "Mastercard",
+          "confidence": 0.5,
+          "detection_source": "rule_based_classifier",
+          "decision_mode": "deterministic",
+          "review_status": "needs_review",
+          "evidence": [
+            {
+              "type": "config_reference",
+              "source": "omnipay-card-router/appsettings.json",
+              "snippet": "Networks.MastercardBaseUrl=https://sandbox.api.mastercard.com"
+            }
+          ],
+          "metadata": {
+            "provider": "Mastercard",
+            "company": null,
+            "category": "external_service",
+            "boundary": "UNKNOWN",
+            "catalog_match": null
+          }
+        },
+        "confidence": 0.5,
+        "detection_source": "rule_based_classifier",
+        "review_status": "needs_review",
+        "requires_human_review": true,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "config_reference",
+            "source": "omnipay-card-router/appsettings.json",
+            "snippet": "Networks.MastercardBaseUrl=https://sandbox.api.mastercard.com"
+          }
+        ],
+        "review_item": {
+          "field": "external_dependencies",
+          "candidate_value": "Mastercard",
+          "confidence": 0.5,
+          "reason": "Could not determine classification for 'Mastercard' with type 'external_service'",
+          "repo_path": "/Users/iuliarinea/Desktop/Coding/KnowledgeForge/sources/demo",
+          "evidence": [
+            {
+              "type": "config_reference",
+              "source": "omnipay-card-router/appsettings.json",
+              "snippet": "Networks.MastercardBaseUrl=https://sandbox.api.mastercard.com"
+            }
+          ],
+          "recommended_action": "human_review"
+        },
+        "review_options": [
+          {
+            "id": "context-business-system",
+            "label": "Keep At Context Level",
+            "value": "BUSINESS_SYSTEM",
+            "description": "Treat Mastercard as an external business company or SaaS that belongs in the system context."
+          },
+          {
+            "id": "container-technical-infra",
+            "label": "Move To Container Level",
+            "value": "TECHNICAL_INFRA",
+            "description": "Treat Mastercard as technical infrastructure or an implementation detail that should not stay in the context diagram."
+          }
+        ],
+        "suggested_prompts": [
+          "We currently use Mastercard for external_service. Compare whether it belongs at C4 context level or container level, and explain the tradeoffs.",
+          "We use Mastercard for a payment-platform workflow. Suggest up to three alternative providers and compare them on price, performance, and integration cost."
+        ],
+        "detected_from_all": [
+          "omnipay-card-router/appsettings.json"
+        ]
+      },
+      {
+        "name": "Globalbank",
+        "type": "external_service",
+        "detected_from": "omnipay-card-router/appsettings.json",
+        "context": "Networks.GlobalBankBaseUrl=https://api.globalbank.test/v1",
+        "evidence_type": "config_reference",
+        "url": "https://api.globalbank.test/v1",
+        "context_name": "Globalbank",
+        "integration_surface": null,
+        "provider": "Globalbank",
+        "company": null,
+        "category": "external_service",
+        "dependency_type": "UNKNOWN",
+        "classification_confidence": 0.5,
+        "classification_reasoning": "Could not determine classification for 'Globalbank' with type 'external_service'",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "Globalbank",
+          "confidence": 0.5,
+          "detection_source": "rule_based_classifier",
+          "decision_mode": "deterministic",
+          "review_status": "needs_review",
+          "evidence": [
+            {
+              "type": "config_reference",
+              "source": "omnipay-card-router/appsettings.json",
+              "snippet": "Networks.GlobalBankBaseUrl=https://api.globalbank.test/v1"
+            }
+          ],
+          "metadata": {
+            "provider": "Globalbank",
+            "company": null,
+            "category": "external_service",
+            "boundary": "UNKNOWN",
+            "catalog_match": null
+          }
+        },
+        "confidence": 0.5,
+        "detection_source": "rule_based_classifier",
+        "review_status": "needs_review",
+        "requires_human_review": true,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "config_reference",
+            "source": "omnipay-card-router/appsettings.json",
+            "snippet": "Networks.GlobalBankBaseUrl=https://api.globalbank.test/v1"
+          }
+        ],
+        "review_item": {
+          "field": "external_dependencies",
+          "candidate_value": "Globalbank",
+          "confidence": 0.5,
+          "reason": "Could not determine classification for 'Globalbank' with type 'external_service'",
+          "repo_path": "/Users/iuliarinea/Desktop/Coding/KnowledgeForge/sources/demo",
+          "evidence": [
+            {
+              "type": "config_reference",
+              "source": "omnipay-card-router/appsettings.json",
+              "snippet": "Networks.GlobalBankBaseUrl=https://api.globalbank.test/v1"
+            }
+          ],
+          "recommended_action": "human_review"
+        },
+        "review_options": [
+          {
+            "id": "context-business-system",
+            "label": "Keep At Context Level",
+            "value": "BUSINESS_SYSTEM",
+            "description": "Treat Globalbank as an external business company or SaaS that belongs in the system context."
+          },
+          {
+            "id": "container-technical-infra",
+            "label": "Move To Container Level",
+            "value": "TECHNICAL_INFRA",
+            "description": "Treat Globalbank as technical infrastructure or an implementation detail that should not stay in the context diagram."
+          }
+        ],
+        "suggested_prompts": [
+          "We currently use Globalbank for external_service. Compare whether it belongs at C4 context level or container level, and explain the tradeoffs.",
+          "We use Globalbank for a payment-platform workflow. Suggest up to three alternative providers and compare them on price, performance, and integration cost."
+        ],
+        "detected_from_all": [
+          "omnipay-card-router/appsettings.json"
+        ]
+      },
+      {
+        "name": "Ledgershield",
+        "type": "external_service",
+        "detected_from": "omnipay-card-router/appsettings.json",
+        "context": "Networks.LedgerShieldBaseUrl=https://screening.ledgershield.test/v1",
+        "evidence_type": "config_reference",
+        "url": "https://screening.ledgershield.test/v1",
+        "context_name": "Ledgershield",
+        "integration_surface": null,
+        "provider": "Ledgershield",
+        "company": null,
+        "category": "external_service",
+        "dependency_type": "UNKNOWN",
+        "classification_confidence": 0.5,
+        "classification_reasoning": "Could not determine classification for 'Ledgershield' with type 'external_service'",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "Ledgershield",
+          "confidence": 0.5,
+          "detection_source": "rule_based_classifier",
+          "decision_mode": "deterministic",
+          "review_status": "needs_review",
+          "evidence": [
+            {
+              "type": "config_reference",
+              "source": "omnipay-card-router/appsettings.json",
+              "snippet": "Networks.LedgerShieldBaseUrl=https://screening.ledgershield.test/v1"
+            }
+          ],
+          "metadata": {
+            "provider": "Ledgershield",
+            "company": null,
+            "category": "external_service",
+            "boundary": "UNKNOWN",
+            "catalog_match": null
+          }
+        },
+        "confidence": 0.5,
+        "detection_source": "rule_based_classifier",
+        "review_status": "needs_review",
+        "requires_human_review": true,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "config_reference",
+            "source": "omnipay-card-router/appsettings.json",
+            "snippet": "Networks.LedgerShieldBaseUrl=https://screening.ledgershield.test/v1"
+          }
+        ],
+        "review_item": {
+          "field": "external_dependencies",
+          "candidate_value": "Ledgershield",
+          "confidence": 0.5,
+          "reason": "Could not determine classification for 'Ledgershield' with type 'external_service'",
+          "repo_path": "/Users/iuliarinea/Desktop/Coding/KnowledgeForge/sources/demo",
+          "evidence": [
+            {
+              "type": "config_reference",
+              "source": "omnipay-card-router/appsettings.json",
+              "snippet": "Networks.LedgerShieldBaseUrl=https://screening.ledgershield.test/v1"
+            }
+          ],
+          "recommended_action": "human_review"
+        },
+        "review_options": [
+          {
+            "id": "context-business-system",
+            "label": "Keep At Context Level",
+            "value": "BUSINESS_SYSTEM",
+            "description": "Treat Ledgershield as an external business company or SaaS that belongs in the system context."
+          },
+          {
+            "id": "container-technical-infra",
+            "label": "Move To Container Level",
+            "value": "TECHNICAL_INFRA",
+            "description": "Treat Ledgershield as technical infrastructure or an implementation detail that should not stay in the context diagram."
+          }
+        ],
+        "suggested_prompts": [
+          "We currently use Ledgershield for external_service. Compare whether it belongs at C4 context level or container level, and explain the tradeoffs.",
+          "We use Ledgershield for a payment-platform workflow. Suggest up to three alternative providers and compare them on price, performance, and integration cost."
+        ],
+        "detected_from_all": [
+          "omnipay-card-router/appsettings.json"
+        ]
+      },
+      {
+        "name": "Kafka",
+        "type": "messaging",
+        "detected_from": "omnipay-event-projections/appsettings.json",
+        "context": "ProjectionInfrastructure.KafkaBootstrapServers=kafka://risk-streams.omnipay.internal:9092",
+        "evidence_type": "config_reference",
+        "url": "kafka://risk-streams.omnipay.internal:9092",
+        "context_name": "Kafka",
+        "integration_surface": null,
+        "provider": "Kafka",
+        "company": "Confluent",
+        "category": "messaging",
+        "dependency_type": "TECHNICAL_INFRA",
+        "classification_confidence": 0.98,
+        "classification_reasoning": "Matched provider catalog entry for Kafka",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "Kafka",
+          "confidence": 0.98,
+          "detection_source": "provider_catalog",
+          "decision_mode": "deterministic",
+          "review_status": "auto_accepted",
+          "evidence": [
+            {
+              "type": "config_reference",
+              "source": "omnipay-event-projections/appsettings.json",
+              "snippet": "ProjectionInfrastructure.KafkaBootstrapServers=kafka://risk-streams.omnipay.internal:9092"
+            }
+          ],
+          "metadata": {
+            "provider": "Kafka",
+            "company": "Confluent",
+            "category": "messaging",
+            "boundary": "TECHNICAL_INFRA",
+            "catalog_match": {
+              "provider": "Kafka",
+              "company": "Confluent",
+              "category": "messaging",
+              "alias_field": "scheme_aliases",
+              "matched_alias": "kafka",
+              "input_value": "kafka://risk-streams.omnipay.internal:9092",
+              "normalized_value": "kafka",
+              "match_strategy": "exact"
+            }
+          }
+        },
+        "confidence": 0.98,
+        "detection_source": "provider_catalog",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "config_reference",
+            "source": "omnipay-event-projections/appsettings.json",
+            "snippet": "ProjectionInfrastructure.KafkaBootstrapServers=kafka://risk-streams.omnipay.internal:9092"
+          }
+        ],
+        "internal_hint": "URL host 'risk-streams.omnipay.internal' looks internal",
+        "detected_from_all": [
+          "omnipay-event-projections/appsettings.json"
+        ]
+      },
+      {
+        "name": "MongoDB",
+        "type": "database",
+        "detected_from": "omnipay-event-projections/appsettings.json",
+        "context": "ProjectionInfrastructure.MongoDbUrl=mongodb://projection-read-model.omnipay.internal:27017/event-projections",
+        "evidence_type": "config_reference",
+        "url": "mongodb://projection-read-model.omnipay.internal:27017/event-projections",
+        "context_name": "MongoDB",
+        "integration_surface": null,
+        "provider": "MongoDB",
+        "company": "MongoDB",
+        "category": "database",
+        "dependency_type": "TECHNICAL_INFRA",
+        "classification_confidence": 0.98,
+        "classification_reasoning": "Matched provider catalog entry for MongoDB",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "MongoDB",
+          "confidence": 0.98,
+          "detection_source": "provider_catalog",
+          "decision_mode": "deterministic",
+          "review_status": "auto_accepted",
+          "evidence": [
+            {
+              "type": "config_reference",
+              "source": "omnipay-event-projections/appsettings.json",
+              "snippet": "ProjectionInfrastructure.MongoDbUrl=mongodb://projection-read-model.omnipay.internal:27017/event-projections"
+            }
+          ],
+          "metadata": {
+            "provider": "MongoDB",
+            "company": "MongoDB",
+            "category": "database",
+            "boundary": "TECHNICAL_INFRA",
+            "catalog_match": {
+              "provider": "MongoDB",
+              "company": "MongoDB",
+              "category": "database",
+              "alias_field": "scheme_aliases",
+              "matched_alias": "mongodb",
+              "input_value": "mongodb://projection-read-model.omnipay.internal:27017/event-projections",
+              "normalized_value": "mongodb",
+              "match_strategy": "exact"
+            }
+          }
+        },
+        "confidence": 0.98,
+        "detection_source": "provider_catalog",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "config_reference",
+            "source": "omnipay-event-projections/appsettings.json",
+            "snippet": "ProjectionInfrastructure.MongoDbUrl=mongodb://projection-read-model.omnipay.internal:27017/event-projections"
+          }
+        ],
+        "internal_hint": "URL host 'projection-read-model.omnipay.internal' looks internal",
+        "detected_from_all": [
+          "omnipay-event-projections/appsettings.json"
+        ]
+      }
+    ],
+    "dependency_freshness_alerts": [],
+    "actors": [
+      {
+        "name": "User",
+        "type": "person",
+        "description": "Uses the system",
+        "detected_from": "repo_name",
+        "detection_method": "generic_fallback",
+        "evidence": "demo"
       }
     ],
     "languages": [
-      "Java",
-      "Python",
-      "TypeScript",
-      "Go",
-      "C#",
-      "HCL"
+      {
+        "language": "C#",
+        "file_count": 11
+      },
+      {
+        "language": "Python",
+        "file_count": 8
+      },
+      {
+        "language": "Java",
+        "file_count": 4
+      },
+      {
+        "language": "TypeScript",
+        "file_count": 4
+      },
+      {
+        "language": "JavaScript",
+        "file_count": 3
+      },
+      {
+        "language": "Go",
+        "file_count": 2
+      }
     ],
     "frameworks": [
-      "Spring Boot",
-      "FastAPI",
-      "NestJS",
-      "Terraform",
-      "Helm",
-      "ASP.NET Core",
-      "Entity Framework Core"
+      {
+        "language": "Python",
+        "framework": "FastAPI",
+        "detected_from": "omnipay-ml-pipeline/requirements.txt"
+      },
+      {
+        "language": "Java",
+        "framework": "Spring",
+        "detected_from": "omnipay-ledger/pom.xml"
+      },
+      {
+        "language": "JavaScript",
+        "framework": "Express",
+        "detected_from": "omnipay-gateway/package.json"
+      },
+      {
+        "language": "TypeScript",
+        "framework": "NestJS",
+        "detected_from": "omnipay-gateway/package.json"
+      },
+      {
+        "language": "Python",
+        "framework": "Flask",
+        "detected_from": "omnipay-payment-processor/requirements.txt"
+      },
+      {
+        "language": "C#",
+        "framework": "ASP.NET Core",
+        "detected_from": "omnipay-card-router/OmniPay.CardRouter.csproj",
+        "version": "net8.0"
+      }
     ],
-    "repository_url": "https://github.com/knowledgeforge-demos/omnipay-platform",
-    "documentation_quality": {
-      "score": 86,
-      "tier": "EXCELLENT"
+    "repository_url": "https://github.com/vladbrincoveanu/KnowledgeForge",
+    "git": {},
+    "context_sources": {
+      "readme_files": [
+        "README.md"
+      ],
+      "deployment_files": [
+        "omnipay-settlement-orchestrator/Dockerfile",
+        "omnipay-ml-pipeline/Dockerfile",
+        "omnipay-ledger/Dockerfile",
+        "omnipay-fraud-ml/Dockerfile",
+        "omnipay-card-router/Dockerfile",
+        "omnipay-payment-processor/Dockerfile",
+        "omnipay-risk-streams/Dockerfile",
+        "omnipay-notifier/Dockerfile",
+        "omnipay-billing-llm/Dockerfile",
+        "omnipay-event-projections/Dockerfile"
+      ],
+      "framework_files": [
+        "omnipay-card-router/OmniPay.CardRouter.csproj",
+        "omnipay-gateway/package.json",
+        "omnipay-ledger/pom.xml",
+        "omnipay-ml-pipeline/requirements.txt",
+        "omnipay-payment-processor/requirements.txt"
+      ]
     },
-    "deployment_targets": [
-      "Container",
-      "Kubernetes",
-      "AWS"
+    "regulatory_frameworks": [],
+    "domain": "AI/ML Processing",
+    "owner": "iuliarinea17",
+    "owner_provenance": {
+      "detection_source": "git_author",
+      "confidence": 0.6,
+      "evidence": [
+        {
+          "type": "git_log",
+          "source": "73548278+iuliarinea17@users.noreply.github.com",
+          "snippet": "iuliarinea17 (73 commits)"
+        }
+      ]
+    },
+    "owner_contributors": [
+      "73548278+iuliarinea17@users.noreply.github.com",
+      "iulia-georgiana.rinea@tuwien.ac.at",
+      "37401169+vladbrincoveanu@users.noreply.github.com"
     ],
-    "last_commit_date": "2026-03-05T10:12:00Z",
-    "commit_count_30d": 18,
-    "commit_count_90d": 47
+    "owner_contributor_stats": [
+      {
+        "email": "73548278+iuliarinea17@users.noreply.github.com",
+        "name": "iuliarinea17",
+        "commit_count": 73
+      },
+      {
+        "email": "iulia-georgiana.rinea@tuwien.ac.at",
+        "name": "Iulia Rinea",
+        "commit_count": 26
+      },
+      {
+        "email": "37401169+vladbrincoveanu@users.noreply.github.com",
+        "name": "vladbrincoveanu",
+        "commit_count": 6
+      }
+    ],
+    "contributor_count": 4,
+    "status": "ACTIVE",
+    "status_evidence": {
+      "commits_30d": 35,
+      "commits_90d": 79,
+      "commits_180d": 99,
+      "last_commit_date": "2026-03-15T17:01:28+01:00",
+      "days_since_last_commit": 0,
+      "git_repos_scanned": 1
+    },
+    "tier": "Tier 1 - Production Critical",
+    "data_class": "PII",
+    "active_experts": 0,
+    "compliance": "AT_RISK",
+    "compliance_confidence": 1.0,
+    "compliance_factors": [
+      "Score: 2/7 checks passed",
+      "\u2705 README presence",
+      "\u274c Tests present",
+      "\u274c CI/CD configured",
+      "\u274c Security checks",
+      "\u274c Secrets detected",
+      "\u2705 Repository structure",
+      "\u274c Dependency management"
+    ],
+    "last_commit_date": "2026-03-15T17:01:28+01:00",
+    "commit_count_30d": 35,
+    "commit_count_90d": 79,
+    "commit_count_180d": 99,
+    "dora_metrics": {
+      "deployment_frequency_per_day": 0.0,
+      "lead_time_days": null,
+      "mttr_hours": null,
+      "change_failure_rate": null,
+      "data_source": "git_commits",
+      "window_days": 30
+    },
+    "on_call_channel": null,
+    "owner_team": "iuliarinea17",
+    "business_domain": "AI/ML Processing",
+    "criticality": "Tier 1 - Production Critical",
+    "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata.\n    *   Constraint: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"OmniPay Demo Repositories\", \"type\": \"system\", \"container_type\": null,."
   },
   "containers": [
     {
       "c4_level": 2,
       "type": "container",
+      "name": "omnipay-infra",
+      "container_type": "Helm Deployed Service",
+      "technology": "Terraform",
+      "protocol": "HTTP",
+      "path": "omnipay-infra",
+      "runtime_environment": "Kubernetes",
+      "deployment": "Helm",
+      "description": "Helm chart for OmniPay platform services.",
+      "repository_url": "https://github.com/vladbrincoveanu/KnowledgeForge/-/tree/main/omnipay-infra",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [
+        "omnipay-gateway",
+        "omnipay-ledger"
+      ],
+      "health_endpoint": "",
+      "endpoint": "",
+      "dockerfile": null,
+      "terraform": true,
+      "helm": true,
+      "kubernetes": true,
+      "owner": "Iulia",
+      "team": null,
+      "owner_team": "Iulia",
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-infra\", \"type\": \"container\", \"container_type."
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "omnipay-settlement-orchestrator",
+      "container_type": "Containerized Service",
+      "technology": ".NET",
+      "protocol": "HTTP",
+      "path": "omnipay-settlement-orchestrator",
+      "runtime_environment": null,
+      "deployment": null,
+      "description": "OmniPay Settlement Orchestrator",
+      "repository_url": "https://github.com/vladbrincoveanu/KnowledgeForge/-/tree/main/omnipay-settlement-orchestrator",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "endpoint": "",
+      "dockerfile": "omnipay-settlement-orchestrator/Dockerfile",
+      "terraform": false,
+      "helm": false,
+      "kubernetes": false,
+      "owner": "Vlad",
+      "team": null,
+      "owner_team": "Vlad",
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based only on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-settlement-orch."
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "omnipay-k8s-ops",
+      "container_type": "Helm Deployed Service",
+      "technology": "Helm",
+      "protocol": "HTTP",
+      "path": "omnipay-k8s-ops",
+      "runtime_environment": "Kubernetes",
+      "deployment": "Helm",
+      "description": "Helm chart metadata for OmniPay eventing and data-platform operations.",
+      "repository_url": "https://github.com/vladbrincoveanu/KnowledgeForge/-/tree/main/omnipay-k8s-ops",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [
+        "omnipay-event-projections",
+        "omnipay-risk-streams",
+        "omnipay-settlement-orchestrator"
+      ],
+      "health_endpoint": "https://ops.omnipay.internal/health",
+      "endpoint": "https://ops.omnipay.internal/platform",
+      "dockerfile": null,
+      "terraform": false,
+      "helm": true,
+      "kubernetes": true,
+      "owner": "Iulia",
+      "team": null,
+      "owner_team": "Iulia",
+      "relationships": [
+        {
+          "from": "omnipay-k8s-ops",
+          "to": "ops.omnipay.internal",
+          "type": "uses",
+          "protocol": "HTTP",
+          "port": "",
+          "source": "helm",
+          "_unresolved": true,
+          "description": "omnipay-k8s-ops.ingress.host \u2192 ops.omnipay.internal"
+        }
+      ],
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-k8."
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "omnipay-ml-pipeline",
+      "container_type": "Python Service",
+      "technology": "Python",
+      "protocol": "REST",
+      "path": "omnipay-ml-pipeline",
+      "runtime_environment": null,
+      "deployment": null,
+      "description": "OmniPay ML Pipeline",
+      "repository_url": "https://github.com/vladbrincoveanu/KnowledgeForge/-/tree/main/omnipay-ml-pipeline",
+      "runtime_info": "Python 3.11-slim",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "endpoint": "",
+      "dockerfile": "omnipay-ml-pipeline/Dockerfile",
+      "terraform": false,
+      "helm": false,
+      "kubernetes": false,
+      "owner": "Vlas",
+      "team": null,
+      "owner_team": "Vlas",
+      "components": [
+        {
+          "id": "fastapi_omnipay-ml-pipeline",
+          "name": "Omnipay-ml-pipeline",
+          "type": "Component"
+        },
+        {
+          "id": "community_detection_omnipay-ml-pipeline",
+          "name": "Omnipay-ml-pipeline",
+          "type": "Component"
+        }
+      ],
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-ml."
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
       "name": "omnipay-ledger",
       "container_type": "Java Service",
-      "technology": "Java / Spring Boot",
+      "technology": "Java",
       "protocol": "HTTP",
-      "path": "sources/demo/omnipay-ledger",
-      "runtime_environment": "Container",
-      "deployment": "Docker",
-      "description": "Source of truth for user balances, holds, and transaction postings.",
-      "repository_url": "https://github.com/knowledgeforge-demos/omnipay-ledger",
-      "runtime_info": "Java 21",
-      "dependencies_internal": [
-        "omnipay-notifier"
-      ],
-      "health_endpoint": "/actuator/health",
-      "endpoint": "https://ledger.omnipay.internal",
+      "path": "omnipay-ledger",
+      "runtime_environment": null,
+      "deployment": null,
+      "description": "OmniPay Ledger",
+      "repository_url": "https://github.com/vladbrincoveanu/KnowledgeForge/-/tree/main/omnipay-ledger",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "endpoint": "",
+      "dockerfile": "omnipay-ledger/Dockerfile",
+      "terraform": false,
+      "helm": false,
+      "kubernetes": false,
       "owner": "Iulia",
-      "tier": "Tier 1 - Production Critical",
-      "data_class": "PII",
-      "status": "ACTIVE",
-      "active_experts": 2,
-      "compliance": "COMPLIANT",
-      "compliance_confidence": 0.95,
-      "llm_description": "A Spring Boot ledger service whose controllers, services, and repositories map cleanly into the Level 3 component view."
+      "team": "omnipay/platform-backend",
+      "owner_team": "omnipay/platform-backend",
+      "components": [
+        {
+          "id": "community_detection_repository",
+          "name": "Repository",
+          "type": "Component"
+        },
+        {
+          "id": "community_detection_api",
+          "name": "Api",
+          "type": "Component"
+        }
+      ],
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-ledger\", \"type\": \"container\", \"container_type."
     },
     {
       "c4_level": 2,
       "type": "container",
       "name": "omnipay-fraud-ml",
       "container_type": "Python Service",
-      "technology": "Python / FastAPI",
-      "protocol": "HTTP",
-      "path": "sources/demo/omnipay-fraud-ml",
-      "runtime_environment": "Container",
-      "deployment": "Docker",
-      "description": "Real-time fraud scoring engine that mixes FastAPI routing with pandas feature engineering and single-owner risk.",
-      "repository_url": "https://github.com/knowledgeforge-demos/omnipay-fraud-ml",
-      "runtime_info": "Python 3.12",
+      "technology": "Python",
+      "protocol": "REST",
+      "path": "omnipay-fraud-ml",
+      "runtime_environment": null,
+      "deployment": null,
+      "description": "OmniPay Fraud ML",
+      "repository_url": "https://github.com/vladbrincoveanu/KnowledgeForge/-/tree/main/omnipay-fraud-ml",
+      "runtime_info": "Python 3.12-slim",
       "dependencies_internal": [],
-      "health_endpoint": "/healthz",
-      "endpoint": "https://fraud.omnipay.internal",
+      "health_endpoint": "",
+      "endpoint": "",
+      "dockerfile": "omnipay-fraud-ml/Dockerfile",
+      "terraform": false,
+      "helm": false,
+      "kubernetes": false,
       "owner": "Vlas",
-      "tier": "Tier 1 - Production Critical",
-      "data_class": "PII",
-      "status": "ACTIVE",
-      "active_experts": 1,
-      "compliance": "AT_RISK",
-      "compliance_confidence": 0.97,
-      "compliance_factors": [
-        "single_point_of_failure"
+      "team": null,
+      "owner_team": "Vlas",
+      "components": [
+        {
+          "id": "community_detection_users",
+          "name": "Users",
+          "type": "Component"
+        }
       ],
-      "llm_description": "A FastAPI-based fraud engine whose demo metadata emphasizes criticality, high sensitivity, and a bus factor of one."
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-fraud."
     },
     {
       "c4_level": 2,
       "type": "container",
       "name": "omnipay-gateway",
-      "container_type": "Node Service",
-      "technology": "TypeScript / NestJS",
+      "container_type": "Node.js Backend",
+      "technology": "Node.js",
       "protocol": "HTTP",
-      "path": "sources/demo/omnipay-gateway",
-      "runtime_environment": "Container",
-      "deployment": "Docker Compose",
-      "description": "Backend-for-frontend for the mobile clients, with Redis-backed orchestration of payment flows.",
-      "repository_url": "https://github.com/knowledgeforge-demos/omnipay-gateway",
-      "runtime_info": "Node.js 22",
+      "path": "omnipay-gateway",
+      "runtime_environment": null,
+      "deployment": null,
+      "description": "OmniPay Gateway",
+      "repository_url": "https://github.com/vladbrincoveanu/KnowledgeForge/-/tree/main/omnipay-gateway",
+      "runtime_info": "Unknown",
       "dependencies_internal": [
-        "omnipay-ledger",
+        "omnipay-card-router",
         "omnipay-fraud-ml",
-        "omnipay-card-router"
+        "omnipay-ledger"
       ],
-      "health_endpoint": "/health",
-      "endpoint": "https://gateway.omnipay.internal",
+      "health_endpoint": "",
+      "endpoint": "",
+      "dockerfile": null,
+      "terraform": false,
+      "helm": false,
+      "kubernetes": false,
       "owner": "Vlad",
-      "tier": "Tier 2 - Production Standard",
-      "data_class": "General",
-      "status": "ACTIVE",
-      "active_experts": 2,
-      "compliance": "COMPLIANT",
-      "compliance_confidence": 0.94,
-      "llm_description": "A NestJS gateway that shows module and controller extraction plus a compose-defined Redis dependency."
+      "team": null,
+      "owner_team": "Vlad",
+      "components": [
+        {
+          "id": "community_detection_payments",
+          "name": "Payments",
+          "type": "Component"
+        }
+      ],
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-gateway."
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "omnipay-card-router",
+      "container_type": "Containerized Service",
+      "technology": ".NET",
+      "protocol": "HTTP",
+      "path": "omnipay-card-router",
+      "runtime_environment": null,
+      "deployment": null,
+      "description": "OmniPay Card Router",
+      "repository_url": "https://github.com/vladbrincoveanu/KnowledgeForge/-/tree/main/omnipay-card-router",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "endpoint": "",
+      "dockerfile": "omnipay-card-router/Dockerfile",
+      "terraform": false,
+      "helm": false,
+      "kubernetes": false,
+      "owner": "Vlad",
+      "team": "omnipay/security-platform",
+      "owner_team": "omnipay/security-platform",
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-card-router."
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "omnipay-disputes",
+      "container_type": "Node.js Backend",
+      "technology": "Node.js",
+      "protocol": "REST",
+      "path": "omnipay-disputes",
+      "runtime_environment": null,
+      "deployment": null,
+      "description": "This service handles chargeback and dispute management for OmniPay. It processes refund requests, communicates with payment providers, and manages the dispute lifecycle.",
+      "repository_url": "https://github.com/vladbrincoveanu/KnowledgeForge/-/tree/main/omnipay-disputes",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "endpoint": "",
+      "dockerfile": null,
+      "terraform": false,
+      "helm": false,
+      "kubernetes": false,
+      "owner": "omnipay/finance-team",
+      "team": "omnipay/risk-team",
+      "owner_team": "omnipay/risk-team",
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: JSON object containing `name`, `type`, `."
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "omnipay-payment-processor",
+      "container_type": "Backend API",
+      "technology": "Python",
+      "protocol": "HTTP",
+      "path": "omnipay-payment-processor",
+      "runtime_environment": null,
+      "deployment": null,
+      "description": "OmniPay Payment Processor",
+      "repository_url": "https://github.com/vladbrincoveanu/KnowledgeForge/-/tree/main/omnipay-payment-processor",
+      "runtime_info": "Python 3.11-slim",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "endpoint": "",
+      "dockerfile": "omnipay-payment-processor/Dockerfile",
+      "terraform": false,
+      "helm": false,
+      "kubernetes": false,
+      "owner": "Vlad",
+      "team": null,
+      "owner_team": "Vlad",
+      "components": [
+        {
+          "id": "community_detection_omnipay-payment-processor",
+          "name": "Omnipay-payment-processor",
+          "type": "Component"
+        }
+      ],
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Base description *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-payment."
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "omnipay-risk-streams",
+      "container_type": "Java Service",
+      "technology": "Java",
+      "protocol": "HTTP",
+      "path": "omnipay-risk-streams",
+      "runtime_environment": null,
+      "deployment": null,
+      "description": "OmniPay Risk Streams",
+      "repository_url": "https://github.com/vladbrincoveanu/KnowledgeForge/-/tree/main/omnipay-risk-streams",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "endpoint": "",
+      "dockerfile": "omnipay-risk-streams/Dockerfile",
+      "terraform": false,
+      "helm": false,
+      "kubernetes": false,
+      "owner": "Vlas",
+      "team": null,
+      "owner_team": "Vlas",
+      "components": [
+        {
+          "id": "community_detection_riskstreams",
+          "name": "Riskstreams",
+          "type": "Component"
+        }
+      ],
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-risk-stream."
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "omnipay-analytics",
+      "container_type": "Node.js Backend",
+      "technology": "Node.js",
+      "protocol": "REST",
+      "path": "omnipay-analytics",
+      "runtime_environment": null,
+      "deployment": null,
+      "description": "OmniPay Analytics",
+      "repository_url": "https://github.com/vladbrincoveanu/KnowledgeForge/-/tree/main/omnipay-analytics",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "endpoint": "",
+      "dockerfile": null,
+      "terraform": false,
+      "helm": false,
+      "kubernetes": false,
+      "owner": "Iulia",
+      "team": null,
+      "owner_team": "Iulia",
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata.\n    *   Constraint: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-analytics\", \"type\": \"."
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "omnipay-auth",
+      "container_type": "Node.js Backend",
+      "technology": "Node.js",
+      "protocol": "REST",
+      "path": "omnipay-auth",
+      "runtime_environment": null,
+      "deployment": null,
+      "description": "This service handles authentication and authorization using Auth0.",
+      "repository_url": "https://github.com/vladbrincoveanu/KnowledgeForge/-/tree/main/omnipay-auth",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "endpoint": "",
+      "dockerfile": null,
+      "terraform": false,
+      "helm": false,
+      "kubernetes": false,
+      "owner": "Vlas",
+      "team": null,
+      "owner_team": "Vlas",
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-auth\",."
     },
     {
       "c4_level": 2,
@@ -454,414 +2624,453 @@
       "name": "omnipay-notifier",
       "container_type": "Go Service",
       "technology": "Go",
-      "protocol": "Event",
-      "path": "sources/demo/omnipay-notifier",
-      "runtime_environment": "Container",
-      "deployment": "Docker",
-      "description": "Worker that listens to payment events and dispatches SMS and email receipts.",
-      "repository_url": "https://github.com/knowledgeforge-demos/omnipay-notifier",
-      "runtime_info": "Go 1.23",
+      "protocol": "HTTP",
+      "path": "omnipay-notifier",
+      "runtime_environment": null,
+      "deployment": null,
+      "description": "OmniPay Notifier",
+      "repository_url": "https://github.com/vladbrincoveanu/KnowledgeForge/-/tree/main/omnipay-notifier",
+      "runtime_info": "Go 1.23-alpine",
       "dependencies_internal": [],
       "health_endpoint": "",
-      "endpoint": "queue://omnipay.receipts",
+      "endpoint": "",
+      "dockerfile": "omnipay-notifier/Dockerfile",
+      "terraform": false,
+      "helm": false,
+      "kubernetes": false,
       "owner": "Iulia",
-      "tier": "Tier 2 - Production Standard",
-      "data_class": "PII",
-      "status": "ACTIVE",
-      "active_experts": 2,
-      "compliance": "COMPLIANT",
-      "compliance_confidence": 0.92,
-      "llm_description": "A compact Go worker whose code and provider references highlight notification boundaries such as Twilio and SendGrid."
+      "team": null,
+      "owner_team": "Iulia",
+      "components": [
+        {
+          "id": "community_detection_notifier",
+          "name": "Notifier",
+          "type": "Component"
+        },
+        {
+          "id": "community_detection_dispatch",
+          "name": "Dispatch",
+          "type": "Component"
+        }
+      ],
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Base description *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-not."
     },
     {
       "c4_level": 2,
       "type": "container",
-      "name": "omnipay-infra",
-      "container_type": "Infrastructure as Code",
-      "technology": "Terraform / Helm",
-      "protocol": "Provisioning",
-      "path": "sources/demo/omnipay-infra",
-      "runtime_environment": "AWS / Kubernetes",
-      "deployment": "Terraform + Helm",
-      "description": "Infrastructure and orchestration workspace for the platform's AWS and Kubernetes footprint.",
-      "repository_url": "https://github.com/knowledgeforge-demos/omnipay-infra",
-      "runtime_info": "Terraform 1.7 / Helm 3",
-      "dependencies_internal": [
-        "omnipay-gateway",
-        "omnipay-ledger",
-        "omnipay-card-router"
-      ],
+      "name": "omnipay-billing-llm",
+      "container_type": "Python Service",
+      "technology": "Python",
+      "protocol": "REST",
+      "path": "omnipay-billing-llm",
+      "runtime_environment": null,
+      "deployment": null,
+      "description": "OmniPay Billing (LLM)",
+      "repository_url": "https://github.com/vladbrincoveanu/KnowledgeForge/-/tree/main/omnipay-billing-llm",
+      "runtime_info": "Python 3.11-slim",
+      "dependencies_internal": [],
       "health_endpoint": "",
       "endpoint": "",
-      "owner": "Iulia",
-      "tier": "Tier 1 - Production Critical",
-      "data_class": "General",
-      "status": "ACTIVE",
-      "active_experts": 2,
-      "compliance": "COMPLIANT",
-      "compliance_confidence": 0.93,
-      "llm_description": "A Terraform and Helm workspace that anchors infrastructure detection for databases, storage, and Kubernetes deployments."
+      "dockerfile": "omnipay-billing-llm/Dockerfile",
+      "terraform": false,
+      "helm": false,
+      "kubernetes": false,
+      "owner": "Vlad",
+      "team": null,
+      "owner_team": "Vlad",
+      "components": [
+        {
+          "id": "fastapi_omnipay-billing-llm",
+          "name": "Omnipay-billing-llm",
+          "type": "Component"
+        }
+      ],
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Base description *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-b."
     },
     {
       "c4_level": 2,
       "type": "container",
-      "name": "omnipay-card-router",
-      "container_type": ".NET Service",
-      "technology": "C# / ASP.NET Core",
-      "protocol": "HTTPS",
-      "path": "sources/demo/omnipay-card-router",
-      "runtime_environment": "Container",
-      "deployment": "Docker",
-      "description": "PCI-scoped card-network integration service for authorizations, captures, and settlement fallbacks.",
-      "repository_url": "https://github.com/knowledgeforge-demos/omnipay-card-router",
-      "runtime_info": ".NET 8",
-      "dependencies_internal": [
-        "omnipay-ledger"
+      "name": "omnipay-event-projections",
+      "container_type": "Containerized Service",
+      "technology": ".NET",
+      "protocol": "HTTP",
+      "path": "omnipay-event-projections",
+      "runtime_environment": null,
+      "deployment": null,
+      "description": "OmniPay Event Projections",
+      "repository_url": "https://github.com/vladbrincoveanu/KnowledgeForge/-/tree/main/omnipay-event-projections",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "endpoint": "",
+      "dockerfile": "omnipay-event-projections/Dockerfile",
+      "terraform": false,
+      "helm": false,
+      "kubernetes": false,
+      "owner": "Iulia",
+      "team": null,
+      "owner_team": "Iulia",
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-event-pro."
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "omnipay-database",
+      "container_type": "Python Service",
+      "technology": "Python",
+      "protocol": "REST",
+      "path": "omnipay-database",
+      "runtime_environment": null,
+      "deployment": null,
+      "description": "OmniPay Database",
+      "repository_url": "https://github.com/vladbrincoveanu/KnowledgeForge/-/tree/main/omnipay-database",
+      "runtime_info": "Python 3.11-slim",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "endpoint": "",
+      "dockerfile": "omnipay-database/Dockerfile",
+      "terraform": false,
+      "helm": false,
+      "kubernetes": false,
+      "owner": "Iulia",
+      "team": null,
+      "owner_team": "Iulia",
+      "components": [
+        {
+          "id": "fastapi_omnipay-database",
+          "name": "Omnipay-database",
+          "type": "Component"
+        }
       ],
-      "health_endpoint": "/health",
-      "endpoint": "https://card-router.omnipay.internal",
-      "owner": "Vlad",
-      "tier": "Tier 1 - Production Critical",
-      "data_class": "Credit-Card",
-      "status": "ACTIVE",
-      "active_experts": 1,
-      "compliance": "AT_RISK",
-      "compliance_confidence": 0.98,
-      "compliance_factors": [
-        "single_point_of_failure"
-      ],
-      "llm_description": "A highly critical ASP.NET Core service with Entity Framework Core and external banking endpoints, built to surface PCI-heavy metadata."
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Base description *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-d."
     }
   ],
   "components": [
     {
       "c4_level": 3,
       "type": "component",
-      "name": "GET /api/v1/balances/{accountId}",
-      "component_type": "API Endpoint",
-      "container": "omnipay-ledger",
-      "file": "sources/demo/omnipay-ledger/src/main/java/com/omnipay/ledger/api/LedgerController.java",
-      "technology": "Spring Boot",
-      "endpoint_method": "GET",
-      "endpoint_path": "/api/v1/balances/{accountId}"
-    },
-    {
-      "c4_level": 3,
-      "type": "component",
-      "name": "POST /api/v1/transactions",
-      "component_type": "API Endpoint",
-      "container": "omnipay-ledger",
-      "file": "sources/demo/omnipay-ledger/src/main/java/com/omnipay/ledger/api/LedgerController.java",
-      "technology": "Spring Boot",
-      "endpoint_method": "POST",
-      "endpoint_path": "/api/v1/transactions"
-    },
-    {
-      "c4_level": 3,
-      "type": "component",
-      "name": "LedgerService",
-      "component_type": "Service",
-      "container": "omnipay-ledger",
-      "file": "sources/demo/omnipay-ledger/src/main/java/com/omnipay/ledger/service/LedgerService.java",
-      "technology": "Spring Boot"
-    },
-    {
-      "c4_level": 3,
-      "type": "component",
-      "name": "BalanceRepository",
-      "component_type": "Repository",
-      "container": "omnipay-ledger",
-      "file": "sources/demo/omnipay-ledger/src/main/java/com/omnipay/ledger/repository/BalanceRepository.java",
-      "technology": "Spring Data"
-    },
-    {
-      "c4_level": 3,
-      "type": "component",
-      "name": "POST /v1/risk/score",
-      "component_type": "API Endpoint",
-      "container": "omnipay-fraud-ml",
-      "file": "sources/demo/omnipay-fraud-ml/app/main.py",
+      "name": "Omnipay-ml-pipeline",
+      "component_type": "Component",
+      "container": "omnipay-ml-pipeline",
+      "file": "omnipay-ml-pipeline/model.py",
+      "documentation": null,
       "technology": "FastAPI",
-      "endpoint_method": "POST",
-      "endpoint_path": "/v1/risk/score"
+      "confidence": 1.0,
+      "extraction_method": "framework_detection",
+      "tags": [],
+      "metadata": {},
+      "container_id": "omnipay-ml-pipeline",
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Omnipay-ml-pipeline\", \"type\": \"component\", \"."
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "POST /v1/risk/feedback",
-      "component_type": "API Endpoint",
+      "name": "Omnipay-ml-pipeline",
+      "component_type": "Component",
+      "container": "omnipay-ml-pipeline",
+      "file": "omnipay-ml-pipeline/train.py",
+      "documentation": null,
+      "technology": "Python",
+      "confidence": 0.5,
+      "extraction_method": "community_detection",
+      "tags": [],
+      "metadata": {
+        "layer": "infrastructure"
+      },
+      "container_id": "omnipay-ml-pipeline",
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Omnipay-ml."
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "Repository",
+      "component_type": "Component",
+      "container": "omnipay-ledger",
+      "file": "omnipay-ledger/BalanceRepository.java",
+      "documentation": null,
+      "technology": "Spring",
+      "confidence": 0.5,
+      "extraction_method": "community_detection",
+      "tags": [],
+      "metadata": {
+        "layer": "data_access"
+      },
+      "container_id": "omnipay-ledger",
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Repository\", \"type\": \"component\", \"container_type\": null, \"."
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "Api",
+      "component_type": "Component",
+      "container": "omnipay-ledger",
+      "file": "omnipay-ledger/LedgerController.java",
+      "documentation": null,
+      "technology": "Spring",
+      "confidence": 0.5,
+      "extraction_method": "community_detection",
+      "tags": [],
+      "metadata": {
+        "layer": "presentation"
+      },
+      "container_id": "omnipay-ledger",
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: A JSON object containing fields like `name`, `type`, `container_type`, `technology`, `."
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "Users",
+      "component_type": "Component",
       "container": "omnipay-fraud-ml",
-      "file": "sources/demo/omnipay-fraud-ml/app/main.py",
-      "technology": "FastAPI",
-      "endpoint_method": "POST",
-      "endpoint_path": "/v1/risk/feedback"
+      "file": "omnipay-fraud-ml/main.py",
+      "documentation": null,
+      "technology": "Python",
+      "confidence": 0.5,
+      "extraction_method": "community_detection",
+      "tags": [],
+      "metadata": {
+        "layer": "presentation"
+      },
+      "container_id": "omnipay-fraud-ml",
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Users\", \"type\": \"component\", \"container_type\": null, \"."
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "FeatureFrameBuilder",
-      "component_type": "Data Pipeline",
-      "container": "omnipay-fraud-ml",
-      "file": "sources/demo/omnipay-fraud-ml/app/scoring/features.py",
-      "technology": "pandas"
-    },
-    {
-      "c4_level": 3,
-      "type": "component",
-      "name": "VelocityScoreModel",
-      "component_type": "Model",
-      "container": "omnipay-fraud-ml",
-      "file": "sources/demo/omnipay-fraud-ml/app/scoring/model.py",
-      "technology": "Python"
-    },
-    {
-      "c4_level": 3,
-      "type": "component",
-      "name": "PaymentsModule",
-      "component_type": "Module",
+      "name": "Payments",
+      "component_type": "Component",
       "container": "omnipay-gateway",
-      "file": "sources/demo/omnipay-gateway/src/payments/payments.module.ts",
-      "technology": "NestJS"
+      "file": "omnipay-gateway/payments.controller.ts",
+      "documentation": null,
+      "technology": "Spring",
+      "confidence": 0.5,
+      "extraction_method": "community_detection",
+      "tags": [],
+      "metadata": {
+        "layer": "presentation"
+      },
+      "container_id": "omnipay-gateway",
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Payments\", \"type\": \"component\", \"container_type\": null, \"."
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "PaymentsController",
-      "component_type": "Controller",
-      "container": "omnipay-gateway",
-      "file": "sources/demo/omnipay-gateway/src/payments/payments.controller.ts",
-      "technology": "NestJS"
+      "name": "Omnipay-payment-processor",
+      "component_type": "Component",
+      "container": "omnipay-payment-processor",
+      "file": "omnipay-payment-processor/app.py",
+      "documentation": null,
+      "technology": "Python",
+      "confidence": 0.5,
+      "extraction_method": "community_detection",
+      "tags": [],
+      "metadata": {
+        "layer": "presentation"
+      },
+      "container_id": "omnipay-payment-processor",
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Omnipay-payment-processor\", \"type\": \"component\", \"container."
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "PaymentsService",
-      "component_type": "Service",
-      "container": "omnipay-gateway",
-      "file": "sources/demo/omnipay-gateway/src/payments/payments.service.ts",
-      "technology": "NestJS"
+      "name": "Riskstreams",
+      "component_type": "Component",
+      "container": "omnipay-risk-streams",
+      "file": "omnipay-risk-streams/RiskStreamsApplication.java",
+      "documentation": null,
+      "technology": "Java",
+      "confidence": 0.5,
+      "extraction_method": "community_detection",
+      "tags": [],
+      "metadata": {},
+      "container_id": "omnipay-risk-streams",
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what this node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Riskstreams\", \"type."
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "ReceiptDispatcher",
-      "component_type": "Worker",
+      "name": "Notifier",
+      "component_type": "Component",
       "container": "omnipay-notifier",
-      "file": "sources/demo/omnipay-notifier/internal/dispatch/receipt_dispatcher.go",
-      "technology": "Go"
+      "file": "omnipay-notifier/main.go",
+      "documentation": null,
+      "technology": "Go",
+      "confidence": 0.3,
+      "extraction_method": "community_detection",
+      "tags": [],
+      "metadata": {},
+      "container_id": "omnipay-notifier",
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Notifier\", \"type\": \"component\", \"container_type\": null, \"."
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "GatewayDeployment",
-      "component_type": "Deployment",
-      "container": "omnipay-infra",
-      "file": "sources/demo/omnipay-infra/chart/templates/gateway-deployment.yaml",
-      "technology": "Helm"
+      "name": "Dispatch",
+      "component_type": "Component",
+      "container": "omnipay-notifier",
+      "file": "omnipay-notifier/receipt_dispatcher.go",
+      "documentation": null,
+      "technology": "Go",
+      "confidence": 0.5,
+      "extraction_method": "community_detection",
+      "tags": [],
+      "metadata": {},
+      "container_id": "omnipay-notifier",
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Base description *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Dispatch\", \"type."
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "LedgerPostgres",
-      "component_type": "Database Resource",
-      "container": "omnipay-infra",
-      "file": "sources/demo/omnipay-infra/main.tf",
-      "technology": "Terraform"
+      "name": "Omnipay-billing-llm",
+      "component_type": "Component",
+      "container": "omnipay-billing-llm",
+      "file": "omnipay-billing-llm/main.py",
+      "documentation": null,
+      "technology": "FastAPI",
+      "confidence": 1.0,
+      "extraction_method": "framework_detection",
+      "tags": [],
+      "metadata": {},
+      "container_id": "omnipay-billing-llm",
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Omnipay-billing-llm\", \"type\": \"component\",."
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "RawEventsBucket",
-      "component_type": "Storage Resource",
-      "container": "omnipay-infra",
-      "file": "sources/demo/omnipay-infra/main.tf",
-      "technology": "Terraform"
-    },
-    {
-      "c4_level": 3,
-      "type": "component",
-      "name": "POST /api/authorizations",
-      "component_type": "API Endpoint",
-      "container": "omnipay-card-router",
-      "file": "sources/demo/omnipay-card-router/Controllers/AuthorizationsController.cs",
-      "technology": "ASP.NET Core",
-      "endpoint_method": "POST",
-      "endpoint_path": "/api/authorizations"
-    },
-    {
-      "c4_level": 3,
-      "type": "component",
-      "name": "CardRouterDbContext",
-      "component_type": "DbContext",
-      "container": "omnipay-card-router",
-      "file": "sources/demo/omnipay-card-router/Data/CardRouterDbContext.cs",
-      "technology": "Entity Framework Core"
+      "name": "Omnipay-database",
+      "component_type": "Component",
+      "container": "omnipay-database",
+      "file": "omnipay-database/main.py",
+      "documentation": null,
+      "technology": "FastAPI",
+      "confidence": 1.0,
+      "extraction_method": "framework_detection",
+      "tags": [],
+      "metadata": {},
+      "container_id": "omnipay-database",
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Omnipay-database."
     }
   ],
   "relationships": {
     "context": [
       {
-        "source": "Customer",
-        "destination": "OmniPay Platform",
+        "source": "User",
+        "destination": "OmniPay Demo Repositories",
+        "description": "Uses the system",
         "relationship_type": "uses",
-        "description": "Initiates authorizations and checks payment status through the mobile app.",
-        "protocol": "HTTPS"
+        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata): `{\"source\": \"User\", \"."
       },
       {
-        "source": "Fraud Analyst",
-        "destination": "OmniPay Platform",
+        "source": "OmniPay Demo Repositories",
+        "destination": "Mixpanel",
+        "description": "Uses Mixpanel for analytics and insights",
         "relationship_type": "uses",
-        "description": "Investigates suspicious transactions and posts analyst feedback.",
-        "protocol": "HTTPS"
+        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data: Edge metadata (`{\"source\": \"OmniPay Demo."
       },
       {
-        "source": "Finance Operator",
-        "destination": "OmniPay Platform",
-        "relationship_type": "uses",
-        "description": "Monitors settlement issues and receipt delivery health.",
-        "protocol": "HTTPS"
-      },
-      {
-        "source": "Risk Operations Manager",
-        "destination": "OmniPay Platform",
-        "relationship_type": "uses",
-        "description": "Reviews provider onboarding decisions and resolves ambiguous external dependency reviews.",
-        "protocol": "HTTPS"
-      },
-      {
-        "source": "OmniPay Platform",
-        "destination": "Visa Network",
-        "relationship_type": "uses",
-        "description": "Routes card authorizations to Visa.",
-        "protocol": "HTTPS"
-      },
-      {
-        "source": "OmniPay Platform",
-        "destination": "Mastercard Network",
-        "relationship_type": "uses",
-        "description": "Routes card authorizations to Mastercard.",
-        "protocol": "HTTPS"
-      },
-      {
-        "source": "OmniPay Platform",
-        "destination": "GlobalBank",
-        "relationship_type": "uses",
-        "description": "Performs banking fallback captures and settlement checks.",
-        "protocol": "HTTPS"
-      },
-      {
-        "source": "OmniPay Platform",
+        "source": "OmniPay Demo Repositories",
         "destination": "Auth0",
+        "description": "Uses Auth0 for authentication and identity",
         "relationship_type": "uses",
-        "description": "Delegates customer login and session management to Auth0.",
-        "protocol": "HTTPS"
+        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data: Edge metadata (`{\"source\": \"OmniPay Demo."
       },
       {
-        "source": "OmniPay Platform",
-        "destination": "Twilio",
+        "source": "OmniPay Demo Repositories",
+        "destination": "Openai",
+        "description": "Uses Openai for AI-powered capabilities",
         "relationship_type": "uses",
-        "description": "Sends receipt SMS messages.",
-        "protocol": "HTTPS"
+        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   `source`: \"."
       },
       {
-        "source": "OmniPay Platform",
-        "destination": "SendGrid",
+        "source": "OmniPay Demo Repositories",
+        "destination": "Stripe",
+        "description": "Uses Stripe for payment processing",
         "relationship_type": "uses",
-        "description": "Sends receipt emails.",
-        "protocol": "HTTPS"
-      },
-      {
-        "source": "OmniPay Platform",
-        "destination": "SignalForge",
-        "relationship_type": "uses",
-        "description": "May orchestrate merchant risk scoring, but the boundary still requires human review.",
-        "protocol": "HTTPS"
-      },
-      {
-        "source": "OmniPay Platform",
-        "destination": "LedgerShield",
-        "relationship_type": "uses",
-        "description": "May support compliance screening and onboarding checks, but the boundary still requires human review.",
-        "protocol": "HTTPS"
-      },
-      {
-        "source": "OmniPay Platform",
-        "destination": "OpenAI",
-        "relationship_type": "uses",
-        "description": "Supports fraud-ops triage experiments in the ML workspace.",
-        "protocol": "HTTPS"
+        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   Source: \"Om."
       }
     ],
     "containers": [
       {
-        "from": "omnipay-gateway",
+        "from": "omnipay-infra",
+        "to": "omnipay-gateway",
+        "type": "uses",
+        "protocol": "HTTP",
+        "source": "runtime",
+        "description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata): `{\"source\": \"omnipay.",
+        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata): `{\"source\": \"omnipay."
+      },
+      {
+        "from": "omnipay-infra",
         "to": "omnipay-ledger",
-        "relationship_type": "calls",
-        "description": "Reads balances and reserves funds before authorization.",
-        "protocol": "http"
+        "type": "uses",
+        "protocol": "HTTP",
+        "source": "runtime",
+        "description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata): `{\"source\": \"omnipay.",
+        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata): `{\"source\": \"omnipay."
+      },
+      {
+        "from": "omnipay-k8s-ops",
+        "to": "omnipay-event-projections",
+        "type": "uses",
+        "protocol": "HTTP",
+        "source": "runtime",
+        "description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   Source: `om.",
+        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   Source: `om."
+      },
+      {
+        "from": "omnipay-k8s-ops",
+        "to": "omnipay-risk-streams",
+        "type": "uses",
+        "protocol": "HTTP",
+        "source": "runtime",
+        "description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   Source: `om.",
+        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   Source: `om."
+      },
+      {
+        "from": "omnipay-k8s-ops",
+        "to": "omnipay-settlement-orchestrator",
+        "type": "uses",
+        "protocol": "HTTP",
+        "source": "runtime",
+        "description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   Source: `om.",
+        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   Source: `om."
+      },
+      {
+        "from": "omnipay-gateway",
+        "to": "omnipay-card-router",
+        "type": "uses",
+        "protocol": "HTTP",
+        "source": "runtime",
+        "description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   Source: `om.",
+        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   Source: `om."
       },
       {
         "from": "omnipay-gateway",
         "to": "omnipay-fraud-ml",
-        "relationship_type": "calls",
-        "description": "Requests a fraud score before routing to the card network.",
-        "protocol": "http"
+        "type": "uses",
+        "protocol": "HTTP",
+        "source": "runtime",
+        "description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata): `source`: \"omnipay-g.",
+        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata): `source`: \"omnipay-g."
       },
       {
         "from": "omnipay-gateway",
-        "to": "omnipay-card-router",
-        "relationship_type": "calls",
-        "description": "Submits authorization and capture requests to the PCI-scoped router.",
-        "protocol": "https"
-      },
-      {
-        "from": "omnipay-card-router",
         "to": "omnipay-ledger",
-        "relationship_type": "updates",
-        "description": "Persists authorization outcomes and hold identifiers.",
-        "protocol": "grpc"
-      },
-      {
-        "from": "omnipay-ledger",
-        "to": "omnipay-notifier",
-        "relationship_type": "publishes",
-        "description": "Emits posted-transaction events for customer receipts.",
-        "protocol": "event"
-      },
-      {
-        "from": "omnipay-infra",
-        "to": "omnipay-gateway",
-        "relationship_type": "deploys",
-        "description": "Deploys the gateway stack and its Redis dependency.",
-        "protocol": "helm"
-      },
-      {
-        "from": "omnipay-infra",
-        "to": "omnipay-ledger",
-        "relationship_type": "provisions",
-        "description": "Creates the managed Postgres instance and deployable runtime configuration.",
-        "protocol": "terraform"
-      },
-      {
-        "from": "omnipay-infra",
-        "to": "omnipay-card-router",
-        "relationship_type": "deploys",
-        "description": "Deploys the PCI-scoped card-routing service into Kubernetes.",
-        "protocol": "helm"
+        "type": "uses",
+        "protocol": "HTTP",
+        "source": "runtime",
+        "description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   Source: `om.",
+        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   Source: `om."
       }
     ]
   },
   "metadata": {
-    "total_containers": 6,
-    "total_components": 17,
-    "extraction_approach": "bundled_demo",
-    "default_demo": true,
-    "demo_source_path": "sources/demo",
+    "total_containers": 17,
+    "total_components": 12,
+    "extraction_approach": "c4_model",
     "runtime": {
-      "platform": "Kubernetes",
-      "cluster": {
-        "name": "omnipay-prod-eu"
-      }
+      "platform": "Unknown",
+      "cluster": {}
     }
   }
 }

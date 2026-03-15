@@ -16,17 +16,10 @@ from typing import Any
 
 from app.services.c4.containers import ContainerManager
 from app.services.c4.context import ContextManager
-from app.services.code_extraction.language_detectors import (
-    PythonLanguageDetector,
-    JavaScriptLanguageDetector,
-    JavaLanguageDetector,
-    DotNetLanguageDetector,
-)
+from app.services.c4.components.component_extractor import ComponentExtractor
+from app.services.c4.components.models import ComponentObject
 from app.services.code_extraction.llm_enrichment import enrich_with_llm_descriptions
-from app.services.code_extraction.component_extractor import (
-    extract_level3_components,
-    link_components_to_containers,
-)
+from app.services.code_extraction.component_extractor import link_components_to_containers
 
 logger = logging.getLogger(__name__)
 
@@ -55,14 +48,7 @@ class C4ArchitectureExtractor:
 
         # Extractors
         self.container_manager = ContainerManager(self.repo_path, llm_manager)
-
-        # Language detectors (Strategy Pattern)
-        self.language_detectors = [
-            PythonLanguageDetector(),
-            JavaScriptLanguageDetector(),
-            JavaLanguageDetector(),
-            DotNetLanguageDetector(),
-        ]
+        self.component_extractor = ComponentExtractor()
 
     def extract(self, max_components_per_domain: int = 10, group_components_by_domain: bool = False) -> dict[str, Any]:
         """Extract C4 architecture."""
@@ -91,10 +77,7 @@ class C4ArchitectureExtractor:
         # Level 3: Components
         logger.info("\n🔌 LEVEL 3: Components")
         logger.info("-" * 80)
-        extract_level3_components(
-            self.repo_path, self.containers, self.components,
-            [], self.language_detectors, self.llm_manager,
-        )
+        self._extract_level3_components()
         logger.info(f"✓ Components: {len(self.components)}")
 
         link_components_to_containers(self.components, self.containers)
@@ -158,6 +141,48 @@ class C4ArchitectureExtractor:
         # Second pass: LLM enrichment (no-op when llm_manager is None)
         self.container_manager.enrich_containers_with_llm()
 
+    def _extract_level3_components(self) -> None:
+        """Extract Level 3: Components using ComponentExtractor (tree-sitter + graph + grouping)."""
+        for container_name, container in self.containers.items():
+            container_rel_path = container.get("path", "")
+            container_abs_path = str(self.repo_path / container_rel_path) if container_rel_path else str(self.repo_path)
+
+            try:
+                component_objects = self.component_extractor.extract(container_abs_path)
+            except Exception as exc:
+                logger.warning("ComponentExtractor failed for container '%s': %s", container_name, exc)
+                component_objects = []
+
+            for obj in component_objects:
+                comp_dict = self._component_object_to_dict(obj, container_name, container_rel_path)
+                self.components[obj.component_id] = comp_dict
+
+    def _component_object_to_dict(self, obj: ComponentObject, container_name: str, container_rel_path: str) -> dict:
+        """Convert a ComponentObject to the dict format used in the C4 output."""
+        file_path = obj.code_elements[0].file_path if obj.code_elements else None
+        if file_path and container_rel_path:
+            try:
+                file_path = str(Path(container_rel_path) / Path(file_path).name)
+            except Exception:
+                pass
+
+        technology = obj.technology or (obj.code_elements[0].language if obj.code_elements else None)
+
+        return {
+            "c4_level": 3,
+            "type": "component",
+            "name": obj.name,
+            "component_type": obj.tags[0].title() if obj.tags else "Component",
+            "container": container_name,
+            "file": file_path,
+            "documentation": obj.description or None,
+            "technology": technology,
+            "confidence": obj.confidence,
+            "extraction_method": obj.extraction_method.value,
+            "tags": obj.tags,
+            "metadata": obj.metadata,
+        }
+
     def _group_by_domain(self):
         """Group components by domain if too many."""
         domains = defaultdict(list)
@@ -210,8 +235,9 @@ def main():
     from infrastructure.llm.llm_manager import LLMManager
 
     repo_root = find_repo_root(app_path)
+    demo_path = repo_root / "sources" / "demo"
     monorepo_path = repo_root / "monorepo"
-    target_repo = monorepo_path if monorepo_path.exists() else repo_root
+    target_repo = demo_path if demo_path.exists() else (monorepo_path if monorepo_path.exists() else repo_root)
 
     try:
         import os
