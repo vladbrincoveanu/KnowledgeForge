@@ -623,20 +623,28 @@ def extract_service_endpoint(project_dir: Path) -> str:
 def infer_type_from_image(image: str) -> str:
     """Infer container type from Docker image name."""
     image_lower = image.lower()
-    
+
     if 'postgres' in image_lower:
         return "PostgreSQL Database"
     elif 'mongo' in image_lower:
         return "MongoDB Database"
     elif 'redis' in image_lower:
         return "Redis Cache"
+    elif 'mssql' in image_lower or 'sqlserver' in image_lower:
+        return "SQL Server Database"
+    elif 'kafka' in image_lower:
+        return "Message Broker"
+    elif 'rabbitmq' in image_lower:
+        return "Message Broker"
+    elif 'elasticsearch' in image_lower or 'opensearch' in image_lower:
+        return "Search Engine"
     elif 'nginx' in image_lower:
         return "Web Server"
     elif 'node' in image_lower:
         return "Node.js Service"
     elif 'python' in image_lower:
         return "Python Service"
-    
+
     return "Service"
 
 
@@ -830,11 +838,14 @@ PORT_PROTOCOL_MAP = {
     "6379": "Redis", "5672": "AMQP", "15672": "AMQP",
     "9092": "Kafka", "9200": "Elasticsearch", "50051": "gRPC",
     "443": "HTTPS", "80": "HTTP", "8080": "HTTP", "8000": "HTTP",
+    "1433": "SQLServer", "4222": "NATS", "1521": "Oracle",
 }
 
 EVENT_BUS_IMAGES = {
     "kafka": ("Kafka", "publishes-to"),
     "rabbitmq": ("AMQP", "publishes-to"),
+    "activemq": ("JMS", "publishes-to"),
+    "mosquitto": ("MQTT", "publishes-to"),
     "nats": ("NATS", "publishes-to"),
     "pulsar": ("Pulsar", "publishes-to"),
     "redis": ("Redis", "uses"),
@@ -888,3 +899,111 @@ def flatten_dict(d: dict, prefix: str = "") -> list[tuple[str, Any]]:
         else:
             result.append((full_key, v))
     return result
+
+
+# ---------------------------------------------------------------------------
+# Connection string / env-var relationship helpers
+# ---------------------------------------------------------------------------
+
+_STANDARD_URL_RE = re.compile(
+    r"^(?P<scheme>postgresql|postgres|mongodb|redis|amqp|amqps|kafka|http|https|grpc|grpcs|mysql|sqlserver|jdbc)"
+    r"(?:\+\w+)?://(?:[^@]+@)?(?P<host>[^/:?\s]+)(?::(?P<port>\d+))?(?:/(?P<database>[^?\s]*))?",
+    re.IGNORECASE,
+)
+_SQLSERVER_RE = re.compile(
+    r"[Ss]erver\s*=\s*(?:tcp:)?(?P<host>[^,;\s]+)(?:,(?P<port>\d+))?",
+    re.IGNORECASE,
+)
+_JDBC_RE = re.compile(
+    r"jdbc:(?P<scheme>[a-zA-Z0-9]+)://(?P<host>[^/:?\s]+)(?::(?P<port>\d+))?(?:/(?P<database>[^?\s]*))?",
+    re.IGNORECASE,
+)
+
+_SCHEME_TO_PROTOCOL = {
+    "postgresql": "PostgreSQL", "postgres": "PostgreSQL",
+    "mongodb": "MongoDB",
+    "redis": "Redis",
+    "amqp": "AMQP", "amqps": "AMQP",
+    "kafka": "Kafka",
+    "http": "HTTP", "https": "HTTPS",
+    "grpc": "gRPC", "grpcs": "gRPC",
+    "mysql": "MySQL",
+    "sqlserver": "SQLServer",
+    "jdbc": "JDBC",
+}
+
+
+def parse_connection_string(value: str) -> Optional[dict]:
+    """Parse a connection string/URL to a dict with protocol, host, port, database.
+
+    Supports:
+    - Standard URL schemes: postgresql://, mongodb://, redis://, amqp://, kafka://,
+      http://, https://, grpc://, mysql://
+    - SQL Server: Server=tcp:host,port
+    - JDBC: jdbc:postgresql://host:port/db
+
+    Returns None when no recognisable pattern is found.
+    """
+    if not value or not isinstance(value, str):
+        return None
+
+    # JDBC check first (before generic URL, avoids matching "jdbc" as scheme)
+    jdbc_m = _JDBC_RE.search(value)
+    if jdbc_m:
+        scheme = jdbc_m.group("scheme").lower()
+        protocol = _SCHEME_TO_PROTOCOL.get(scheme, scheme.upper())
+        return {
+            "protocol": protocol,
+            "host": jdbc_m.group("host"),
+            "port": jdbc_m.group("port"),
+            "database": jdbc_m.group("database") or None,
+        }
+
+    # Standard URL schemes
+    url_m = _STANDARD_URL_RE.search(value)
+    if url_m:
+        scheme = url_m.group("scheme").lower()
+        protocol = _SCHEME_TO_PROTOCOL.get(scheme, scheme.upper())
+        return {
+            "protocol": protocol,
+            "host": url_m.group("host"),
+            "port": url_m.group("port"),
+            "database": url_m.group("database") or None,
+        }
+
+    # SQL Server connection string
+    sql_m = _SQLSERVER_RE.search(value)
+    if sql_m:
+        return {
+            "protocol": "SQLServer",
+            "host": sql_m.group("host"),
+            "port": sql_m.group("port"),
+            "database": None,
+        }
+
+    return None
+
+
+_DIRECTION_PRODUCER_TOKENS = frozenset({
+    "PRODUCER", "PUBLISHER", "OUTPUT", "SEND", "SENDER", "PUBLISH", "EMIT", "WRITER",
+})
+_DIRECTION_CONSUMER_TOKENS = frozenset({
+    "CONSUMER", "SUBSCRIBER", "INPUT", "RECEIVE", "RECEIVER", "LISTENER",
+    "SUBSCRIBE", "READER", "INBOX",
+})
+
+
+def infer_direction_from_env_name(var_name: str) -> str:
+    """Return relationship direction based on env-var name conventions.
+
+    Splits on underscores and checks each token.
+    Returns "publishes-to", "subscribes-to", or "uses" (default).
+    """
+    if not var_name:
+        return "uses"
+    tokens = set(var_name.upper().split("_"))
+    if tokens & _DIRECTION_PRODUCER_TOKENS:
+        return "publishes-to"
+    if tokens & _DIRECTION_CONSUMER_TOKENS:
+        return "subscribes-to"
+    return "uses"
