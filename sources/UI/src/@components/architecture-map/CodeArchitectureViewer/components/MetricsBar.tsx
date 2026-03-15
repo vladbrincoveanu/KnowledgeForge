@@ -95,24 +95,6 @@ export default function MetricsBar({
         </div>
 
         <div className="metrics-actions">
-          <div className="metrics-section extract-section">
-            <button
-              className="extract-btn"
-              onClick={() => setRepoSectionExpanded(!repoSectionExpanded)}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              Add Repository
-            </button>
-          </div>
         </div>
       </div>
 
@@ -175,45 +157,6 @@ export default function MetricsBar({
         </div>
       </div>
 
-      {/* Repository Panel (expandable) */}
-      {repoSectionExpanded && (
-        <div className="repo-panel">
-          <div className="repo-panel-header">
-            <h4>Add Repository</h4>
-            <button
-              className="close-btn"
-              onClick={() => setRepoSectionExpanded(false)}
-            >
-              ×
-            </button>
-          </div>
-          <div className="repo-panel-content">
-            <div className="input-group">
-              <label>GitHub URL</label>
-              <div className="input-row">
-                <input
-                  type="text"
-                  placeholder="https://github.com/owner/repo"
-                  value={githubUrl}
-                  onChange={(e) => setGithubUrl(e.target.value)}
-                />
-                <button
-                  onClick={handleExtractFromGithub}
-                  disabled={isExtracting || !githubUrl}
-                >
-                  {isExtracting ? "Extracting..." : "Extract"}
-                </button>
-              </div>
-            </div>
-            {extractionStatus && (
-              <div className="status-message">{extractionStatus}</div>
-            )}
-            {extractionError && (
-              <div className="error-message">{extractionError}</div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

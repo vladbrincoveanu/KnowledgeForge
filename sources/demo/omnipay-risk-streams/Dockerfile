@@ -1,0 +1,10 @@
+FROM maven:3.9.8-eclipse-temurin-21 AS build
+WORKDIR /src
+COPY pom.xml .
+COPY src ./src
+RUN mvn -q -DskipTests package
+
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+COPY --from=build /src/target/omnipay-risk-streams-jar-with-dependencies.jar app.jar
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

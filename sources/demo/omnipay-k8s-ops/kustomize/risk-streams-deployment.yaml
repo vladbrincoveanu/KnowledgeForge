@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: risk-streams
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: risk-streams
+  template:
+    metadata:
+      labels:
+        app: risk-streams
+    spec:
+      containers:
+        - name: risk-streams
+          image: ghcr.io/knowledgeforge-demos/omnipay-risk-streams:1.0.0
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: kafka:9092
+            - name: INPUT_TOPIC
+              value: payments.authorized.v1
+            - name: OUTPUT_TOPIC
+              value: risk.enriched.v1

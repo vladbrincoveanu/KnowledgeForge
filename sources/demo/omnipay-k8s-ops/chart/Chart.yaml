@@ -1,0 +1,6 @@
+apiVersion: v2
+name: omnipay-k8s-ops
+description: Helm chart metadata for OmniPay eventing and data-platform operations.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

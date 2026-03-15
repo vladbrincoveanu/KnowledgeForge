@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: omnipay-platform
+resources:
+  - settlement-orchestrator-deployment.yaml
+  - event-projections-deployment.yaml
+  - risk-streams-deployment.yaml
+  - kafka-statefulset.yaml
+  - rabbitmq-statefulset.yaml
+  - mongodb-statefulset.yaml
+  - redis-statefulset.yaml
+  - sqlserver-statefulset.yaml
+  - ingress.yaml

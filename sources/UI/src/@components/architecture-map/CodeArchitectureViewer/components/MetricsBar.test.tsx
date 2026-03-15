@@ -2,7 +2,7 @@
 
 import React from "react";
 import * as matchers from "@testing-library/jest-dom/matchers";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 
 import MetricsBar from "./MetricsBar";
@@ -42,35 +42,16 @@ const baseProps = {
 };
 
 describe("MetricsBar", () => {
-  test("uses parent-controlled repo panel state when opening", () => {
-    const setRepoSectionExpanded = vi.fn();
+  test("renders without errors", () => {
+    const { container } = render(<MetricsBar {...baseProps} />);
 
-    render(
-      <MetricsBar
-        {...baseProps}
-        repoSectionExpanded={false}
-        setRepoSectionExpanded={setRepoSectionExpanded}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
-
-    expect(setRepoSectionExpanded).toHaveBeenCalledWith(true);
+    expect(container.querySelector(".metrics-bar")).toBeInTheDocument();
   });
 
-  test("uses parent-controlled repo panel state when closing", () => {
-    const setRepoSectionExpanded = vi.fn();
+  test("does not render Add Repository button", () => {
+    const { container } = render(<MetricsBar {...baseProps} />);
 
-    render(
-      <MetricsBar
-        {...baseProps}
-        repoSectionExpanded
-        setRepoSectionExpanded={setRepoSectionExpanded}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "×" }));
-
-    expect(setRepoSectionExpanded).toHaveBeenCalledWith(false);
+    expect(container.querySelector(".extract-btn")).not.toBeInTheDocument();
+    expect(container.querySelector(".repo-panel")).not.toBeInTheDocument();
   });
 });

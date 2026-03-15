@@ -258,6 +258,22 @@ RAW_PROVIDER_CATALOG: tuple[dict[str, object], ...] = (
         "scheme_aliases": ("mysql", "mysql2"),
     },
     {
+        "provider": "SQL Server",
+        "company": "Microsoft",
+        "category": "database",
+        "default_boundary": "TECHNICAL_INFRA",
+        "package_aliases": (
+            "microsoft.data.sqlclient",
+            "system.data.sqlclient",
+            "microsoft.entityframeworkcore.sqlserver",
+            "aspnetcore.healthchecks.sqlserver",
+        ),
+        "env_aliases": ("SQLSERVER_CONNECTION_STRING", "MSSQL_CONNECTION_STRING"),
+        "url_aliases": ("database.windows.net",),
+        "image_aliases": ("mcr.microsoft.com/mssql/server", "sqlserver"),
+        "scheme_aliases": ("sqlserver", "mssql"),
+    },
+    {
         "provider": "MongoDB",
         "company": "MongoDB",
         "category": "database",

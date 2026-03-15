@@ -1,0 +1,20 @@
+defaults:
+  - model: rf
+  - data: transaction
+  - _self_
+
+mlflow:
+  tracking_uri: ${MLFLOW_TRACKING_URI}
+  experiment_name: omnipay_risk
+  run_name: production
+
+training:
+  epochs: 100
+  batch_size: 256
+  learning_rate: 0.001
+  early_stopping_patience: 10
+
+serving:
+  host: 0.0.0.0
+  port: 8080
+  model_version: latest

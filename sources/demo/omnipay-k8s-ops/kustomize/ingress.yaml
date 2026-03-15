@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: omnipay-ops
+spec:
+  rules:
+    - host: ops.omnipay.internal
+      http:
+        paths:
+          - path: /settlements
+            pathType: Prefix
+            backend:
+              service:
+                name: settlement-orchestrator
+                port:
+                  number: 8080
+          - path: /projections
+            pathType: Prefix
+            backend:
+              service:
+                name: event-projections
+                port:
+                  number: 8080

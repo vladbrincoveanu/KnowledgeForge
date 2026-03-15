@@ -1,0 +1,11 @@
+ingress:
+  host: ops.omnipay.internal
+  path: /platform
+
+services:
+  settlementOrchestrator:
+    image: ghcr.io/knowledgeforge-demos/omnipay-settlement-orchestrator:1.0.0
+  eventProjections:
+    image: ghcr.io/knowledgeforge-demos/omnipay-event-projections:1.0.0
+  riskStreams:
+    image: ghcr.io/knowledgeforge-demos/omnipay-risk-streams:1.0.0

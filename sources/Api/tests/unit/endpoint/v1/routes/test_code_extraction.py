@@ -179,10 +179,60 @@ class TestArchitectureEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data["system_context"]["name"] == "OmniPay Platform"
+        assert data["metadata"]["total_containers"] == len(data["containers"])
+        assert data["metadata"]["total_components"] == len(data["components"])
+        assert len(data["containers"]) >= 17
+        assert len(data["components"]) >= 60
+
+        container_names = {container["name"] for container in data["containers"]}
+        assert {
+            "omnipay-payment-processor",
+            "omnipay-analytics",
+            "omnipay-auth",
+            "omnipay-database",
+            "omnipay-billing-llm",
+            "omnipay-ml-pipeline",
+            "omnipay-disputes",
+            "omnipay-settlement-orchestrator",
+            "omnipay-event-projections",
+            "omnipay-risk-streams",
+            "omnipay-k8s-ops",
+        }.issubset(container_names)
+
+        dependency_names = {
+            dependency["name"]
+            for dependency in data["system_context"]["external_dependencies"]
+        }
+        assert {
+            "Stripe",
+            "Mixpanel",
+            "PostgreSQL",
+            "Redis",
+            "Kafka",
+            "RabbitMQ",
+            "MongoDB",
+            "SQL Server",
+        }.issubset(dependency_names)
+
         assert any(
             container["owner"] == "Vlad"
             for container in data["containers"]
             if container["name"] == "omnipay-gateway"
+        )
+        assert any(
+            container["technology"] == ".NET 8 / ASP.NET Core"
+            for container in data["containers"]
+            if container["name"] == "omnipay-settlement-orchestrator"
+        )
+        assert any(
+            container["technology"] == "Java / Kafka Streams"
+            for container in data["containers"]
+            if container["name"] == "omnipay-risk-streams"
+        )
+        assert any(
+            container["team"] == "omnipay/risk-team"
+            for container in data["containers"]
+            if container["name"] == "omnipay-disputes"
         )
 
     def test_runtime_extraction_overrides_bundled_demo(self, client):

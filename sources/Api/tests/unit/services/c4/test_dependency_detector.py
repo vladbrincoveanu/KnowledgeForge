@@ -164,6 +164,62 @@ class TestDependencyDetectorDetect:
         sources = [d.get("detected_from", "") for d in result]
         assert any("package.json" in s or "pyproject" in s or "requirements" in s for s in sources)
 
+    def test_detects_from_nested_package_json(self, temp_repo):
+        service_dir = temp_repo / "services" / "analytics"
+        service_dir.mkdir(parents=True)
+        package_json = {
+            "name": "analytics",
+            "dependencies": {
+                "mixpanel": "^0.17.0",
+            },
+        }
+        (service_dir / "package.json").write_text(json.dumps(package_json, indent=2))
+
+        detector = DependencyDetector(temp_repo, enable_classification=False)
+        result = detector.detect_external_dependencies()
+
+        mixpanel_dep = next(dep for dep in result if dep["name"] == "Mixpanel")
+        assert mixpanel_dep["detected_from"] == "services/analytics/package.json"
+        assert mixpanel_dep["detection_source"] == "provider_catalog"
+
+    def test_detects_kafka_rabbitmq_mongodb_from_appsettings(self, temp_repo):
+        appsettings = {
+            "ProjectionInfrastructure": {
+                "KafkaBootstrapServers": "kafka://risk-streams.internal:9092",
+                "MongoDbUrl": "mongodb://projection-db.internal:27017/projections",
+            },
+            "Messaging": {
+                "RabbitMqUrl": "amqps://settlement-bus.internal:5671/settlements",
+            },
+        }
+        (temp_repo / "appsettings.json").write_text(json.dumps(appsettings, indent=2))
+
+        detector = DependencyDetector(temp_repo, enable_classification=False)
+        result = detector.detect_external_dependencies()
+
+        names = {dep["name"] for dep in result}
+        assert {"Kafka", "RabbitMQ", "MongoDB"}.issubset(names)
+
+    def test_detects_sql_server_from_csproj_catalog(self, temp_repo):
+        csproj = """
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.1" />
+  </ItemGroup>
+</Project>
+"""
+        (temp_repo / "platform.csproj").write_text(csproj)
+
+        detector = DependencyDetector(temp_repo, enable_classification=False)
+        result = detector.detect_external_dependencies()
+
+        sqlserver = next(dep for dep in result if dep["name"] == "SQL Server")
+        assert sqlserver["detected_from"] == "platform.csproj"
+        assert sqlserver["detection_source"] == "provider_catalog"
+
     def test_detects_from_env_file(self, env_file_repo):
         detector = DependencyDetector(env_file_repo, enable_classification=False)
         result = detector.detect_external_dependencies()

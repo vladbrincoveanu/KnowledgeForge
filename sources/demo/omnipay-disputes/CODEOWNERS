@@ -1,0 +1,9 @@
+# Ambiguous ownership - multiple teams claim this service
+
+# Finance team claims ownership for billing compliance
+* @omnipay/finance-team
+
+# Risk team also claims ownership for fraud prevention
+* @omnipay/risk-team
+
+# This creates a conflict that should trigger human review

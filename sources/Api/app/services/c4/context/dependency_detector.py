@@ -250,8 +250,7 @@ class DependencyDetector:
             except (OSError, ValueError) as e:
                 logger.debug("Error parsing pyproject.toml: %s", e)
 
-        package_json = self.repo_path / "package.json"
-        if package_json.exists():
+        for package_json in limited_rglob(self.repo_path, "package.json"):
             try:
                 with open(package_json) as f:
                     data = json.load(f)
@@ -262,7 +261,9 @@ class DependencyDetector:
                 for dep_name in all_deps:
                     deps.extend(
                         self._build_package_dependency_candidates(
-                            str(dep_name), "package.json", external_patterns
+                            str(dep_name),
+                            str(package_json.relative_to(self.repo_path)),
+                            external_patterns,
                         )
                     )
             except (OSError, json.JSONDecodeError, ValueError) as e:

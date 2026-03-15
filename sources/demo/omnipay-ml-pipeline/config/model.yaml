@@ -1,0 +1,15 @@
+name: random_forest
+type: ensemble
+
+rf:
+  n_estimators: 200
+  max_depth: 15
+  min_samples_split: 5
+  min_samples_leaf: 2
+  random_state: 42
+
+xgb:
+  n_estimators: 150
+  max_depth: 8
+  learning_rate: 0.05
+  subsample: 0.8

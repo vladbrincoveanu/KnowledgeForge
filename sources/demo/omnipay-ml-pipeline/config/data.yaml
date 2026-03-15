@@ -1,0 +1,24 @@
+name: transaction_data
+source: postgres
+
+database:
+  host: ${POSTGRES_HOST}
+  port: ${POSTGRES_PORT}
+  database: transactions
+  table: features
+
+preprocessing:
+  normalize: true
+  handle_missing: mean
+  outlier_threshold: 3.0
+
+features:
+  - amount
+  - currency
+  - merchant_category
+  - time_of_day
+  - day_of_week
+  - account_age
+  - transaction_history
+
+target: is_fraudulent
