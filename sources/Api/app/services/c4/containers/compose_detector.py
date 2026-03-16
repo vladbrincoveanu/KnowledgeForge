@@ -8,6 +8,7 @@ import yaml
 
 from .base_detector import BaseContainerDetector
 from . import utils
+from .relationship_extractor import EnvVarRelationshipExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,7 @@ class ComposeDetector(BaseContainerDetector):
                         "name": service_name,
                         "container_type": utils.infer_type_from_image(image),
                         "technology": image.split(':')[0] if image else "Unknown",
-                        "protocol": "HTTP",
+                        "protocol": self._infer_service_protocol(image, service_config),
                         "path": str(compose_file.relative_to(self.repo_path)),
 
                         # IT Landscape fields
@@ -85,12 +86,30 @@ class ComposeDetector(BaseContainerDetector):
                     for link in service_config.get('links', []):
                         target = link.split(':')[0]
                         if target in services and target != service_name:
+                            target_image = services[target].get('image', '')
+                            link_protocol, link_rel_type = utils.infer_relationship_type_from_image(target_image)
                             relationships.append({
                                 "from": service_name, "to": target,
-                                "type": "uses", "protocol": "HTTP",
+                                "type": link_rel_type, "protocol": link_protocol,
                                 "source": "compose",
                                 "description": f"{service_name} links to {target}",
                             })
+
+                    # environment variables → EnvVarRelationshipExtractor
+                    env = service_config.get('environment', {})
+                    if env:
+                        if isinstance(env, dict):
+                            env_rels = EnvVarRelationshipExtractor(service_name, "compose").extract_from_dict(env)
+                        elif isinstance(env, list):
+                            env_dict = {}
+                            for item in env:
+                                if isinstance(item, str) and '=' in item:
+                                    k, _, v = item.partition('=')
+                                    env_dict[k.strip()] = v.strip()
+                            env_rels = EnvVarRelationshipExtractor(service_name, "compose").extract_from_dict(env_dict)
+                        else:
+                            env_rels = []
+                        relationships.extend(env_rels)
 
                     # named volumes (collect for second pass)
                     for vol in service_config.get('volumes', []):
@@ -123,3 +142,40 @@ class ComposeDetector(BaseContainerDetector):
                 logger.debug(f"Error parsing {compose_file}: {e}")
 
         return containers
+
+    @staticmethod
+    def _infer_service_protocol(image: str, service_config: dict) -> str:
+        """Infer the primary protocol for a compose service.
+
+        Priority:
+        1. Event-bus images (Kafka, RabbitMQ, etc.) via infer_relationship_type_from_image
+        2. Well-known database/cache images via infer_type_from_image
+        3. Exposed port numbers via infer_protocol_from_port
+        4. Default HTTP
+        """
+        # Event-bus / broker images
+        proto, _ = utils.infer_relationship_type_from_image(image)
+        if proto != "HTTP":
+            return proto
+
+        # Database / cache images from type name
+        container_type = utils.infer_type_from_image(image)
+        for keyword, protocol in (
+            ("PostgreSQL", "PostgreSQL"),
+            ("MongoDB", "MongoDB"),
+            ("Redis", "Redis"),
+            ("SQL Server", "SQLServer"),
+            ("Elasticsearch", "Elasticsearch"),
+            ("Search", "Elasticsearch"),
+        ):
+            if keyword in container_type:
+                return protocol
+
+        # Exposed ports
+        for port_spec in service_config.get('ports', []):
+            port_str = str(port_spec).split(':')[-1].split('/')[0]
+            inferred = utils.infer_protocol_from_port(port_str)
+            if inferred != "TCP":
+                return inferred
+
+        return "HTTP"

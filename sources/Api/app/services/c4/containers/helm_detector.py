@@ -8,6 +8,7 @@ import yaml
 
 from .base_detector import BaseContainerDetector
 from . import utils
+from .relationship_extractor import EnvVarRelationshipExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -84,13 +85,24 @@ class HelmDetector(BaseContainerDetector):
                             "description": f"{chart_name} depends on Helm subchart {dep_name}",
                         })
 
-                # 2. values.yaml: scan for url/host/dsn/addr keys → infer protocol
+                # 2. values.yaml: infer container type from image + scan for url/host/dsn/addr keys
                 values_file = chart_dir / 'values.yaml'
                 if values_file.exists():
                     try:
                         values_data = yaml.safe_load(
                             values_file.read_text(encoding='utf-8', errors='ignore')
                         ) or {}
+
+                        # Look for image repository in values.yaml to refine container_type
+                        image_from_values = self._extract_image_from_values(values_data)
+                        if image_from_values:
+                            inferred_type = utils.infer_type_from_image(image_from_values)
+                            if inferred_type != "Service":
+                                container["container_type"] = inferred_type
+                            inferred_proto, _ = utils.infer_relationship_type_from_image(image_from_values)
+                            if inferred_proto != "HTTP":
+                                container["protocol"] = inferred_proto
+
                         for key, value in utils.flatten_dict(values_data):
                             key_lower = key.lower()
                             if any(h in key_lower for h in ('url', 'host', 'dsn', 'endpoint', 'addr', 'address')):
@@ -105,7 +117,12 @@ class HelmDetector(BaseContainerDetector):
                                     elif 'grpc' in key_lower or '50051' in value_str:
                                         proto, port = 'gRPC', '50051'
                                     else:
-                                        proto, port = 'HTTP', ''
+                                        # Try to infer from image if available
+                                        if image_from_values:
+                                            proto, _ = utils.infer_relationship_type_from_image(image_from_values)
+                                        else:
+                                            proto = 'HTTP'
+                                        port = ''
                                     relationships.append({
                                         "from": chart_name, "to": value_str,
                                         "type": "uses", "protocol": proto, "port": port,
@@ -115,10 +132,56 @@ class HelmDetector(BaseContainerDetector):
                     except Exception as e:
                         logger.debug(f"Error scanning values.yaml in {chart_dir}: {e}")
 
+                # 3. Scan templates/ for Deployment/StatefulSet/DaemonSet → extract env var relationships
+                templates_dir = chart_dir / 'templates'
+                if templates_dir.exists():
+                    for tpl_file in templates_dir.glob('*.yaml'):
+                        try:
+                            docs = list(yaml.safe_load_all(
+                                tpl_file.read_text(encoding='utf-8', errors='ignore')
+                            ))
+                            for doc in docs:
+                                if not isinstance(doc, dict):
+                                    continue
+                                if str(doc.get('kind', '')).lower() not in ('deployment', 'statefulset', 'daemonset'):
+                                    continue
+                                spec = (doc.get('spec') or {}).get('template', {}).get('spec', {})
+                                for c_spec in (spec.get('containers') or []):
+                                    img = c_spec.get('image', '')
+                                    if img and container.get('container_type') == 'Helm Deployed Service':
+                                        inferred = utils.infer_type_from_image(img)
+                                        if inferred != "Service":
+                                            container['container_type'] = inferred
+                                    env_rels = EnvVarRelationshipExtractor(chart_name, 'helm').extract(
+                                        c_spec.get('env') or []
+                                    )
+                                    relationships.extend(env_rels)
+                        except Exception as e:
+                            logger.debug(f"Error scanning template {tpl_file}: {e}")
+
                 container["relationships"] = relationships
                 containers.append(container)
             
             except Exception as e:
                 logger.debug(f"Error parsing {chart_file}: {e}")
-        
+
         return containers
+
+    @staticmethod
+    def _extract_image_from_values(values_data: dict) -> str:
+        """Try to extract the primary service image name from values.yaml.
+
+        Looks for common patterns:
+        - image.repository: "my-image"
+        - image: "my-image:tag"
+        """
+        if not isinstance(values_data, dict):
+            return ""
+        image_section = values_data.get('image')
+        if isinstance(image_section, dict):
+            repo = image_section.get('repository', '')
+            if repo:
+                return str(repo).strip()
+        if isinstance(image_section, str) and image_section.strip():
+            return image_section.split(':')[0].strip()
+        return ""

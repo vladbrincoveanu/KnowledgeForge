@@ -14,8 +14,22 @@ from .structure_detector import StructureDetector
 from .compose_detector import ComposeDetector
 from .helm_detector import HelmDetector
 from .terraform_detector import TerraformDetector
+from .kubernetes_detector import KubernetesDetector
+from .relationship_extractor import ConfigRelationshipExtractor
 
 logger = logging.getLogger(__name__)
+
+
+def _deduplicate_relationships(rels: list[dict]) -> list[dict]:
+    """Remove duplicate relationships by (to, type, protocol) key."""
+    seen: set[tuple] = set()
+    unique: list[dict] = []
+    for r in rels:
+        key = (r.get("to"), r.get("type"), r.get("protocol"))
+        if key not in seen:
+            seen.add(key)
+            unique.append(r)
+    return unique
 
 
 class ContainerManager:
@@ -41,6 +55,7 @@ class ContainerManager:
             ComposeDetector(self.repo_path),
             HelmDetector(self.repo_path, llm_manager),
             TerraformDetector(self.repo_path),
+            KubernetesDetector(self.repo_path),
         ]
     
     def detect_all_containers(self) -> dict[str, dict[str, Any]]:
@@ -78,9 +93,17 @@ class ContainerManager:
             terraform_containers = terraform_detector.detect()
             for container in terraform_containers:
                 self._register_or_merge_container(container, source="terraform")
-        
+
+        # Run Kubernetes detection (raw manifests and Kustomize)
+        kubernetes_detector = self.detectors[4]
+        if kubernetes_detector.can_detect():
+            kubernetes_containers = kubernetes_detector.detect()
+            for container in kubernetes_containers:
+                self._merge_kubernetes_container(container)
+
         # Map internal dependencies
         self._map_internal_dependencies()
+        self._match_topic_producers_consumers()
 
         # Drop root-level structure placeholders when real compose/helm services exist.
         # The structure detector registers the repo root (path=".") as a container when
@@ -136,6 +159,45 @@ class ContainerManager:
         self._merge_container_data(existing, helm_container)
         self._apply_helm_overrides(existing, helm_container)
 
+    def _merge_kubernetes_container(self, k8s_container: dict[str, Any]) -> None:
+        """Merge Kubernetes container info with an existing container.
+
+        - Preserves the existing container's name, path, and structure-derived fields.
+        - Appends K8s relationships to the existing relationships list.
+        - Fills in missing or generic fields (container_type, technology, protocol)
+          from K8s data only when the existing values are empty or generic placeholders.
+        """
+        existing_key, existing = self._find_existing_container(k8s_container)
+        if not existing:
+            self.containers[k8s_container.get('name')] = k8s_container
+            return
+
+        # Append K8s-extracted relationships rather than replacing, then deduplicate.
+        k8s_rels = k8s_container.get("relationships") or []
+        if k8s_rels:
+            existing.setdefault("relationships", []).extend(k8s_rels)
+            existing["relationships"] = _deduplicate_relationships(existing["relationships"])
+
+        # Overwrite generic placeholder values with K8s-derived specifics.
+        _generic_type = {"Service", "Unknown", None}
+        _generic_tech = {"Unknown", None}
+        if existing.get("container_type") in _generic_type:
+            incoming_type = k8s_container.get("container_type")
+            if incoming_type and incoming_type not in _generic_type:
+                existing["container_type"] = incoming_type
+        if existing.get("technology") in _generic_tech:
+            incoming_tech = k8s_container.get("technology")
+            if incoming_tech and incoming_tech not in _generic_tech:
+                existing["technology"] = incoming_tech
+        if not existing.get("protocol") and k8s_container.get("protocol"):
+            existing["protocol"] = k8s_container["protocol"]
+
+        # Copy K8s-only metadata fields not present on the existing container.
+        for key in ("runtime_environment", "deployment", "kubernetes_kind",
+                    "kubernetes_namespace", "health_endpoint"):
+            if not existing.get(key) and k8s_container.get(key):
+                existing[key] = k8s_container[key]
+
     def _merge_container_data(self, existing: dict[str, Any], incoming: dict[str, Any]) -> None:
         """Merge incoming container data into existing without overwriting truthy values."""
         for key, value in incoming.items():
@@ -167,7 +229,7 @@ class ContainerManager:
 
         # Don't use path-based matching for files that define multiple containers
         # (docker-compose, helm values) — every service in the file shares the same path.
-        _multi_container_files = ("docker-compose", "values.yaml")
+        _multi_container_files = ("docker-compose", "values.yaml", "kustomize")
         use_path_match = incoming_path and not any(
             p in str(incoming_path) for p in _multi_container_files
         )
@@ -179,10 +241,34 @@ class ContainerManager:
             if incoming_slugs & existing_slugs:
                 return key, existing
 
+        # Suffix containment fallback: handles K8s metadata.name being a shortened
+        # form of the repo directory name (universal K8s convention — teams strip org
+        # prefixes). Only compare name slugs; path slugs overlap for unrelated reasons.
+        incoming_name = container.get("name")
+        if incoming_name:
+            incoming_name_slug = self._slugify(incoming_name)
+            for key, existing in self.containers.items():
+                existing_name = existing.get("name")
+                if not existing_name:
+                    continue
+                existing_name_slug = self._slugify(existing_name)
+                longer, shorter = (
+                    (incoming_name_slug, existing_name_slug)
+                    if len(incoming_name_slug) >= len(existing_name_slug)
+                    else (existing_name_slug, incoming_name_slug)
+                )
+                if not longer.endswith(shorter):
+                    continue
+                # Require the shorter slug to be substantial to avoid false matches
+                # (e.g. "api" matching "my-org-api-gateway").
+                segments = shorter.split("-")
+                if len(segments) >= 3 or len(shorter) >= 10:
+                    return key, existing
+
         return None, None
 
     # Paths that define multiple containers — excluded from identity slugs
-    _MULTI_CONTAINER_PATHS = ("docker-compose", "values.yaml")
+    _MULTI_CONTAINER_PATHS = ("docker-compose", "values.yaml", "kustomization.yaml", "kustomize")
 
     def _get_container_slugs(self, container: dict[str, Any]) -> set[str]:
         """Build identity slugs from container name, path, and parent directory."""
@@ -235,16 +321,41 @@ class ContainerManager:
         self._discover_runtime_dependencies()
 
     def _discover_runtime_dependencies(self) -> None:
-        """Discover internal dependencies from compose, k8s manifests, and env files."""
-        files = []
-        files.extend(self.repo_path.rglob("docker-compose*.yml"))
-        files.extend(self.repo_path.rglob("docker-compose*.yaml"))
-        files.extend(self.repo_path.rglob("*.env"))
-        files.extend(self.repo_path.rglob(".env*"))
-        files.extend(self.repo_path.rglob("*.yml"))
-        files.extend(self.repo_path.rglob("*.yaml"))
+        """Discover internal dependencies from compose, k8s manifests, and config files.
 
-        for file_path in files:
+        Phase 1: structured config files (appsettings.json, application.yml, .env, …)
+                 processed via ConfigRelationshipExtractor → stored as rich relationships.
+        Phase 2: unstructured YAML files (docker-compose, generic manifests) use
+                 extract_internal_service_refs() as a fallback → stored as
+                 dependencies_internal.
+        """
+        # Phase 1: structured config files per container directory
+        # Skip containers that already have config-extracted relationships
+        # (e.g., from StructureDetector) to avoid duplicates.
+        for container_name, container in self.containers.items():
+            if container.get("relationships"):
+                continue
+            container_path = container.get("path")
+            if not container_path or container_path in {".", ""}:
+                continue
+            project_dir = self.repo_path / container_path
+            if not project_dir.is_dir():
+                continue
+            try:
+                rels = ConfigRelationshipExtractor(container_name).extract_from_directory(project_dir)
+                if rels:
+                    container.setdefault("relationships", []).extend(rels)
+            except Exception as e:
+                logger.debug("ConfigRelationshipExtractor failed for %s: %s", container_name, e)
+
+        # Phase 2: fallback for unstructured YAML files
+        unstructured_files: list[Path] = []
+        unstructured_files.extend(self.repo_path.rglob("docker-compose*.yml"))
+        unstructured_files.extend(self.repo_path.rglob("docker-compose*.yaml"))
+        unstructured_files.extend(self.repo_path.rglob("*.yml"))
+        unstructured_files.extend(self.repo_path.rglob("*.yaml"))
+
+        for file_path in unstructured_files:
             if not file_path.is_file():
                 continue
 
@@ -268,6 +379,65 @@ class ContainerManager:
             deps = container.get("dependencies_internal")
             if deps:
                 container["dependencies_internal"] = sorted(set(deps))
+
+    def _match_topic_producers_consumers(self) -> None:
+        """Create explicit cross-container relationships for shared messaging topics/queues.
+
+        Scans all container relationships for those with metadata.topic or metadata.queue,
+        groups publishers (type="publishes-to") and subscribers (type="subscribes-to") by
+        topic name, then creates a direct publisher → subscriber relationship that
+        references the broker as intermediary.
+        """
+        from collections import defaultdict
+
+        # topic_name → {"publishers": [container_name], "subscribers": [container_name], "broker": str|None}
+        topics: dict[str, dict] = defaultdict(lambda: {"publishers": [], "subscribers": [], "broker": None})
+
+        for container_name, container in self.containers.items():
+            for rel in container.get("relationships", []):
+                metadata = rel.get("metadata") or {}
+                topic_name = metadata.get("topic") or metadata.get("queue")
+                if not topic_name:
+                    continue
+
+                rel_type = rel.get("type", "")
+                broker = rel.get("to") or None
+
+                if rel_type == "publishes-to":
+                    topics[topic_name]["publishers"].append(container_name)
+                    if broker and not topics[topic_name]["broker"]:
+                        topics[topic_name]["broker"] = broker
+                elif rel_type == "subscribes-to":
+                    topics[topic_name]["subscribers"].append(container_name)
+                    if broker and not topics[topic_name]["broker"]:
+                        topics[topic_name]["broker"] = broker
+
+        for topic_name, info in topics.items():
+            publishers = info["publishers"]
+            subscribers = info["subscribers"]
+            broker = info["broker"]
+
+            if not publishers or not subscribers:
+                continue
+
+            for publisher in publishers:
+                if publisher not in self.containers:
+                    continue
+                for subscriber in subscribers:
+                    if subscriber not in self.containers or subscriber == publisher:
+                        continue
+
+                    via = broker or topic_name
+                    rel = {
+                        "from": publisher,
+                        "to": subscriber,
+                        "type": "async",
+                        "protocol": "messaging",
+                        "source": "topic-match",
+                        "description": f"{publisher} sends to {subscriber} via {via}",
+                        "metadata": {"topic": topic_name, "broker": broker},
+                    }
+                    self.containers[publisher].setdefault("relationships", []).append(rel)
 
     def _resolve_container_by_token(self, token: str) -> Optional[str]:
         """Resolve a token to a known container name by slug matching."""
@@ -345,7 +515,9 @@ class ContainerManager:
 
     def _resolve_relationship(self, rel: dict, source_container: str) -> Optional[dict]:
         """Validate and resolve relationship endpoints. Returns None to discard."""
-        from_name = rel.get("from") or source_container
+        # Always use the registered container name as 'from' — the rel may carry
+        # a pre-merge name (e.g., K8s metadata.name) that differs from the canonical key.
+        from_name = source_container
         to_raw = rel.get("to", "")
 
         if not from_name or not to_raw or from_name == to_raw:

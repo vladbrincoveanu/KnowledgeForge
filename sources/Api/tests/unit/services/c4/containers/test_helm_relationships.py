@@ -118,3 +118,112 @@ class TestRelationshipsKeyAlwaysPresent:
         result = HelmDetector(temp_repo).detect()
         assert "relationships" in result[0]
         assert isinstance(result[0]["relationships"], list)
+
+
+class TestValuesImageInference:
+    """Test container_type / protocol inference from image in values.yaml."""
+
+    def test_postgres_image_repository_sets_container_type(self, temp_repo):
+        chart_dir = make_chart(temp_repo, "db-svc")
+        (chart_dir / "values.yaml").write_text(yaml.dump({
+            "image": {"repository": "postgres", "tag": "14"}
+        }))
+        result = HelmDetector(temp_repo).detect()
+        assert "PostgreSQL" in result[0].get("container_type", "")
+
+    def test_redis_image_repository_sets_container_type(self, temp_repo):
+        chart_dir = make_chart(temp_repo, "cache-svc")
+        (chart_dir / "values.yaml").write_text(yaml.dump({
+            "image": {"repository": "redis", "tag": "7"}
+        }))
+        result = HelmDetector(temp_repo).detect()
+        assert "Redis" in result[0].get("container_type", "")
+
+    def test_unknown_image_keeps_helm_deployed_service_type(self, temp_repo):
+        chart_dir = make_chart(temp_repo, "custom-svc")
+        (chart_dir / "values.yaml").write_text(yaml.dump({
+            "image": {"repository": "my-custom-app", "tag": "1.0"}
+        }))
+        result = HelmDetector(temp_repo).detect()
+        assert result[0].get("container_type") == "Helm Deployed Service"
+
+
+class TestTemplateEnvVarRelationships:
+    """Test env var relationship extraction from Deployment templates."""
+
+    def test_deployment_env_vars_produce_relationships(self, temp_repo):
+        chart_dir = make_chart(temp_repo, "api")
+        templates_dir = chart_dir / "templates"
+        templates_dir.mkdir()
+        deployment = {
+            "apiVersion": "apps/v1",
+            "kind": "Deployment",
+            "metadata": {"name": "api"},
+            "spec": {
+                "template": {
+                    "spec": {
+                        "containers": [{
+                            "name": "api",
+                            "image": "my-api:latest",
+                            "env": [
+                                {"name": "DB_URL", "value": "postgresql://postgres:5432/mydb"}
+                            ],
+                        }]
+                    }
+                }
+            },
+        }
+        (templates_dir / "deployment.yaml").write_text(yaml.dump(deployment))
+        result = HelmDetector(temp_repo).detect()
+        rels = result[0].get("relationships", [])
+        assert any(r.get("protocol") == "PostgreSQL" for r in rels)
+
+    def test_statefulset_template_also_scanned(self, temp_repo):
+        chart_dir = make_chart(temp_repo, "worker")
+        templates_dir = chart_dir / "templates"
+        templates_dir.mkdir()
+        sts = {
+            "apiVersion": "apps/v1",
+            "kind": "StatefulSet",
+            "metadata": {"name": "worker"},
+            "spec": {
+                "template": {
+                    "spec": {
+                        "containers": [{
+                            "name": "worker",
+                            "image": "my-worker:latest",
+                            "env": [
+                                {"name": "KAFKA_BROKER", "value": "kafka:9092"}
+                            ],
+                        }]
+                    }
+                }
+            },
+        }
+        (templates_dir / "statefulset.yaml").write_text(yaml.dump(sts))
+        result = HelmDetector(temp_repo).detect()
+        rels = result[0].get("relationships", [])
+        assert any(r.get("source") == "helm" for r in rels)
+
+    def test_non_workload_templates_ignored(self, temp_repo):
+        chart_dir = make_chart(temp_repo, "svc")
+        templates_dir = chart_dir / "templates"
+        templates_dir.mkdir()
+        service_manifest = {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {"name": "svc"},
+            "spec": {"ports": [{"port": 80}]},
+        }
+        (templates_dir / "service.yaml").write_text(yaml.dump(service_manifest))
+        result = HelmDetector(temp_repo).detect()
+        # Should not crash; relationships may be empty
+        assert "relationships" in result[0]
+
+    def test_malformed_template_does_not_crash(self, temp_repo):
+        chart_dir = make_chart(temp_repo, "broken")
+        templates_dir = chart_dir / "templates"
+        templates_dir.mkdir()
+        (templates_dir / "bad.yaml").write_text(": broken :")
+        result = HelmDetector(temp_repo).detect()
+        assert len(result) == 1

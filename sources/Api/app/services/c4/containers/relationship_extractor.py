@@ -178,7 +178,16 @@ class ConfigRelationshipExtractor:
             except Exception as e:
                 logger.debug("ConfigRelationshipExtractor: failed to parse %s: %s", config_file, e)
 
-        return relationships
+        # Deduplicate: env-specific config variants (e.g., appsettings.json +
+        # appsettings.Development.json) often contain the same connection strings.
+        seen: set[tuple] = set()
+        unique: list[dict] = []
+        for r in relationships:
+            key = (r.get("to"), r.get("type"), r.get("protocol"))
+            if key not in seen:
+                seen.add(key)
+                unique.append(r)
+        return unique
 
     # ------------------------------------------------------------------
     # Internal

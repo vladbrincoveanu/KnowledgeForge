@@ -9,6 +9,7 @@ import yaml
 
 from .base_detector import BaseContainerDetector
 from . import utils
+from .relationship_extractor import ConfigRelationshipExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +113,43 @@ class StructureDetector(BaseContainerDetector):
         
         return containers
     
+    def _is_infrastructure_only(self, project_dir: Path) -> bool:
+        """Return True when the directory contains only IaC files with no application code.
+
+        Infrastructure-only = has IaC signals (.tf / Chart.yaml / kustomization.yaml)
+        AND no app framework manifests (Dockerfile, package.json, pom.xml, go.mod, …)
+        AND no app source files (*.py, *.js, *.ts, *.java, *.go, *.cs, *.rs, *.rb).
+        """
+        _APP_EXTENSIONS = {'.py', '.js', '.ts', '.java', '.go', '.cs', '.rs', '.rb'}
+        _APP_MANIFESTS = {
+            'Dockerfile', 'package.json', 'pom.xml', 'go.mod',
+            'requirements.txt', 'pyproject.toml', 'Cargo.toml',
+            'build.gradle', 'build.gradle.kts',
+        }
+
+        has_iac = (
+            bool(list(project_dir.glob('*.tf')))
+            or (project_dir / 'Chart.yaml').exists()
+            or (project_dir / 'chart' / 'Chart.yaml').exists()
+            or (project_dir / 'kustomization.yaml').exists()
+            or (project_dir / 'kustomize' / 'kustomization.yaml').exists()
+        )
+        if not has_iac:
+            return False
+
+        for manifest in _APP_MANIFESTS:
+            if (project_dir / manifest).exists():
+                return False
+
+        if list(project_dir.glob('*.csproj')) or list(project_dir.glob('*.sln')):
+            return False
+
+        for f in project_dir.iterdir():
+            if f.is_file() and f.suffix in _APP_EXTENSIONS:
+                return False
+
+        return True
+
     def _is_deployable_service(self, directory: Path) -> bool:
         """Check if directory contains a deployable service.
         
@@ -204,7 +242,12 @@ class StructureDetector(BaseContainerDetector):
             container["description"] = (
                 f"Kubernetes workload deployed via {deployment_label}."
             )
-        
+
+        if self._is_infrastructure_only(project_dir):
+            container["is_infrastructure_only"] = True
+
+        container["relationships"] = ConfigRelationshipExtractor(container_name).extract_from_directory(project_dir)
+
         return container
     
     def _path_matches_gitops(self, rel_path: str) -> bool:

@@ -1,6 +1,15 @@
 import React, { memo } from 'react';
 import { Handle, Position } from 'reactflow';
 
+interface ContainerMeta {
+  container_type?: string;
+  technology?: string;
+  protocol?: string;
+  runtime_environment?: string;
+  deployment?: string;
+  [key: string]: any;
+}
+
 interface CustomNodeProps {
   data: {
     label: string;
@@ -11,6 +20,7 @@ interface CustomNodeProps {
     line?: number;
     isExternal?: boolean;
     decorators?: string[];
+    containerMeta?: ContainerMeta;
   };
 }
 
@@ -43,6 +53,34 @@ const getC4Style = (type: string): C4Style => {
   return { bg: '', color: '', stereotype: null, isC4: false };
 };
 
+/**
+ * Infer a visual category from the container_type string.
+ */
+type ContainerCategory = 'database' | 'broker' | 'cache' | 'service';
+
+interface CategoryStyle {
+  headerBg: string;
+  headerLabel: string;
+  borderColor: string;
+  bodyBg: string;
+}
+
+const CATEGORY_STYLES: Record<ContainerCategory, CategoryStyle> = {
+  database: { headerBg: '#1d4ed8', headerLabel: 'DATABASE',       borderColor: '#3b82f6', bodyBg: '#eff6ff' },
+  broker:   { headerBg: '#b45309', headerLabel: 'MESSAGE BROKER', borderColor: '#f59e0b', bodyBg: '#fffbeb' },
+  cache:    { headerBg: '#047857', headerLabel: 'CACHE',          borderColor: '#10b981', bodyBg: '#ecfdf5' },
+  service:  { headerBg: '#334155', headerLabel: 'CONTAINER',      borderColor: '#94a3b8', bodyBg: '#ffffff' },
+};
+
+function inferCategory(containerType?: string): ContainerCategory {
+  if (!containerType) return 'service';
+  const lower = containerType.toLowerCase();
+  if (lower.includes('database') || lower.includes('data store') || lower.includes('datastore')) return 'database';
+  if (lower.includes('message broker') || lower.includes('event bus') || lower.includes('queue')) return 'broker';
+  if (lower.includes('cache') || lower.includes('in-memory')) return 'cache';
+  return 'service';
+}
+
 const CustomNode: React.FC<CustomNodeProps> = ({ data }) => {
   // Format the label to be more readable (replace underscores, limit length)
   const formatLabel = (label: string) => {
@@ -54,6 +92,46 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data }) => {
 
   const isContainer = data.type === 'container';
   const { bg, color, stereotype, isC4 } = getC4Style(data.type);
+
+  // For container entities, use category-based styling
+  if (isContainer && data.containerMeta) {
+    const category = inferCategory(data.containerMeta.container_type);
+    const catStyle = CATEGORY_STYLES[category];
+    const tech = data.containerMeta.technology;
+
+    return (
+      <div
+        className={`react-flow__node-custom node-type-container`}
+        style={{
+          borderColor: catStyle.borderColor,
+          background: catStyle.bodyBg,
+        }}
+      >
+        <Handle type="target" position={Position.Left} className="custom-handle" />
+
+        <div
+          className="node-header"
+          style={{ background: catStyle.headerBg, color: '#fff' }}
+        >
+          {catStyle.headerLabel}
+        </div>
+
+        <div className="node-content">
+          <div className="node-name" title={data.label}>
+            {formatLabel(data.label)}
+          </div>
+          {data.file && <div className="node-file">{data.file}</div>}
+          {tech && (
+            <div className="node-file" style={{ color: '#64748b' }}>
+              {tech}
+            </div>
+          )}
+        </div>
+
+        <Handle type="source" position={Position.Right} className="custom-handle" />
+      </div>
+    );
+  }
 
   return (
     <div

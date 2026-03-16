@@ -296,6 +296,35 @@ const getLayoutedElements = (
         ((container.style?.width as number) || 850) + containerSpacing;
     });
 
+    // Position standalone nodes (non-K8s containers, non-child entities)
+    // below the cluster frame in a grid layout
+    if (standaloneNodes.length > 0) {
+      // Find the bottom edge of positioned containers
+      let maxY = 0;
+      containerNodes.forEach((c) => {
+        const h = (c.style?.height as number) || 520;
+        maxY = Math.max(maxY, (c.position?.y || 0) + h);
+      });
+
+      const standaloneStartY = maxY + 80;
+      const cols = Math.min(5, Math.max(2, Math.ceil(Math.sqrt(standaloneNodes.length))));
+      const nodeW = 260;
+      const nodeH = 120;
+      const gapX = 40;
+      const gapY = 40;
+
+      standaloneNodes.forEach((node, idx) => {
+        const row = Math.floor(idx / cols);
+        const col = idx % cols;
+        node.position = {
+          x: 200 + col * (nodeW + gapX),
+          y: standaloneStartY + row * (nodeH + gapY),
+        };
+        node.sourcePosition = Position.Right;
+        node.targetPosition = Position.Left;
+      });
+    }
+
     return {
       nodes: [...containerNodes, ...childNodes, ...standaloneNodes],
       edges,

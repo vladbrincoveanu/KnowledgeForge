@@ -339,29 +339,56 @@
   background: transparent;
   border: none;
   padding: 0;
+  position: relative;
+
+  .container-badge {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 4px 12px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: #fff;
+    border-radius: 6px 6px 0 0;
+  }
 
   .container-header {
     position: absolute;
-    top: 10px;
-    left: 20px;
+    top: 28px;
+    left: 12px;
+    right: 12px;
     z-index: 10;
 
     .container-label {
-      font-size: 16px;
+      font-size: 14px;
       font-weight: 600;
       color: #0f172a;
-      margin-bottom: 4px;
-    }
-
-    .container-type {
-      font-size: 12px;
-      color: #475569;
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .container-tech {
       font-size: 11px;
       color: #64748b;
     }
+  }
+
+  // Category-specific backgrounds
+  &--database {
+    background: #eff6ff;
+  }
+  &--broker {
+    background: #fffbeb;
+  }
+  &--cache {
+    background: #ecfdf5;
+  }
+  &--service {
+    background: #f8fafc;
   }
 }
 

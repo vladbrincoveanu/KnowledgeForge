@@ -5,7 +5,7 @@
     "type": "system",
     "name": "OmniPay Demo Repositories",
     "purpose": "OmniPay is a curated demo workspace for KnowledgeForge.",
-    "description": "Thinking Process:\n\n1.  Analyze the Request:\n    *   Task: Generate a concise 2-3 sentence description for the given system.\n    *   System Name: OmniPay Demo Repositories\n    *   Purpose: Curated demo workspace for KnowledgeForge.\n    *   Domain: AI/ML Processing\n    *   Owner: iuliarinea17\n    *   Tier: Tier 1 - Production Critical\n    *   Status: ACTIVE\n    *   Languages/Frameworks: C#, Python,.",
+    "description": "OmniPay is a curated demo workspace for KnowledgeForge.",
     "external_dependencies": [
       {
         "name": "Redis",
@@ -2166,7 +2166,7 @@
       {
         "email": "iulia-georgiana.rinea@tuwien.ac.at",
         "name": "Iulia Rinea",
-        "commit_count": 26
+        "commit_count": 28
       },
       {
         "email": "37401169+vladbrincoveanu@users.noreply.github.com",
@@ -2177,10 +2177,10 @@
     "contributor_count": 4,
     "status": "ACTIVE",
     "status_evidence": {
-      "commits_30d": 35,
-      "commits_90d": 79,
-      "commits_180d": 99,
-      "last_commit_date": "2026-03-15T17:01:28+01:00",
+      "commits_30d": 37,
+      "commits_90d": 81,
+      "commits_180d": 101,
+      "last_commit_date": "2026-03-16T00:50:16+01:00",
       "days_since_last_commit": 0,
       "git_repos_scanned": 1
     },
@@ -2199,10 +2199,10 @@
       "\u2705 Repository structure",
       "\u274c Dependency management"
     ],
-    "last_commit_date": "2026-03-15T17:01:28+01:00",
-    "commit_count_30d": 35,
-    "commit_count_90d": 79,
-    "commit_count_180d": 99,
+    "last_commit_date": "2026-03-16T00:50:16+01:00",
+    "commit_count_30d": 37,
+    "commit_count_90d": 81,
+    "commit_count_180d": 101,
     "dora_metrics": {
       "deployment_frequency_per_day": 0.0,
       "lead_time_days": null,
@@ -2215,7 +2215,7 @@
     "owner_team": "iuliarinea17",
     "business_domain": "AI/ML Processing",
     "criticality": "Tier 1 - Production Critical",
-    "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata.\n    *   Constraint: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"OmniPay Demo Repositories\", \"type\": \"system\", \"container_type\": null,."
+    "llm_description": "OmniPay is a curated demo workspace for KnowledgeForge."
   },
   "containers": [
     {
@@ -2244,7 +2244,9 @@
       "owner": "Iulia",
       "team": null,
       "owner_team": "Iulia",
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-infra\", \"type\": \"container\", \"container_type."
+      "is_infrastructure_only": true,
+      "relationships": [],
+      "llm_description": "omnipay-infra is a deployable service (Helm Deployed Service, Terraform, Helm)."
     },
     {
       "c4_level": 2,
@@ -2254,8 +2256,8 @@
       "technology": ".NET",
       "protocol": "HTTP",
       "path": "omnipay-settlement-orchestrator",
-      "runtime_environment": null,
-      "deployment": null,
+      "runtime_environment": "Kubernetes",
+      "deployment": "Kustomize",
       "description": "OmniPay Settlement Orchestrator",
       "repository_url": "https://github.com/vladbrincoveanu/KnowledgeForge/-/tree/main/omnipay-settlement-orchestrator",
       "runtime_info": "Unknown",
@@ -2269,7 +2271,83 @@
       "owner": "Vlad",
       "team": null,
       "owner_team": "Vlad",
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based only on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-settlement-orch."
+      "relationships": [
+        {
+          "from": "omnipay-settlement-orchestrator",
+          "to": "omnipay-settlement-sql.database.windows.net",
+          "type": "uses",
+          "protocol": "SQLServer",
+          "port": "1433",
+          "source": "config",
+          "description": "omnipay-settlement-orchestrator uses omnipay-settlement-sql.database.windows.net via ConnectionStrings.SettlementSqlServer",
+          "_unresolved": true,
+          "metadata": {}
+        },
+        {
+          "from": "omnipay-settlement-orchestrator",
+          "to": "settlement-bus.omnipay.internal",
+          "type": "uses",
+          "protocol": "AMQP",
+          "port": "5671",
+          "source": "config",
+          "description": "omnipay-settlement-orchestrator uses settlement-bus.omnipay.internal via SettlementInfrastructure.RabbitMqUrl",
+          "_unresolved": true,
+          "metadata": {
+            "database": "settlements"
+          }
+        },
+        {
+          "from": "omnipay-settlement-orchestrator",
+          "to": "settlement-cache.omnipay.internal",
+          "type": "uses",
+          "protocol": "Redis",
+          "port": "6379",
+          "source": "config",
+          "description": "omnipay-settlement-orchestrator uses settlement-cache.omnipay.internal via SettlementInfrastructure.RedisUrl",
+          "_unresolved": true,
+          "metadata": {
+            "database": "4"
+          }
+        },
+        {
+          "from": "settlement-orchestrator",
+          "to": "sqlserver",
+          "type": "uses",
+          "protocol": "SQLServer",
+          "port": "1433",
+          "source": "env",
+          "description": "settlement-orchestrator uses sqlserver via SETTLEMENT_SQLSERVER_CONNECTION",
+          "_unresolved": true,
+          "metadata": {}
+        },
+        {
+          "from": "settlement-orchestrator",
+          "to": "rabbitmq",
+          "type": "uses",
+          "protocol": "AMQP",
+          "port": "5672",
+          "source": "env",
+          "description": "settlement-orchestrator uses rabbitmq via RABBITMQ_URL",
+          "_unresolved": true,
+          "metadata": {}
+        },
+        {
+          "from": "settlement-orchestrator",
+          "to": "redis",
+          "type": "uses",
+          "protocol": "Redis",
+          "port": "6379",
+          "source": "env",
+          "description": "settlement-orchestrator uses redis via REDIS_URL",
+          "_unresolved": true,
+          "metadata": {
+            "database": "4"
+          }
+        }
+      ],
+      "kubernetes_kind": "Deployment",
+      "kubernetes_namespace": "default",
+      "llm_description": "omnipay-settlement-orchestrator is a deployable service (Containerized Service, .NET, Kustomize)."
     },
     {
       "c4_level": 2,
@@ -2285,9 +2363,14 @@
       "repository_url": "https://github.com/vladbrincoveanu/KnowledgeForge/-/tree/main/omnipay-k8s-ops",
       "runtime_info": "Unknown",
       "dependencies_internal": [
+        "kafka",
+        "mongodb",
         "omnipay-event-projections",
         "omnipay-risk-streams",
-        "omnipay-settlement-orchestrator"
+        "omnipay-settlement-orchestrator",
+        "rabbitmq",
+        "redis",
+        "sqlserver"
       ],
       "health_endpoint": "https://ops.omnipay.internal/health",
       "endpoint": "https://ops.omnipay.internal/platform",
@@ -2298,6 +2381,7 @@
       "owner": "Iulia",
       "team": null,
       "owner_team": "Iulia",
+      "is_infrastructure_only": true,
       "relationships": [
         {
           "from": "omnipay-k8s-ops",
@@ -2310,7 +2394,7 @@
           "description": "omnipay-k8s-ops.ingress.host \u2192 ops.omnipay.internal"
         }
       ],
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-k8."
+      "llm_description": "omnipay-k8s-ops is a deployable service (Helm Deployed Service, Helm, Helm)."
     },
     {
       "c4_level": 2,
@@ -2335,6 +2419,7 @@
       "owner": "Vlas",
       "team": null,
       "owner_team": "Vlas",
+      "relationships": [],
       "components": [
         {
           "id": "fastapi_omnipay-ml-pipeline",
@@ -2347,7 +2432,7 @@
           "type": "Component"
         }
       ],
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-ml."
+      "llm_description": "omnipay-ml-pipeline is a deployable service (Python Service, Python)."
     },
     {
       "c4_level": 2,
@@ -2372,6 +2457,7 @@
       "owner": "Iulia",
       "team": "omnipay/platform-backend",
       "owner_team": "omnipay/platform-backend",
+      "relationships": [],
       "components": [
         {
           "id": "community_detection_repository",
@@ -2384,7 +2470,7 @@
           "type": "Component"
         }
       ],
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-ledger\", \"type\": \"container\", \"container_type."
+      "llm_description": "omnipay-ledger is a deployable service (Java Service, Java)."
     },
     {
       "c4_level": 2,
@@ -2409,6 +2495,7 @@
       "owner": "Vlas",
       "team": null,
       "owner_team": "Vlas",
+      "relationships": [],
       "components": [
         {
           "id": "community_detection_users",
@@ -2416,7 +2503,7 @@
           "type": "Component"
         }
       ],
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-fraud."
+      "llm_description": "omnipay-fraud-ml is a deployable service (Python Service, Python)."
     },
     {
       "c4_level": 2,
@@ -2434,7 +2521,8 @@
       "dependencies_internal": [
         "omnipay-card-router",
         "omnipay-fraud-ml",
-        "omnipay-ledger"
+        "omnipay-ledger",
+        "redis"
       ],
       "health_endpoint": "",
       "endpoint": "",
@@ -2445,6 +2533,7 @@
       "owner": "Vlad",
       "team": null,
       "owner_team": "Vlad",
+      "relationships": [],
       "components": [
         {
           "id": "community_detection_payments",
@@ -2452,7 +2541,7 @@
           "type": "Component"
         }
       ],
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-gateway."
+      "llm_description": "omnipay-gateway is a deployable service (Node.js Backend, Node.js)."
     },
     {
       "c4_level": 2,
@@ -2477,7 +2566,68 @@
       "owner": "Vlad",
       "team": "omnipay/security-platform",
       "owner_team": "omnipay/security-platform",
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-card-router."
+      "relationships": [
+        {
+          "from": "omnipay-card-router",
+          "to": "omnipay-card-router-sql.database.windows.net",
+          "type": "uses",
+          "protocol": "SQLServer",
+          "port": "1433",
+          "source": "config",
+          "description": "omnipay-card-router uses omnipay-card-router-sql.database.windows.net via ConnectionStrings.CardRouter",
+          "_unresolved": true,
+          "metadata": {}
+        },
+        {
+          "from": "omnipay-card-router",
+          "to": "sandbox.api.visa.com",
+          "type": "uses",
+          "protocol": "HTTPS",
+          "port": null,
+          "source": "config",
+          "description": "omnipay-card-router uses sandbox.api.visa.com via Networks.VisaBaseUrl",
+          "_unresolved": true,
+          "metadata": {}
+        },
+        {
+          "from": "omnipay-card-router",
+          "to": "sandbox.api.mastercard.com",
+          "type": "uses",
+          "protocol": "HTTPS",
+          "port": null,
+          "source": "config",
+          "description": "omnipay-card-router uses sandbox.api.mastercard.com via Networks.MastercardBaseUrl",
+          "_unresolved": true,
+          "metadata": {}
+        },
+        {
+          "from": "omnipay-card-router",
+          "to": "api.globalbank.test",
+          "type": "uses",
+          "protocol": "HTTPS",
+          "port": null,
+          "source": "config",
+          "description": "omnipay-card-router uses api.globalbank.test via Networks.GlobalBankBaseUrl",
+          "_unresolved": true,
+          "metadata": {
+            "database": "v1"
+          }
+        },
+        {
+          "from": "omnipay-card-router",
+          "to": "screening.ledgershield.test",
+          "type": "uses",
+          "protocol": "HTTPS",
+          "port": null,
+          "source": "config",
+          "description": "omnipay-card-router uses screening.ledgershield.test via Networks.LedgerShieldBaseUrl",
+          "_unresolved": true,
+          "metadata": {
+            "database": "v1"
+          }
+        }
+      ],
+      "llm_description": "omnipay-card-router is a deployable service (Containerized Service, .NET)."
     },
     {
       "c4_level": 2,
@@ -2502,7 +2652,8 @@
       "owner": "omnipay/finance-team",
       "team": "omnipay/risk-team",
       "owner_team": "omnipay/risk-team",
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: JSON object containing `name`, `type`, `."
+      "relationships": [],
+      "llm_description": "omnipay-disputes is a deployable service (Node.js Backend, Node.js)."
     },
     {
       "c4_level": 2,
@@ -2527,6 +2678,19 @@
       "owner": "Vlad",
       "team": null,
       "owner_team": "Vlad",
+      "relationships": [
+        {
+          "from": "omnipay-payment-processor",
+          "to": "localhost",
+          "type": "uses",
+          "protocol": "Redis",
+          "port": "6379",
+          "source": "config",
+          "description": "omnipay-payment-processor uses localhost via REDIS_URL",
+          "_unresolved": true,
+          "metadata": {}
+        }
+      ],
       "components": [
         {
           "id": "community_detection_omnipay-payment-processor",
@@ -2534,7 +2698,7 @@
           "type": "Component"
         }
       ],
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Base description *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-payment."
+      "llm_description": "omnipay-payment-processor is a deployable service (Backend API, Python)."
     },
     {
       "c4_level": 2,
@@ -2544,8 +2708,8 @@
       "technology": "Java",
       "protocol": "HTTP",
       "path": "omnipay-risk-streams",
-      "runtime_environment": null,
-      "deployment": null,
+      "runtime_environment": "Kubernetes",
+      "deployment": "Kustomize",
       "description": "OmniPay Risk Streams",
       "repository_url": "https://github.com/vladbrincoveanu/KnowledgeForge/-/tree/main/omnipay-risk-streams",
       "runtime_info": "Unknown",
@@ -2559,6 +2723,21 @@
       "owner": "Vlas",
       "team": null,
       "owner_team": "Vlas",
+      "relationships": [
+        {
+          "from": "risk-streams",
+          "to": "kafka",
+          "type": "uses",
+          "protocol": "Kafka",
+          "port": "9092",
+          "source": "env",
+          "description": "risk-streams uses kafka via KAFKA_BOOTSTRAP_SERVERS",
+          "_unresolved": true,
+          "metadata": {}
+        }
+      ],
+      "kubernetes_kind": "Deployment",
+      "kubernetes_namespace": "default",
       "components": [
         {
           "id": "community_detection_riskstreams",
@@ -2566,7 +2745,7 @@
           "type": "Component"
         }
       ],
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-risk-stream."
+      "llm_description": "omnipay-risk-streams is a deployable service (Java Service, Java, Kustomize)."
     },
     {
       "c4_level": 2,
@@ -2591,7 +2770,22 @@
       "owner": "Iulia",
       "team": null,
       "owner_team": "Iulia",
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata.\n    *   Constraint: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-analytics\", \"type\": \"."
+      "relationships": [
+        {
+          "from": "omnipay-analytics",
+          "to": "localhost",
+          "type": "uses",
+          "protocol": "PostgreSQL",
+          "port": "5432",
+          "source": "config",
+          "description": "omnipay-analytics uses localhost via DATABASE_URL",
+          "_unresolved": true,
+          "metadata": {
+            "database": "analytics"
+          }
+        }
+      ],
+      "llm_description": "omnipay-analytics is a deployable service (Node.js Backend, Node.js)."
     },
     {
       "c4_level": 2,
@@ -2616,7 +2810,8 @@
       "owner": "Vlas",
       "team": null,
       "owner_team": "Vlas",
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-auth\",."
+      "relationships": [],
+      "llm_description": "omnipay-auth is a deployable service (Node.js Backend, Node.js)."
     },
     {
       "c4_level": 2,
@@ -2641,6 +2836,7 @@
       "owner": "Iulia",
       "team": null,
       "owner_team": "Iulia",
+      "relationships": [],
       "components": [
         {
           "id": "community_detection_notifier",
@@ -2653,7 +2849,7 @@
           "type": "Component"
         }
       ],
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Base description *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-not."
+      "llm_description": "omnipay-notifier is a deployable service (Go Service, Go)."
     },
     {
       "c4_level": 2,
@@ -2678,6 +2874,7 @@
       "owner": "Vlad",
       "team": null,
       "owner_team": "Vlad",
+      "relationships": [],
       "components": [
         {
           "id": "fastapi_omnipay-billing-llm",
@@ -2685,7 +2882,7 @@
           "type": "Component"
         }
       ],
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Base description *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-b."
+      "llm_description": "omnipay-billing-llm is a deployable service (Python Service, Python)."
     },
     {
       "c4_level": 2,
@@ -2695,8 +2892,8 @@
       "technology": ".NET",
       "protocol": "HTTP",
       "path": "omnipay-event-projections",
-      "runtime_environment": null,
-      "deployment": null,
+      "runtime_environment": "Kubernetes",
+      "deployment": "Kustomize",
       "description": "OmniPay Event Projections",
       "repository_url": "https://github.com/vladbrincoveanu/KnowledgeForge/-/tree/main/omnipay-event-projections",
       "runtime_info": "Unknown",
@@ -2710,7 +2907,85 @@
       "owner": "Iulia",
       "team": null,
       "owner_team": "Iulia",
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-event-pro."
+      "relationships": [
+        {
+          "from": "omnipay-event-projections",
+          "to": "risk-streams.omnipay.internal",
+          "type": "uses",
+          "protocol": "Kafka",
+          "port": "9092",
+          "source": "config",
+          "description": "omnipay-event-projections uses risk-streams.omnipay.internal via ProjectionInfrastructure.KafkaBootstrapServers",
+          "_unresolved": true,
+          "metadata": {}
+        },
+        {
+          "from": "omnipay-event-projections",
+          "to": "projection-read-model.omnipay.internal",
+          "type": "uses",
+          "protocol": "MongoDB",
+          "port": "27017",
+          "source": "config",
+          "description": "omnipay-event-projections uses projection-read-model.omnipay.internal via ProjectionInfrastructure.MongoDbUrl",
+          "_unresolved": true,
+          "metadata": {
+            "database": "event-projections"
+          }
+        },
+        {
+          "from": "omnipay-event-projections",
+          "to": "projection-cache.omnipay.internal",
+          "type": "uses",
+          "protocol": "Redis",
+          "port": "6379",
+          "source": "config",
+          "description": "omnipay-event-projections uses projection-cache.omnipay.internal via ProjectionInfrastructure.RedisUrl",
+          "_unresolved": true,
+          "metadata": {
+            "database": "6"
+          }
+        },
+        {
+          "from": "event-projections",
+          "to": "kafka",
+          "type": "uses",
+          "protocol": "Kafka",
+          "port": "9092",
+          "source": "env",
+          "description": "event-projections uses kafka via KAFKA_BOOTSTRAP_SERVERS",
+          "_unresolved": true,
+          "metadata": {}
+        },
+        {
+          "from": "event-projections",
+          "to": "mongodb",
+          "type": "uses",
+          "protocol": "MongoDB",
+          "port": "27017",
+          "source": "env",
+          "description": "event-projections uses mongodb via MONGODB_URI",
+          "_unresolved": true,
+          "metadata": {
+            "database": "event-projections"
+          }
+        },
+        {
+          "from": "event-projections",
+          "to": "redis",
+          "type": "uses",
+          "protocol": "Redis",
+          "port": "6379",
+          "source": "env",
+          "description": "event-projections uses redis via REDIS_URL",
+          "_unresolved": true,
+          "metadata": {
+            "database": "6"
+          }
+        }
+      ],
+      "kubernetes_kind": "Deployment",
+      "kubernetes_namespace": "default",
+      "llm_description": "omnipay-event-projections is a deployable service (Containerized Service, .NET, Kustomize)."
     },
     {
       "c4_level": 2,
@@ -2735,6 +3010,7 @@
       "owner": "Iulia",
       "team": null,
       "owner_team": "Iulia",
+      "relationships": [],
       "components": [
         {
           "id": "fastapi_omnipay-database",
@@ -2742,7 +3018,107 @@
           "type": "Component"
         }
       ],
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Base description *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"omnipay-d."
+      "llm_description": "omnipay-database is a deployable service (Python Service, Python)."
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "sqlserver",
+      "container_type": "Database",
+      "technology": "SQL Server",
+      "protocol": "SQLServer",
+      "path": "omnipay-k8s-ops/kustomize",
+      "runtime_environment": "Kubernetes",
+      "deployment": "Kustomize",
+      "description": "Kubernetes StatefulSet workload.",
+      "repository_url": "",
+      "runtime_info": "",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "relationships": [],
+      "kubernetes_kind": "StatefulSet",
+      "kubernetes_namespace": "default",
+      "llm_description": "sqlserver is a deployable service (Database, SQL Server, Kustomize)."
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "redis",
+      "container_type": "Cache",
+      "technology": "Redis",
+      "protocol": "Redis",
+      "path": "omnipay-k8s-ops/kustomize",
+      "runtime_environment": "Kubernetes",
+      "deployment": "Kustomize",
+      "description": "Kubernetes StatefulSet workload.",
+      "repository_url": "",
+      "runtime_info": "",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "relationships": [],
+      "kubernetes_kind": "StatefulSet",
+      "kubernetes_namespace": "default",
+      "llm_description": "redis is a deployable service (Cache, Redis, Kustomize)."
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "rabbitmq",
+      "container_type": "Message Broker",
+      "technology": "RabbitMQ",
+      "protocol": "AMQP",
+      "path": "omnipay-k8s-ops/kustomize",
+      "runtime_environment": "Kubernetes",
+      "deployment": "Kustomize",
+      "description": "Kubernetes StatefulSet workload.",
+      "repository_url": "",
+      "runtime_info": "",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "relationships": [],
+      "kubernetes_kind": "StatefulSet",
+      "kubernetes_namespace": "default",
+      "llm_description": "rabbitmq is a deployable service (Message Broker, RabbitMQ, Kustomize)."
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "mongodb",
+      "container_type": "Database",
+      "technology": "MongoDB",
+      "protocol": "MongoDB",
+      "path": "omnipay-k8s-ops/kustomize",
+      "runtime_environment": "Kubernetes",
+      "deployment": "Kustomize",
+      "description": "Kubernetes StatefulSet workload.",
+      "repository_url": "",
+      "runtime_info": "",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "relationships": [],
+      "kubernetes_kind": "StatefulSet",
+      "kubernetes_namespace": "default",
+      "llm_description": "mongodb is a deployable service (Database, MongoDB, Kustomize)."
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "kafka",
+      "container_type": "Message Broker",
+      "technology": "Kafka",
+      "protocol": "Kafka",
+      "path": "omnipay-k8s-ops/kustomize",
+      "runtime_environment": "Kubernetes",
+      "deployment": "Kustomize",
+      "description": "Kubernetes StatefulSet workload.",
+      "repository_url": "",
+      "runtime_info": "",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "relationships": [],
+      "kubernetes_kind": "StatefulSet",
+      "kubernetes_namespace": "default",
+      "llm_description": "kafka is a deployable service (Message Broker, Kafka, Kustomize)."
     }
   ],
   "components": [
@@ -2760,7 +3136,7 @@
       "tags": [],
       "metadata": {},
       "container_id": "omnipay-ml-pipeline",
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Omnipay-ml-pipeline\", \"type\": \"component\", \"."
+      "llm_description": "Omnipay-ml-pipeline is a component within the system."
     },
     {
       "c4_level": 3,
@@ -2778,7 +3154,7 @@
         "layer": "infrastructure"
       },
       "container_id": "omnipay-ml-pipeline",
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Omnipay-ml."
+      "llm_description": "Omnipay-ml-pipeline is a component within the system."
     },
     {
       "c4_level": 3,
@@ -2796,7 +3172,7 @@
         "layer": "data_access"
       },
       "container_id": "omnipay-ledger",
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Repository\", \"type\": \"component\", \"container_type\": null, \"."
+      "llm_description": "Repository is a component within the system."
     },
     {
       "c4_level": 3,
@@ -2814,7 +3190,7 @@
         "layer": "presentation"
       },
       "container_id": "omnipay-ledger",
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: A JSON object containing fields like `name`, `type`, `container_type`, `technology`, `."
+      "llm_description": "Api is a component within the system."
     },
     {
       "c4_level": 3,
@@ -2832,7 +3208,7 @@
         "layer": "presentation"
       },
       "container_id": "omnipay-fraud-ml",
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Users\", \"type\": \"component\", \"container_type\": null, \"."
+      "llm_description": "Users is a component within the system."
     },
     {
       "c4_level": 3,
@@ -2850,7 +3226,7 @@
         "layer": "presentation"
       },
       "container_id": "omnipay-gateway",
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Payments\", \"type\": \"component\", \"container_type\": null, \"."
+      "llm_description": "Payments is a component within the system."
     },
     {
       "c4_level": 3,
@@ -2868,7 +3244,7 @@
         "layer": "presentation"
       },
       "container_id": "omnipay-payment-processor",
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Omnipay-payment-processor\", \"type\": \"component\", \"container."
+      "llm_description": "Omnipay-payment-processor is a component within the system."
     },
     {
       "c4_level": 3,
@@ -2884,7 +3260,7 @@
       "tags": [],
       "metadata": {},
       "container_id": "omnipay-risk-streams",
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what this node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Riskstreams\", \"type."
+      "llm_description": "Riskstreams is a component within the system."
     },
     {
       "c4_level": 3,
@@ -2900,7 +3276,7 @@
       "tags": [],
       "metadata": {},
       "container_id": "omnipay-notifier",
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Notifier\", \"type\": \"component\", \"container_type\": null, \"."
+      "llm_description": "Notifier is a component within the system."
     },
     {
       "c4_level": 3,
@@ -2916,7 +3292,7 @@
       "tags": [],
       "metadata": {},
       "container_id": "omnipay-notifier",
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Base description *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Dispatch\", \"type."
+      "llm_description": "Dispatch is a component within the system."
     },
     {
       "c4_level": 3,
@@ -2932,7 +3308,7 @@
       "tags": [],
       "metadata": {},
       "container_id": "omnipay-billing-llm",
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Omnipay-billing-llm\", \"type\": \"component\",."
+      "llm_description": "Omnipay-billing-llm is a component within the system."
     },
     {
       "c4_level": 3,
@@ -2948,7 +3324,7 @@
       "tags": [],
       "metadata": {},
       "container_id": "omnipay-database",
-      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Omnipay-database."
+      "llm_description": "Omnipay-database is a component within the system."
     }
   ],
   "relationships": {
@@ -2958,46 +3334,129 @@
         "destination": "OmniPay Demo Repositories",
         "description": "Uses the system",
         "relationship_type": "uses",
-        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata): `{\"source\": \"User\", \"."
+        "llm_description": "User uses OmniPay Demo Repositories."
       },
       {
         "source": "OmniPay Demo Repositories",
         "destination": "Mixpanel",
         "description": "Uses Mixpanel for analytics and insights",
         "relationship_type": "uses",
-        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data: Edge metadata (`{\"source\": \"OmniPay Demo."
+        "llm_description": "OmniPay Demo Repositories uses Mixpanel."
       },
       {
         "source": "OmniPay Demo Repositories",
         "destination": "Auth0",
         "description": "Uses Auth0 for authentication and identity",
         "relationship_type": "uses",
-        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data: Edge metadata (`{\"source\": \"OmniPay Demo."
+        "llm_description": "OmniPay Demo Repositories uses Auth0."
       },
       {
         "source": "OmniPay Demo Repositories",
         "destination": "Openai",
         "description": "Uses Openai for AI-powered capabilities",
         "relationship_type": "uses",
-        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   `source`: \"."
+        "llm_description": "OmniPay Demo Repositories uses Openai."
       },
       {
         "source": "OmniPay Demo Repositories",
         "destination": "Stripe",
         "description": "Uses Stripe for payment processing",
         "relationship_type": "uses",
-        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   Source: \"Om."
+        "llm_description": "OmniPay Demo Repositories uses Stripe."
       }
     ],
     "containers": [
+      {
+        "from": "omnipay-settlement-orchestrator",
+        "to": "sqlserver",
+        "type": "uses",
+        "protocol": "SQLServer",
+        "port": "1433",
+        "source": "env",
+        "description": "settlement-orchestrator uses sqlserver via SETTLEMENT_SQLSERVER_CONNECTION",
+        "metadata": {},
+        "llm_description": "omnipay-settlement-orchestrator uses sqlserver over SQLServer."
+      },
+      {
+        "from": "omnipay-settlement-orchestrator",
+        "to": "rabbitmq",
+        "type": "uses",
+        "protocol": "AMQP",
+        "port": "5672",
+        "source": "env",
+        "description": "settlement-orchestrator uses rabbitmq via RABBITMQ_URL",
+        "metadata": {},
+        "llm_description": "omnipay-settlement-orchestrator uses rabbitmq over AMQP."
+      },
+      {
+        "from": "omnipay-settlement-orchestrator",
+        "to": "redis",
+        "type": "uses",
+        "protocol": "Redis",
+        "port": "6379",
+        "source": "env",
+        "description": "settlement-orchestrator uses redis via REDIS_URL",
+        "metadata": {
+          "database": "4"
+        },
+        "llm_description": "omnipay-settlement-orchestrator uses redis over Redis."
+      },
+      {
+        "from": "omnipay-risk-streams",
+        "to": "kafka",
+        "type": "uses",
+        "protocol": "Kafka",
+        "port": "9092",
+        "source": "env",
+        "description": "risk-streams uses kafka via KAFKA_BOOTSTRAP_SERVERS",
+        "metadata": {},
+        "llm_description": "omnipay-risk-streams uses kafka over Kafka."
+      },
+      {
+        "from": "omnipay-event-projections",
+        "to": "kafka",
+        "type": "uses",
+        "protocol": "Kafka",
+        "port": "9092",
+        "source": "env",
+        "description": "event-projections uses kafka via KAFKA_BOOTSTRAP_SERVERS",
+        "metadata": {},
+        "llm_description": "omnipay-event-projections uses kafka over Kafka."
+      },
+      {
+        "from": "omnipay-event-projections",
+        "to": "mongodb",
+        "type": "uses",
+        "protocol": "MongoDB",
+        "port": "27017",
+        "source": "env",
+        "description": "event-projections uses mongodb via MONGODB_URI",
+        "metadata": {
+          "database": "event-projections"
+        },
+        "llm_description": "omnipay-event-projections uses mongodb over MongoDB."
+      },
+      {
+        "from": "omnipay-event-projections",
+        "to": "redis",
+        "type": "uses",
+        "protocol": "Redis",
+        "port": "6379",
+        "source": "env",
+        "description": "event-projections uses redis via REDIS_URL",
+        "metadata": {
+          "database": "6"
+        },
+        "llm_description": "omnipay-event-projections uses redis over Redis."
+      },
       {
         "from": "omnipay-infra",
         "to": "omnipay-gateway",
         "type": "uses",
         "protocol": "HTTP",
         "source": "runtime",
-        "description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata): `{\"source\": \"omnipay.",
-        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata): `{\"source\": \"omnipay."
+        "description": "omnipay-infra uses omnipay-gateway over HTTP.",
+        "llm_description": "omnipay-infra uses omnipay-gateway over HTTP."
       },
       {
         "from": "omnipay-infra",
@@ -3005,8 +3464,26 @@
         "type": "uses",
         "protocol": "HTTP",
         "source": "runtime",
-        "description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata): `{\"source\": \"omnipay.",
-        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata): `{\"source\": \"omnipay."
+        "description": "omnipay-infra uses omnipay-ledger over HTTP.",
+        "llm_description": "omnipay-infra uses omnipay-ledger over HTTP."
+      },
+      {
+        "from": "omnipay-k8s-ops",
+        "to": "kafka",
+        "type": "uses",
+        "protocol": "HTTP",
+        "source": "runtime",
+        "description": "omnipay-k8s-ops uses kafka over HTTP.",
+        "llm_description": "omnipay-k8s-ops uses kafka over HTTP."
+      },
+      {
+        "from": "omnipay-k8s-ops",
+        "to": "mongodb",
+        "type": "uses",
+        "protocol": "HTTP",
+        "source": "runtime",
+        "description": "omnipay-k8s-ops uses mongodb over HTTP.",
+        "llm_description": "omnipay-k8s-ops uses mongodb over HTTP."
       },
       {
         "from": "omnipay-k8s-ops",
@@ -3014,8 +3491,8 @@
         "type": "uses",
         "protocol": "HTTP",
         "source": "runtime",
-        "description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   Source: `om.",
-        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   Source: `om."
+        "description": "omnipay-k8s-ops uses omnipay-event-projections over HTTP.",
+        "llm_description": "omnipay-k8s-ops uses omnipay-event-projections over HTTP."
       },
       {
         "from": "omnipay-k8s-ops",
@@ -3023,8 +3500,8 @@
         "type": "uses",
         "protocol": "HTTP",
         "source": "runtime",
-        "description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   Source: `om.",
-        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   Source: `om."
+        "description": "omnipay-k8s-ops uses omnipay-risk-streams over HTTP.",
+        "llm_description": "omnipay-k8s-ops uses omnipay-risk-streams over HTTP."
       },
       {
         "from": "omnipay-k8s-ops",
@@ -3032,8 +3509,35 @@
         "type": "uses",
         "protocol": "HTTP",
         "source": "runtime",
-        "description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   Source: `om.",
-        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   Source: `om."
+        "description": "omnipay-k8s-ops uses omnipay-settlement-orchestrator over HTTP.",
+        "llm_description": "omnipay-k8s-ops uses omnipay-settlement-orchestrator over HTTP."
+      },
+      {
+        "from": "omnipay-k8s-ops",
+        "to": "rabbitmq",
+        "type": "uses",
+        "protocol": "HTTP",
+        "source": "runtime",
+        "description": "omnipay-k8s-ops uses rabbitmq over HTTP.",
+        "llm_description": "omnipay-k8s-ops uses rabbitmq over HTTP."
+      },
+      {
+        "from": "omnipay-k8s-ops",
+        "to": "redis",
+        "type": "uses",
+        "protocol": "HTTP",
+        "source": "runtime",
+        "description": "omnipay-k8s-ops uses redis over HTTP.",
+        "llm_description": "omnipay-k8s-ops uses redis over HTTP."
+      },
+      {
+        "from": "omnipay-k8s-ops",
+        "to": "sqlserver",
+        "type": "uses",
+        "protocol": "HTTP",
+        "source": "runtime",
+        "description": "omnipay-k8s-ops uses sqlserver over HTTP.",
+        "llm_description": "omnipay-k8s-ops uses sqlserver over HTTP."
       },
       {
         "from": "omnipay-gateway",
@@ -3041,8 +3545,8 @@
         "type": "uses",
         "protocol": "HTTP",
         "source": "runtime",
-        "description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   Source: `om.",
-        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   Source: `om."
+        "description": "omnipay-gateway uses omnipay-card-router over HTTP.",
+        "llm_description": "omnipay-gateway uses omnipay-card-router over HTTP."
       },
       {
         "from": "omnipay-gateway",
@@ -3050,8 +3554,8 @@
         "type": "uses",
         "protocol": "HTTP",
         "source": "runtime",
-        "description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata): `source`: \"omnipay-g.",
-        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata): `source`: \"omnipay-g."
+        "description": "omnipay-gateway uses omnipay-fraud-ml over HTTP.",
+        "llm_description": "omnipay-gateway uses omnipay-fraud-ml over HTTP."
       },
       {
         "from": "omnipay-gateway",
@@ -3059,13 +3563,22 @@
         "type": "uses",
         "protocol": "HTTP",
         "source": "runtime",
-        "description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   Source: `om.",
-        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   Source: `om."
+        "description": "omnipay-gateway uses omnipay-ledger over HTTP.",
+        "llm_description": "omnipay-gateway uses omnipay-ledger over HTTP."
+      },
+      {
+        "from": "omnipay-gateway",
+        "to": "redis",
+        "type": "uses",
+        "protocol": "HTTP",
+        "source": "runtime",
+        "description": "omnipay-gateway uses redis over HTTP.",
+        "llm_description": "omnipay-gateway uses redis over HTTP."
       }
     ]
   },
   "metadata": {
-    "total_containers": 17,
+    "total_containers": 22,
     "total_components": 12,
     "extraction_approach": "c4_model",
     "runtime": {

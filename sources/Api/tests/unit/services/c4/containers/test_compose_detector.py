@@ -132,6 +132,144 @@ class TestComposeDetectorDetect:
         assert isinstance(result, list)
 
 
+class TestComposeDetectorProtocolInference:
+    """Test protocol inference from image and ports."""
+
+    def test_postgres_service_gets_postgresql_protocol(self, temp_repo):
+        content = {
+            "version": "3.8",
+            "services": {"db": {"image": "postgres:14", "ports": ["5432:5432"]}},
+        }
+        (temp_repo / "docker-compose.yml").write_text(yaml.dump(content))
+        result = ComposeDetector(temp_repo).detect()
+        db = next(c for c in result if c["name"] == "db")
+        assert db["protocol"] == "PostgreSQL"
+
+    def test_redis_service_gets_redis_protocol(self, temp_repo):
+        content = {
+            "version": "3.8",
+            "services": {"cache": {"image": "redis:7", "ports": ["6379:6379"]}},
+        }
+        (temp_repo / "docker-compose.yml").write_text(yaml.dump(content))
+        result = ComposeDetector(temp_repo).detect()
+        cache = next(c for c in result if c["name"] == "cache")
+        assert cache["protocol"] == "Redis"
+
+    def test_kafka_service_gets_kafka_protocol(self, temp_repo):
+        content = {
+            "version": "3.8",
+            "services": {"broker": {"image": "confluentinc/cp-kafka:7.0"}},
+        }
+        (temp_repo / "docker-compose.yml").write_text(yaml.dump(content))
+        result = ComposeDetector(temp_repo).detect()
+        broker = next(c for c in result if c["name"] == "broker")
+        assert broker["protocol"] == "Kafka"
+
+    def test_unknown_image_falls_back_to_http(self, temp_repo):
+        content = {
+            "version": "3.8",
+            "services": {"api": {"image": "my-custom-api:latest"}},
+        }
+        (temp_repo / "docker-compose.yml").write_text(yaml.dump(content))
+        result = ComposeDetector(temp_repo).detect()
+        api = next(c for c in result if c["name"] == "api")
+        assert api["protocol"] == "HTTP"
+
+
+class TestComposeDetectorEnvVarRelationships:
+    """Test env var relationship extraction for compose services."""
+
+    def test_env_dict_with_db_url_produces_relationship(self, temp_repo):
+        content = {
+            "version": "3.8",
+            "services": {
+                "api": {
+                    "image": "my-api:latest",
+                    "environment": {"DATABASE_URL": "postgresql://db:5432/mydb"},
+                },
+                "db": {"image": "postgres:14"},
+            },
+        }
+        (temp_repo / "docker-compose.yml").write_text(yaml.dump(content))
+        result = ComposeDetector(temp_repo).detect()
+        api = next(c for c in result if c["name"] == "api")
+        rels = api.get("relationships", [])
+        assert any(r.get("protocol") == "PostgreSQL" for r in rels)
+
+    def test_env_list_format_produces_relationship(self, temp_repo):
+        content = {
+            "version": "3.8",
+            "services": {
+                "worker": {
+                    "image": "my-worker:latest",
+                    "environment": ["REDIS_URL=redis://cache:6379/0"],
+                },
+                "cache": {"image": "redis:7"},
+            },
+        }
+        (temp_repo / "docker-compose.yml").write_text(yaml.dump(content))
+        result = ComposeDetector(temp_repo).detect()
+        worker = next(c for c in result if c["name"] == "worker")
+        rels = worker.get("relationships", [])
+        assert any(r.get("protocol") == "Redis" for r in rels)
+
+    def test_env_var_relationships_marked_unresolved(self, temp_repo):
+        content = {
+            "version": "3.8",
+            "services": {
+                "svc": {
+                    "image": "my-svc:latest",
+                    "environment": {"KAFKA_BROKER": "kafka:9092"},
+                },
+            },
+        }
+        (temp_repo / "docker-compose.yml").write_text(yaml.dump(content))
+        result = ComposeDetector(temp_repo).detect()
+        svc = next(c for c in result if c["name"] == "svc")
+        rels = svc.get("relationships", [])
+        assert any(r.get("_unresolved") for r in rels)
+
+
+class TestComposeDetectorLinksProtocol:
+    """Test that links protocol is inferred from target image."""
+
+    def test_link_to_kafka_gets_kafka_protocol(self, temp_repo):
+        content = {
+            "version": "3.8",
+            "services": {
+                "consumer": {
+                    "image": "my-consumer:latest",
+                    "links": ["broker"],
+                },
+                "broker": {"image": "confluentinc/cp-kafka:7.0"},
+            },
+        }
+        (temp_repo / "docker-compose.yml").write_text(yaml.dump(content))
+        result = ComposeDetector(temp_repo).detect()
+        consumer = next(c for c in result if c["name"] == "consumer")
+        rels = consumer.get("relationships", [])
+        link_rels = [r for r in rels if r.get("source") == "compose" and "links" in r.get("description", "")]
+        assert any(r.get("protocol") == "Kafka" for r in link_rels)
+
+    def test_link_to_unknown_image_defaults_to_http(self, temp_repo):
+        content = {
+            "version": "3.8",
+            "services": {
+                "frontend": {
+                    "image": "my-frontend:latest",
+                    "links": ["backend"],
+                },
+                "backend": {"image": "my-backend:latest"},
+            },
+        }
+        (temp_repo / "docker-compose.yml").write_text(yaml.dump(content))
+        result = ComposeDetector(temp_repo).detect()
+        frontend = next(c for c in result if c["name"] == "frontend")
+        rels = frontend.get("relationships", [])
+        link_rels = [r for r in rels if r.get("to") == "backend"]
+        assert any(r.get("protocol") == "HTTP" for r in link_rels)
+
+
 class TestComposeDetectorContainerTypes:
     """Test container type classification."""
 

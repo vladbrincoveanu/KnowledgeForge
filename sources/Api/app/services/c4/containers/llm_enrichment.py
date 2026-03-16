@@ -62,7 +62,10 @@ file stores, background workers, caches.
 
 NOT containers (discard these): one-off init/migration tasks (Flyway, Alembic),
 CI scripts, build tools (webpack, gradle wrapper), test fixtures, mock servers
-used only in dev.
+used only in dev. Infrastructure-as-Code repositories containing only Terraform,
+Helm charts, or Kustomize overlays without application source code — these are
+deployment descriptors, not running applications. However, workloads DEFINED
+inside these repos (e.g., a StatefulSet deploying Kafka) ARE containers.
 
 AMBIGUOUS CASES
   • Sidecar containers (envoy, istio-proxy): discard — infrastructure, not application
@@ -111,6 +114,44 @@ OUTPUT SCHEMA (strict JSON, every container must appear, null = keep existing):
 # ---------------------------------------------------------------------------
 
 _FEW_SHOT_EXAMPLES: list[dict[str, Any]] = [
+    {
+        "label": "Infrastructure-only repo (discard)",
+        "input": {
+            "repo_context": {
+                "total_containers": 2,
+                "detection_sources": ["helm", "terraform"],
+                "is_infrastructure_only": True,
+            },
+            "container_signals": [
+                {
+                    "name": "ingress-nginx",
+                    "signals": [{"signal_type": "infrastructure-only", "source_file": "helm/ingress-nginx/values.yaml", "attributes": {"deployment": "Helm"}, "confidence": 0.80}],
+                },
+                {
+                    "name": "cert-manager",
+                    "signals": [{"signal_type": "infrastructure-only", "source_file": "terraform/cert_manager.tf", "attributes": {"deployment": "Terraform"}, "confidence": 0.85}],
+                },
+            ],
+            "relationship_signals": [],
+        },
+        "output": {
+            "containers": [
+                {
+                    "name": "ingress-nginx", "verdict": "discard",
+                    "container_type": None, "technology": None, "protocol": None,
+                    "description": None, "confidence": 0.90,
+                    "notes": "Ingress controller is infrastructure; no application source code in repo.",
+                },
+                {
+                    "name": "cert-manager", "verdict": "discard",
+                    "container_type": None, "technology": None, "protocol": None,
+                    "description": None, "confidence": 0.88,
+                    "notes": "Certificate management operator; infrastructure component, not an application container.",
+                },
+            ],
+            "inferred_relationships": [],
+        },
+    },
     {
         "label": "Microservice + MongoDB",
         "input": {
@@ -172,8 +213,13 @@ def _infer_signal_type(container: dict[str, Any]) -> str:
 
     if "terraform" in deployment:
         return "terraform-resource"
-    if deployment in ("helm", "gitops"):
+    if deployment == "helm":
         return "helm-chart"
+    if deployment in ("kustomize", "manifest"):
+        return "kustomize-manifest"
+    if deployment == "gitops":
+        # GitOps repos with no technology hint are likely pure infra overlays
+        return "infrastructure-only" if not tech else "helm-chart"
     if "values.yaml" in path:
         return "helm-values"
     if "/" in tech or (":" in tech and "kubernetes" not in tech):
@@ -211,6 +257,7 @@ def _signal_confidence(signal_type: str) -> float:
         "helm-chart": 0.85,
         "helm-values": 0.80,
         "kustomize-manifest": 0.80,
+        "infrastructure-only": 0.65,
         "filesystem-structure": 0.60,
     }.get(signal_type, 0.70)
 
@@ -278,23 +325,36 @@ def build_evidence_bundle(
             "signals": signals,
         })
 
+    def _rel_direction(rel_type: str) -> str:
+        return "inbound" if rel_type == "subscribes-to" else "outbound"
+
     relationship_signals: list[dict[str, Any]] = [
         {
             "from": r.get("from", ""),
             "to": r.get("to", ""),
             "type": r.get("type", "uses"),
             "protocol": r.get("protocol", ""),
+            "direction": _rel_direction(r.get("type", "uses")),
             "source": r.get("source", ""),
-            "confidence": 0.85,
+            "confidence": r.get("confidence", 0.85),
         }
         for r in relationships
         if r.get("from") and r.get("to")
     ]
 
+    _app_sources = {"compose", "structure"}
+    _infra_sources = {"helm", "terraform", "kustomize", "manifest", "gitops", "infrastructure-only"}
+    is_infrastructure_only = bool(
+        detection_sources
+        and detection_sources.issubset(_infra_sources)
+        and not detection_sources.intersection(_app_sources)
+    )
+
     return {
         "repo_context": {
             "total_containers": len(containers),
             "detection_sources": sorted(detection_sources),
+            "is_infrastructure_only": is_infrastructure_only,
         },
         "container_signals": container_signals,
         "relationship_signals": relationship_signals,

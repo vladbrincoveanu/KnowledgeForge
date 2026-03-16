@@ -6,6 +6,7 @@ from .structure_detector import StructureDetector
 from .compose_detector import ComposeDetector
 from .helm_detector import HelmDetector
 from .terraform_detector import TerraformDetector
+from .kubernetes_detector import KubernetesDetector
 from .utils import is_deployable_service
 from .llm_enrichment import (
     enrich_containers,
@@ -22,6 +23,7 @@ __all__ = [
     'ComposeDetector',
     'HelmDetector',
     'TerraformDetector',
+    'KubernetesDetector',
     'is_deployable_service',
     'enrich_containers',
     'build_evidence_bundle',

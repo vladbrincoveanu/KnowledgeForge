@@ -34,6 +34,11 @@ class BaseContainerDetector(ABC):
                 - runtime_info: Runtime version info
                 - dependencies_internal: List of internal service names
                 - health_endpoint: Health check URL
+                - relationships: List of relationship dicts with keys:
+                    - target: Target container name
+                    - protocol: Communication protocol (HTTP, gRPC, etc.)
+                    - metadata: Dict of source-specific details (e.g., port,
+                      path, network, Helm values key, K8s resource kind)
         """
         pass
     
