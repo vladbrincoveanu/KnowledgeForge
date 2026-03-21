@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from typing import TYPE_CHECKING
 
 import networkx as nx
@@ -67,7 +68,7 @@ class GroupingStrategy:
             # Tier 2b — Louvain fallback
             remainder_components = self._group_with_louvain(remainder, dep_graph)
 
-        return framework_components + remainder_components
+        return self._deduplicate_components(framework_components + remainder_components)
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -101,6 +102,36 @@ class GroupingStrategy:
             comp.extraction_method = ExtractionMethod.LLM_REFINED
             comp.confidence = 0.75
         return components
+
+    @staticmethod
+    def _deduplicate_components(
+        components: list[ComponentObject],
+    ) -> list[ComponentObject]:
+        """Remove elements that appear in multiple components, keeping each only in the highest-confidence one."""
+        # Map each qualified_name to all (component_index, confidence) pairs
+        qname_to_entries: dict[str, list[tuple[int, float]]] = defaultdict(list)
+        for idx, comp in enumerate(components):
+            for element in comp.code_elements:
+                qname_to_entries[element.qualified_name].append((idx, comp.confidence))
+
+        # For duplicates, determine the winning component index (highest confidence)
+        winner: dict[str, int] = {}
+        for qname, entries in qname_to_entries.items():
+            if len(entries) > 1:
+                winner[qname] = max(entries, key=lambda x: x[1])[0]
+
+        if not winner:
+            return components
+
+        result: list[ComponentObject] = []
+        for idx, comp in enumerate(components):
+            comp.code_elements = [
+                e for e in comp.code_elements
+                if winner.get(e.qualified_name, idx) == idx
+            ]
+            if comp.code_elements:
+                result.append(comp)
+        return result
 
     def _group_with_louvain(
         self,

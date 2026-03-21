@@ -1,12 +1,14 @@
 """Provider catalog matching utilities for deterministic dependency resolution."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
 from .provider_catalog_data import RAW_PROVIDER_CATALOG
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class ProviderCatalogEntry:
     """Normalized provider metadata and its detection aliases."""
 
@@ -21,7 +23,7 @@ class ProviderCatalogEntry:
     scheme_aliases: tuple[str, ...] = ()
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class ProviderMatchResult:
     """Explainable provider catalog match result."""
 

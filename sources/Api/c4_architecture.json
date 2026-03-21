@@ -2166,7 +2166,7 @@
       {
         "email": "iulia-georgiana.rinea@tuwien.ac.at",
         "name": "Iulia Rinea",
-        "commit_count": 28
+        "commit_count": 29
       },
       {
         "email": "37401169+vladbrincoveanu@users.noreply.github.com",
@@ -2177,11 +2177,11 @@
     "contributor_count": 4,
     "status": "ACTIVE",
     "status_evidence": {
-      "commits_30d": 37,
-      "commits_90d": 81,
-      "commits_180d": 101,
-      "last_commit_date": "2026-03-16T00:50:16+01:00",
-      "days_since_last_commit": 0,
+      "commits_30d": 33,
+      "commits_90d": 82,
+      "commits_180d": 100,
+      "last_commit_date": "2026-03-16T23:24:17+01:00",
+      "days_since_last_commit": 4,
       "git_repos_scanned": 1
     },
     "tier": "Tier 1 - Production Critical",
@@ -2199,10 +2199,10 @@
       "\u2705 Repository structure",
       "\u274c Dependency management"
     ],
-    "last_commit_date": "2026-03-16T00:50:16+01:00",
-    "commit_count_30d": 37,
-    "commit_count_90d": 81,
-    "commit_count_180d": 101,
+    "last_commit_date": "2026-03-16T23:24:17+01:00",
+    "commit_count_30d": 33,
+    "commit_count_90d": 82,
+    "commit_count_180d": 100,
     "dora_metrics": {
       "deployment_frequency_per_day": 0.0,
       "lead_time_days": null,
@@ -2347,6 +2347,23 @@
       ],
       "kubernetes_kind": "Deployment",
       "kubernetes_namespace": "default",
+      "components": [
+        {
+          "id": "omnipay-settlement-orchestrator::community_detection_settlementrepository",
+          "name": "SettlementRepository",
+          "type": "repository"
+        },
+        {
+          "id": "omnipay-settlement-orchestrator::community_detection_settlement",
+          "name": "Settlement",
+          "type": "component"
+        },
+        {
+          "id": "omnipay-settlement-orchestrator::community_detection_batchapi",
+          "name": "BatchAPI",
+          "type": "controller"
+        }
+      ],
       "llm_description": "omnipay-settlement-orchestrator is a deployable service (Containerized Service, .NET, Kustomize)."
     },
     {
@@ -2422,14 +2439,14 @@
       "relationships": [],
       "components": [
         {
-          "id": "fastapi_omnipay-ml-pipeline",
-          "name": "Omnipay-ml-pipeline",
-          "type": "Component"
+          "id": "omnipay-ml-pipeline::fastapi_model",
+          "name": "Model",
+          "type": "component"
         },
         {
-          "id": "community_detection_omnipay-ml-pipeline",
-          "name": "Omnipay-ml-pipeline",
-          "type": "Component"
+          "id": "omnipay-ml-pipeline::community_detection_loadinfrastructure",
+          "name": "LoadInfrastructure",
+          "type": "component"
         }
       ],
       "llm_description": "omnipay-ml-pipeline is a deployable service (Python Service, Python)."
@@ -2460,14 +2477,14 @@
       "relationships": [],
       "components": [
         {
-          "id": "community_detection_repository",
+          "id": "omnipay-ledger::community_detection_repository",
           "name": "Repository",
-          "type": "Component"
+          "type": "repository"
         },
         {
-          "id": "community_detection_api",
+          "id": "omnipay-ledger::community_detection_api",
           "name": "Api",
-          "type": "Component"
+          "type": "controller"
         }
       ],
       "llm_description": "omnipay-ledger is a deployable service (Java Service, Java)."
@@ -2498,9 +2515,9 @@
       "relationships": [],
       "components": [
         {
-          "id": "community_detection_users",
-          "name": "Users",
-          "type": "Component"
+          "id": "omnipay-fraud-ml::community_detection_scoreapi",
+          "name": "ScoreAPI",
+          "type": "controller"
         }
       ],
       "llm_description": "omnipay-fraud-ml is a deployable service (Python Service, Python)."
@@ -2536,9 +2553,9 @@
       "relationships": [],
       "components": [
         {
-          "id": "community_detection_payments",
+          "id": "omnipay-gateway::nestjs_payments",
           "name": "Payments",
-          "type": "Component"
+          "type": "controller"
         }
       ],
       "llm_description": "omnipay-gateway is a deployable service (Node.js Backend, Node.js)."
@@ -2627,6 +2644,18 @@
           }
         }
       ],
+      "components": [
+        {
+          "id": "omnipay-card-router::community_detection_authorizationsapi",
+          "name": "AuthorizationsAPI",
+          "type": "controller"
+        },
+        {
+          "id": "omnipay-card-router::community_detection_cardapi",
+          "name": "CardAPI",
+          "type": "controller"
+        }
+      ],
       "llm_description": "omnipay-card-router is a deployable service (Containerized Service, .NET)."
     },
     {
@@ -2653,6 +2682,13 @@
       "team": "omnipay/risk-team",
       "owner_team": "omnipay/risk-team",
       "relationships": [],
+      "components": [
+        {
+          "id": "omnipay-disputes::fallback_omnipay-disputes",
+          "name": "DisputesAPI",
+          "type": "controller"
+        }
+      ],
       "llm_description": "omnipay-disputes is a deployable service (Node.js Backend, Node.js)."
     },
     {
@@ -2693,9 +2729,9 @@
       ],
       "components": [
         {
-          "id": "community_detection_omnipay-payment-processor",
-          "name": "Omnipay-payment-processor",
-          "type": "Component"
+          "id": "omnipay-payment-processor::community_detection_paymentapi",
+          "name": "PaymentAPI",
+          "type": "controller"
         }
       ],
       "llm_description": "omnipay-payment-processor is a deployable service (Backend API, Python)."
@@ -2740,9 +2776,9 @@
       "kubernetes_namespace": "default",
       "components": [
         {
-          "id": "community_detection_riskstreams",
-          "name": "Riskstreams",
-          "type": "Component"
+          "id": "omnipay-risk-streams::community_detection_risk",
+          "name": "Risk",
+          "type": "component"
         }
       ],
       "llm_description": "omnipay-risk-streams is a deployable service (Java Service, Java, Kustomize)."
@@ -2785,6 +2821,13 @@
           }
         }
       ],
+      "components": [
+        {
+          "id": "omnipay-analytics::fallback_omnipay-analytics",
+          "name": "AnalyticsAPI",
+          "type": "controller"
+        }
+      ],
       "llm_description": "omnipay-analytics is a deployable service (Node.js Backend, Node.js)."
     },
     {
@@ -2811,6 +2854,13 @@
       "team": null,
       "owner_team": "Vlas",
       "relationships": [],
+      "components": [
+        {
+          "id": "omnipay-auth::fallback_omnipay-auth",
+          "name": "AuthAPI",
+          "type": "controller"
+        }
+      ],
       "llm_description": "omnipay-auth is a deployable service (Node.js Backend, Node.js)."
     },
     {
@@ -2839,14 +2889,14 @@
       "relationships": [],
       "components": [
         {
-          "id": "community_detection_notifier",
-          "name": "Notifier",
-          "type": "Component"
+          "id": "omnipay-notifier::community_detection_component_66e2",
+          "name": "Component_66e2",
+          "type": "component"
         },
         {
-          "id": "community_detection_dispatch",
-          "name": "Dispatch",
-          "type": "Component"
+          "id": "omnipay-notifier::community_detection_receipt",
+          "name": "Receipt",
+          "type": "component"
         }
       ],
       "llm_description": "omnipay-notifier is a deployable service (Go Service, Go)."
@@ -2877,9 +2927,9 @@
       "relationships": [],
       "components": [
         {
-          "id": "fastapi_omnipay-billing-llm",
-          "name": "Omnipay-billing-llm",
-          "type": "Component"
+          "id": "omnipay-billing-llm::fastapi_main",
+          "name": "Main",
+          "type": "component"
         }
       ],
       "llm_description": "omnipay-billing-llm is a deployable service (Python Service, Python)."
@@ -2985,6 +3035,18 @@
       ],
       "kubernetes_kind": "Deployment",
       "kubernetes_namespace": "default",
+      "components": [
+        {
+          "id": "omnipay-event-projections::community_detection_projection",
+          "name": "Projection",
+          "type": "component"
+        },
+        {
+          "id": "omnipay-event-projections::community_detection_projectionapi",
+          "name": "ProjectionAPI",
+          "type": "controller"
+        }
+      ],
       "llm_description": "omnipay-event-projections is a deployable service (Containerized Service, .NET, Kustomize)."
     },
     {
@@ -3013,9 +3075,9 @@
       "relationships": [],
       "components": [
         {
-          "id": "fastapi_omnipay-database",
-          "name": "Omnipay-database",
-          "type": "Component"
+          "id": "omnipay-database::fastapi_main",
+          "name": "Main",
+          "type": "component"
         }
       ],
       "llm_description": "omnipay-database is a deployable service (Python Service, Python)."
@@ -3125,8 +3187,60 @@
     {
       "c4_level": 3,
       "type": "component",
-      "name": "Omnipay-ml-pipeline",
-      "component_type": "Component",
+      "name": "SettlementRepository",
+      "component_type": "repository",
+      "container": "omnipay-settlement-orchestrator",
+      "file": "omnipay-settlement-orchestrator/Program.cs",
+      "documentation": null,
+      "technology": "ASP.NET / Entity Framework",
+      "confidence": 0.5,
+      "extraction_method": "community_detection",
+      "tags": [],
+      "metadata": {
+        "layer": "data_access"
+      },
+      "container_id": "omnipay-settlement-orchestrator",
+      "llm_description": "SettlementRepository is a component within the system."
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "Settlement",
+      "component_type": "component",
+      "container": "omnipay-settlement-orchestrator",
+      "file": "omnipay-settlement-orchestrator/SettlementBatch.cs",
+      "documentation": null,
+      "technology": "C#",
+      "confidence": 0.5,
+      "extraction_method": "community_detection",
+      "tags": [],
+      "metadata": {},
+      "container_id": "omnipay-settlement-orchestrator",
+      "llm_description": "Settlement is a component within the system."
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "BatchAPI",
+      "component_type": "controller",
+      "container": "omnipay-settlement-orchestrator",
+      "file": "omnipay-settlement-orchestrator/SettlementBatchesController.cs",
+      "documentation": null,
+      "technology": "ASP.NET",
+      "confidence": 0.5,
+      "extraction_method": "community_detection",
+      "tags": [],
+      "metadata": {
+        "layer": "presentation"
+      },
+      "container_id": "omnipay-settlement-orchestrator",
+      "llm_description": "BatchAPI is a component within the system."
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "Model",
+      "component_type": "component",
       "container": "omnipay-ml-pipeline",
       "file": "omnipay-ml-pipeline/model.py",
       "documentation": null,
@@ -3136,13 +3250,13 @@
       "tags": [],
       "metadata": {},
       "container_id": "omnipay-ml-pipeline",
-      "llm_description": "Omnipay-ml-pipeline is a component within the system."
+      "llm_description": "Model is a component within the system."
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "Omnipay-ml-pipeline",
-      "component_type": "Component",
+      "name": "LoadInfrastructure",
+      "component_type": "component",
       "container": "omnipay-ml-pipeline",
       "file": "omnipay-ml-pipeline/train.py",
       "documentation": null,
@@ -3154,13 +3268,13 @@
         "layer": "infrastructure"
       },
       "container_id": "omnipay-ml-pipeline",
-      "llm_description": "Omnipay-ml-pipeline is a component within the system."
+      "llm_description": "LoadInfrastructure is a component within the system."
     },
     {
       "c4_level": 3,
       "type": "component",
       "name": "Repository",
-      "component_type": "Component",
+      "component_type": "repository",
       "container": "omnipay-ledger",
       "file": "omnipay-ledger/BalanceRepository.java",
       "documentation": null,
@@ -3178,7 +3292,7 @@
       "c4_level": 3,
       "type": "component",
       "name": "Api",
-      "component_type": "Component",
+      "component_type": "controller",
       "container": "omnipay-ledger",
       "file": "omnipay-ledger/LedgerController.java",
       "documentation": null,
@@ -3195,8 +3309,8 @@
     {
       "c4_level": 3,
       "type": "component",
-      "name": "Users",
-      "component_type": "Component",
+      "name": "ScoreAPI",
+      "component_type": "controller",
       "container": "omnipay-fraud-ml",
       "file": "omnipay-fraud-ml/main.py",
       "documentation": null,
@@ -3208,31 +3322,84 @@
         "layer": "presentation"
       },
       "container_id": "omnipay-fraud-ml",
-      "llm_description": "Users is a component within the system."
+      "llm_description": "ScoreAPI is a component within the system."
     },
     {
       "c4_level": 3,
       "type": "component",
       "name": "Payments",
-      "component_type": "Component",
+      "component_type": "controller",
       "container": "omnipay-gateway",
       "file": "omnipay-gateway/payments.controller.ts",
       "documentation": null,
-      "technology": "Spring",
-      "confidence": 0.5,
-      "extraction_method": "community_detection",
+      "technology": "NestJS",
+      "confidence": 1.0,
+      "extraction_method": "framework_detection",
       "tags": [],
-      "metadata": {
-        "layer": "presentation"
-      },
+      "metadata": {},
       "container_id": "omnipay-gateway",
       "llm_description": "Payments is a component within the system."
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "Omnipay-payment-processor",
-      "component_type": "Component",
+      "name": "AuthorizationsAPI",
+      "component_type": "controller",
+      "container": "omnipay-card-router",
+      "file": "omnipay-card-router/AuthorizationsController.cs",
+      "documentation": null,
+      "technology": "ASP.NET",
+      "confidence": 0.5,
+      "extraction_method": "community_detection",
+      "tags": [],
+      "metadata": {
+        "layer": "presentation"
+      },
+      "container_id": "omnipay-card-router",
+      "llm_description": "AuthorizationsAPI is a component within the system."
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "CardAPI",
+      "component_type": "controller",
+      "container": "omnipay-card-router",
+      "file": "omnipay-card-router/CardRouterDbContext.cs",
+      "documentation": null,
+      "technology": "ASP.NET / Entity Framework",
+      "confidence": 0.5,
+      "extraction_method": "community_detection",
+      "tags": [],
+      "metadata": {
+        "layer": "presentation"
+      },
+      "container_id": "omnipay-card-router",
+      "llm_description": "CardAPI is a component within the system."
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "DisputesAPI",
+      "component_type": "controller",
+      "container": "omnipay-disputes",
+      "file": null,
+      "documentation": null,
+      "technology": "Node.js",
+      "confidence": 0.3,
+      "extraction_method": "community_detection",
+      "tags": [],
+      "metadata": {
+        "fallback": true,
+        "entry_file": "src/index.js"
+      },
+      "container_id": "omnipay-disputes",
+      "llm_description": "DisputesAPI is a component within the system."
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "PaymentAPI",
+      "component_type": "controller",
       "container": "omnipay-payment-processor",
       "file": "omnipay-payment-processor/app.py",
       "documentation": null,
@@ -3244,13 +3411,13 @@
         "layer": "presentation"
       },
       "container_id": "omnipay-payment-processor",
-      "llm_description": "Omnipay-payment-processor is a component within the system."
+      "llm_description": "PaymentAPI is a component within the system."
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "Riskstreams",
-      "component_type": "Component",
+      "name": "Risk",
+      "component_type": "component",
       "container": "omnipay-risk-streams",
       "file": "omnipay-risk-streams/RiskStreamsApplication.java",
       "documentation": null,
@@ -3260,13 +3427,51 @@
       "tags": [],
       "metadata": {},
       "container_id": "omnipay-risk-streams",
-      "llm_description": "Riskstreams is a component within the system."
+      "llm_description": "Risk is a component within the system."
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "Notifier",
-      "component_type": "Component",
+      "name": "AnalyticsAPI",
+      "component_type": "controller",
+      "container": "omnipay-analytics",
+      "file": null,
+      "documentation": null,
+      "technology": "Node.js",
+      "confidence": 0.3,
+      "extraction_method": "community_detection",
+      "tags": [],
+      "metadata": {
+        "fallback": true,
+        "entry_file": "src/index.js"
+      },
+      "container_id": "omnipay-analytics",
+      "llm_description": "AnalyticsAPI is a component within the system."
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "AuthAPI",
+      "component_type": "controller",
+      "container": "omnipay-auth",
+      "file": null,
+      "documentation": null,
+      "technology": "Node.js",
+      "confidence": 0.3,
+      "extraction_method": "community_detection",
+      "tags": [],
+      "metadata": {
+        "fallback": true,
+        "entry_file": "src/index.js"
+      },
+      "container_id": "omnipay-auth",
+      "llm_description": "AuthAPI is a component within the system."
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "Component_66e2",
+      "component_type": "component",
       "container": "omnipay-notifier",
       "file": "omnipay-notifier/main.go",
       "documentation": null,
@@ -3276,13 +3481,13 @@
       "tags": [],
       "metadata": {},
       "container_id": "omnipay-notifier",
-      "llm_description": "Notifier is a component within the system."
+      "llm_description": "Component_66e2 is a component within the system."
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "Dispatch",
-      "component_type": "Component",
+      "name": "Receipt",
+      "component_type": "component",
       "container": "omnipay-notifier",
       "file": "omnipay-notifier/receipt_dispatcher.go",
       "documentation": null,
@@ -3292,13 +3497,13 @@
       "tags": [],
       "metadata": {},
       "container_id": "omnipay-notifier",
-      "llm_description": "Dispatch is a component within the system."
+      "llm_description": "Receipt is a component within the system."
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "Omnipay-billing-llm",
-      "component_type": "Component",
+      "name": "Main",
+      "component_type": "component",
       "container": "omnipay-billing-llm",
       "file": "omnipay-billing-llm/main.py",
       "documentation": null,
@@ -3308,13 +3513,47 @@
       "tags": [],
       "metadata": {},
       "container_id": "omnipay-billing-llm",
-      "llm_description": "Omnipay-billing-llm is a component within the system."
+      "llm_description": "Main is a component within the system."
     },
     {
       "c4_level": 3,
       "type": "component",
-      "name": "Omnipay-database",
-      "component_type": "Component",
+      "name": "Projection",
+      "component_type": "component",
+      "container": "omnipay-event-projections",
+      "file": "omnipay-event-projections/Program.cs",
+      "documentation": null,
+      "technology": "C#",
+      "confidence": 0.5,
+      "extraction_method": "community_detection",
+      "tags": [],
+      "metadata": {},
+      "container_id": "omnipay-event-projections",
+      "llm_description": "Projection is a component within the system."
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "ProjectionAPI",
+      "component_type": "controller",
+      "container": "omnipay-event-projections",
+      "file": "omnipay-event-projections/ProjectionController.cs",
+      "documentation": null,
+      "technology": "ASP.NET",
+      "confidence": 0.5,
+      "extraction_method": "community_detection",
+      "tags": [],
+      "metadata": {
+        "layer": "presentation"
+      },
+      "container_id": "omnipay-event-projections",
+      "llm_description": "ProjectionAPI is a component within the system."
+    },
+    {
+      "c4_level": 3,
+      "type": "component",
+      "name": "Main",
+      "component_type": "component",
       "container": "omnipay-database",
       "file": "omnipay-database/main.py",
       "documentation": null,
@@ -3324,7 +3563,7 @@
       "tags": [],
       "metadata": {},
       "container_id": "omnipay-database",
-      "llm_description": "Omnipay-database is a component within the system."
+      "llm_description": "Main is a component within the system."
     }
   ],
   "relationships": {
@@ -3579,7 +3818,7 @@
   },
   "metadata": {
     "total_containers": 22,
-    "total_components": 12,
+    "total_components": 22,
     "extraction_approach": "c4_model",
     "runtime": {
       "platform": "Unknown",

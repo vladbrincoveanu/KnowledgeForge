@@ -141,9 +141,20 @@ class C4ArchitectureExtractor:
         # Second pass: LLM enrichment (no-op when llm_manager is None)
         self.container_manager.enrich_containers_with_llm()
 
+    # Container types that are infrastructure — no components expected
+    _INFRA_CONTAINER_TYPES = frozenset({
+        "Database", "Cache", "Message Broker",
+        "Helm Deployed Service",
+    })
+
     def _extract_level3_components(self) -> None:
         """Extract Level 3: Components using ComponentExtractor (tree-sitter + graph + grouping)."""
         for container_name, container in self.containers.items():
+            # Skip infra containers that have no application code
+            ctype = container.get("container_type", "")
+            if ctype in self._INFRA_CONTAINER_TYPES:
+                continue
+
             container_rel_path = container.get("path", "")
             container_abs_path = str(self.repo_path / container_rel_path) if container_rel_path else str(self.repo_path)
 
@@ -153,9 +164,63 @@ class C4ArchitectureExtractor:
                 logger.warning("ComponentExtractor failed for container '%s': %s", container_name, exc)
                 component_objects = []
 
+            # Fallback: if no components were extracted but the container has
+            # source files, create a single entry-point component so the
+            # container isn't invisible at Level 3.
+            if not component_objects:
+                fallback = self._create_fallback_component(
+                    container_name, container_rel_path, container_abs_path, container,
+                )
+                if fallback:
+                    component_objects = [fallback]
+
             for obj in component_objects:
                 comp_dict = self._component_object_to_dict(obj, container_name, container_rel_path)
-                self.components[obj.component_id] = comp_dict
+                # Namespace component IDs by container to avoid cross-container collisions
+                unique_id = f"{container_name}::{obj.component_id}"
+                self.components[unique_id] = comp_dict
+
+    def _create_fallback_component(
+        self, container_name: str, container_rel_path: str,
+        container_abs_path: str, container: dict,
+    ) -> "ComponentObject | None":
+        """Create a single fallback component from the entry-point file."""
+        from app.services.c4.components.models import (
+            ComponentObject, ComponentType, ExtractionMethod,
+        )
+        # Look for common entry-point files
+        entry_candidates = [
+            "main.py", "app.py", "server.py", "index.js", "index.ts",
+            "main.go", "Main.java", "Program.cs", "Startup.cs",
+            "src/index.js", "src/index.ts", "src/main.ts", "src/app.ts",
+            "src/server.ts", "src/server.js", "cmd/main.go",
+        ]
+        entry_file = None
+        for candidate in entry_candidates:
+            full = Path(container_abs_path) / candidate
+            if full.exists():
+                entry_file = candidate
+                break
+
+        if not entry_file:
+            return None
+
+        # Derive a readable name from the container name
+        # e.g. "omnipay-disputes" → "Disputes"
+        parts = container_name.split("-")
+        # Use last meaningful segment
+        name = parts[-1].capitalize() if len(parts) > 1 else parts[0].capitalize()
+
+        return ComponentObject(
+            component_id=f"fallback_{container_name}",
+            name=f"{name}API",
+            technology=container.get("technology", "Unknown"),
+            component_type=ComponentType.CONTROLLER,
+            extraction_method=ExtractionMethod.COMMUNITY_DETECTION,
+            confidence=0.3,
+            code_elements=[],
+            metadata={"fallback": True, "entry_file": entry_file},
+        )
 
     def _component_object_to_dict(self, obj: ComponentObject, container_name: str, container_rel_path: str) -> dict:
         """Convert a ComponentObject to the dict format used in the C4 output."""
@@ -172,7 +237,7 @@ class C4ArchitectureExtractor:
             "c4_level": 3,
             "type": "component",
             "name": obj.name,
-            "component_type": obj.tags[0].title() if obj.tags else "Component",
+            "component_type": obj.component_type.value if obj.component_type else "Component",
             "container": container_name,
             "file": file_path,
             "documentation": obj.description or None,

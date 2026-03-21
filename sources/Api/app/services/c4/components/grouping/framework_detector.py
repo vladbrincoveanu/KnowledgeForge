@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import re
 from abc import ABC, abstractmethod
-from collections import defaultdict
+from collections import Counter, defaultdict
 
 from app.services.c4.components.models import (
     CodeElement,
     ComponentObject,
     ComponentRelationship,
+    ComponentType,
     ExtractionMethod,
     FrameworkResult,
 )
@@ -27,6 +28,12 @@ _ROLE_SUFFIXES = re.compile(
 _CONTROLLER_ANNOTATIONS = frozenset({"Controller", "RestController"})
 _SERVICE_ANNOTATIONS = frozenset({"Service"})
 _REPOSITORY_ANNOTATIONS = frozenset({"Repository"})
+
+_ROLE_TO_COMPONENT_TYPE: dict[str, ComponentType] = {
+    "controller": ComponentType.CONTROLLER,
+    "service": ComponentType.SERVICE,
+    "repository": ComponentType.REPOSITORY,
+}
 
 
 def _domain(qualified_name: str) -> str:
@@ -49,6 +56,8 @@ def _element_role(element: CodeElement) -> str:
 
 
 def _has_spring(element: CodeElement) -> bool:
+    if element.language not in ("java", "kotlin"):
+        return False
     return bool(set(element.annotations) & SPRING_ANNOTATIONS)
 
 
@@ -78,10 +87,17 @@ def _is_fastapi_element(element: CodeElement) -> bool:
 
 
 def _fastapi_group_key(element: CodeElement) -> str:
-    """Return the directory name for grouping FastAPI elements."""
+    """Return a meaningful group key for FastAPI elements.
+
+    Uses the file stem (without extension) rather than the directory name
+    when the parent directory looks like a project root (contains hyphens).
+    """
     import os
-    return os.path.basename(os.path.dirname(element.file_path)) or \
-           os.path.splitext(os.path.basename(element.file_path))[0]
+    dir_name = os.path.basename(os.path.dirname(element.file_path))
+    file_stem = os.path.splitext(os.path.basename(element.file_path))[0]
+    if not dir_name or "-" in dir_name:
+        return file_stem
+    return dir_name
 
 
 class FrameworkMatcher(ABC):
@@ -136,11 +152,16 @@ class SpringPatternMatcher(FrameworkMatcher):
             roles = {_element_role(e) for e in elems}
             domain_roles[domain] = roles
 
+            role_counts = Counter(_element_role(e) for e in elems)
+            dominant_role, _ = role_counts.most_common(1)[0]
+            component_type = _ROLE_TO_COMPONENT_TYPE.get(dominant_role, ComponentType.COMPONENT)
+
             local_confidence = self.detect(elems)
             component = ComponentObject(
                 component_id=f"spring_{domain.lower()}",
                 name=domain,
                 technology="Spring",
+                component_type=component_type,
                 extraction_method=ExtractionMethod.FRAMEWORK_DETECTION,
                 confidence=local_confidence,
                 code_elements=elems,
@@ -279,6 +300,128 @@ class FastAPIPatternMatcher(FrameworkMatcher):
         )
 
 
+# ---------------------------------------------------------------------------
+# NestJS / Express helpers
+# ---------------------------------------------------------------------------
+
+_NESTJS_DECORATORS: frozenset[str] = frozenset({
+    "Controller", "Injectable", "Guard", "Interceptor", "Pipe",
+})
+
+_EXPRESS_IMPORT_PATTERN = re.compile(r'\bexpress\b')
+
+_TS_JS_LANGUAGES = frozenset({"typescript", "tsx", "javascript"})
+
+
+def _is_nestjs_element(element: CodeElement) -> bool:
+    if element.language not in _TS_JS_LANGUAGES:
+        return False
+    return bool(set(element.annotations) & _NESTJS_DECORATORS)
+
+
+def _is_express_element(element: CodeElement) -> bool:
+    if element.language not in _TS_JS_LANGUAGES:
+        return False
+    return any(_EXPRESS_IMPORT_PATTERN.search(imp) for imp in element.imports)
+
+
+def _nestjs_role(element: CodeElement) -> str:
+    ann = set(element.annotations)
+    name = element.qualified_name.rsplit(".", 1)[-1]
+    if "Controller" in ann:
+        return "controller"
+    if "Injectable" in ann:
+        if name.endswith("Service"):
+            return "service"
+        if name.endswith("Repository"):
+            return "repository"
+    return "other"
+
+
+class NestJSExpressPatternMatcher(FrameworkMatcher):
+    @property
+    def name(self) -> str:
+        return "NestJSExpressPatternMatcher"
+
+    def detect(self, elements: list[CodeElement]) -> float:
+        if not elements:
+            return 0.0
+        ts_js = [e for e in elements if e.language in _TS_JS_LANGUAGES]
+        if not ts_js:
+            return 0.0
+        matching = sum(
+            1 for e in ts_js if _is_nestjs_element(e) or _is_express_element(e)
+        )
+        return matching / len(ts_js)
+
+    def group(self, elements: list[CodeElement]) -> FrameworkResult:
+        import os
+
+        nestjs_elements = [e for e in elements if _is_nestjs_element(e)]
+        express_elements = [
+            e for e in elements
+            if _is_express_element(e) and not _is_nestjs_element(e)
+        ]
+        matched_paths = (
+            {e.file_path for e in nestjs_elements} |
+            {e.file_path for e in express_elements}
+        )
+        ungrouped = [e for e in elements if e.file_path not in matched_paths]
+
+        components: list[ComponentObject] = []
+
+        # NestJS: group by directory
+        dir_elements: dict[str, list[CodeElement]] = defaultdict(list)
+        for e in nestjs_elements:
+            dir_name = os.path.basename(os.path.dirname(e.file_path))
+            file_stem = os.path.splitext(os.path.basename(e.file_path))[0]
+            key = file_stem if (not dir_name or "-" in dir_name) else dir_name
+            dir_elements[key].append(e)
+
+        for key, elems in dir_elements.items():
+            local_confidence = sum(
+                1 for e in elems if _is_nestjs_element(e)
+            ) / len(elems)
+            role_counts = Counter(_nestjs_role(e) for e in elems)
+            dominant_role, _ = role_counts.most_common(1)[0]
+            component_type = _ROLE_TO_COMPONENT_TYPE.get(dominant_role, ComponentType.COMPONENT)
+            components.append(ComponentObject(
+                component_id=f"nestjs_{key.lower()}",
+                name=key.capitalize(),
+                technology="NestJS",
+                component_type=component_type,
+                extraction_method=ExtractionMethod.FRAMEWORK_DETECTION,
+                confidence=local_confidence,
+                code_elements=elems,
+            ))
+
+        # Express: group by file
+        file_elements: dict[str, list[CodeElement]] = defaultdict(list)
+        for e in express_elements:
+            key = os.path.splitext(os.path.basename(e.file_path))[0]
+            file_elements[key].append(e)
+
+        for key, elems in file_elements.items():
+            local_confidence = sum(
+                1 for e in elems if _is_express_element(e)
+            ) / len(elems)
+            components.append(ComponentObject(
+                component_id=f"express_{key.lower()}",
+                name=key.capitalize(),
+                technology="Express",
+                component_type=ComponentType.COMPONENT,
+                extraction_method=ExtractionMethod.FRAMEWORK_DETECTION,
+                confidence=local_confidence,
+                code_elements=elems,
+            ))
+
+        return FrameworkResult(
+            detector_name="NestJSExpressPatternMatcher",
+            components=components,
+            ungrouped_elements=ungrouped,
+        )
+
+
 class FrameworkDetectorRegistry:
     _CONFIDENCE_THRESHOLD = 0.5
 
@@ -287,6 +430,7 @@ class FrameworkDetectorRegistry:
             SpringPatternMatcher(),
             DjangoPatternMatcher(),
             FastAPIPatternMatcher(),
+            NestJSExpressPatternMatcher(),
         ]
 
     def detect(self, elements: list[CodeElement]) -> FrameworkResult | None:

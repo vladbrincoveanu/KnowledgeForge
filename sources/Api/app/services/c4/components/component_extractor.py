@@ -3,6 +3,7 @@ from typing import Optional
 
 from app.services.c4.components.parsing.tree_sitter_parser import TreeSitterParser
 from app.services.c4.components.parsing.visitors.python_visitor import PythonVisitor
+from app.services.c4.components.parsing.visitors.csharp_visitor import CSharpVisitor
 from app.services.c4.components.parsing.visitors.go_visitor import GoVisitor
 from app.services.c4.components.parsing.visitors.java_visitor import JavaVisitor
 from app.services.c4.components.parsing.visitors.typescript_visitor import TypeScriptVisitor
@@ -15,7 +16,7 @@ from app.services.c4.components.models import CodeElement, ComponentObject
 logger = logging.getLogger(__name__)
 
 _VISITORS: dict = {}
-for _v in [PythonVisitor(), GoVisitor(), JavaVisitor(), TypeScriptVisitor()]:
+for _v in [PythonVisitor(), CSharpVisitor(), GoVisitor(), JavaVisitor(), TypeScriptVisitor()]:
     for _lang in _v.supported_languages:
         _VISITORS[_lang] = _v
 

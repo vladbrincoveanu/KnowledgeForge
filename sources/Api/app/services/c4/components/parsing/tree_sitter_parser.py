@@ -24,7 +24,7 @@ class TreeSitterParser:
         ".tsx": "tsx",
         ".js": "javascript",
         ".go": "go",
-        ".cs": "c_sharp",
+        ".cs": "csharp",
         ".rs": "rust",
         ".kt": "kotlin",
         ".rb": "ruby",

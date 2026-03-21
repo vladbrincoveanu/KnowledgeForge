@@ -11,6 +11,7 @@ from ..models import (
     ArchitecturalLayer,
     CodeElement,
     ComponentObject,
+    ComponentType,
     DependencyEdge,
     ExtractionMethod,
 )
@@ -233,10 +234,17 @@ class LLMComponentService:
         element_names: list[str] = data.get("element_names") or []
         code_elements = [element_map[n] for n in element_names if n in element_map]
 
+        raw_type = data.get("component_type", "")
+        try:
+            component_type = ComponentType(raw_type)
+        except ValueError:
+            component_type = ComponentType.COMPONENT
+
         return ComponentObject(
             component_id=component_id,
             name=name,
             description=data.get("description", ""),
+            component_type=component_type,
             confidence=0.8,
             extraction_method=ExtractionMethod.HYBRID,
             code_elements=code_elements,

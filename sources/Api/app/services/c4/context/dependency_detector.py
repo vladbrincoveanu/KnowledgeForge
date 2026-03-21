@@ -1,5 +1,7 @@
 """External dependency detection for C4 Context level."""
 
+from __future__ import annotations
+
 import json
 import logging
 import re

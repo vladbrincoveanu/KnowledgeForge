@@ -22,7 +22,7 @@ class ReviewStatus(str, Enum):
     REJECTED = "rejected"
 
 
-@dataclass(slots=True)
+@dataclass
 class EvidenceItem:
     """A single evidence item supporting an extracted value."""
 
@@ -35,7 +35,7 @@ class EvidenceItem:
         return asdict(self)
 
 
-@dataclass(slots=True)
+@dataclass
 class ExtractionDecision:
     """Shared extraction result payload for context fields."""
 
@@ -56,7 +56,7 @@ class ExtractionDecision:
         return data
 
 
-@dataclass(slots=True)
+@dataclass
 class ReviewItem:
     """Review queue item for ambiguous or conflicting extractions."""
 

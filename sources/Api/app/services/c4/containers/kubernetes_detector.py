@@ -1,5 +1,7 @@
 """Kubernetes manifest container detector (raw YAML and Kustomize)."""
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
 from typing import Any

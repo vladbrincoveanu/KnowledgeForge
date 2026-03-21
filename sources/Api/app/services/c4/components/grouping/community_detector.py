@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 from collections import Counter, defaultdict
 
 import community as community_louvain
 import networkx as nx
 
 from app.services.c4.components.models import (
+    ArchitecturalLayer,
     CodeElement,
     ComponentObject,
     ExtractionMethod,
@@ -18,6 +20,12 @@ from app.services.c4.components.models import (
 _GENERIC_TOKENS = frozenset({
     "impl", "base", "util", "service", "helper", "handler",
     "manager", "factory", "builder", "abstract", "common",
+    # Java/C# package prefixes and ubiquitous tokens
+    "com", "org", "net", "main", "app", "src", "lib", "pkg",
+    "internal", "model", "models", "config", "test", "tests",
+    "core", "server", "client", "program", "startup", "index",
+    "users", "module", "modules", "controllers", "services",
+    "repositories", "api", "web", "data",
 })
 
 
@@ -134,6 +142,8 @@ class CommunityDetector:
         if not elements:
             return "Component"
 
+        base_name: str | None = None
+
         # --- Directory strategy ---
         dir_names: list[str] = []
         for e in elements:
@@ -142,26 +152,63 @@ class CommunityDetector:
                 dir_names.append(parent.lower())
 
         if dir_names:
-            most_common_dir, dir_count = Counter(dir_names).most_common(1)[0]
-            if dir_count / len(elements) > 0.5 and len(most_common_dir) > 2:
-                return most_common_dir.capitalize()
+            dir_counter = Counter(dir_names)
+            most_common_dir, dir_count = dir_counter.most_common(1)[0]
+            # Only use directory name when it actually discriminates among
+            # elements.  When every element lives in the same directory (e.g.
+            # the container root) the name carries no information.
+            has_variety = len(dir_counter) > 1
+            # Skip directory names that look like project/container roots
+            # (contain hyphens, e.g. "omnipay-settlement-orchestrator").
+            looks_like_project = "-" in most_common_dir
+            if has_variety and not looks_like_project and dir_count / len(elements) > 0.5 and len(most_common_dir) > 2:
+                base_name = most_common_dir.capitalize()
 
-        # --- Qualified-name token strategy ---
-        tokens: list[str] = []
-        for e in elements:
-            for part in e.qualified_name.replace("_", ".").split("."):
-                token = part.lower()
-                if len(token) > 2 and token not in _GENERIC_TOKENS:
-                    tokens.append(token)
+        # --- Symbol-name token strategy ---
+        # Use only the leaf symbol name (class/function), not path segments
+        # which pollute with directory names and usernames.
+        if base_name is None:
+            tokens: list[str] = []
+            for e in elements:
+                # Last segment of qualified name is the symbol itself
+                symbol = e.qualified_name.rsplit(".", 1)[-1]
+                # Split CamelCase and snake_case into meaningful tokens
+                parts = re.sub(r"([a-z])([A-Z])", r"\1_\2", symbol).split("_")
+                for part in parts:
+                    token = part.lower()
+                    if len(token) > 2 and token not in _GENERIC_TOKENS:
+                        tokens.append(token)
 
-        if tokens:
-            most_common_token, _ = Counter(tokens).most_common(1)[0]
-            return most_common_token.capitalize()
+            if tokens:
+                most_common_token, _ = Counter(tokens).most_common(1)[0]
+                base_name = most_common_token.capitalize()
 
         # --- Fallback: stable hash of sorted element names ---
-        key = "_".join(sorted(e.qualified_name for e in elements))
-        short_hash = hashlib.md5(key.encode()).hexdigest()[:4]
-        return f"Component_{short_hash}"
+        if base_name is None:
+            key = "_".join(sorted(e.qualified_name for e in elements))
+            short_hash = hashlib.md5(key.encode()).hexdigest()[:4]
+            return f"Component_{short_hash}"
+
+        suffix = self._layer_suffix(elements)
+        if suffix and not base_name.lower().endswith(suffix.lower()):
+            return f"{base_name}{suffix}"
+        return base_name
+
+    @staticmethod
+    def _layer_suffix(elements: list[CodeElement]) -> str:
+        """Return a role suffix based on the dominant architectural layer."""
+        layer_counts = Counter(
+            e.layer for e in elements if e.layer != ArchitecturalLayer.UNKNOWN
+        )
+        if not layer_counts:
+            return ""
+        dominant = layer_counts.most_common(1)[0][0]
+        return {
+            ArchitecturalLayer.PRESENTATION: "API",
+            ArchitecturalLayer.BUSINESS: "Service",
+            ArchitecturalLayer.DATA_ACCESS: "Repository",
+            ArchitecturalLayer.INFRASTRUCTURE: "Infrastructure",
+        }.get(dominant, "")
 
     def to_components(
         self, groups: list[list[CodeElement]]

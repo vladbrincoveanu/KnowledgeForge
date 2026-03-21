@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import re
 from collections import Counter
 
 from app.services.c4.components.models import (
@@ -9,6 +11,7 @@ from app.services.c4.components.models import (
     CodeElement,
     CodeElementKind,
     ComponentObject,
+    ComponentType,
     ExtractionMethod,
 )
 from .community_detector import CommunityDetector
@@ -19,6 +22,27 @@ _SPRING_ANNOTATIONS = frozenset({
 })
 _DJANGO_FILE_PATTERNS = frozenset({"models.py", "views.py", "serializers.py"})
 _FASTAPI_IMPORTS = frozenset({"fastapi", "APIRouter"})
+
+_ASPNET_ANNOTATIONS = frozenset({
+    "ApiController", "Controller",
+    "HttpGet", "HttpPost", "HttpPut", "HttpDelete", "HttpPatch", "Authorize",
+})
+_DBCONTEXT_BASE = "DbContext"
+
+_NESTJS_DECORATORS = frozenset({"Controller", "Injectable", "Guard", "Interceptor", "Pipe"})
+_EXPRESS_IMPORT_RE = re.compile(r'\bexpress\b')
+
+_LAYER_TO_COMPONENT_TYPE: dict[ArchitecturalLayer, ComponentType] = {
+    ArchitecturalLayer.PRESENTATION: ComponentType.CONTROLLER,
+    ArchitecturalLayer.BUSINESS: ComponentType.SERVICE,
+    ArchitecturalLayer.DATA_ACCESS: ComponentType.REPOSITORY,
+    ArchitecturalLayer.INFRASTRUCTURE: ComponentType.COMPONENT,
+}
+_ROLE_TO_COMPONENT_TYPE: dict[str, ComponentType] = {
+    "controller": ComponentType.CONTROLLER,
+    "service": ComponentType.SERVICE,
+    "repository": ComponentType.REPOSITORY,
+}
 
 _community_detector = CommunityDetector()
 
@@ -33,6 +57,7 @@ class ComponentBuilder:
     ) -> ComponentObject:
         name = _community_detector.name_cluster(group)
         technology = self._infer_technology(group)
+        component_type = self._infer_component_type(group)
         layer = self._infer_layer(group)
         interfaces = [
             e.qualified_name
@@ -52,6 +77,7 @@ class ComponentBuilder:
             component_id=component_id,
             name=name,
             technology=technology,
+            component_type=component_type,
             extraction_method=method,
             confidence=confidence,
             code_elements=group,
@@ -63,30 +89,58 @@ class ComponentBuilder:
     # ------------------------------------------------------------------
 
     def _infer_technology(self, group: list[CodeElement]) -> str:
-        # Spring: any element has a Spring annotation
-        for element in group:
-            if any(ann in _SPRING_ANNOTATIONS for ann in element.annotations):
-                return "Spring"
-
-        # Django: file name matches known Django patterns
-        for element in group:
-            import os
-            filename = os.path.basename(element.file_path)
-            if filename in _DJANGO_FILE_PATTERNS:
-                return "Django"
-
-        # FastAPI: imports contain fastapi or APIRouter
-        for element in group:
-            if any(imp in _FASTAPI_IMPORTS for imp in element.imports):
-                return "FastAPI"
-
-        # Fallback: dominant language title-cased
         languages = [e.language for e in group if e.language]
-        if languages:
-            dominant, _ = Counter(languages).most_common(1)[0]
-            return dominant.title()
+        if not languages:
+            return ""
+        dominant_lang, _ = Counter(languages).most_common(1)[0]
 
-        return ""
+        if dominant_lang in ("java", "kotlin"):
+            if any(ann in _SPRING_ANNOTATIONS for e in group for ann in e.annotations):
+                return "Spring"
+            return dominant_lang.title()
+
+        if dominant_lang == "csharp":
+            has_aspnet = any(ann in _ASPNET_ANNOTATIONS for e in group for ann in e.annotations)
+            has_dbcontext = any(_DBCONTEXT_BASE in bc for e in group for bc in e.base_classes)
+            if has_dbcontext:
+                return "ASP.NET / Entity Framework"
+            if has_aspnet:
+                return "ASP.NET"
+            return "C#"
+
+        if dominant_lang in ("typescript", "tsx"):
+            if any(ann in _NESTJS_DECORATORS for e in group for ann in e.annotations):
+                return "NestJS"
+            return dominant_lang.title()
+
+        if dominant_lang == "javascript":
+            if any(_EXPRESS_IMPORT_RE.search(imp) for e in group for imp in e.imports):
+                return "Express"
+            return "JavaScript"
+
+        if dominant_lang == "python":
+            for element in group:
+                if os.path.basename(element.file_path) in _DJANGO_FILE_PATTERNS:
+                    return "Django"
+            for element in group:
+                if any(imp in _FASTAPI_IMPORTS for imp in element.imports):
+                    return "FastAPI"
+            return "Python"
+
+        return dominant_lang.title()
+
+    def _infer_component_type(self, group: list[CodeElement]) -> ComponentType:
+        votes: list[ComponentType] = []
+        for element in group:
+            ct = _LAYER_TO_COMPONENT_TYPE.get(element.layer)
+            if ct is not None:
+                votes.append(ct)
+            if element.role in _ROLE_TO_COMPONENT_TYPE:
+                votes.append(_ROLE_TO_COMPONENT_TYPE[element.role])
+        if votes:
+            dominant, _ = Counter(votes).most_common(1)[0]
+            return dominant
+        return ComponentType.COMPONENT
 
     def _infer_layer(self, group: list[CodeElement]) -> ArchitecturalLayer:
         layers = [

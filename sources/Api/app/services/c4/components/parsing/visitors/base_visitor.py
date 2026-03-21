@@ -54,6 +54,10 @@ class BaseVisitor(ABC):
             base = os.path.splitext(normalized)[0]
             return f"{base.replace('/', '.')}.{element_name}"
 
+        if ext == ".cs":
+            if package:
+                return f"{package}.{element_name}"
+
         base = os.path.splitext(normalized)[0]
         return f"{base.replace('/', '.')}.{element_name}"
 

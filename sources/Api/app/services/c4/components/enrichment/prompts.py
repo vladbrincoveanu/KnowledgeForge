@@ -93,6 +93,17 @@ A C4 component is a grouping of related code that:
   - Would be deployed or versioned together
   - Can be described in one sentence
 
+Component types (pick the single best fit):
+  controller    — handles HTTP requests, routes, or user input entry points
+  service       — encapsulates business logic and orchestrates operations
+  repository    — abstracts data persistence (DB queries, ORM, DAOs)
+  handler       — processes events, messages, or commands
+  gateway       — integrates with external systems, APIs, or message brokers
+  engine        — performs heavy computation, algorithms, or processing pipelines
+  middleware    — cross-cutting interceptors (auth, logging, error handling)
+  configuration — configuration loading, environment parsing, or wiring
+  component     — general-purpose component that does not fit a more specific type
+
 Component roles mirror element roles but at a coarser grain:
   controller, service, repository, engine, gateway, adapter, util, config, other
 
@@ -127,6 +138,8 @@ Guidelines:
 Return a JSON array where each object has exactly these fields:
   name                — short, domain-meaningful component name (string)
   description         — one sentence describing what this component does (string)
+  component_type      — one of: controller, service, repository, handler, gateway,
+                        engine, middleware, configuration, component
   role                — one of: controller, service, repository, engine, gateway,
                         adapter, util, config, other
   layer               — one of: presentation, business, data_access, infrastructure, unknown
@@ -162,6 +175,17 @@ correct its mistakes:
 Apply the same C4 component criteria as always:
   single bounded responsibility, high internal cohesion, low external coupling.
 
+Component types (pick the single best fit for each component):
+  controller    — handles HTTP requests, routes, or user input entry points
+  service       — encapsulates business logic and orchestrates operations
+  repository    — abstracts data persistence (DB queries, ORM, DAOs)
+  handler       — processes events, messages, or commands
+  gateway       — integrates with external systems, APIs, or message brokers
+  engine        — performs heavy computation, algorithms, or processing pipelines
+  middleware    — cross-cutting interceptors (auth, logging, error handling)
+  configuration — configuration loading, environment parsing, or wiring
+  component     — general-purpose component that does not fit a more specific type
+
 Respond ONLY with a JSON array. No markdown, no explanation, no code fences.\
 """
 
@@ -183,6 +207,8 @@ Every element must appear in exactly one component in your output.
 Return a JSON array where each object has exactly these fields:
   name                — short, domain-meaningful component name (string)
   description         — one sentence describing what this component does (string)
+  component_type      — one of: controller, service, repository, handler, gateway,
+                        engine, middleware, configuration, component
   role                — one of: controller, service, repository, engine, gateway,
                         adapter, util, config, other
   layer               — one of: presentation, business, data_access, infrastructure, unknown
