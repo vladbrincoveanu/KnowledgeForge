@@ -84,6 +84,14 @@ def get_config() -> ConfigNamespace:
             "max_retries": 3,
             "use_embeddings": False,
         },
+        "llm": {
+            "provider": "lmstudio",
+            "base_url": "http://localhost:1234/v1",
+            "model_name": "local-model",
+            "api_key": "",
+            "max_retries": 3,
+            "use_embeddings": False,
+        },
         "extraction": {
             "confidence_threshold": 0.7,
             "relationship_threshold": 0.6,
@@ -139,6 +147,13 @@ def get_config() -> ConfigNamespace:
     lmstudio["base_url"] = os.getenv("LMSTUDIO_BASE_URL", lmstudio.get("base_url", ""))
     lmstudio["model_name"] = os.getenv("LMSTUDIO_MODEL", lmstudio.get("model_name", ""))
     merged["lmstudio"] = lmstudio
+
+    llm = merged.get("llm", {})
+    llm["provider"] = os.getenv("LLM_PROVIDER", llm.get("provider", "lmstudio"))
+    llm["base_url"] = os.getenv("LLM_BASE_URL", llm.get("base_url", "http://localhost:1234/v1"))
+    llm["model_name"] = os.getenv("LLM_MODEL", llm.get("model_name", "local-model"))
+    llm["api_key"] = os.getenv("LLM_API_KEY", llm.get("api_key", ""))
+    merged["llm"] = llm
 
     _CONFIG = _to_namespace(merged)
     assert _CONFIG is not None

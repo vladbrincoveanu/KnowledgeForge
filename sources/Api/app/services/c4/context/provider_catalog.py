@@ -113,13 +113,19 @@ def _select_best_match(
 
 
 def _host_from_url(url: str) -> str:
-    parsed = urlparse(url)
-    host = parsed.netloc or parsed.path
-    return host.lower()
+    try:
+        parsed = urlparse(url)
+        host = parsed.netloc or parsed.path
+        return host.lower()
+    except ValueError:
+        return ""
 
 
 def _scheme_from_url(url: str) -> str:
-    return urlparse(url).scheme.lower()
+    try:
+        return urlparse(url).scheme.lower()
+    except ValueError:
+        return ""
 
 
 def validate_provider_catalog(

@@ -7,18 +7,26 @@ import logging
 import re
 from typing import Any, Optional
 
+from pydantic import ValidationError
+
 from ..models import (
     ArchitecturalLayer,
     CodeElement,
     ComponentObject,
     ComponentType,
+    Contract,
+    ContractMetadata,
+    ContractType,
     DependencyEdge,
+    Direction,
     ExtractionMethod,
 )
+from ..parsing.tree_sitter_parser import TreeSitterParser
 from .prompts import (
     COMPONENT_GROUPING_PROMPT,
     COMPONENT_REFINEMENT_PROMPT,
     ELEMENT_CLASSIFICATION_PROMPT,
+    SOURCE_COMPONENT_IDENTIFICATION_PROMPT,
 )
 
 logger = logging.getLogger(__name__)
@@ -128,6 +136,127 @@ class LLMComponentService:
             logger.exception("refine_grouping: unexpected error; using Louvain fallback")
             return self._louvain_fallback(louvain_groups)
 
+    def identify_components_and_contracts_from_source(
+        self,
+        container_name: str,
+        technology: str,
+        source_files: list,
+        file_tree: str,
+        already_detected: list[ComponentObject] | None = None,
+        remainder: list[CodeElement] | None = None,
+    ) -> tuple[list[ComponentObject], list[Contract]]:
+        """Identify components and contracts directly from source code via LLM.
+
+        Returns (components, contracts). Falls back to ([], []) on any error.
+        """
+        if not source_files:
+            return [], []
+
+        try:
+            files_content = "\n\n".join(
+                f"# File: {sf.file_path}\n```{sf.language}\n{sf.content}\n```"
+                for sf in source_files
+            )
+
+            already_detected_json = "[]"
+            if already_detected:
+                already_detected_json = json.dumps([
+                    {
+                        "name": c.name,
+                        "component_type": c.metadata.get("component_type", "other"),
+                        "files": [e.file_path for e in c.code_elements],
+                        "element_names": [e.qualified_name for e in c.code_elements],
+                    }
+                    for c in already_detected
+                ])
+
+            system_msg, user_template = SOURCE_COMPONENT_IDENTIFICATION_PROMPT
+            prompt = system_msg.format(
+                container_name=container_name,
+                technology=technology,
+            ) + "\n\n" + user_template.format(
+                container_name=container_name,
+                technology=technology,
+                file_tree=file_tree,
+                source_files=files_content,
+                already_detected_json=already_detected_json,
+            )
+
+            raw = self._llm.generate_text(
+                prompt,
+                max_tokens=LLM_MAX_TOKENS * 4,
+                temperature=LLM_TEMPERATURE,
+                use_cache=True,
+            )
+
+            result = self._parse_source_response(raw)
+            if result is None:
+                logger.warning("identify_components_and_contracts_from_source: could not parse LLM response")
+                return [], []
+
+            components_data = result.get("components", [])
+            contracts_data = result.get("contracts", [])
+
+            components = self.map_proposals_to_components(components_data, already_detected, remainder)
+
+            contracts = self._parse_contracts(contracts_data, components)
+
+            return components, contracts
+
+        except Exception:
+            logger.exception("identify_components_and_contracts_from_source: unexpected error")
+            return [], []
+
+    def map_proposals_to_components(
+        self,
+        proposals: list[dict],
+        already_detected: list[ComponentObject] | None = None,
+        remainder: list[CodeElement] | None = None,
+    ) -> list[ComponentObject]:
+        """Map LLM component proposals to ComponentObjects, matching to existing CodeElements.
+
+        Matches each proposal's element_names against already_detected and remainder
+        CodeElements to populate code_elements on the resulting ComponentObject.
+        """
+        element_map: dict[str, CodeElement] = {}
+        if already_detected:
+            for comp in already_detected:
+                for el in comp.code_elements:
+                    element_map[el.qualified_name] = el
+        if remainder:
+            for el in remainder:
+                element_map[el.qualified_name] = el
+
+        components: list[ComponentObject] = []
+        for proposal in proposals:
+            if not isinstance(proposal, dict):
+                continue
+
+            name = proposal.get("name", "UnknownComponent")
+            component_id = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+            element_names: list[str] = proposal.get("element_names") or []
+            provided: list[str] = proposal.get("provided_interfaces") or []
+            required: list[str] = proposal.get("required_interfaces") or []
+
+            component = ComponentObject(
+                component_id=component_id,
+                name=name,
+                description=proposal.get("description", ""),
+                technology=proposal.get("technology", ""),
+                confidence=0.85,
+                extraction_method=ExtractionMethod.LLM_DIRECT,
+                code_elements=[element_map[n] for n in element_names if n in element_map],
+                metadata={
+                    "component_type": proposal.get("component_type", "other"),
+                    "architectural_layer": proposal.get("architectural_layer", "unknown"),
+                    "provided_interfaces": provided,
+                    "required_interfaces": required,
+                },
+            )
+            components.append(component)
+
+        return components
+
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
@@ -189,11 +318,9 @@ class LLMComponentService:
         if not raw:
             return None
 
-        # Strip ```json ... ``` fences
         cleaned = re.sub(r"^```(?:json)?\s*", "", raw.strip(), flags=re.IGNORECASE)
         cleaned = re.sub(r"\s*```\s*$", "", cleaned).strip()
 
-        # Try direct parse
         try:
             data = json.loads(cleaned)
             if isinstance(data, list):
@@ -201,7 +328,6 @@ class LLMComponentService:
         except json.JSONDecodeError:
             pass
 
-        # Fallback: regex extract first [...]
         match = re.search(r"\[[\s\S]*\]", cleaned)
         if match:
             try:
@@ -213,6 +339,89 @@ class LLMComponentService:
 
         logger.debug("_parse_json_array: could not extract JSON array from response")
         return None
+
+    def _parse_source_response(self, raw: Optional[str]) -> Optional[dict]:
+        """Parse the source-based identification response (has {components, contracts} keys)."""
+        if not raw:
+            return None
+
+        cleaned = re.sub(r"^```(?:json)?\s*", "", raw.strip(), flags=re.IGNORECASE)
+        cleaned = re.sub(r"\s*```\s*$", "", cleaned).strip()
+
+        try:
+            data = json.loads(cleaned)
+            if isinstance(data, dict) and ("components" in data or "contracts" in data):
+                return data
+        except json.JSONDecodeError:
+            pass
+
+        match = re.search(r"\{[\s\S]*\}", cleaned)
+        if match:
+            try:
+                data = json.loads(match.group(0))
+                if isinstance(data, dict):
+                    return data
+            except json.JSONDecodeError:
+                pass
+
+        logger.debug("_parse_source_response: could not extract JSON object from response")
+        return None
+
+    def _parse_contracts(
+        self,
+        contracts_data: list[dict],
+        components: list[ComponentObject],
+    ) -> list[Contract]:
+        """Parse contract data from LLM response into Contract objects."""
+        contracts: list[Contract] = []
+        component_name_map = {c.name: c.component_id for c in components}
+
+        for cd in contracts_data:
+            if not isinstance(cd, dict):
+                continue
+
+            try:
+                contract_type_str = cd.get("contract_type", "http_endpoint")
+                try:
+                    contract_type = ContractType(contract_type_str)
+                except ValueError:
+                    contract_type = ContractType.HTTP_ENDPOINT
+
+                direction_str = cd.get("direction", "provided")
+                direction = Direction.PROVIDED if direction_str == "provided" else Direction.REQUIRED
+
+                metadata_dict = cd.get("metadata") or {}
+                metadata = ContractMetadata(
+                    method=metadata_dict.get("method"),
+                    path=metadata_dict.get("path"),
+                    topic=metadata_dict.get("topic"),
+                    queue=metadata_dict.get("queue"),
+                    message_schema=metadata_dict.get("schema") or metadata_dict.get("message_schema"),
+                    proto_service=metadata_dict.get("proto_service"),
+                    proto_method=metadata_dict.get("proto_method"),
+                    command=metadata_dict.get("command"),
+                    auth=metadata_dict.get("auth"),
+                    content_type=metadata_dict.get("content_type"),
+                    event_name=metadata_dict.get("event_name"),
+                    payload_fields=metadata_dict.get("payload_fields"),
+                    direction=direction,
+                )
+
+                contract = Contract(
+                    contract_id=cd.get("contract_id", cd.get("name", "unknown")),
+                    contract_type=contract_type,
+                    name=cd.get("name", "UnknownContract"),
+                    direction=direction,
+                    component=cd.get("component", ""),
+                    metadata=metadata,
+                    description=cd.get("description", ""),
+                )
+                contracts.append(contract)
+            except (ValueError, ValidationError):
+                logger.warning(f"_parse_contracts: failed to parse contract {cd.get('name')}")
+                continue
+
+        return contracts
 
     @staticmethod
     def _element_to_dict(element: CodeElement) -> dict:

@@ -20,14 +20,15 @@ class PythonVisitor(BaseVisitor):
 
     def visit(self, tree: Tree, file_path: str, source: bytes) -> list[CodeElement]:
         imports: list[str] = []
+        call_exprs: list[str] = []
         elements: list[CodeElement] = []
 
         for node in tree.root_node.children:
-            self._handle_node(node, source, file_path, imports, elements, decorators=[])
+            self._handle_node(node, source, file_path, imports, call_exprs, elements, decorators=[])
 
-        # Attach collected imports to every element
         for el in elements:
             el.imports = list(imports)
+            el.method_calls = list(call_exprs)
 
         return elements
 
@@ -41,6 +42,7 @@ class PythonVisitor(BaseVisitor):
         source: bytes,
         file_path: str,
         imports: list[str],
+        call_exprs: list[str],
         elements: list[CodeElement],
         decorators: list[str],
     ) -> None:
@@ -54,7 +56,7 @@ class PythonVisitor(BaseVisitor):
             dec_texts = self._collect_decorators(node, source)
             for child in node.children:
                 if child.type in ("class_definition", "function_definition", "async_function_definition"):
-                    self._handle_node(child, source, file_path, imports, elements, decorators=dec_texts)
+                    self._handle_node(child, source, file_path, imports, call_exprs, elements, decorators=dec_texts)
 
         elif node.type == "class_definition":
             elements.append(self._make_class_element(node, source, file_path, decorators))
@@ -62,12 +64,39 @@ class PythonVisitor(BaseVisitor):
         elif node.type in ("function_definition", "async_function_definition"):
             elements.append(self._make_function_element(node, source, file_path, decorators))
 
+        elif node.type == "expression_statement":
+            self._extract_call_exprs(node, source, imports, call_exprs)
+
     def _parse_import(self, node: Node, source: bytes) -> list[str]:
         return [
             self._node_text(child, source)
             for child in node.children
             if child.type == "dotted_name"
         ]
+
+    def _extract_call_exprs(
+        self,
+        node: Node,
+        source: bytes,
+        imports: list[str],
+        call_exprs: list[str],
+    ) -> None:
+        for child in node.children:
+            if child.type == "call":
+                callee_text = self._get_call_callee(child, source)
+                if callee_text and "." in callee_text:
+                    call_exprs.append(callee_text)
+
+    def _get_call_callee(self, node: Node, source: bytes) -> str:
+        for child in node.children:
+            if child.type == "attribute":
+                obj = self._node_text(child.children[0], source) if child.children else ""
+                attr = self._node_text(child.children[-1], source) if len(child.children) > 1 else ""
+                if obj and attr:
+                    return f"{obj}.{attr}"
+            elif child.type == "identifier":
+                return self._node_text(child, source)
+        return ""
 
     def _parse_import_from(self, node: Node, source: bytes) -> list[str]:
         module = ""

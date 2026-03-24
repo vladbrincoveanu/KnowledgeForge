@@ -19,26 +19,40 @@ def get_llm_manager() -> Optional[LLMManager]:
     """Create an LLM manager, returning None if LLM is unavailable."""
     try:
         config = get_config()
+        provider = os.getenv(
+            "LLM_PROVIDER",
+            getattr(config.llm, "provider", "lmstudio")
+            if hasattr(config, "llm")
+            else "lmstudio",
+        )
         base_url = os.getenv(
-            "LMSTUDIO_BASE_URL",
-            getattr(config.lmstudio, "base_url", "http://localhost:1234/v1")
-            if hasattr(config, "lmstudio")
+            "LLM_BASE_URL",
+            getattr(config.llm, "base_url", "http://localhost:1234/v1")
+            if hasattr(config, "llm")
             else "http://localhost:1234/v1",
         )
         model = os.getenv(
-            "LMSTUDIO_MODEL_NAME",
-            getattr(config.lmstudio, "model_name", "qwen/qwen2.5-vl-7b")
-            if hasattr(config, "lmstudio")
+            "LLM_MODEL",
+            getattr(config.llm, "model_name", "qwen/qwen2.5-vl-7b")
+            if hasattr(config, "llm")
             else "qwen/qwen2.5-vl-7b",
         )
+        api_key = os.getenv(
+            "LLM_API_KEY",
+            getattr(config.llm, "api_key", "")
+            if hasattr(config, "llm")
+            else "",
+        )
         max_retries = (
-            getattr(config.lmstudio, "max_retries", 3)
-            if hasattr(config, "lmstudio")
+            getattr(config.llm, "max_retries", 3)
+            if hasattr(config, "llm")
             else 3
         )
         manager = LLMManager(
-            lmstudio_url=base_url,
+            provider=provider,
+            base_url=base_url,
             default_model=model,
+            api_key=api_key,
             max_retries=max_retries,
         )
         if not getattr(manager, "is_available", True):

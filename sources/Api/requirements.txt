@@ -14,7 +14,8 @@ neo4j>=5.13.0
 psycopg2-binary>=2.9.9
 sqlalchemy>=2.0.23
 networkx>=3.2.0
-python-louvain>=0.16
+igraph>=0.10.0
+leidenalg>=0.10.0
 
 # Data & ML stack
 pandas>=2.1.2
@@ -42,6 +43,8 @@ python-dotenv>=1.0.0
 # Code extraction & IaC
 PyYAML>=6.0.1
 tomli>=2.0.1  # Parse TOML manifests (pyproject.toml, Cargo.toml, etc.)
+tree-sitter>=0.20.0
+tree-sitter-language-pack==0.13.0
 
 # Testing / linting
 pytest>=7.4.0

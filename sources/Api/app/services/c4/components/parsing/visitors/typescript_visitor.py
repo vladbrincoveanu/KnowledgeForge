@@ -35,6 +35,7 @@ class TypeScriptVisitor(BaseVisitor):
         language = ext_map.get(os.path.splitext(file_path)[1].lower(), "typescript")
 
         imports: list[str] = []
+        call_exprs: list[str] = []
         elements: list[CodeElement] = []
         is_express = False
 
@@ -72,14 +73,29 @@ class TypeScriptVisitor(BaseVisitor):
                 if el is not None:
                     elements.append(el)
 
+        self._collect_call_exprs(tree.root_node, source, call_exprs)
+
         for el in elements:
             el.imports = list(imports)
+            el.method_calls = list(call_exprs)
 
         return elements
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def _collect_call_exprs(self, node: Node, source: bytes, call_exprs: list[str], _depth: int = 0) -> None:
+        if _depth > 50:
+            return
+        for child in node.children:
+            if child.type == "call_expression":
+                callee = child.child_by_field_name("function")
+                if callee:
+                    text = self._node_text(callee, source)
+                    if "." in text:
+                        call_exprs.append(text)
+            self._collect_call_exprs(child, source, call_exprs, _depth + 1)
 
     def _extract_esm_import(self, node: Node, source: bytes) -> str:
         source_node = node.child_by_field_name("source")

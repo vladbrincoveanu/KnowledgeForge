@@ -86,10 +86,11 @@ def test_extract_with_mock_llm(mini_project):
     mock_llm = MagicMock()
     mock_llm.classify_elements.side_effect = lambda els: els
     mock_llm.group_elements.return_value = []
+    mock_llm.identify_components_and_contracts_from_source.return_value = ([], [])
 
     result = ComponentExtractor(llm_service=mock_llm).extract(str(mini_project))
 
-    mock_llm.classify_elements.assert_called()
+    mock_llm.identify_components_and_contracts_from_source.assert_called()
     assert isinstance(result, list)
 
 

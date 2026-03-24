@@ -72,7 +72,7 @@ class GitHubDownloader:
                 git_cmd.extend([clone_url, str(repo_path)])
                 
                 logger.info(f"Running: git clone {'--depth 1 ' if not full_history else ''}{github_url}")
-                subprocess.run(git_cmd, check=True, capture_output=True, text=True)
+                subprocess.run(git_cmd, check=True, capture_output=True, text=True, timeout=300)
                 
                 logger.info(f"Repository cloned successfully to {repo_path}")
                 return repo_path
@@ -90,7 +90,7 @@ class GitHubDownloader:
             logger.info(f"Downloading archive from {archive_url}")
             
             try:
-                response = requests.get(archive_url, timeout=60)
+                response = requests.get(archive_url, timeout=120)
                 response.raise_for_status()
                 
                 zip_path = output_dir / f"{repo}.zip"

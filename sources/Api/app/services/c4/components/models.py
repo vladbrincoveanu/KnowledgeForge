@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -123,3 +123,49 @@ class FrameworkResult(BaseModel):
     detector_name: str
     components: list[ComponentObject] = Field(default_factory=list)
     ungrouped_elements: list[CodeElement] = Field(default_factory=list)
+
+
+class ContractType(str, Enum):
+    HTTP_ENDPOINT = "http_endpoint"
+    GRAPHQL_OPERATION = "graphql_operation"
+    GRAPHQL_SUBSCRIPTION = "graphql_subscription"
+    GRAPHQL_QUERY = "graphql_query"
+    GRAPHQL_MUTATION = "graphql_mutation"
+    GRPC_METHOD = "grpc_method"
+    MESSAGE_PRODUCER = "message_producer"
+    MESSAGE_CONSUMER = "message_consumer"
+    EVENT_EMITTER = "event_emitter"
+    WEBSOCKET_ENDPOINT = "websocket_endpoint"
+    WEBHOOK = "webhook"
+    CLI_COMMAND = "cli_command"
+
+
+class Direction(str, Enum):
+    PROVIDED = "provided"
+    REQUIRED = "required"
+
+
+class ContractMetadata(BaseModel):
+    method: Optional[str] = None
+    path: Optional[str] = None
+    topic: Optional[str] = None
+    queue: Optional[str] = None
+    message_schema: Optional[str] = None
+    proto_service: Optional[str] = None
+    proto_method: Optional[str] = None
+    command: Optional[str] = None
+    auth: Optional[str] = None
+    content_type: Optional[str] = None
+    event_name: Optional[str] = None
+    payload_fields: Optional[list[str]] = None
+    direction: Optional[Direction] = None
+
+
+class Contract(BaseModel):
+    contract_id: str
+    contract_type: ContractType
+    name: str
+    direction: Direction
+    component: str
+    metadata: ContractMetadata = Field(default_factory=ContractMetadata)
+    description: str = ""

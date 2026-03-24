@@ -845,7 +845,10 @@ class DependencyDetector:
         url = dep.get("url", "")
         if not url:
             return None
-        parsed = urlparse(url)
+        try:
+            parsed = urlparse(url)
+        except ValueError:
+            return None
         host = (parsed.hostname or "").lower()
         if not host:
             return None
@@ -1102,7 +1105,10 @@ class DependencyDetector:
 
     def _extract_service_name_from_url(self, url: str) -> str:
         """Extract a display name from a URL."""
-        parsed = urlparse(url)
+        try:
+            parsed = urlparse(url)
+        except ValueError:
+            return "External Service"
         host = parsed.hostname or parsed.netloc or parsed.path
         if not host:
             return "External Service"

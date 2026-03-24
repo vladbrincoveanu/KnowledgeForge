@@ -76,7 +76,7 @@ app = FastAPI(
         "- **Real-time updates**: WebSocket channel streams extraction progress\n\n"
         "## Authentication\n"
         "No authentication required for local / dev deployments. "
-        "Set `OPENAI_API_KEY` or `LMSTUDIO_BASE_URL` environment variables to enable LLM enrichment."
+        "Set `LLM_PROVIDER`, `LLM_BASE_URL`, `LLM_MODEL`, and `LLM_API_KEY` environment variables to enable LLM enrichment."
     ),
     version="1.0.0",
     docs_url="/docs",

@@ -10,9 +10,10 @@ Focus on architectural boundaries, not code details.
 
 import json
 import logging
+import time
 from collections import defaultdict
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from app.services.c4.containers import ContainerManager
 from app.services.c4.context import ContextManager
@@ -20,6 +21,7 @@ from app.services.c4.components.component_extractor import ComponentExtractor
 from app.services.c4.components.models import ComponentObject
 from app.services.code_extraction.llm_enrichment import enrich_with_llm_descriptions
 from app.services.code_extraction.component_extractor import link_components_to_containers
+from app.utils.performance_tracker import PerformanceTracker
 
 logger = logging.getLogger(__name__)
 
@@ -50,35 +52,57 @@ class C4ArchitectureExtractor:
         self.container_manager = ContainerManager(self.repo_path, llm_manager)
         self.component_extractor = ComponentExtractor()
 
-    def extract(self, max_components_per_domain: int = 10, group_components_by_domain: bool = False) -> dict[str, Any]:
+    def extract(self, max_components_per_domain: int = 10, group_components_by_domain: bool = False, task_id: Optional[str] = None, repo_url: Optional[str] = None) -> dict[str, Any]:
         """Extract C4 architecture."""
+        tracker = PerformanceTracker(
+            task_id=task_id or f"extract_{int(time.time())}",
+            repository_url=repo_url or str(self.repo_path)
+        )
+
         logger.info("Starting C4 Model extraction...")
         logger.info("=" * 80)
 
         # Level 2: Containers first (needed for domain detection)
         logger.info("\n📦 LEVEL 2: Containers")
         logger.info("-" * 80)
+        t0 = time.time()
         self._extract_level2_containers()
-        logger.info(f"✓ Containers: {len(self.containers)}")
+        containers_ms = (time.time() - t0) * 1000
+        logger.info(f"✓ Containers: {len(self.containers)} [{containers_ms:.0f}ms]")
+        if tracker:
+            tracker.results.add_phase("L2_Containers", containers_ms)
 
         # Level 1: Context (System + External Dependencies + IT Landscape metadata)
         logger.info("\n📊 LEVEL 1: System Context")
         logger.info("-" * 80)
+        t0 = time.time()
         self._extract_level1_context()
+        context_ms = (time.time() - t0) * 1000
         logger.info(f"✓ System: {self.system_context.get('name', 'Unknown')}")
         logger.info(f"✓ Owner: {self.system_context.get('owner_team', self.system_context.get('owner', 'Unknown'))}")
         logger.info(f"✓ Domain: {self.system_context.get('business_domain', self.system_context.get('domain', 'Unknown'))}")
         logger.info(f"✓ External dependencies: {len(self.system_context.get('external_dependencies', []))}")
+        logger.info(f"  [Level 1 completed in {context_ms:.0f}ms]")
+        if tracker:
+            tracker.results.add_phase("L1_Context", context_ms)
 
         # Build container relationships
+        t0 = time.time()
         self.container_relationships = self.container_manager.build_container_relationships()
         self.cluster_metadata = self.container_manager.detect_cluster_metadata()
+        rels_ms = (time.time() - t0) * 1000
+        if tracker:
+            tracker.results.add_phase("Container_Relationships", rels_ms)
 
         # Level 3: Components
         logger.info("\n🔌 LEVEL 3: Components")
         logger.info("-" * 80)
+        t0 = time.time()
         self._extract_level3_components()
-        logger.info(f"✓ Components: {len(self.components)}")
+        components_ms = (time.time() - t0) * 1000
+        logger.info(f"✓ Components: {len(self.components)} [{components_ms:.0f}ms]")
+        if tracker:
+            tracker.results.add_phase("L3_Components", components_ms)
 
         link_components_to_containers(self.components, self.containers)
         logger.info("✓ Component-container links created")
@@ -89,11 +113,20 @@ class C4ArchitectureExtractor:
             self._group_by_domain()
 
         # Enrich with LLM-generated descriptions
+        t0 = time.time()
         enrich_with_llm_descriptions(
             self.system_context, self.containers, self.components,
             self.context_relationships, self.container_relationships,
             self.llm_manager,
         )
+        llm_ms = (time.time() - t0) * 1000
+        logger.info(f"✓ LLM enrichment completed [{llm_ms:.0f}ms]")
+        if tracker:
+            tracker.results.add_phase("LLM_Enrichment", llm_ms)
+
+        if tracker:
+            tracker.save()
+            logger.info(f"\n📊 Benchmark saved: {tracker.results.task_id}_benchmark.json")
 
         # Build final structure
         c4_architecture = {
@@ -306,9 +339,11 @@ def main():
 
     try:
         import os
-        base_url = os.getenv("LMSTUDIO_BASE_URL", "http://localhost:1234/v1")
-        model = os.getenv("LMSTUDIO_MODEL_NAME", "qwen/qwen2.5-vl-7b")
-        llm = LLMManager(lmstudio_url=base_url, default_model=model)
+        provider = os.getenv("LLM_PROVIDER", "lmstudio")
+        base_url = os.getenv("LLM_BASE_URL", "http://localhost:1234/v1")
+        model = os.getenv("LLM_MODEL", "qwen/qwen2.5-vl-7b")
+        api_key = os.getenv("LLM_API_KEY", "")
+        llm = LLMManager(provider=provider, base_url=base_url, default_model=model, api_key=api_key)
     except Exception:
         llm = None
         print("LLM not available, proceeding without system purpose generation")

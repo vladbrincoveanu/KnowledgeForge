@@ -1,4 +1,4 @@
-"""Louvain community detection fallback for grouping ungrouped CodeElements."""
+"""Leiden community detection fallback for grouping ungrouped CodeElements."""
 
 from __future__ import annotations
 
@@ -7,7 +7,8 @@ import os
 import re
 from collections import Counter, defaultdict
 
-import community as community_louvain
+import igraph as ig
+import leidenalg as la
 import networkx as nx
 
 from app.services.c4.components.models import (
@@ -30,7 +31,7 @@ _GENERIC_TOKENS = frozenset({
 
 
 class CommunityDetector:
-    """Groups CodeElements into ComponentObjects using Louvain community detection."""
+    """Groups CodeElements into ComponentObjects using Leiden community detection."""
 
     def detect(
         self,
@@ -46,9 +47,14 @@ class CommunityDetector:
             return {}
         if graph.number_of_edges() == 0:
             return {node: i for i, node in enumerate(graph.nodes())}
-        return community_louvain.best_partition(
-            graph, weight="weight", resolution=resolution
+        ig_graph = ig.Graph.from_networkx(graph)
+        partition = la.find_partition(
+            ig_graph,
+            la.ModularityVertexPartition,
+            weights="weight",
+            seed=42,
         )
+        return dict(zip(ig_graph.vs["_nx_name"], partition.membership))
 
     def post_process(
         self,
@@ -99,7 +105,11 @@ class CommunityDetector:
                 continue
             subgraph = graph.subgraph(members).copy()
             if subgraph.number_of_edges() > 0:
-                sub_partition = community_louvain.best_partition(subgraph, weight="weight")
+                ig_subgraph = ig.Graph.from_networkx(subgraph)
+                ig_partition = la.find_partition(
+                    ig_subgraph, la.ModularityVertexPartition, weights="weight", seed=42
+                )
+                sub_partition = dict(zip(ig_subgraph.vs["_nx_name"], ig_partition.membership))
             else:
                 # No edges — each connected component becomes its own sub-cluster
                 sub_partition = {}
