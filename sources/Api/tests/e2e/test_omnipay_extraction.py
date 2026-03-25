@@ -120,7 +120,7 @@ def _run_llm_container_extraction(repo_path: Path) -> List[dict]:
     return list(containers.values())
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
 def omnipay_extraction() -> tuple[List[dict], dict]:
     """Extract from the OmniPay demo directory."""
     if not DEMO_DIR.exists():
@@ -981,3 +981,173 @@ class TestOmniPayTotalServiceCount:
         found = {c.get("name") for c in omnipay_containers}
         missing = original - found
         assert not missing, f"Missing original services: {missing}"
+
+
+class TestOmniPaySnapshotValidation:
+    """Validate extraction output against snapshot for regression detection.
+
+    Run with --snapshot-update to regenerate the snapshot:
+        pytest tests/e2e/test_omnipay_extraction.py::TestOmniPaySnapshotValidation -v --snapshot-update
+    """
+
+    SNAPSHOT_FILE = Path(__file__).parent / "snapshots" / "omnipay_extraction.json"
+
+    def _serialize_for_snapshot(self, containers: List[dict], context: dict) -> dict:
+        """Serialize extraction output deterministically for snapshot comparison."""
+        containers_sorted = sorted(containers, key=lambda c: c.get("name", ""))
+        for container in containers_sorted:
+            for key in ["relationships", "dependencies_internal"]:
+                if key in container and isinstance(container[key], list):
+                    container[key] = sorted(container[key], key=lambda x: str(x) if x else "")
+            if "path" in container:
+                container["path"] = str(container["path"])
+        return {
+            "containers": containers_sorted,
+            "system_context": context,
+        }
+
+    @pytest.fixture
+    def snapshot_path(self) -> Path:
+        """Return path to snapshot file."""
+        return self.SNAPSHOT_FILE
+
+    @pytest.fixture
+    def extraction_output(self) -> dict:
+        """Run extraction and return deterministic output."""
+        if not DEMO_DIR.exists():
+            pytest.skip(f"Demo directory not found: {DEMO_DIR}")
+
+        containers, context = _run_extraction(DEMO_DIR)
+        return self._serialize_for_snapshot(containers, context)
+
+    @pytest.fixture
+    def expected_snapshot(self, snapshot_path) -> dict:
+        """Load expected snapshot, or skip if doesn't exist."""
+        if not snapshot_path.exists():
+            pytest.skip(f"Snapshot file not found: {snapshot_path}. Run with --snapshot-update to create.")
+
+        with open(snapshot_path, "r") as f:
+            return json.load(f)
+
+    def test_snapshot_exists(self, snapshot_path):
+        """Snapshot file should exist after initial generation."""
+        assert snapshot_path.exists(), (
+            f"Snapshot file missing: {snapshot_path}. "
+            "Run with --snapshot-update to generate initial snapshot."
+        )
+
+    def test_container_count_matches_snapshot(self, extraction_output, expected_snapshot):
+        """Container count should match snapshot."""
+        expected_count = len(expected_snapshot["containers"])
+        actual_count = len(extraction_output["containers"])
+        assert actual_count == expected_count, (
+            f"Container count mismatch: got {actual_count}, expected {expected_count}. "
+            "Run with --snapshot-update to update snapshot."
+        )
+
+    def test_all_snapshot_services_present(self, extraction_output, expected_snapshot):
+        """All services in snapshot should be present in extraction."""
+        expected_names = {c["name"] for c in expected_snapshot["containers"]}
+        actual_names = {c["name"] for c in extraction_output["containers"]}
+        missing = expected_names - actual_names
+        extra = actual_names - expected_names
+
+        if missing or extra:
+            drift_msg = ""
+            if missing:
+                drift_msg += f"\n  Missing services: {sorted(missing)}"
+            if extra:
+                drift_msg += f"\n  New services: {sorted(extra)}"
+            drift_msg += "\nRun with --snapshot-update to update snapshot."
+            pytest.fail(drift_msg)
+
+    def test_container_fields_match_snapshot(self, extraction_output, expected_snapshot):
+        """Each container's key fields should match snapshot."""
+        expected_by_name = {c["name"]: c for c in expected_snapshot["containers"]}
+        actual_by_name = {c["name"]: c for c in extraction_output["containers"]}
+
+        missing_fields = []
+        wrong_fields = []
+
+        for name, expected in expected_by_name.items():
+            if name not in actual_by_name:
+                missing_fields.append(name)
+                continue
+
+            actual = actual_by_name[name]
+            key_fields = ["name", "technology", "container_type", "protocol", "runtime_environment", "deployment"]
+
+            for field in key_fields:
+                if expected.get(field) != actual.get(field):
+                    wrong_fields.append(f"{name}.{field}: got {actual.get(field)!r}, expected {expected.get(field)!r}")
+
+        if missing_fields or wrong_fields:
+            msg = ""
+            if missing_fields:
+                msg += f"\n  Missing containers: {sorted(missing_fields)}"
+            if wrong_fields:
+                msg += f"\n  Field mismatches:\n    " + "\n    ".join(wrong_fields[:10])
+                if len(wrong_fields) > 10:
+                    msg += f"\n    ... and {len(wrong_fields) - 10} more"
+            msg += "\nRun with --snapshot-update to update snapshot."
+            pytest.fail(msg)
+
+    def test_system_context_has_required_fields(self, extraction_output):
+        """System context should have all required fields."""
+        context = extraction_output["system_context"]
+        required_fields = [
+            "c4_level", "type", "name", "purpose", "domain",
+            "owner", "status", "tier", "data_class",
+            "external_dependencies", "languages", "frameworks",
+        ]
+
+        missing = [f for f in required_fields if f not in context]
+        assert not missing, f"System context missing fields: {missing}"
+
+    def test_system_context_matches_snapshot(self, extraction_output, expected_snapshot):
+        """System context key fields should match snapshot."""
+        expected = expected_snapshot["system_context"]
+        actual = extraction_output["system_context"]
+
+        key_fields = ["name", "domain", "owner", "status", "tier", "data_class"]
+
+        mismatches = []
+        for field in key_fields:
+            if expected.get(field) != actual.get(field):
+                mismatches.append(f"{field}: got {actual.get(field)!r}, expected {expected.get(field)!r}")
+
+        if mismatches:
+            msg = "System context field mismatches:\n  " + "\n  ".join(mismatches)
+            msg += "\nRun with --snapshot-update to update snapshot."
+            pytest.fail(msg)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def update_snapshot_if_requested(snapshot_update, omnipay_extraction):
+    """If --snapshot-update passed, regenerate snapshot file."""
+    if not snapshot_update:
+        return
+
+    if not DEMO_DIR.exists():
+        return
+
+    snapshot_path = Path(__file__).parent / "snapshots" / "omnipay_extraction.json"
+    snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+
+    containers, context = _run_extraction(DEMO_DIR)
+
+    containers_sorted = sorted(containers, key=lambda c: c.get("name", ""))
+    for container in containers_sorted:
+        for key in ["relationships", "dependencies_internal"]:
+            if key in container and isinstance(container[key], list):
+                container[key] = sorted(container[key], key=lambda x: str(x) if x else "")
+
+    snapshot_data = {
+        "containers": containers_sorted,
+        "system_context": context,
+    }
+
+    with open(snapshot_path, "w") as f:
+        json.dump(snapshot_data, f, indent=2, default=str)
+
+    pytest.skip(f"Snapshot updated at {snapshot_path}")
