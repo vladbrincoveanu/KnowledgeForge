@@ -15,6 +15,7 @@ from .compose_detector import ComposeDetector
 from .helm_detector import HelmDetector
 from .terraform_detector import TerraformDetector
 from .kubernetes_detector import KubernetesDetector
+from .python_library_detector import PythonLibraryDetector
 from .relationship_extractor import ConfigRelationshipExtractor
 
 logger = logging.getLogger(__name__)
@@ -100,6 +101,13 @@ class ContainerManager:
             kubernetes_containers = kubernetes_detector.detect()
             for container in kubernetes_containers:
                 self._merge_kubernetes_container(container)
+
+        # Run Python library detection (finds packages without __main__.py)
+        python_library_detector = PythonLibraryDetector(self.repo_path, self.llm_manager)
+        if python_library_detector.can_detect():
+            library_containers = python_library_detector.detect()
+            for container in library_containers:
+                self._register_or_merge_container(container, source="python_library")
 
         # Map internal dependencies
         self._map_internal_dependencies()
