@@ -1,0 +1,5 @@
+{
+  "name": "@omnipay/no-ownership",
+  "version": "1.0.0",
+  "description": "Service with no ownership signals"
+}

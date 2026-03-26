@@ -962,9 +962,9 @@ class TestOmniPayTotalServiceCount:
     """Test that all OmniPay services are discovered."""
 
     def test_total_service_count(self, omnipay_containers):
-        """Should discover all current OmniPay services, including platform extensions."""
-        assert len(omnipay_containers) >= 17, (
-            f"Expected at least 17 services, got {len(omnipay_containers)}. "
+        """Should discover all current OmniPay services, including platform extensions and edge case services."""
+        assert len(omnipay_containers) >= 23, (
+            f"Expected at least 23 services, got {len(omnipay_containers)}. "
             f"Found: {[c.get('name') for c in omnipay_containers]}"
         )
 

@@ -1,0 +1,7 @@
+{
+  "name": "@omnipay/multi-lang-frontend",
+  "version": "1.0.0",
+  "description": "TypeScript frontend for multi-lang service",
+  "main": "index.ts",
+  "dependencies": {}
+}

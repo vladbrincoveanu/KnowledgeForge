@@ -1,0 +1,5 @@
+{
+  "name": "@omnipay/symlink-service",
+  "version": "1.0.0",
+  "description": "Service with symlinks for edge case testing"
+}

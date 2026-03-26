@@ -177,6 +177,31 @@
     {
       "c4_level": 2,
       "type": "container",
+      "name": "omnipay-conflicted-ownership",
+      "container_type": "Frontend (Node.js)",
+      "technology": "Node.js",
+      "protocol": "REST",
+      "path": "omnipay-conflicted-ownership",
+      "runtime_environment": null,
+      "deployment": null,
+      "description": "This service has conflicting CODEOWNERS entries. Tests extraction's ability to handle multiple teams claiming ownership.",
+      "repository_url": "",
+      "runtime_info": "Node.js 18-alpine",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "endpoint": "",
+      "dockerfile": "omnipay-conflicted-ownership/Dockerfile",
+      "terraform": false,
+      "helm": false,
+      "kubernetes": false,
+      "owner": "omnipay/team-alpha",
+      "team": "omnipay/team-beta",
+      "owner_team": "omnipay/team-beta",
+      "relationships": []
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
       "name": "omnipay-database",
       "container_type": "Python Service",
       "technology": "Python",
@@ -442,6 +467,81 @@
     {
       "c4_level": 2,
       "type": "container",
+      "name": "omnipay-multi-lang",
+      "container_type": "Python Service",
+      "technology": "Python",
+      "protocol": "HTTP",
+      "path": "omnipay-multi-lang",
+      "runtime_environment": null,
+      "deployment": null,
+      "description": "This service uses both Python (backend) and TypeScript (frontend). Tests extraction's ability to detect multiple languages in a single service.",
+      "repository_url": "",
+      "runtime_info": "Python 3.11-slim",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "endpoint": "",
+      "dockerfile": "omnipay-multi-lang/Dockerfile",
+      "terraform": false,
+      "helm": false,
+      "kubernetes": false,
+      "owner": null,
+      "team": null,
+      "owner_team": null,
+      "relationships": []
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "omnipay-nested-service",
+      "container_type": "Python Service",
+      "technology": "Python",
+      "protocol": "HTTP",
+      "path": "omnipay-nested-service",
+      "runtime_environment": null,
+      "deployment": null,
+      "description": "",
+      "repository_url": "",
+      "runtime_info": "Python 3.11-slim",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "endpoint": "",
+      "dockerfile": "omnipay-nested-service/Dockerfile",
+      "terraform": false,
+      "helm": false,
+      "kubernetes": false,
+      "owner": null,
+      "team": null,
+      "owner_team": null,
+      "relationships": []
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "omnipay-no-ownership",
+      "container_type": "Frontend (Node.js)",
+      "technology": "Node.js",
+      "protocol": "REST",
+      "path": "omnipay-no-ownership",
+      "runtime_environment": null,
+      "deployment": null,
+      "description": "This service has no ownership signals - no CODEOWNERS, no README with owner info. Tests extraction's ability to handle orphaned/unowned services.",
+      "repository_url": "",
+      "runtime_info": "Node.js 18-alpine",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "endpoint": "",
+      "dockerfile": "omnipay-no-ownership/Dockerfile",
+      "terraform": false,
+      "helm": false,
+      "kubernetes": false,
+      "owner": null,
+      "team": null,
+      "owner_team": null,
+      "relationships": []
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
       "name": "omnipay-notifier",
       "container_type": "Go Service",
       "technology": "Go",
@@ -529,6 +629,31 @@
     {
       "c4_level": 2,
       "type": "container",
+      "name": "omnipay-rust-service",
+      "container_type": "Go Service",
+      "technology": "Rust",
+      "protocol": "HTTP",
+      "path": "omnipay-rust-service",
+      "runtime_environment": null,
+      "deployment": null,
+      "description": "This service uses Rust - an uncommon language in this ecosystem. Tests extraction's ability to detect Rust services.",
+      "repository_url": "",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "endpoint": "",
+      "dockerfile": "omnipay-rust-service/Dockerfile",
+      "terraform": false,
+      "helm": false,
+      "kubernetes": false,
+      "owner": null,
+      "team": null,
+      "owner_team": null,
+      "relationships": []
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
       "name": "omnipay-settlement-orchestrator",
       "container_type": "Containerized Service",
       "technology": ".NET",
@@ -588,6 +713,31 @@
           }
         }
       ]
+    },
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "omnipay-symlink-service",
+      "container_type": "Frontend (Node.js)",
+      "technology": "Node.js",
+      "protocol": "REST",
+      "path": "omnipay-symlink-service",
+      "runtime_environment": null,
+      "deployment": null,
+      "description": "This service uses symlinks to test path resolution edge cases.",
+      "repository_url": "",
+      "runtime_info": "Node.js 18-alpine",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "endpoint": "",
+      "dockerfile": "omnipay-symlink-service/Dockerfile",
+      "terraform": false,
+      "helm": false,
+      "kubernetes": false,
+      "owner": null,
+      "team": null,
+      "owner_team": null,
+      "relationships": []
     }
   ],
   "system_context": {
@@ -2632,7 +2782,32 @@
         ]
       }
     ],
-    "dependency_freshness_alerts": [],
+    "dependency_freshness_alerts": [
+      {
+        "dependency": "flask",
+        "version": "2.0.0",
+        "issue": "range_version",
+        "source": "omnipay-nested-service/requirements.txt"
+      },
+      {
+        "dependency": "flask",
+        "version": "2.0.0",
+        "issue": "range_version",
+        "source": "omnipay-multi-lang/requirements.txt"
+      },
+      {
+        "dependency": "requests",
+        "version": "2.28.0",
+        "issue": "range_version",
+        "source": "omnipay-multi-lang/requirements.txt"
+      },
+      {
+        "dependency": "flask",
+        "version": "2.0.0",
+        "issue": "range_version",
+        "source": "omnipay-symlink-service/requirements.txt"
+      }
+    ],
     "actors": [
       {
         "name": "User",
@@ -2645,28 +2820,32 @@
     ],
     "languages": [
       {
+        "language": "Python",
+        "file_count": 12
+      },
+      {
         "language": "C#",
         "file_count": 11
       },
       {
-        "language": "Python",
-        "file_count": 8
+        "language": "JavaScript",
+        "file_count": 6
+      },
+      {
+        "language": "TypeScript",
+        "file_count": 5
       },
       {
         "language": "Java",
         "file_count": 4
       },
       {
-        "language": "TypeScript",
-        "file_count": 4
-      },
-      {
-        "language": "JavaScript",
-        "file_count": 3
-      },
-      {
         "language": "Go",
         "file_count": 2
+      },
+      {
+        "language": "Rust",
+        "file_count": 1
       }
     ],
     "frameworks": [
@@ -2681,6 +2860,11 @@
         "detected_from": "omnipay-ledger/pom.xml"
       },
       {
+        "language": "Python",
+        "framework": "Flask",
+        "detected_from": "omnipay-nested-service/requirements.txt"
+      },
+      {
         "language": "JavaScript",
         "framework": "Express",
         "detected_from": "omnipay-gateway/package.json"
@@ -2691,9 +2875,9 @@
         "detected_from": "omnipay-gateway/package.json"
       },
       {
-        "language": "Python",
-        "framework": "Flask",
-        "detected_from": "omnipay-payment-processor/requirements.txt"
+        "language": "Rust",
+        "framework": "Actix",
+        "detected_from": "omnipay-rust-service/Cargo.toml"
       },
       {
         "language": "C#",
@@ -2728,20 +2912,21 @@
         "omnipay-settlement-orchestrator/Dockerfile",
         "omnipay-ml-pipeline/Dockerfile",
         "omnipay-ledger/Dockerfile",
+        "omnipay-no-ownership/Dockerfile",
         "omnipay-fraud-ml/Dockerfile",
+        "omnipay-nested-service/Dockerfile",
         "omnipay-card-router/Dockerfile",
-        "omnipay-payment-processor/Dockerfile",
-        "omnipay-risk-streams/Dockerfile",
-        "omnipay-notifier/Dockerfile",
-        "omnipay-billing-llm/Dockerfile",
-        "omnipay-event-projections/Dockerfile"
+        "omnipay-conflicted-ownership/Dockerfile",
+        "omnipay-rust-service/Dockerfile",
+        "omnipay-payment-processor/Dockerfile"
       ],
       "framework_files": [
         "omnipay-card-router/OmniPay.CardRouter.csproj",
         "omnipay-gateway/package.json",
         "omnipay-ledger/pom.xml",
         "omnipay-ml-pipeline/requirements.txt",
-        "omnipay-payment-processor/requirements.txt"
+        "omnipay-nested-service/requirements.txt",
+        "omnipay-rust-service/Cargo.toml"
       ]
     },
     "regulatory_frameworks": [],
@@ -2761,7 +2946,7 @@
       "commits_90d": 1,
       "commits_180d": 1,
       "last_commit_date": "2026-03-20T07:52:20+01:00",
-      "days_since_last_commit": 5,
+      "days_since_last_commit": 6,
       "git_repos_scanned": 1
     },
     "tier": "Tier 2 - Production Standard",

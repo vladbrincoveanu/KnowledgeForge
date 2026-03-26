@@ -1,0 +1,7 @@
+{
+  "name": "@omnipay/nested-helper",
+  "version": "1.0.0",
+  "description": "Internal helper module for nested-service",
+  "main": "index.js",
+  "dependencies": {}
+}
