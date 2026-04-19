@@ -139,6 +139,10 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data }) => {
   const { bg, color, stereotype, isC4 } = getC4Style(data.type);
   const isGhostExternal = data.attributes?.isGhostExternal === true;
 
+  const ghostStyle = isGhostExternal
+    ? { border: "2px dashed #9ca3af", background: "#f9fafb", opacity: 0.9 }
+    : undefined;
+
   // For container entities, use category-based styling
   if (isContainer && data.containerMeta) {
     const category = inferCategory(data.containerMeta.container_type);
@@ -151,10 +155,8 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data }) => {
           isGhostExternal ? " node-external-ghost" : ""
         }`}
         style={{
-          borderColor: isGhostExternal ? "#9ca3af" : catStyle.borderColor,
-          background: isGhostExternal ? "#f9fafb" : catStyle.bodyBg,
-          border: isGhostExternal ? "2px dashed #9ca3af" : undefined,
-          opacity: isGhostExternal ? 0.9 : 1,
+          borderColor: catStyle.borderColor,
+          ...ghostStyle,
         }}
       >
         <Handle
@@ -197,11 +199,9 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data }) => {
         isGhostExternal ? " node-external-ghost" : ""
       }`}
       style={
-        isGhostExternal
-          ? { border: "2px dashed #9ca3af", background: "#f9fafb", opacity: 0.9 }
-          : isC4
-          ? { background: bg, color, borderColor: bg }
-          : undefined
+        isC4
+          ? { background: bg, color, borderColor: bg, ...ghostStyle }
+          : ghostStyle
       }
     >
       <Handle
