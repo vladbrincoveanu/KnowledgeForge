@@ -94,8 +94,7 @@ export default function MetricsBar({
           />
         </div>
 
-        <div className="metrics-actions">
-        </div>
+        <div className="metrics-actions"></div>
       </div>
 
       <div className="metrics-row metrics-row-secondary">
@@ -105,7 +104,7 @@ export default function MetricsBar({
             {AVAILABLE_LEVELS.map((level) => (
               <button
                 key={level.key}
-                className={`level-pill ${selectedLevel === level.key ? "active" : ""}`}
+                className={`level-pill cursor-pointer ${selectedLevel === level.key ? "active" : ""}`}
                 onClick={() => toggleLevel(level.key)}
                 style={
                   {
@@ -123,19 +122,19 @@ export default function MetricsBar({
           <span className="section-label">View</span>
           <div className="view-toggle">
             <button
-              className={`view-btn ${dependencyViewFilter === "all" ? "active" : ""}`}
+              className={`view-btn cursor-pointer ${dependencyViewFilter === "all" ? "active" : ""}`}
               onClick={() => setDependencyViewFilter("all")}
             >
               All
             </button>
             <button
-              className={`view-btn ${dependencyViewFilter === "business" ? "active" : ""}`}
+              className={`view-btn cursor-pointer ${dependencyViewFilter === "business" ? "active" : ""}`}
               onClick={() => setDependencyViewFilter("business")}
             >
               Business
             </button>
             <button
-              className={`view-btn ${dependencyViewFilter === "technical" ? "active" : ""}`}
+              className={`view-btn cursor-pointer ${dependencyViewFilter === "technical" ? "active" : ""}`}
               onClick={() => setDependencyViewFilter("technical")}
             >
               Technical
@@ -145,7 +144,7 @@ export default function MetricsBar({
 
         <div className="metrics-cluster external-section">
           <span className="section-label">Scope</span>
-          <label className="toggle-label">
+          <label className="toggle-label cursor-pointer">
             <input
               type="checkbox"
               checked={showExternal}
@@ -156,7 +155,6 @@ export default function MetricsBar({
           </label>
         </div>
       </div>
-
     </div>
   );
 }
