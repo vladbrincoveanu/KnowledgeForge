@@ -72,7 +72,8 @@ class StructureDetector(BaseContainerDetector):
         """Detect containers from project structure."""
         containers = []
         registered_paths = set()
-        
+        resolved_paths = set()  # Track resolved (real) paths to deduplicate symlinks
+
         # Recursively search for framework manifests with pruning
         for root, dirs, files in os.walk(self.repo_path, topdown=True):
             dirs[:] = [d for d in dirs if d not in self.excluded_dirs]
@@ -91,6 +92,16 @@ class StructureDetector(BaseContainerDetector):
                     service_dir = service_dir.parent
                 if manifest_file.name == 'kustomization.yaml' and service_dir.name in {'kustomize', 'kustomization'}:
                     service_dir = service_dir.parent
+
+                # Deduplicate symlinked directories by resolved path
+                try:
+                    resolved_service_dir = service_dir.resolve()
+                except (OSError, RuntimeError):
+                    resolved_service_dir = service_dir
+                resolved_rel = resolved_service_dir.relative_to(self.repo_path)
+                if str(resolved_rel) in resolved_paths:
+                    continue  # Skip — this is a symlink to an already-seen directory
+                resolved_paths.add(str(resolved_rel))
 
                 # Skip if already registered
                 rel_path = service_dir.relative_to(self.repo_path)
