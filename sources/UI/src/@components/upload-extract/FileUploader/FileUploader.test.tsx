@@ -1,22 +1,27 @@
+/* @vitest-environment jsdom */
+
 /**
- * @fileoverview Unit tests for FileUploader component
- * Tests file upload functionality, error handling, and user interactions
+ * @fileoverview Unit tests for FileUploader component (GitHub repo extraction)
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import '@testing-library/jest-dom';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as matchers from '@testing-library/jest-dom/matchers';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import FileUploader from './FileUploader';
+import { codeArchitectureAPI } from '@/services/api';
+
+expect.extend(matchers);
+
+// Test URLs
+const REPO_FACEBOOK = 'https://github.com/facebook/react';
+const REPO_MICROSOFT = 'https://github.com/microsoft/typescript';
+const GITHUB_INPUT_PLACEHOLDER = /github\.com\/owner\/repository/i;
 
 // Mock the API service
 vi.mock('@/services/api', () => ({
-  ontologyAPI: {
-    extractOntology: vi.fn(),
+  codeArchitectureAPI: {
+    extractFromGitHub: vi.fn(),
     getExtractionStatus: vi.fn(),
-  },
-  fileAPI: {
-    uploadFile: vi.fn(),
-    processLocalFile: vi.fn(),
   },
   wsService: {
     connect: vi.fn(),
@@ -24,300 +29,304 @@ vi.mock('@/services/api', () => ({
     on: vi.fn(),
     off: vi.fn(),
   },
-  apiUtils: {
-    formatFileSize: vi.fn(() => '1KB'),
-    handleApiError: vi.fn(),
-  },
 }));
 
 describe('FileUploader Component', () => {
   const mockOnFilesUploaded = vi.fn();
   const mockOnExtractionStarted = vi.fn();
+  const mockShowNotification = vi.fn();
 
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.clearAllMocks();
-    const { ontologyAPI } = await import('@/services/api');
-    ontologyAPI.extractOntology.mockResolvedValue({ task_id: 'mock-task-id' });
+    codeArchitectureAPI.extractFromGitHub.mockResolvedValue({ task_id: 'mock-task-id' });
+    codeArchitectureAPI.getExtractionStatus.mockResolvedValue({
+      status: 'pending',
+      message: 'Queued',
+      progress: 0,
+    });
   });
 
-  it('renders file upload component correctly', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('renders empty state with GitHub URL input', () => {
     render(
       <FileUploader
         onFilesUploaded={mockOnFilesUploaded}
         isProcessing={false}
         onExtractionStarted={mockOnExtractionStarted}
-      />
+        showNotification={mockShowNotification}
+      />,
     );
 
-    // Check if the main upload area is present
-    expect(screen.getByText(/drag and drop/i)).toBeInTheDocument();
-    expect(screen.getByText(/Upload Data Files/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER)).toBeInTheDocument();
+    expect(screen.getByText(/Add one or more GitHub repository URLs above/i)).toBeInTheDocument();
   });
 
-  it('shows file input when clicking browse', () => {
+  it('shows error for empty URL submission', () => {
     render(
       <FileUploader
         onFilesUploaded={mockOnFilesUploaded}
         isProcessing={false}
         onExtractionStarted={mockOnExtractionStarted}
-      />
+        showNotification={mockShowNotification}
+      />,
     );
 
-    const uploadArea = screen.getByText(/drag and drop/i).closest('div');
-    expect(uploadArea).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /add/i }));
+
+    expect(screen.getByText(/please enter a github url/i)).toBeInTheDocument();
   });
 
-  it('accepts CSV files', () => {
+  it('shows error for invalid GitHub URL', () => {
     render(
       <FileUploader
         onFilesUploaded={mockOnFilesUploaded}
         isProcessing={false}
         onExtractionStarted={mockOnExtractionStarted}
-      />
+        showNotification={mockShowNotification}
+      />,
     );
 
-    const uploadArea = screen.getByText(/drag and drop/i);
-    expect(uploadArea).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+      target: { value: 'not-a-valid-url' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /add/i }));
+
+    expect(screen.getByText(/enter a valid github repository url/i)).toBeInTheDocument();
   });
 
-  it('handles file drop correctly', async () => {
-    const { fileAPI } = await import('@/services/api');
-    const mockUploadFile = fileAPI.uploadFile as ReturnType<typeof vi.fn>;
-    const mockProcessLocalFile = fileAPI.processLocalFile as ReturnType<
-      typeof vi.fn
-    >;
-
-    mockUploadFile.mockResolvedValue({
-      file_id: 'test-id',
-      filename: 'test.csv',
-      file_path: '/uploads/test.csv',
-      message: 'Upload successful',
-    });
-
-    mockProcessLocalFile.mockResolvedValue({
-      name: 'test.csv',
-      headers: ['id', 'name', 'email'],
-      rowCount: 1,
-      size: 1024,
-    });
-
+  it('adds a valid GitHub URL to the repo list', () => {
     render(
       <FileUploader
         onFilesUploaded={mockOnFilesUploaded}
         isProcessing={false}
         onExtractionStarted={mockOnExtractionStarted}
-      />
+        showNotification={mockShowNotification}
+      />,
     );
 
-    const dropZone = screen.getByText(/drag and drop/i).closest('div');
-    expect(dropZone).toBeInTheDocument();
-
-    // Create a mock file
-    const file = new File(['id,name,email\n1,John,john@test.com'], 'test.csv', {
-      type: 'text/csv',
+    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+      target: { value: REPO_FACEBOOK },
     });
+    fireEvent.click(screen.getByRole('button', { name: /add/i }));
 
-    // Simulate file drop
-    if (dropZone) {
-      fireEvent.drop(dropZone, {
-        dataTransfer: {
-          files: [file],
-        },
-      });
-    }
-
-    // Wait for upload to complete
-    await waitFor(() => {
-      expect(mockUploadFile).toHaveBeenCalledWith(file);
-    });
+    expect(screen.getByText(/facebook\/react/i)).toBeInTheDocument();
+    expect(screen.getByText(/ready to extract/i)).toBeInTheDocument();
   });
 
-  it('shows error for non-CSV files', async () => {
-    // Mock alert function
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
-
+  it('strips .git suffix from GitHub URL', () => {
     render(
       <FileUploader
         onFilesUploaded={mockOnFilesUploaded}
         isProcessing={false}
         onExtractionStarted={mockOnExtractionStarted}
-      />
+        showNotification={mockShowNotification}
+      />,
     );
 
-    const dropZone = screen.getByText(/drag and drop/i).closest('div');
-
-    // Create a non-CSV file
-    const file = new File(['not csv content'], 'test.txt', {
-      type: 'text/plain',
+    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+      target: { value: 'https://github.com/facebook/react.git' },
     });
+    fireEvent.click(screen.getByRole('button', { name: /add/i }));
 
-    if (dropZone) {
-      fireEvent.drop(dropZone, {
-        dataTransfer: {
-          files: [file],
-        },
-      });
-    }
-
-    await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith(
-        expect.stringContaining('CSV or Excel files only')
-      );
-    });
-
-    alertSpy.mockRestore();
+    expect(screen.getByText(/facebook\/react/i)).toBeInTheDocument();
+    expect(screen.queryByText(/\.git/i)).not.toBeInTheDocument();
   });
 
-  it('handles upload errors gracefully', async () => {
-    const { fileAPI } = await import('@/services/api');
-    const mockUploadFile = fileAPI.uploadFile as ReturnType<typeof vi.fn>;
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
-
-    mockUploadFile.mockRejectedValue(new Error('Upload failed'));
-
+  it('shows error for duplicate GitHub URL', () => {
     render(
       <FileUploader
         onFilesUploaded={mockOnFilesUploaded}
         isProcessing={false}
         onExtractionStarted={mockOnExtractionStarted}
-      />
+        showNotification={mockShowNotification}
+      />,
     );
 
-    const dropZone = screen.getByText(/drag and drop/i).closest('div');
-    const file = new File(['id,name\n1,John'], 'test.csv', {
-      type: 'text/csv',
+    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+      target: { value: REPO_FACEBOOK },
     });
+    fireEvent.click(screen.getByRole('button', { name: /add/i }));
 
-    if (dropZone) {
-      fireEvent.drop(dropZone, {
-        dataTransfer: {
-          files: [file],
-        },
-      });
-    }
-
-    await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Upload failed')
-      );
+    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+      target: { value: REPO_FACEBOOK },
     });
+    fireEvent.click(screen.getByRole('button', { name: /add/i }));
 
-    alertSpy.mockRestore();
+    expect(screen.getByText(/this repository has already been added/i)).toBeInTheDocument();
   });
 
-  it('shows upload progress when uploading', async () => {
-    const { fileAPI } = await import('@/services/api');
-    const mockUploadFile = fileAPI.uploadFile as ReturnType<typeof vi.fn>;
-    const mockProcessLocalFile = fileAPI.processLocalFile as ReturnType<
-      typeof vi.fn
-    >;
-
-    let resolveUpload;
-    const uploadPromise = new Promise(resolve => {
-      resolveUpload = resolve;
-    });
-
-    mockUploadFile.mockImplementation(() => uploadPromise);
-
-    mockProcessLocalFile.mockResolvedValue({
-      name: 'test.csv',
-      headers: ['id', 'name'],
-      rowCount: 1,
-      size: 1024,
-    });
-
+  it('removes a repo from the list', () => {
     render(
       <FileUploader
         onFilesUploaded={mockOnFilesUploaded}
         isProcessing={false}
         onExtractionStarted={mockOnExtractionStarted}
-      />
+        showNotification={mockShowNotification}
+      />,
     );
 
-    const dropZone = screen.getByText(/drag and drop/i).closest('div');
-    const file = new File(['id,name\n1,John'], 'test.csv', {
-      type: 'text/csv',
+    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+      target: { value: REPO_FACEBOOK },
     });
+    fireEvent.click(screen.getByRole('button', { name: /add/i }));
 
-    if (dropZone) {
-      fireEvent.drop(dropZone, {
-        dataTransfer: {
-          files: [file],
-        },
-      });
-    }
+    expect(screen.getByText(/facebook\/react/i)).toBeInTheDocument();
 
-    // Check for upload progress indicator
-    await waitFor(() => {
-      expect(screen.getByText(/Uploading.../i)).toBeInTheDocument();
-    });
+    const removeButtons = screen.getAllByTitle(/remove/i);
+    fireEvent.click(removeButtons[0]);
 
-    // Resolve the upload promise
-    resolveUpload({
-      file_id: 'test-id',
-      filename: 'test.csv',
-      file_path: '/uploads/test.csv',
-      message: 'Upload successful',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText(/Success/i)).toBeInTheDocument();
-    });
+    expect(screen.queryByText(/facebook\/react/i)).not.toBeInTheDocument();
   });
 
-  it('calls onFilesUploaded with correct data', async () => {
-    const { fileAPI } = await import('@/services/api');
-    const mockUploadFile = fileAPI.uploadFile as ReturnType<typeof vi.fn>;
-    const mockProcessLocalFile = fileAPI.processLocalFile as ReturnType<
-      typeof vi.fn
-    >;
-
-    const uploadResponse = {
-      file_id: 'test-id-123',
-      filename: 'customers.csv',
-      file_path: 'uploads/test-id-123_customers.csv',
-      size: 1024,
-      message: 'Upload successful',
-    };
-
-    const processedFile = {
-      name: 'customers.csv',
-      headers: ['id', 'name', 'email'],
-      rowCount: 1,
-      size: 1024,
-      serverPath: uploadResponse.file_path,
-    };
-
-    mockUploadFile.mockResolvedValue(uploadResponse);
-    mockProcessLocalFile.mockResolvedValue(processedFile);
-
+  it('clears all repos', () => {
     render(
       <FileUploader
         onFilesUploaded={mockOnFilesUploaded}
         isProcessing={false}
         onExtractionStarted={mockOnExtractionStarted}
-      />
+        showNotification={mockShowNotification}
+      />,
     );
 
-    const dropZone = screen.getByText(/drag and drop/i).closest('div');
-    const file = new File(
-      ['id,name,email\n1,John,john@test.com'],
-      'customers.csv',
-      {
-        type: 'text/csv',
-      }
-    );
-
-    if (dropZone) {
-      fireEvent.drop(dropZone, {
-        dataTransfer: {
-          files: [file],
-        },
-      });
-    }
-
-    await waitFor(() => {
-      expect(mockOnFilesUploaded).toHaveBeenCalledWith([processedFile]);
+    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+      target: { value: REPO_FACEBOOK },
     });
+    fireEvent.click(screen.getByRole('button', { name: /add/i }));
+
+    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+      target: { value: REPO_MICROSOFT },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /add/i }));
+
+    expect(screen.getByText(/facebook\/react/i)).toBeInTheDocument();
+    expect(screen.getByText(/microsoft\/typescript/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /clear all/i }));
+
+    expect(screen.queryByText(/facebook\/react/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/microsoft\/typescript/i)).not.toBeInTheDocument();
+  });
+
+  it('starts extraction when Extract button is clicked', () => {
+    render(
+      <FileUploader
+        onFilesUploaded={mockOnFilesUploaded}
+        isProcessing={false}
+        onExtractionStarted={mockOnExtractionStarted}
+        showNotification={mockShowNotification}
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+      target: { value: REPO_FACEBOOK },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /add/i }));
+
+    fireEvent.click(screen.getByRole('button', { name: /extract/i }));
+
+    expect(codeArchitectureAPI.extractFromGitHub).toHaveBeenCalledWith(REPO_FACEBOOK, true, true);
+  });
+
+  it('shows extract button enabled when repo is added', () => {
+    render(
+      <FileUploader
+        onFilesUploaded={mockOnFilesUploaded}
+        isProcessing={false}
+        onExtractionStarted={mockOnExtractionStarted}
+        showNotification={mockShowNotification}
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+      target: { value: REPO_FACEBOOK },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /add/i }));
+
+    expect(screen.getByRole('button', { name: /extract/i })).not.toBeDisabled();
+  });
+
+  it('adds repo via Enter key', () => {
+    render(
+      <FileUploader
+        onFilesUploaded={mockOnFilesUploaded}
+        isProcessing={false}
+        onExtractionStarted={mockOnExtractionStarted}
+        showNotification={mockShowNotification}
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+      target: { value: REPO_FACEBOOK },
+    });
+    fireEvent.keyDown(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+      key: 'Enter',
+    });
+
+    expect(screen.getByText(/facebook\/react/i)).toBeInTheDocument();
+  });
+
+  it('shows ready to extract message after adding repo', () => {
+    render(
+      <FileUploader
+        onFilesUploaded={mockOnFilesUploaded}
+        isProcessing={false}
+        onExtractionStarted={mockOnExtractionStarted}
+        showNotification={mockShowNotification}
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+      target: { value: REPO_FACEBOOK },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /add/i }));
+
+    expect(screen.getByText(/ready to extract/i)).toBeInTheDocument();
+  });
+
+  it('shows multiple repos with correct status labels', () => {
+    render(
+      <FileUploader
+        onFilesUploaded={mockOnFilesUploaded}
+        isProcessing={false}
+        onExtractionStarted={mockOnExtractionStarted}
+        showNotification={mockShowNotification}
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+      target: { value: REPO_FACEBOOK },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /add/i }));
+
+    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+      target: { value: REPO_MICROSOFT },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /add/i }));
+
+    // Each repo has "Ready to extract" message and "Ready" status label
+    const readyLabels = screen.getAllByText(/ready/i);
+    expect(readyLabels).toHaveLength(4);
+  });
+
+  it('clears input after adding repo', () => {
+    render(
+      <FileUploader
+        onFilesUploaded={mockOnFilesUploaded}
+        isProcessing={false}
+        onExtractionStarted={mockOnExtractionStarted}
+        showNotification={mockShowNotification}
+      />,
+    );
+
+    const input = screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER);
+    fireEvent.change(input, {
+      target: { value: REPO_FACEBOOK },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /add/i }));
+
+    expect(input).toHaveValue('');
   });
 });

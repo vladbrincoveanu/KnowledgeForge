@@ -2893,7 +2893,7 @@
       "last_commit_date": "2026-03-20T07:52:20+01:00",
       "first_commit_date": "2026-03-20T07:52:20+01:00",
       "total_commits": 1,
-      "commits_30d": 1,
+      "commits_30d": 0,
       "commits_90d": 1,
       "commits_180d": 1,
       "top_contributors": [
@@ -2942,17 +2942,17 @@
     "contributor_count": 1,
     "status": "MAINTENANCE",
     "status_evidence": {
-      "commits_30d": 1,
+      "commits_30d": 0,
       "commits_90d": 1,
       "commits_180d": 1,
       "last_commit_date": "2026-03-20T07:52:20+01:00",
-      "days_since_last_commit": 6,
+      "days_since_last_commit": 30,
       "git_repos_scanned": 1
     },
-    "tier": "Tier 2 - Production Standard",
+    "tier": "Tier 1 - Production Critical",
     "data_class": "General",
     "active_experts": 0,
-    "compliance": "AT_RISK",
+    "compliance": "NON_COMPLIANT",
     "compliance_confidence": 1.0,
     "compliance_factors": [
       "Score: 2/7 checks passed",
@@ -2965,11 +2965,11 @@
       "\u274c Dependency management"
     ],
     "last_commit_date": "2026-03-20T07:52:20+01:00",
-    "commit_count_30d": 1,
+    "commit_count_30d": 0,
     "commit_count_90d": 1,
     "commit_count_180d": 1,
     "dora_metrics": {
-      "deployment_frequency_per_day": 0.0333,
+      "deployment_frequency_per_day": 0.0,
       "lead_time_days": null,
       "mttr_hours": null,
       "change_failure_rate": null,
@@ -2979,6 +2979,6 @@
     "on_call_channel": null,
     "owner_team": "Unassigned",
     "business_domain": "Infrastructure",
-    "criticality": "Tier 2 - Production Standard"
+    "criticality": "Tier 1 - Production Critical"
   }
 }
