@@ -17,7 +17,7 @@ import re
 import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 from app.utils.fs_utils import limited_rglob
 
@@ -27,6 +27,9 @@ except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 fallback
     import tomli
 
 logger = logging.getLogger(__name__)
+
+TIER1_LANGUAGES = {"java", "typescript", "javascript", "c#", "csharp", ".net"}
+TIER2_LANGUAGES = {"python", "go", "rust"}
 
 
 class MetadataDetector:
@@ -456,9 +459,27 @@ Team name:"""
         max_domain = max(indicators.items(), key=lambda x: x[1])
         return domain_map.get(max_domain[0], 'General')
 
-    def determine_criticality(self) -> str:
-        """Determine system criticality tier."""
+    def determine_criticality(self, languages: Optional[List[str]] = None) -> str:
+        """Determine system criticality tier.
+
+        Args:
+            languages: Optional list of detected programming language names.
+        """
         criticality_score = 0
+
+        # Language-based criticality boost
+        if languages:
+            # Handle list[dict] from detect_languages() or list[str]
+            lang_lower = set()
+            for l in languages:
+                if isinstance(l, dict):
+                    lang_lower.add(l.get("language", "").lower().strip())
+                else:
+                    lang_lower.add(str(l).lower().strip())
+            if TIER1_LANGUAGES & lang_lower:
+                return "Tier 1 - Production Critical"
+            if TIER2_LANGUAGES & lang_lower:
+                criticality_score += 2
 
         prod_indicators = [
             'prod', 'production', 'live',
