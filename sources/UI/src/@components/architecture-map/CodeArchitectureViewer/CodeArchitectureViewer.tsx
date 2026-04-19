@@ -2130,24 +2130,37 @@ const CodeArchitectureViewerInner: React.FC = () => {
       filteredEntities,
     );
 
-    const dependencyEdges =
-      selectedLevel === "container_level" && filteredRelationships.length === 0
+    // Build context external entities from system_context for linking container edges to context-level externals
+    const contextExternalEntities = (
+      architecture.system_context?.external_dependencies || []
+    ).map((dep: any, idx: number) => ({
+      id: `context_external_${idx}`,
+      name: dep.context_name || dep.name,
+      entity_type: "external_system",
+    }));
+
+    const { nodes: ghostNodes, edges: dependencyEdges } =
+      selectedLevel === "container_level" &&
+      (architecture?.containers?.length > 0 ||
+        (architecture?.relationships?.containers?.length ?? 0) > 0)
         ? generateC4Edges(
             architecture?.containers || [],
             architecture?.relationships?.containers || [],
+            contextExternalEntities,
           )
-        : [];
+        : { nodes: [], edges: [] };
 
     const mergedEdges = [...rfEdges, ...dependencyEdges];
+    const mergedNodes = [...rfNodes, ...ghostNodes];
 
     // Apply layout — use star layout for C4 context level, dagre for everything else
     let layoutedNodes: Node[];
     let layoutedEdges: Edge[];
     if (selectedLevel === "context_level") {
-      layoutedNodes = layoutContextLevel([...rfNodes]);
+      layoutedNodes = layoutContextLevel([...mergedNodes]);
       layoutedEdges = mergedEdges;
     } else {
-      const result = getLayoutedElements(rfNodes, mergedEdges);
+      const result = getLayoutedElements(mergedNodes, mergedEdges);
       layoutedNodes = result.nodes;
       layoutedEdges = result.edges;
     }
