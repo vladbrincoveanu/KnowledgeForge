@@ -105,53 +105,99 @@ const edgeTypes = {
 const buildContainerId = (container: any, idx: number) =>
   `container_${container.name || idx}`;
 
-const generateC4Edges = (
+export const generateC4Edges = (
   containers: any[] = [],
   relationships: any[] = [],
-): Edge[] => {
+  contextExternalEntities: any[] = [],
+): { nodes: Node[]; edges: Edge[] } => {
   const nameToId = new Map<string, string>();
+  containers.forEach((container, idx) => {
+    if (container?.name) {
+      const id = `container_${container.name || idx}`;
+      nameToId.set(container.name, id);
+      // Also store with omnipay- prefix stripped for helm name mismatch fallback
+      if (container.name.startsWith("omnipay-")) {
+        nameToId.set(container.name.slice(8), id);
+      }
+    }
+  });
+
+  // Build context external name → id lookup (normalise for matching)
+  const contextExternalIdByName = new Map<string, string>();
+  contextExternalEntities.forEach((ext) => {
+    if (ext.name) {
+      contextExternalIdByName.set(ext.name.toLowerCase(), ext.id);
+      // Also store with spaces/dashes normalised
+      const normalised = ext.name.toLowerCase().replace(/[-_\s]+/g, "");
+      contextExternalIdByName.set(normalised, ext.id);
+    }
+  });
+
+  const stripOmniPrefix = (name: string) =>
+    name.startsWith("omnipay-") ? name.slice(8) : name;
+
+  const ghostNodes: Node[] = [];
   const edges: Edge[] = [];
   const relationshipEdgesAdded = new Set<string>();
 
-  containers.forEach((container, idx) => {
-    if (container?.name) {
-      nameToId.set(container.name, buildContainerId(container, idx));
+  const resolveId = (
+    name: string,
+  ): { id: string | null; isGhost: boolean } => {
+    if (!name) return { id: null, isGhost: false };
+    // 1. Direct container name lookup
+    if (nameToId.has(name)) return { id: nameToId.get(name)!, isGhost: false };
+    // 2. Strip omnipay- prefix and retry
+    const stripped = stripOmniPrefix(name);
+    if (nameToId.has(stripped)) return { id: nameToId.get(stripped)!, isGhost: false };
+    // 3. Check context externals (direct + normalised)
+    const normalised = name.toLowerCase().replace(/[-_\s]+/g, "");
+    if (contextExternalIdByName.has(name.toLowerCase()))
+      return { id: contextExternalIdByName.get(name.toLowerCase())!, isGhost: false };
+    if (contextExternalIdByName.has(normalised))
+      return { id: contextExternalIdByName.get(normalised)!, isGhost: false };
+    // 4. Create ghost external node
+    const ghostId = `ghost_external_${name.toLowerCase().replace(/[^a-z0-9]/g, "_")}`;
+    if (!ghostNodes.some((n) => n.id === ghostId)) {
+      ghostNodes.push({
+        id: ghostId,
+        type: "custom",
+        position: { x: 0, y: 0 },
+        data: {
+          label: name,
+          type: "external_system",
+          displayType: "External",
+          isExternal: true,
+          attributes: { isGhostExternal: true },
+        },
+      });
     }
-  });
+    return { id: ghostId, isGhost: true };
+  };
 
   relationships.forEach((rel, idx) => {
     const sourceName = rel?.from ?? rel?.source;
     const targetName = rel?.to ?? rel?.destination;
-    if (!sourceName || !targetName) {
-      return;
-    }
+    if (!sourceName || !targetName) return;
 
-    const sourceId = nameToId.get(String(sourceName));
-    const targetId = nameToId.get(String(targetName));
-    if (!sourceId || !targetId) {
-      return;
-    }
+    const sourceResult = resolveId(String(sourceName));
+    const targetResult = resolveId(String(targetName));
+    if (!sourceResult.id || !targetResult.id) return;
 
-    const relationshipKey = `${sourceId}-${targetId}`;
-    if (relationshipEdgesAdded.has(relationshipKey)) {
-      return;
-    }
+    const relationshipKey = `${sourceResult.id}-${targetResult.id}`;
+    if (relationshipEdgesAdded.has(relationshipKey)) return;
 
     const protocol =
       typeof rel?.protocol === "string" ? rel.protocol.trim() : "";
     const label = protocol ? protocol.toUpperCase() : undefined;
-    const edgeId = `c4-rel-${sourceId}-${targetId}-${idx}`;
 
     edges.push({
-      id: edgeId,
-      source: sourceId,
-      target: targetId,
+      id: `c4-rel-${sourceResult.id}-${targetResult.id}-${idx}`,
+      source: sourceResult.id,
+      target: targetResult.id,
       label,
       type: "C4Edge",
       interactionWidth: 16,
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-      },
+      markerEnd: { type: MarkerType.ArrowClosed },
       data: {
         description: rel?.description || rel?.llm_description,
         llm_description: rel?.llm_description,
@@ -159,56 +205,42 @@ const generateC4Edges = (
         relationship_type: rel?.relationship_type || rel?.type,
       },
     });
-
     relationshipEdgesAdded.add(relationshipKey);
   });
 
-  if (relationships.length > 0) {
-    return edges;
-  }
+  // Fallback: build edges from container.dependencies_internal when no relationships given
+  if (relationships.length === 0) {
+    containers.forEach((container, idx) => {
+      const sourceId = `container_${container.name || idx}`;
+      const protocol =
+        typeof container?.protocol === "string" ? container.protocol.trim() : "";
+      const label = protocol ? protocol.toUpperCase() : undefined;
+      const deps: string[] = Array.isArray(container?.dependencies_internal)
+        ? container.dependencies_internal.map(String)
+        : [];
 
-  containers.forEach((container, idx) => {
-    const sourceId = buildContainerId(container, idx);
-    const protocol =
-      typeof container?.protocol === "string" ? container.protocol.trim() : "";
-    const label = protocol ? protocol.toUpperCase() : undefined;
-    const dependencies: string[] = Array.isArray(
-      container?.dependencies_internal,
-    )
-      ? container.dependencies_internal.map((dependency: unknown) =>
-          String(dependency),
-        )
-      : [];
+      deps.forEach((depName, depIdx) => {
+        const targetResult = resolveId(depName);
+        if (!targetResult.id) return;
+        const key = `${sourceId}-${targetResult.id}`;
+        if (relationshipEdgesAdded.has(key)) return;
 
-    dependencies.forEach((dependencyName: string, depIdx: number) => {
-      const targetId = nameToId.get(String(dependencyName));
-      if (!targetId) {
-        return;
-      }
-
-      if (relationshipEdgesAdded.has(`${sourceId}-${targetId}`)) {
-        return;
-      }
-
-      edges.push({
-        id: `c4-edge-${sourceId}-${targetId}-${depIdx}`,
-        source: sourceId,
-        target: targetId,
-        label,
-        type: "C4Edge",
-        interactionWidth: 16,
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-        },
-        data: {
-          protocol,
-          relationship_type: "uses",
-        },
+        edges.push({
+          id: `c4-rel-${sourceId}-${targetResult.id}-${depIdx}`,
+          source: sourceId,
+          target: targetResult.id,
+          label,
+          type: "C4Edge",
+          interactionWidth: 16,
+          markerEnd: { type: MarkerType.ArrowClosed },
+          data: { protocol, relationship_type: "uses" },
+        });
+        relationshipEdgesAdded.add(key);
       });
     });
-  });
+  }
 
-  return edges;
+  return { nodes: ghostNodes, edges };
 };
 
 const normalizeDescription = (text?: string) => {
@@ -307,7 +339,10 @@ const getLayoutedElements = (
       });
 
       const standaloneStartY = maxY + 80;
-      const cols = Math.min(5, Math.max(2, Math.ceil(Math.sqrt(standaloneNodes.length))));
+      const cols = Math.min(
+        5,
+        Math.max(2, Math.ceil(Math.sqrt(standaloneNodes.length))),
+      );
       const nodeW = 260;
       const nodeH = 120;
       const gapX = 40;
@@ -389,11 +424,11 @@ const getLayoutedElements = (
     dagreGraph.setGraph({
       rankdir: direction,
       align: "UL",
-      ranksep: 240,      // More room for context labels and edge curves
-      nodesep: 155,      // Keep neighboring nodes from pinching labels
-      edgesep: 70,       // Give parallel edges enough breathing room
-      marginx: 150,      // Larger margins
-      marginy: 150,      // Larger margins
+      ranksep: 240, // More room for context labels and edge curves
+      nodesep: 155, // Keep neighboring nodes from pinching labels
+      edgesep: 70, // Give parallel edges enough breathing room
+      marginx: 150, // Larger margins
+      marginy: 150, // Larger margins
       ranker: "network-simplex",
     });
 
@@ -439,8 +474,8 @@ const getLayoutedElements = (
   const nodesPerRow = Math.max(1, Math.ceil(Math.sqrt(nodes.length)));
   const nodeWidth = 260;
   const nodeHeight = 140;
-  const spacingX = 140;  // Major increase
-  const spacingY = 120;  // Major increase
+  const spacingX = 140; // Major increase
+  const spacingY = 120; // Major increase
 
   const layoutedNodes = nodes.map((node, index) => {
     const row = Math.floor(index / nodesPerRow);
@@ -470,17 +505,23 @@ function layoutContextLevel(nodes: Node[]): Node[] {
   const system = nodes.find((n) => n.data?.type === "system");
   const persons = nodes.filter((n) => n.data?.type === "person");
   const externals = nodes.filter(
-    (n) => n.data?.type !== "system" && n.data?.type !== "person" && n.data?.is_external
+    (n) =>
+      n.data?.type !== "system" &&
+      n.data?.type !== "person" &&
+      n.data?.is_external,
   );
   const otherExternals = nodes.filter(
-    (n) => n.data?.type !== "system" && n.data?.type !== "person" && !n.data?.is_external
+    (n) =>
+      n.data?.type !== "system" &&
+      n.data?.type !== "person" &&
+      !n.data?.is_external,
   );
 
   // Node dimensions for spacing calculations
   const nodeWidth = 260;
   const nodeHeight = 140;
-  const personsX = 80;              // Far left
-  const externalsX = cx + 400;       // Far right
+  const personsX = 80; // Far left
+  const externalsX = cx + 400; // Far right
   const systemX = cx - nodeWidth / 2; // Center
   const systemY = cy - nodeHeight / 2;
 
@@ -496,7 +537,7 @@ function layoutContextLevel(nodes: Node[]): Node[] {
   persons.forEach((n, i) => {
     n.position = {
       x: personsX,
-      y: cy - (persons.length - 1) * personSpacingY / 2 + i * personSpacingY
+      y: cy - ((persons.length - 1) * personSpacingY) / 2 + i * personSpacingY,
     };
     n.sourcePosition = Position.Right;
     n.targetPosition = Position.Left;
@@ -508,7 +549,10 @@ function layoutContextLevel(nodes: Node[]): Node[] {
   allExternals.forEach((n, i) => {
     n.position = {
       x: externalsX,
-      y: cy - (allExternals.length - 1) * externalSpacingY / 2 + i * externalSpacingY
+      y:
+        cy -
+        ((allExternals.length - 1) * externalSpacingY) / 2 +
+        i * externalSpacingY,
     };
     n.sourcePosition = Position.Left;
     n.targetPosition = Position.Right;
@@ -1051,8 +1095,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
             decision_mode: dep.decision_mode || dep.decision?.decision_mode,
             review_status: dep.review_status || dep.decision?.review_status,
             requires_human_review:
-              dep.requires_human_review ||
-              dep.review_status === "needs_review",
+              dep.requires_human_review || dep.review_status === "needs_review",
             review_threshold: dep.review_threshold,
             review_item: dep.review_item,
             review_options: dep.review_options,
@@ -2321,41 +2364,44 @@ const CodeArchitectureViewerInner: React.FC = () => {
         let streamedReply = "";
         let receivedDelta = false;
 
-        await codeArchitectureAPI.streamChatWithContext({
-          message: trimmedMessage,
-          history: historyForRequest,
-          selection: buildSelectionChatContext(),
-          architecture: buildArchitectureChatContext(),
-        }, {
-          onDelta: (delta) => {
-            if (!delta) {
-              return;
-            }
-            receivedDelta = true;
-            streamedReply += delta;
+        await codeArchitectureAPI.streamChatWithContext(
+          {
+            message: trimmedMessage,
+            history: historyForRequest,
+            selection: buildSelectionChatContext(),
+            architecture: buildArchitectureChatContext(),
           },
-          onComplete: () => {
-            setChatMessages((currentMessages) => {
-              if (!receivedDelta) {
+          {
+            onDelta: (delta) => {
+              if (!delta) {
+                return;
+              }
+              receivedDelta = true;
+              streamedReply += delta;
+            },
+            onComplete: () => {
+              setChatMessages((currentMessages) => {
+                if (!receivedDelta) {
+                  return [
+                    ...currentMessages,
+                    {
+                      role: "assistant",
+                      content: "No response available.",
+                    },
+                  ];
+                }
+
                 return [
                   ...currentMessages,
                   {
                     role: "assistant",
-                    content: "No response available.",
+                    content: streamedReply.trim() || "No response available.",
                   },
                 ];
-              }
-
-              return [
-                ...currentMessages,
-                {
-                  role: "assistant",
-                  content: streamedReply.trim() || "No response available.",
-                },
-              ];
-            });
+              });
+            },
           },
-        });
+        );
       } catch (error) {
         setChatMessages((currentMessages) => [
           ...currentMessages,
