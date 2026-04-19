@@ -81,7 +81,7 @@ class ContextManager:
         # IT Landscape metadata
         owner_team, owner_provenance = self.metadata_detector.detect_owner_team()
         business_domain = self.metadata_detector.infer_business_domain()
-        criticality = self.metadata_detector.determine_criticality()
+        criticality = self.metadata_detector.determine_criticality(languages)
         data_class = self.metadata_detector.infer_data_classification()
 
         # If the repository looks infrastructure-focused, prefer General data class
