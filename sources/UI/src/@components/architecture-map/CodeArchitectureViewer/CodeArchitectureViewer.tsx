@@ -102,9 +102,6 @@ const edgeTypes = {
   C4Edge,
 };
 
-const buildContainerId = (container: any, idx: number) =>
-  `container_${container.name || idx}`;
-
 export const generateC4Edges = (
   containers: any[] = [],
   relationships: any[] = [],
@@ -115,7 +112,7 @@ export const generateC4Edges = (
     if (container?.name) {
       const id = `container_${container.name || idx}`;
       nameToId.set(container.name, id);
-      // Also store with omnipay- prefix stripped for helm name mismatch fallback
+      // Store stripped form for helm name mismatch fallback
       if (container.name.startsWith("omnipay-")) {
         nameToId.set(container.name.slice(8), id);
       }
@@ -133,10 +130,8 @@ export const generateC4Edges = (
     }
   });
 
-  const stripOmniPrefix = (name: string) =>
-    name.startsWith("omnipay-") ? name.slice(8) : name;
-
   const ghostNodes: Node[] = [];
+  const ghostNodeIds = new Set<string>();
   const edges: Edge[] = [];
   const relationshipEdgesAdded = new Set<string>();
 
@@ -147,17 +142,19 @@ export const generateC4Edges = (
     // 1. Direct container name lookup
     if (nameToId.has(name)) return { id: nameToId.get(name)!, isGhost: false };
     // 2. Strip omnipay- prefix and retry
-    const stripped = stripOmniPrefix(name);
+    const stripped = name.startsWith("omnipay-") ? name.slice(8) : name;
     if (nameToId.has(stripped)) return { id: nameToId.get(stripped)!, isGhost: false };
     // 3. Check context externals (direct + normalised)
-    const normalised = name.toLowerCase().replace(/[-_\s]+/g, "");
-    if (contextExternalIdByName.has(name.toLowerCase()))
-      return { id: contextExternalIdByName.get(name.toLowerCase())!, isGhost: false };
+    const lowerName = name.toLowerCase();
+    const normalised = lowerName.replace(/[-_\s]+/g, "");
+    if (contextExternalIdByName.has(lowerName))
+      return { id: contextExternalIdByName.get(lowerName)!, isGhost: false };
     if (contextExternalIdByName.has(normalised))
       return { id: contextExternalIdByName.get(normalised)!, isGhost: false };
-    // 4. Create ghost external node
-    const ghostId = `ghost_external_${name.toLowerCase().replace(/[^a-z0-9]/g, "_")}`;
-    if (!ghostNodes.some((n) => n.id === ghostId)) {
+    // 4. Create ghost external node (O(1) Set lookup)
+    const ghostId = `ghost_external_${lowerName.replace(/[^a-z0-9]/g, "_")}`;
+    if (!ghostNodeIds.has(ghostId)) {
+      ghostNodeIds.add(ghostId);
       ghostNodes.push({
         id: ghostId,
         type: "custom",
