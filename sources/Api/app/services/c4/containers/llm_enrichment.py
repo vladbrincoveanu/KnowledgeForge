@@ -218,8 +218,7 @@ def _infer_signal_type(container: dict[str, Any]) -> str:
     if deployment in ("kustomize", "manifest"):
         return "kustomize-manifest"
     if deployment == "gitops":
-        # GitOps repos with no technology hint are likely pure infra overlays
-        return "infrastructure-only" if not tech else "helm-chart"
+        return "helm-chart"
     if "values.yaml" in path:
         return "helm-values"
     if "/" in tech or (":" in tech and "kubernetes" not in tech):

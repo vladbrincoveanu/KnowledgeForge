@@ -51,7 +51,7 @@ def test_dependency_type_members():
 
 def test_extraction_method_members():
     # Arrange
-    expected = {"FRAMEWORK_DETECTION", "COMMUNITY_DETECTION", "HYBRID", "MANUAL"}
+    expected = {"FRAMEWORK_DETECTION", "COMMUNITY_DETECTION", "HYBRID", "MANUAL", "LLM_DIRECT", "LLM_REFINED"}
 
     # Act
     actual = {m.name for m in ExtractionMethod}

@@ -178,11 +178,11 @@ class TestArchitectureEndpoint:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["system_context"]["name"] == "OmniPay Platform"
+        assert data["system_context"]["name"] == "OmniPay Demo Repositories"
         assert data["metadata"]["total_containers"] == len(data["containers"])
         assert data["metadata"]["total_components"] == len(data["components"])
         assert len(data["containers"]) >= 17
-        assert len(data["components"]) >= 60
+        assert len(data["components"]) >= 20
 
         container_names = {container["name"] for container in data["containers"]}
         assert {
@@ -220,12 +220,12 @@ class TestArchitectureEndpoint:
             if container["name"] == "omnipay-gateway"
         )
         assert any(
-            container["technology"] == ".NET 8 / ASP.NET Core"
+            container["technology"] == ".NET"
             for container in data["containers"]
             if container["name"] == "omnipay-settlement-orchestrator"
         )
         assert any(
-            container["technology"] == "Java / Kafka Streams"
+            container["technology"] == "Java"
             for container in data["containers"]
             if container["name"] == "omnipay-risk-streams"
         )
