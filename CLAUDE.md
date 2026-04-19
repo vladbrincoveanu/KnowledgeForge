@@ -1,46 +1,82 @@
-## Agent Team: Container Extraction
+# CLAUDE.md
 
-### Architect
-- Owns design decisions for the container detection pipeline
-- Evaluates whether detection phases correctly map to C4 Container semantics 
-  (name, type/responsibility, technology, inter-container communication)
-- Reviews extraction output against Simon Brown's container definition:
-  "an application or data store that needs to be running for the system to work"
-- Decides how to handle edge cases (e.g., sidecar containers, init containers, 
-  shared volumes, multi-stage Dockerfiles)
-- Produces specs and interface contracts, does NOT write implementation
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-### Implementer
-- Writes extraction code for the assigned detection phase
-- Each task scoped to one phase: Dockerfile parsing, docker-compose, Helm, or Terraform
-- Runs tests before marking done
-- Follows merge/dedup contract defined by Architect
+## Project Overview
 
-### Reviewer  
-- Reviews implementation against C4 container spec completeness
-- Checks: does the extracted Container Dictionary capture name, type, 
-  technology, and relationships?
-- Validates edge cases against real repos (train-ticket, eShop, Robot Shop)
-- Challenges Architect if extraction logic misclassifies 
-  (e.g., init container treated as real container)
+KnowledgeForge is a C4 architecture extraction engine that analyzes codebases and produces structured C4-level graphs (Context, Container, Component, Code). It transforms messy repositories into graph insights stored in Neo4j.
+
+**Stack:** FastAPI (Backend) | React/TypeScript (Frontend) | Neo4j (Graph) | PostgreSQL (Metadata) | Docker
+
+## Mother Commands
+
+Always run these after implementing changes:
+
+```bash
+make quick-check    # Fast restart + tests (1-2 min) - use for most changes
+make full-check     # Complete rebuild + tests (5-10 min) - use for infrastructure changes
+make ci             # CI/CD pipeline simulation - use before merging
 ```
 
-## Example Prompt to Launch
+**E2E Tests:** 11 tests in `sources/Api/test_e2e_extraction.py` + OmniPay demo tests in `sources/Api/tests/e2e/test_omnipay_extraction.py`
+
+## Architecture
+
+### Workspace Separation (The "Iron Curtain")
+
 ```
-Create an agent team for KnowledgeForge container extraction:
+sources/Api/app/services/c4/context/     # Context-level extraction - OUR WORKSPACE
+sources/Api/app/services/c4/containers/   # Container-level extraction - OTHER SQUAD'S WORKSPACE
+```
 
-- Architect: review the current 4-phase container detection pipeline 
-  (Structure → Compose → Helm → Terraform → merge/dedup) and produce 
-  a spec for handling inter-container relationships. C4 containers must 
-  capture name, type, technology, and how they communicate.
+Do NOT modify `containers/` unless explicitly coordinating with the other developer.
 
-- Implementer: implement the relationship extraction based on 
-  Architect's spec — docker-compose links/networks, Helm service 
-  dependencies, Terraform resource references.
+### Extraction Pipeline
 
-- Reviewer: validate extracted container dictionaries against the 
-  train-ticket repo (41 microservices). Check completeness and 
-  flag any misclassified containers.
+```
+GitHub URL → ServiceDiscovery → Language/API/Deployment Detection
+    → ServiceEnhancers (8 phases: compliance, docs, comms, auth, etc.)
+    → Neo4j (graph) + PostgreSQL (metadata)
+```
 
-Architect finishes spec first. Then Implementer and Reviewer 
-can work in parallel (Implementer codes, Reviewer audits existing output).
+Key files:
+- `sources/Api/app/services/service_extraction/service_enhancers.py` - Enhancement chain
+- `sources/Api/app/services/c4/context/context_manager.py` - Context extraction orchestrator
+- `sources/Api/app/services/c4/containers/container_manager.py` - Container extraction
+
+### Service Data Format
+
+Each extracted service has **5 primary fields**:
+1. `domain` - Business domain (e.g., "ai", "docs", "api")
+2. `owner` - From git history (top contributor), never "Unassigned" when git exists
+3. `status` - "Active-Dev", "Maintenance-Only", "Deprecated / Frozen"
+4. `tier` - "Tier 1", "Tier 2", "Tier 3", "Unknown"
+5. `data_class` - "PII", "Credit-Card", "Internal", "Public", "Unknown"
+
+## Development Commands
+
+```bash
+# API (runs inside Docker)
+docker compose exec api python -m pytest tests/ -v           # Unit tests
+docker compose exec api python -m pytest test_e2e_extraction.py -v  # E2E tests
+docker compose exec api python tests/test_pipeline.py        # Pipeline integration
+
+# UI (run from sources/UI)
+npm run test          # Vitest tests
+npm run fix-all       # Format + lint + type-check
+npm run check-all     # Validate without fixing
+
+# Standalone
+make test-e2e-omnipay        # OmniPay demo E2E tests
+make test-owner              # Owner detection test
+make test-containers         # Container detection test
+```
+
+## Key Conventions
+
+- **Error handling:** Never use bare `except Exception:` (except for 3rd-party LLM calls)
+- **Pydantic:** Use V2 with strict typing; enums use `.value` for membership checks
+- **Git history:** `full_history=True` required for accurate owner detection
+- **ServiceStatus values:** `ACTIVE`, `MAINTENANCE`, `DEPRECATED`, `ARCHIVED`, `unknown` (NOT old strings)
+- **Endpoints:** Extract from Helm `values.yaml`, Ingress, and README docs
+- **Zip extraction:** Always use `safe_extract_zip()` to block path traversal

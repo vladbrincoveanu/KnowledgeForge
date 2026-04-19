@@ -6,7 +6,6 @@ from typing import Any, Optional
 
 from .base_detector import BaseContainerDetector
 from . import utils
-from .relationship_extractor import ConfigRelationshipExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +16,7 @@ EXCLUDED_DIRS = {
     '.idea', '.vscode', 'logs', 'temp', 'tmp', '.pytest_cache',
     'test', 'tests', '__tests__', 'docs', 'documentation',
     '.next', '.nuxt', '.cache', 'coverage', '.coverage',
-    '.tox', '.nox', '.eggs', '*.egg-info',
+    '.tox', '.nox', '.eggs', '.egg-info',
 }
 
 
