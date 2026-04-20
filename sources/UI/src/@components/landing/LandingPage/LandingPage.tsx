@@ -1339,6 +1339,23 @@ const TeamSection: React.FC = () => (
         we have lived it. No consultants — just practitioners.
       </p>
     </div>
+
+    {/* ── FOUNDING NARRATIVE ── */}
+    <div className="lp-team__narrative">
+      <p className="lp-team__narrative-lead">Built by engineers. Run from Vienna.</p>
+      <p className="lp-team__narrative-body">
+        The product has two layers. A code extraction engine that needs to be
+        precise, deterministic, and robust at scale — that&apos;s one domain. An
+        intelligence layer on top that needs to be reliable, auditable, and
+        production-grade — that&apos;s the other. We each built half the product
+        before we formalised the company.
+      </p>
+      <p className="lp-team__narrative-body">
+        We did not start with a pitch deck. We started with the extraction
+        engine — it runs today, across multiple languages, on real codebases.
+      </p>
+    </div>
+
     <div className="lp-team__grid">
       {FOUNDERS.map((founder) => (
         <article key={founder.name} className="lp-founder-card">
@@ -1361,6 +1378,7 @@ const TeamSection: React.FC = () => (
       ))}
     </div>
 
+    {/* ── ASK BLOCK (unchanged) ── */}
     <div className="lp-ask-block">
       <h2>Seeking 3 Enterprise Design Partners</h2>
       <div className="lp-ask-block__perks">
