@@ -1524,8 +1524,8 @@ const LandingPage: React.FC = () => {
           <AltitudeTabSwitcher />
         </section>
 
-        {/* ── PIPELINE ── */}
-        <PipelineSection />
+        {/* ── THREE-STAGE PLATFORM ── */}
+        <PipelineStagesSection />
 
         {/* ── RISK REGISTER ── */}
         <RiskSection />
