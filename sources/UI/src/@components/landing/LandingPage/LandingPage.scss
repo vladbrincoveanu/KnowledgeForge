@@ -183,6 +183,11 @@
     line-height: 1.7;
     margin: 0;
   }
+
+  &--tight {
+    margin-top: 4rem;
+    margin-bottom: 1.5rem;
+  }
 }
 
 /* ── MAIN WRAPPER ────────────────────────────────────────────────────────────── */
@@ -500,6 +505,7 @@
     border-color 200ms ease,
     box-shadow 250ms ease,
     transform 200ms ease;
+  cursor: pointer;
 
   &:hover {
     border-color: rgba(59, 130, 246, 0.3);
@@ -569,6 +575,7 @@
     border-color 200ms ease,
     box-shadow 250ms ease,
     transform 200ms ease;
+  cursor: pointer;
 
   &:hover {
     transform: translateY(-2px);
@@ -690,6 +697,39 @@
     font-size: 0.9rem;
     line-height: 1.5;
   }
+
+  &__matrix-row {
+    display: grid;
+    grid-template-columns: 1.6fr 0.8fr 0.8fr 0.8fr 0.9fr;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem 1.75rem;
+    border-bottom: 1px solid var(--lp-border);
+    transition: background 200ms ease;
+
+    &:last-child { border-bottom: none; }
+    &:hover:not(&--header) { background: rgba(255, 255, 255, 0.02); }
+
+    &--header {
+      background: var(--lp-card-solid);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--lp-muted);
+    }
+  }
+
+  &__matrix-cell {
+    text-align: center;
+    opacity: 0.65;
+
+    &--strong {
+      font-weight: 700;
+      opacity: 1;
+      color: var(--lp-cta);
+    }
+  }
 }
 
 /* ── SOLUTION / PILLARS ──────────────────────────────────────────────────────── */
@@ -722,6 +762,7 @@
     border-color 200ms ease,
     transform 200ms ease,
     box-shadow 250ms ease;
+  cursor: pointer;
 
   &:hover {
     border-color: rgba(34, 197, 94, 0.35);
@@ -909,6 +950,7 @@
     border-color 200ms ease,
     box-shadow 250ms ease,
     transform 200ms ease;
+  cursor: pointer;
 
   &:hover {
     transform: translateY(-3px);
@@ -1038,6 +1080,7 @@
     border-color 200ms ease,
     box-shadow 250ms ease,
     transform 200ms ease;
+  cursor: pointer;
 
   &:hover {
     border-color: rgba(239, 68, 68, 0.3);
@@ -1073,6 +1116,26 @@
     color: var(--lp-cta);
     letter-spacing: 0.04em;
     margin-bottom: 0.75rem;
+  }
+
+  &__caption {
+    display: block;
+    margin-top: -0.25rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.85rem;
+    color: var(--lp-muted);
+    opacity: 0.75;
+    line-height: 1.5;
+  }
+
+  &__source {
+    display: block;
+    margin-top: 0.75rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--lp-muted);
+    opacity: 0.55;
   }
 
   p {
@@ -1142,6 +1205,7 @@
     border-color 200ms ease,
     box-shadow 250ms ease,
     transform 200ms ease;
+  cursor: pointer;
 
   &:hover {
     border-color: rgba(59, 130, 246, 0.25);
