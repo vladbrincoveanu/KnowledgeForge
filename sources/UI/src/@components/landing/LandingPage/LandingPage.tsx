@@ -1266,6 +1266,45 @@ const PipelineSection: React.FC = () => (
   </section>
 );
 
+const StageCard: React.FC<(typeof PLATFORM_STAGES)[number]> = ({
+  number,
+  name,
+  tagline,
+  description,
+  icon,
+  color,
+}) => (
+  <article className={`lp-stage-card lp-stage-card--${color}`}>
+    <div className="lp-stage-card__header">
+      <span className="lp-stage-card__number">{number}</span>
+      <span className={`lp-stage-card__icon lp-stage-card__icon--${color}`}>
+        {icon}
+      </span>
+    </div>
+    <h3 className="lp-stage-card__name">{name}</h3>
+    <p className="lp-stage-card__tagline">{tagline}</p>
+    <p className="lp-stage-card__description">{description}</p>
+  </article>
+);
+
+const PipelineStagesSection: React.FC = () => (
+  <section className="lp-pipeline" aria-label="How the platform works">
+    <div className="lp-section-header">
+      <span className="lp-eyebrow">Three stages. One source of truth.</span>
+      <h2>How the platform works.</h2>
+      <p>
+        What an ontology did for enterprise data — we are doing for enterprise
+        software.
+      </p>
+    </div>
+    <div className="lp-stages__grid">
+      {PLATFORM_STAGES.map((stage) => (
+        <StageCard key={stage.number} {...stage} />
+      ))}
+    </div>
+  </section>
+);
+
 const RiskSection: React.FC = () => (
   <section className="lp-risks" aria-label="Risk metrics">
     <div className="lp-section-header">
