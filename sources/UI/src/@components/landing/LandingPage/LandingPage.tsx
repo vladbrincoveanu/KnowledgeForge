@@ -1342,7 +1342,9 @@ const TeamSection: React.FC = () => (
 
     {/* ── FOUNDING NARRATIVE ── */}
     <div className="lp-team__narrative">
-      <p className="lp-team__narrative-lead">Built by engineers. Run from Vienna.</p>
+      <p className="lp-team__narrative-lead">
+        Built by engineers. Run from Vienna.
+      </p>
       <p className="lp-team__narrative-body">
         The product has two layers. A code extraction engine that needs to be
         precise, deterministic, and robust at scale — that&apos;s one domain. An
@@ -1524,7 +1526,9 @@ const LandingPage: React.FC = () => {
             </p>
           </div>
           <div className="lp-pillars__grid">
-            {PILLARS.map((p) => PillarCard(p))}
+            {PILLARS.map((p) => (
+              <PillarCard key={p.title} {...p} />
+            ))}
           </div>
         </section>
 
