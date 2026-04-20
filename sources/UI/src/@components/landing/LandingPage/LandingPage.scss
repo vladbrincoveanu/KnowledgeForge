@@ -1087,6 +1087,37 @@
 .lp-team {
   padding: var(--lp-section-py) 0;
 
+  &__narrative {
+    max-width: 720px;
+    margin: 0 auto 3rem;
+    text-align: center;
+  }
+
+  &__narrative-lead {
+    font-size: clamp(1.4rem, 2.5vw, 2rem);
+    font-weight: 700;
+    margin: 0 0 1.25rem;
+    letter-spacing: -0.025em;
+    background: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  &__narrative-body {
+    font-size: 1rem;
+    color: var(--lp-muted);
+    line-height: 1.75;
+    margin: 0 0 1rem;
+    max-width: 60ch;
+    margin-left: auto;
+    margin-right: auto;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
   &__grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
