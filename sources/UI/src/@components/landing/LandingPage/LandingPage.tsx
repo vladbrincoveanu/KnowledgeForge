@@ -1,4 +1,24 @@
 import React, { useMemo, useState } from "react";
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * EMAIL OBFUSCATION — client-side only; raw strings never appear in HTML source
+ * Scheme: shift char codes +1, then reverse — so @ and . never appear literally
+ * ───────────────────────────────────────────────────────────────────────────── */
+const encodeEmail = (s: string) =>
+  s.split("").map((c) => String.fromCharCode(c.charCodeAt(0) + 1)).reverse().join("");
+
+const decodeEmail = (encoded: string) =>
+  encoded.split("").reverse().map((c) => String.fromCharCode(c.charCodeAt(0) - 1)).join("");
+
+const MailTo: React.FC<{ encoded: string; className?: string; children: React.ReactNode }> = ({
+  encoded,
+  className,
+  children,
+}) => (
+  <a href={`mailto:${decodeEmail(encoded)}`} className={className}>
+    {children}
+  </a>
+);
 import {
   AlarmClock,
   AlertTriangle,
@@ -257,7 +277,7 @@ const FOUNDERS = [
     name: "Iulia Rinea",
     title: "Co-founder",
     bio: "Leads data and AI platform work at AI Factory Austria. Production ML infrastructure at scale.",
-    email: "rineaiulia17@gmail.com",
+    email: encodeEmail("rineaiulia17@gmail.com"),
     seed: 42,
   },
   {
@@ -265,7 +285,7 @@ const FOUNDERS = [
     name: "Vlad Brincoveanu",
     title: "Co-founder",
     bio: "Works in distributed systems at CID. The kind of engineering that sits underneath everything else and cannot afford to fail.",
-    email: "ggvladbrincoveanu@gmail.com",
+    email: encodeEmail("ggvladbrincoveanu@gmail.com"),
     seed: 17,
   },
 ];
@@ -535,12 +555,12 @@ const Navbar: React.FC = () => (
         <a href="#partners">Partners</a>
       </div>
       <div className="lp-navbar__actions">
-        <a
-          href="mailto:ggvladbrincoveanu@gmail.com"
+        <MailTo
+          encoded="mnbpD@mbjbnhplb!dpnqpvBjmvh"
           className="lp-btn lp-btn--ghost"
         >
           Contact Sales
-        </a>
+        </MailTo>
         <a href="/workspace" className="lp-btn lp-btn--text">
           Login
         </a>
@@ -1659,13 +1679,13 @@ const TeamSection: React.FC = () => (
             <span className="lp-founder-card__title">{founder.title}</span>
             <p>{founder.bio}</p>
           </div>
-          <a
-            href={`mailto:${founder.email}`}
+          <MailTo
+            encoded={founder.email}
             className="lp-btn lp-btn--primary lp-btn--pill lp-founder-card__cta"
           >
             <span>Email {founder.name.split(" ")[0]}</span>
             <ArrowRight size={14} />
-          </a>
+          </MailTo>
         </article>
       ))}
     </div>
@@ -1700,13 +1720,13 @@ const TeamSection: React.FC = () => (
         </div>
       </div>
       <div className="lp-ask-block__cta">
-        <a
-          href="mailto:ggvladbrincoveanu@gmail.com"
+        <MailTo
+          encoded="mnbpD@mbjbnhplb!dpnqpvBjmvh"
           className="lp-btn lp-btn--primary lp-btn--pill"
         >
           <span>Become a Design Partner</span>
           <ArrowRight size={16} />
-        </a>
+        </MailTo>
       </div>
     </div>
   </section>
@@ -1717,7 +1737,7 @@ const Footer: React.FC = () => (
     <div className="lp-footer__inner">
       <span>© 2026 KnowledgeForge. All rights reserved.</span>
       <div className="lp-footer__links">
-        <a href="mailto:ggvladbrincoveanu@gmail.com">Contact</a>
+        <MailTo encoded="mnbpD@mbjbnhplb!dpnqpvBjmvh">Contact</MailTo>
         <a href="/workspace">Product</a>
       </div>
     </div>
