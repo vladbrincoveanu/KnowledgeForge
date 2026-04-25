@@ -1,7 +1,7 @@
 # KnowledgeForge - Unified Project Management
 # This Makefile provides commands to manage the entire KnowledgeForge stack
 
-.PHONY: help up down clean logs status install test tests e2e api ui dev prod build build-docker fix validate restart restart-full restart-dev restart-api restart-api-dev restart-ui restart-ui-dev sync pull clean-worktrees full-check quick-check ci test-e2e-omnipay test-e2e-omnipay-verbose
+.PHONY: help up down clean logs status install test tests e2e api ui dev prod build build-docker fix validate restart restart-full restart-dev restart-api restart-api-dev restart-ui restart-ui-dev sync pull clean-worktrees full-check quick-check ci
 
 # Default target
 help:
@@ -26,8 +26,7 @@ help:
 	@echo "  make test       - Run API tests only (unit + pipeline)"
 	@echo "  make test-e2e   - Run E2E extraction tests (GitHub → JSON → UI)"
 	@echo "  make test-e2e-verbose - Run E2E tests with detailed output"
-	@echo "  make test-e2e-omnipay - Run OmniPay demo E2E extraction tests"
-	@echo "  make test-e2e-omnipay-verbose - Run OmniPay E2E tests with detailed output"
+
 	@echo "  make test-owner - Test owner detection specifically"
 	@echo "  make test-containers - Test container detection specifically"
 	@echo "  make test-endpoints - Test endpoint extraction specifically"
@@ -184,17 +183,6 @@ test-containers:
 test-endpoints:
 	@echo "🧪 Testing endpoint extraction..."
 	docker compose exec api python -m pytest test_e2e_extraction.py::TestE2EExtraction::test_06_container_endpoints -v -s
-
-# Run OmniPay E2E tests
-test-e2e-omnipay:
-	@echo "🧪 Running OmniPay demo E2E extraction tests..."
-	docker compose exec api python -m pytest tests/e2e/test_omnipay_extraction.py -v
-	@echo "✅ OmniPay E2E tests completed!"
-
-test-e2e-omnipay-verbose:
-	@echo "🧪 Running OmniPay E2E tests with detailed output..."
-	docker compose exec api python -m pytest tests/e2e/test_omnipay_extraction.py -v -s
-	@echo "✅ OmniPay E2E tests completed!"
 
 # Run tests with coverage
 test-coverage:
@@ -477,7 +465,6 @@ quick-check:
 	@echo "📋 Step 3/4: Running E2E extraction tests..."
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@$(MAKE) test-e2e || (echo "❌ E2E extraction tests failed!" && exit 1)
-	@$(MAKE) test-e2e-omnipay || (echo "❌ OmniPay E2E tests failed!" && exit 1)
 	@echo "✅ E2E extraction tests passed"
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -501,25 +488,25 @@ ci:
 	@echo "⏱️  Estimated time: 3-5 minutes"
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "📋 Step 1/8: Git status check..."
+	@echo "📋 Step 1/7: Git status check..."
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@git status --short || (echo "❌ Git status check failed!" && exit 1)
 	@echo "✅ Git status OK"
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "📋 Step 2/8: Stopping services..."
+	@echo "📋 Step 2/7: Stopping services..."
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@docker-compose down
 	@echo "✅ Services stopped"
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "📋 Step 3/8: Building Docker images..."
+	@echo "📋 Step 3/7: Building Docker images..."
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@docker-compose build || (echo "❌ Docker build failed!" && exit 1)
 	@echo "✅ Docker build successful"
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "📋 Step 4/8: Starting services..."
+	@echo "📋 Step 4/7: Starting services..."
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@docker-compose up -d || (echo "❌ Failed to start services!" && exit 1)
 	@echo "✅ Services started"
@@ -528,26 +515,20 @@ ci:
 	@sleep 10
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "📋 Step 5/8: Health checks..."
+	@echo "📋 Step 5/7: Health checks..."
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@curl -f http://localhost:8000/health -s || (echo "❌ API health check failed!" && exit 1)
 	@echo "✅ API is healthy"
 	@curl -f http://localhost:3000 -s > /dev/null || (echo "⚠️  UI might not be ready yet (non-critical)")
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "📋 Step 6/8: Running E2E tests..."
+	@echo "📋 Step 6/7: Running E2E tests..."
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@docker compose exec api python -m pytest test_e2e_extraction.py -v --tb=short || (echo "❌ E2E tests failed!" && exit 1)
 	@echo "✅ E2E tests passed"
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "📋 Step 6b/8: Running OmniPay E2E tests..."
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@docker compose exec api python -m pytest tests/e2e/test_omnipay_extraction.py -v --tb=short || (echo "❌ OmniPay E2E tests failed!" && exit 1)
-	@echo "✅ OmniPay E2E tests passed"
-	@echo ""
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "📋 Step 7/8: Code quality checks..."
+	@echo "📋 Step 6/7: Code quality checks..."
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "Checking Python imports..."
 	@docker compose exec api python -c "from app.services.c4.context.context_manager import ContextManager" || (echo "❌ Import check failed!" && exit 1)
@@ -556,7 +537,7 @@ ci:
 	@echo "✅ All imports OK"
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "📋 Step 8/8: Docker resource check..."
+	@echo "📋 Step 7/7: Docker resource check..."
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}" | head -6
 	@echo ""
@@ -570,7 +551,6 @@ ci:
 	@echo "  ✅ Docker build successful"
 	@echo "  ✅ Services healthy"
 	@echo "  ✅ E2E tests passed"
-	@echo "  ✅ OmniPay E2E tests passed"
 	@echo "  ✅ Import checks passed"
 	@echo "  ✅ Git status clean"
 

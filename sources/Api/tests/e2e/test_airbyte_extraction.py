@@ -4,7 +4,7 @@
 import pytest
 from pathlib import Path
 
-DEMO_AIRBYTE_PATH = Path("/Users/vladbrincoveanu/Desktop/Startup/KnowledgeForge/sources/demo/airbyte")
+DEMO_AIRBYTE_PATH = Path("/app/sources/demo/airbyte")
 API_ROOT = Path(__file__).parent.parent.parent / "Api"
 
 

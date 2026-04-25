@@ -17,7 +17,7 @@ from app.utils.config import get_config
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/review", tags=["review"])
+router = APIRouter(tags=["review"])
 
 
 def _build_database_url() -> str:
