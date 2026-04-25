@@ -16,23 +16,23 @@ export interface ReviewItem {
 
 export const reviewService = {
   listPending: async (runId: string): Promise<{ items: ReviewItem[]; total: number }> => {
-    const response = await api.get(`/v1/review/pending?run_id=${encodeURIComponent(runId)}`);
+    const response = await api.get(`/api/v1/review/pending?run_id=${encodeURIComponent(runId)}`);
     return response.data;
   },
 
   approve: async (itemId: string, reviewerNote?: string): Promise<void> => {
-    await api.post(`/v1/review/${itemId}/approve`, { reviewer_note: reviewerNote });
+    await api.post(`/api/v1/review/${itemId}/approve`, { reviewer_note: reviewerNote });
   },
 
   reject: async (itemId: string, reviewerNote?: string): Promise<void> => {
-    await api.post(`/v1/review/${itemId}/reject`, { reviewer_note: reviewerNote });
+    await api.post(`/api/v1/review/${itemId}/reject`, { reviewer_note: reviewerNote });
   },
 
   override: async (itemId: string, value: string, reviewerNote?: string): Promise<void> => {
-    await api.post(`/v1/review/${itemId}/override`, { value, reviewer_note: reviewerNote });
+    await api.post(`/api/v1/review/${itemId}/override`, { value, reviewer_note: reviewerNote });
   },
 
   bulkApprove: async (runId: string, minConfidence = 0.85): Promise<void> => {
-    await api.post(`/v1/review/${runId}/bulk-approve`, { min_confidence: minConfidence });
+    await api.post(`/api/v1/review/${runId}/bulk-approve`, { min_confidence: minConfidence });
   },
 };

@@ -15,7 +15,8 @@ export const ReviewDashboard: React.FC = () => {
       const data = await reviewService.listPending(runId);
       setItems(data.items);
       setTotal(data.total);
-    } catch {
+    } catch (err) {
+      console.error("Failed to load review items:", err);
     } finally {
       setLoading(false);
     }
@@ -24,25 +25,41 @@ export const ReviewDashboard: React.FC = () => {
   useEffect(() => { loadPending(); }, [runId]);
 
   const handleApprove = async (id: string) => {
-    await reviewService.approve(id);
-    await loadPending();
+    try {
+      await reviewService.approve(id);
+      await loadPending();
+    } catch (err) {
+      console.error("Failed to approve item:", err);
+    }
   };
 
   const handleReject = async (id: string) => {
-    await reviewService.reject(id);
-    await loadPending();
+    try {
+      await reviewService.reject(id);
+      await loadPending();
+    } catch (err) {
+      console.error("Failed to reject item:", err);
+    }
   };
 
   const handleOverride = async (id: string) => {
-    await reviewService.override(id, overrideValue);
-    setOverrideField(null);
-    setOverrideValue("");
-    await loadPending();
+    try {
+      await reviewService.override(id, overrideValue);
+      setOverrideField(null);
+      setOverrideValue("");
+      await loadPending();
+    } catch (err) {
+      console.error("Failed to override item:", err);
+    }
   };
 
   const handleBulkApprove = async () => {
-    await reviewService.bulkApprove(runId);
-    await loadPending();
+    try {
+      await reviewService.bulkApprove(runId);
+      await loadPending();
+    } catch (err) {
+      console.error("Failed to bulk approve:", err);
+    }
   };
 
   return (
