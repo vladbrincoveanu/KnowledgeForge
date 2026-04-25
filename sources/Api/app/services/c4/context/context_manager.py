@@ -57,6 +57,8 @@ class ContextManager:
         """
         logger.info("Extracting C4 Level 1: System Context")
 
+        extraction_run_id = str(uuid4())
+
         # System identification
         system_name = self.system_detector.detect_system_name()
         system_purpose = self.system_detector.generate_system_purpose()
@@ -86,9 +88,8 @@ class ContextManager:
 
         owner_confidence = owner_provenance.get("confidence", 0.0)
         if owner_confidence < 0.70:
-            run_id = str(uuid4())
             enqueue_review_item_if_low_confidence(
-                extraction_run_id=run_id,
+                extraction_run_id=extraction_run_id,
                 field="owner",
                 candidate_values=[owner_team] if owner_team else [],
                 llm_suggestion=None,

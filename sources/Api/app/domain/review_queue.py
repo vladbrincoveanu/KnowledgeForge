@@ -1,6 +1,7 @@
 """Write review items to PostgreSQL from the extraction pipeline."""
 
 import logging
+import os
 from uuid import uuid4
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -9,7 +10,14 @@ from app.domain.models import ReviewItemModel
 
 logger = logging.getLogger(__name__)
 
-DATABASE_URL = "postgresql://knowledgeforge:knowledgeforge123@postgres:5432/knowledgeforge"
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    f"postgresql://{os.environ.get('KF_DATABASE__USERNAME', 'knowledgeforge')}:"
+    f"{os.environ.get('KF_DATABASE__PASSWORD', 'knowledgeforge123')}@"
+    f"{os.environ.get('KF_DATABASE__HOST', 'postgres')}:"
+    f"{os.environ.get('KF_DATABASE__PORT', '5432')}/"
+    f"{os.environ.get('KF_DATABASE__NAME', 'knowledgeforge')}"
+)
 _engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
