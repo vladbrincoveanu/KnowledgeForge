@@ -45,7 +45,7 @@ def get_db():
     try:
         yield db
     finally:
-        db.close()
+        db.remove()
 
 
 class ReviewStatus(str, Enum):
@@ -201,7 +201,7 @@ def bulk_approve(
         )
         .update(
             {"status": ReviewStatus.APPROVED.value, "updated_at": datetime.now(timezone.utc)},
-            synchronize_session=False,
+            synchronize_session="fetch",
         )
     )
     db.commit()
