@@ -1,8 +1,10 @@
 """Review queue API — CRUD for HITL review items."""
 
 import logging
-from datetime import datetime
-from typing import Annotated
+import os
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Any, Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -11,22 +13,39 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.domain.models import Base, ReviewItemModel
+from app.utils.config import get_config
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/review", tags=["review"])
 
-DATABASE_URL = "postgresql://knowledgeforge:knowledgeforge123@postgres:5432/knowledgeforge"
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(bind=engine)
+
+def _build_database_url() -> str:
+    config = get_config()
+    db = config.database
+    password = os.environ.get("POSTGRES_PASSWORD", db.password)
+    host = os.environ.get("POSTGRES_HOST", db.host)
+    username = os.environ.get("POSTGRES_USERNAME", db.username)
+    name = os.environ.get("POSTGRES_DB", db.name)
+    return f"postgresql://{username}:{password}@{host}:5432/{name}"
 
 
 def get_db():
+    database_url = os.environ.get("DATABASE_URL") or _build_database_url()
+    engine = create_engine(database_url)
+    SessionLocal = sessionmaker(bind=engine)
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+
+
+class ReviewStatus(str, Enum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    OVERRIDDEN = "OVERRIDDEN"
 
 
 # ── Schemas ────────────────────────────────────────────────────────────────────
@@ -36,7 +55,7 @@ class ReviewItemBase(BaseModel):
     candidate_values: list[str]
     llm_suggestion: str | None = None
     confidence: float = Field(..., ge=0.0, le=1.0)
-    evidence: list[dict] = Field(default_factory=list)
+    evidence: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ReviewItemResponse(ReviewItemBase):
@@ -77,6 +96,8 @@ class MessageResponse(BaseModel):
 @router.get("/pending", response_model=PendingResponse)
 def list_pending(
     run_id: Annotated[str, Query(description="Extraction run ID to filter by")],
+    skip: Annotated[int, Query(description="Number of items to skip", ge=0)] = 0,
+    limit: Annotated[int, Query(description="Max items to return", ge=1)] = 50,
     db: Session = Depends(get_db),
 ):
     """List all pending review items for a given extraction run."""
@@ -84,12 +105,22 @@ def list_pending(
         db.query(ReviewItemModel)
         .filter(
             ReviewItemModel.extraction_run_id == run_id,
-            ReviewItemModel.status == "PENDING",
+            ReviewItemModel.status == ReviewStatus.PENDING.value,
         )
         .order_by(ReviewItemModel.confidence.asc())
+        .offset(skip)
+        .limit(limit)
         .all()
     )
-    return PendingResponse(items=[ReviewItemResponse.model_validate(i) for i in items], total=len(items))
+    total = (
+        db.query(ReviewItemModel)
+        .filter(
+            ReviewItemModel.extraction_run_id == run_id,
+            ReviewItemModel.status == ReviewStatus.PENDING.value,
+        )
+        .count()
+    )
+    return PendingResponse(items=[ReviewItemResponse.model_validate(i) for i in items], total=total)
 
 
 @router.post("/{item_id}/approve", response_model=MessageResponse)
@@ -102,10 +133,10 @@ def approve_item(
     item = db.query(ReviewItemModel).filter(ReviewItemModel.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Review item not found")
-    item.status = "APPROVED"
+    item.status = ReviewStatus.APPROVED.value
     if payload.reviewer_note:
         item.reviewer_note = payload.reviewer_note
-    item.updated_at = datetime.utcnow()
+    item.updated_at = datetime.now(timezone.utc)
     db.commit()
     return MessageResponse(message="Item approved")
 
@@ -120,10 +151,10 @@ def reject_item(
     item = db.query(ReviewItemModel).filter(ReviewItemModel.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Review item not found")
-    item.status = "REJECTED"
+    item.status = ReviewStatus.REJECTED.value
     if payload.reviewer_note:
         item.reviewer_note = payload.reviewer_note
-    item.updated_at = datetime.utcnow()
+    item.updated_at = datetime.now(timezone.utc)
     db.commit()
     return MessageResponse(message="Item rejected")
 
@@ -138,11 +169,11 @@ def override_item(
     item = db.query(ReviewItemModel).filter(ReviewItemModel.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Review item not found")
-    item.status = "OVERRIDDEN"
+    item.status = ReviewStatus.OVERRIDDEN.value
     item.llm_suggestion = payload.value
     if payload.reviewer_note:
         item.reviewer_note = payload.reviewer_note
-    item.updated_at = datetime.utcnow()
+    item.updated_at = datetime.now(timezone.utc)
     db.commit()
     return MessageResponse(message="Item overridden")
 
@@ -158,11 +189,11 @@ def bulk_approve(
         db.query(ReviewItemModel)
         .filter(
             ReviewItemModel.extraction_run_id == run_id,
-            ReviewItemModel.status == "PENDING",
+            ReviewItemModel.status == ReviewStatus.PENDING.value,
             ReviewItemModel.confidence >= payload.min_confidence,
         )
         .update(
-            {"status": "APPROVED", "updated_at": datetime.utcnow()},
+            {"status": ReviewStatus.APPROVED.value, "updated_at": datetime.now(timezone.utc)},
             synchronize_session=False,
         )
     )
