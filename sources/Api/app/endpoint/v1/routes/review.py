@@ -45,7 +45,7 @@ def get_db():
     try:
         yield db
     finally:
-        db.remove()
+        db.close()
 
 
 class ReviewStatus(str, Enum):
