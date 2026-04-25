@@ -30,10 +30,17 @@ def _build_database_url() -> str:
     return f"postgresql://{username}:{password}@{host}:5432/{name}"
 
 
+_database_url = os.environ.get("DATABASE_URL") or _build_database_url()
+_engine = create_engine(
+    _database_url,
+    pool_pre_ping=True,
+    pool_size=5,
+    max_overflow=10,
+)
+SessionLocal = sessionmaker(bind=_engine)
+
+
 def get_db():
-    database_url = os.environ.get("DATABASE_URL") or _build_database_url()
-    engine = create_engine(database_url)
-    SessionLocal = sessionmaker(bind=engine)
     db = SessionLocal()
     try:
         yield db
