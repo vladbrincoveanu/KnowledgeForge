@@ -19,10 +19,12 @@ import logging
 import re
 from pathlib import Path
 from typing import Any, Optional
+from uuid import uuid4
 
 from .system_detector import SystemDetector
 from .dependency_detector import DependencyDetector
 from .metadata_detector import MetadataDetector
+from app.domain.review_queue import enqueue_review_item_if_low_confidence
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +83,18 @@ class ContextManager:
         # IT Landscape metadata
         owner_team, owner_provenance = self.metadata_detector.detect_owner_team()
         business_domain = self.metadata_detector.infer_business_domain()
+
+        owner_confidence = owner_provenance.get("confidence", 0.0)
+        if owner_confidence < 0.70:
+            run_id = str(uuid4())
+            enqueue_review_item_if_low_confidence(
+                extraction_run_id=run_id,
+                field="owner",
+                candidate_values=[owner_team] if owner_team else [],
+                llm_suggestion=None,
+                confidence=owner_confidence,
+                evidence=[owner_provenance],
+            )
         criticality = self.metadata_detector.determine_criticality(languages)
         data_class = self.metadata_detector.infer_data_classification()
 

@@ -22,6 +22,9 @@ import json
 import logging
 import re
 from typing import Any, Optional
+from uuid import uuid4
+
+from app.domain.review_queue import enqueue_review_item_if_low_confidence
 
 logger = logging.getLogger(__name__)
 
@@ -680,6 +683,27 @@ def enrich_containers(
 
     # Apply enrichments to the full containers dict (batch keys are a subset)
     apply_enrichments(containers, relationships, llm_result)
+
+    run_id = str(uuid4())
+    for container in containers.values():
+        llm_confidence = container.get("llm_confidence", 1.0)
+        if llm_confidence < 0.70:
+            enqueue_review_item_if_low_confidence(
+                extraction_run_id=run_id,
+                field="container_verdict",
+                candidate_values=[container.get("container_type", "Unknown")],
+                llm_suggestion=container.get("llm_notes"),
+                confidence=llm_confidence,
+                evidence=[
+                    {
+                        "container_name": container.get("name", ""),
+                        "container_type": container.get("container_type"),
+                        "technology": container.get("technology"),
+                        "verdict": container.get("llm_verdict"),
+                        "notes": container.get("llm_notes"),
+                    }
+                ],
+            )
 
     enriched = sum(1 for c in containers.values() if c.get("llm_enriched"))
     discarded = sum(1 for c in containers.values() if c.get("llm_verdict") == "discard")
