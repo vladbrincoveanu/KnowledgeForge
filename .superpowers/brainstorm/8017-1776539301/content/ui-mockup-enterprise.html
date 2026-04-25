@@ -1,0 +1,177 @@
+<h2>Enterprise Dashboard Direction</h2>
+<p class="subtitle">Information-dense, structured layout. Keep 2-panel graph + chat.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Preview: Enterprise Dashboard Refinement</div>
+  <div class="mockup-body">
+
+    <!-- Top Bar -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#fff;border-bottom:1px solid #e5e7eb;font-family:system-ui,sans-serif;">
+      <div style="display:flex;flex-direction:column;gap:2px;">
+        <span style="font-size:15px;font-weight:600;color:#111827;">OmniPay Platform</span>
+        <span style="font-size:11px;color:#6b7280;">18 services · 7 external deps · Updated 2h ago</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div style="display:flex;gap:12px;padding:6px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;">
+          <div style="text-align:center;">
+            <div style="font-size:18px;font-weight:700;color:#111827;">18</div>
+            <div style="font-size:9px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">Services</div>
+          </div>
+          <div style="width:1px;background:#e5e7eb;"></div>
+          <div style="text-align:center;">
+            <div style="font-size:18px;font-weight:700;color:#111827;">7</div>
+            <div style="font-size:9px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">Ext. Deps</div>
+          </div>
+          <div style="width:1px;background:#e5e7eb;"></div>
+          <div style="text-align:center;">
+            <div style="font-size:18px;font-weight:700;color:#16a34a;">Compliant</div>
+            <div style="font-size:9px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">Status</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Layout -->
+    <div style="display:flex;flex:1;height:calc(100vh - 200px);">
+
+      <!-- Filters Sidebar -->
+      <div style="width:240px;background:#f9fafb;border-right:1px solid #e5e7eb;padding:16px;display:flex;flex-direction:column;gap:20px;font-family:system-ui,sans-serif;">
+        <div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#374151;margin-bottom:10px;">Search</div>
+          <input style="width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;background:#fff;" placeholder="Filter services...">
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#374151;margin-bottom:10px;">Services by Domain</div>
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#374151;padding:4px 0;">
+              <input type="checkbox" checked> Payment
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#374151;padding:4px 0;">
+              <input type="checkbox" checked> Infrastructure
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#374151;padding:4px 0;">
+              <input type="checkbox"> Analytics
+            </label>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#374151;margin-bottom:10px;">Layout</div>
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#374151;padding:4px 0;">
+              <input type="radio" name="layout" checked> Dagre Top-Bottom
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#9ca3af;padding:4px 0;">
+              <input type="radio" name="layout" disabled> Dagre Left-Right
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Graph Panel -->
+      <div style="flex:1;display:flex;flex-direction:column;background:#fafafa;padding:12px;gap:12px;">
+
+        <!-- Metrics Bar -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#fff;border:1px solid #e5e7eb;border-radius:10px;font-family:system-ui,sans-serif;">
+          <div style="display:flex;gap:8px;align-items:center;">
+            <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#9ca3af;">Level:</span>
+            <div style="display:flex;gap:4px;">
+              <span style="padding:3px 10px;background:#2563eb;color:#fff;border-radius:20px;font-size:10px;font-weight:600;">Context</span>
+              <span style="padding:3px 10px;background:#fff;color:#6b7280;border:1px solid #e5e7eb;border-radius:20px;font-size:10px;font-weight:600;">Container</span>
+              <span style="padding:3px 10px;background:#fff;color:#6b7280;border:1px solid #e5e7eb;border-radius:20px;font-size:10px;font-weight:600;">Component</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <button style="padding:6px 12px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;">Extract</button>
+          </div>
+        </div>
+
+        <!-- Graph Area -->
+        <div style="flex:1;background:#fff;border:1px solid #e5e7eb;border-radius:14px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
+          <!-- Node -->
+          <div style="position:absolute;top:30%;left:25%;background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px 14px;box-shadow:0 2px 8px rgba(0,0,0,0.06);min-width:160px;">
+            <div style="background:#111827;color:#fff;padding:4px 10px;border-radius:6px 6px 0 0;margin:-10px -14px 10px -14px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Container</div>
+            <div style="font-size:13px;font-weight:600;color:#111827;">omnipay-gateway</div>
+            <div style="font-size:10px;color:#6b7280;margin-top:2px;">TypeScript/NestJS</div>
+          </div>
+          <!-- Node 2 -->
+          <div style="position:absolute;top:30%;right:25%;background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px 14px;box-shadow:0 2px 8px rgba(0,0,0,0.06);min-width:160px;">
+            <div style="background:#374151;color:#fff;padding:4px 10px;border-radius:6px 6px 0 0;margin:-10px -14px 10px -14px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Container</div>
+            <div style="font-size:13px;font-weight:600;color:#111827;">omnipay-ledger</div>
+            <div style="font-size:10px;color:#6b7280;margin-top:2px;">Java/Spring Boot</div>
+          </div>
+          <!-- Node 3 -->
+          <div style="position:absolute;bottom:25%;left:40%;background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px 14px;box-shadow:0 2px 8px rgba(0,0,0,0.06);min-width:160px;">
+            <div style="background:#374151;color:#fff;padding:4px 10px;border-radius:6px 6px 0 0;margin:-10px -14px 10px -14px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Container</div>
+            <div style="font-size:13px;font-weight:600;color:#111827;">omnipay-infra</div>
+            <div style="font-size:10px;color:#6b7280;margin-top:2px;">Terraform/Helm</div>
+          </div>
+          <!-- Edge -->
+          <svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;" preserveaspectratio="none">
+            <path d="M 25% 38% Q 35% 38% 40% 50%" stroke="#8fa1b8" stroke-width="2" fill="none" stroke-dasharray="4 2" marker-end="url(#arrow)"/>
+            <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#8fa1b8"/></marker></defs>
+          </svg>
+          <div style="position:absolute;bottom:16px;right:16px;font-size:10px;color:#9ca3af;font-family:system-ui;">ReactFlow · dagre layout · 3 nodes</div>
+        </div>
+      </div>
+
+      <!-- Chat Panel -->
+      <div style="width:340px;background:#fff;border-left:1px solid #e5e7eb;display:flex;flex-direction:column;font-family:system-ui,sans-serif;">
+        <div style="padding:14px 16px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:10px;">
+          <div style="width:36px;height:36px;background:linear-gradient(135deg,#06b6d4,#0ea5e9);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;">🤖</div>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#111827;">omnipay-gateway</div>
+            <div style="font-size:10px;color:#6b7280;padding:2px 8px;background:#f0fdf4;border-radius:20px;display:inline-block;margin-top:2px;">Container · TypeScript</div>
+          </div>
+          <button style="margin-left:auto;width:28px;height:28px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;color:#6b7280;font-size:14px;cursor:pointer;">×</button>
+        </div>
+        <div style="flex:1;padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <div style="padding:10px 12px;background:#f3f4f6;border-radius:12px;font-size:12px;color:#374151;line-height:1.5;">
+              <div style="font-weight:600;margin-bottom:4px;color:#111827;">Domain</div>
+              Payment processing gateway handling transaction routing and authorization.
+            </div>
+          </div>
+          <div style="padding:10px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;font-size:11px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+              <span style="color:#64748b;font-size:10px;">Owner</span>
+              <span style="font-weight:600;color:#1e3a8a;">@omnipay/core-team</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+              <span style="color:#64748b;font-size:10px;">Status</span>
+              <span style="font-weight:600;color:#166534;">Active-Dev</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+              <span style="color:#64748b;font-size:10px;">Tier</span>
+              <span style="font-weight:600;color:#111827;">Tier 1</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="color:#64748b;font-size:10px;">Data Class</span>
+              <span style="font-weight:600;color:#111827;">PII + Credit-Card</span>
+            </div>
+          </div>
+          <div style="padding:10px 12px;background:#f3f4f6;border-radius:12px;font-size:11px;">
+            <div style="color:#64748b;font-size:10px;margin-bottom:4px;">Technology Stack</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;">
+              <span style="padding:2px 8px;background:#fff;border:1px solid #e5e7eb;border-radius:4px;font-size:10px;color:#374151;">TypeScript</span>
+              <span style="padding:2px 8px;background:#fff;border:1px solid #e5e7eb;border-radius:4px;font-size:10px;color:#374151;">NestJS</span>
+              <span style="padding:2px 8px;background:#fff;border:1px solid #e5e7eb;border-radius:4px;font-size:10px;color:#374151;">PostgreSQL</span>
+            </div>
+          </div>
+          <div style="padding:10px 12px;background:#f3f4f6;border-radius:12px;font-size:11px;">
+            <div style="color:#64748b;font-size:10px;margin-bottom:4px;">Endpoints</div>
+            <div style="font-family:monospace;font-size:10px;color:#166534;background:#f0fdf4;padding:4px 8px;border-radius:4px;border-left:2px solid #22c55e;">POST /payments/authorize</div>
+          </div>
+        </div>
+        <div style="padding:12px;border-top:1px solid #e5e7eb;">
+          <div style="display:flex;gap:8px;align-items:end;">
+            <textarea style="flex:1;resize:none;border:1px solid #e5e7eb;border-radius:12px;padding:10px;font-size:12px;font-family:inherit;background:#f9fafb;outline:none;color:#111827;" rows="2" placeholder="Ask about this service..."></textarea>
+            <button style="width:36px;height:36px;background:#2563eb;color:#fff;border:none;border-radius:999px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;">→</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<p style="font-size:12px;color:#6b7280;margin-top:12px;text-align:center;font-family:system-ui;">Key changes: tighter typography, muted palette, structured card hierarchy, cleaner sidebar, restrained node styling</p>

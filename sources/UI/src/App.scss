@@ -3,11 +3,15 @@
   min-height: 100vh;
   height: 100vh;
   background:
-    radial-gradient(circle at top left, rgba(37, 99, 235, 0.08), transparent 24%),
+    radial-gradient(
+      circle at top left,
+      rgba(37, 99, 235, 0.08),
+      transparent 24%
+    ),
     linear-gradient(180deg, #f8f5ee 0%, #f3ede2 100%);
   color: #14213d;
   overflow: hidden;
-  font-family: 'Avenir Next', 'Segoe UI', 'Helvetica Neue', sans-serif;
+  font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
 }
 
 .app-container {
@@ -61,8 +65,8 @@
 .nav-brand h2 {
   margin: 0;
   color: #14213d;
-  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Georgia,
-    serif;
+  font-family:
+    "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
   font-size: 1.55rem;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -169,8 +173,8 @@
   justify-content: center;
   gap: 1rem;
   margin: 0;
-  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Georgia,
-    serif;
+  font-family:
+    "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
   font-size: clamp(2.3rem, 4vw, 3.4rem);
   font-weight: 700;
   letter-spacing: -0.03em;

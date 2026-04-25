@@ -1,0 +1,39 @@
+{
+  "task_id": "extract_1774109473",
+  "repository_url": "/tmp/code_arch_ad435683-949f-4fa5-b2cd-0b0e4b1d1603_l8qhbhgr/dagster-slurm",
+  "timestamp": "2026-03-21T16:11:13.932785",
+  "total_duration_ms": 103.44743728637695,
+  "phases": [
+    {
+      "name": "L2_Containers",
+      "duration_ms": 31.388282775878906,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "L1_Context",
+      "duration_ms": 71.2120532989502,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "Container_Relationships",
+      "duration_ms": 0.04601478576660156,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "L3_Components",
+      "duration_ms": 0.774383544921875,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "LLM_Enrichment",
+      "duration_ms": 0.026702880859375,
+      "success": true,
+      "error": null
+    }
+  ],
+  "sub_phases": {}
+}

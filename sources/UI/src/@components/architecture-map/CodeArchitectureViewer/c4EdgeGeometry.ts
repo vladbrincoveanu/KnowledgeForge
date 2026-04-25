@@ -1,7 +1,7 @@
 /**
  * Pure geometry inputs required to lay out a C4 relationship.
  */
-export type EdgeLabelPlacement = 'source' | 'target' | 'center';
+export type EdgeLabelPlacement = "source" | "target" | "center";
 
 export interface C4EdgeGeometryInput {
   id: string;
@@ -48,11 +48,7 @@ export const getEdgeLaneOffset = (
   sourceY: number,
   targetY: number,
 ) => {
-  const directionalBucket = clamp(
-    Math.round((targetY - sourceY) / 150),
-    -2,
-    2,
-  );
+  const directionalBucket = clamp(Math.round((targetY - sourceY) / 150), -2, 2);
   const jitterBucket = (Math.abs(hashString(id)) % 3) - 1;
   return directionalBucket * 16 + jitterBucket * 10;
 };
@@ -66,7 +62,7 @@ export const getC4EdgeGeometry = ({
   sourceY,
   targetX,
   targetY,
-  labelPlacement = 'target',
+  labelPlacement = "target",
 }: C4EdgeGeometryInput): C4EdgeGeometry => {
   const laneOffset = getEdgeLaneOffset(id, sourceY, targetY);
   const deltaX = targetX - sourceX;
@@ -76,26 +72,22 @@ export const getC4EdgeGeometry = ({
   const normalY = deltaX / distance;
   const directionalSpread = clamp(deltaY * 0.14, -28, 28);
   const labelProgress =
-    labelPlacement === 'source'
+    labelPlacement === "source"
       ? deltaX >= 0
         ? 0.36
         : 0.64
-      : labelPlacement === 'center'
+      : labelPlacement === "center"
         ? 0.5
         : deltaX >= 0
           ? 0.78
           : 0.22;
   const labelLiftBase =
-    labelPlacement === 'source'
-      ? 28
-      : labelPlacement === 'center'
-        ? 22
-        : 18;
+    labelPlacement === "source" ? 28 : labelPlacement === "center" ? 22 : 18;
   const labelLift = labelLiftBase + Math.abs(laneOffset) * 0.55;
   const labelLaneWeight =
-    labelPlacement === 'source'
+    labelPlacement === "source"
       ? 0.22
-      : labelPlacement === 'center'
+      : labelPlacement === "center"
         ? 0.16
         : 0.12;
 

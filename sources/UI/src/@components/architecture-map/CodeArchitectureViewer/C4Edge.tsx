@@ -1,27 +1,27 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties } from "react";
 import {
   BaseEdge,
   EdgeLabelRenderer,
   EdgeProps,
   getBezierPath,
-} from 'reactflow';
+} from "reactflow";
 
-import { getC4EdgeGeometry } from './c4EdgeGeometry';
+import { getC4EdgeGeometry } from "./c4EdgeGeometry";
 
 // Color palette for different relationship types
 const EDGE_COLORS: Record<string, string> = {
-  uses: '#6366f1',
-  calls: '#10b981',
-  async: '#f59e0b',
-  contains: '#8b5cf6',
-  depends: '#ec4899',
-  triggers: '#14b8a6',
+  uses: "#6366f1",
+  calls: "#10b981",
+  async: "#f59e0b",
+  contains: "#8b5cf6",
+  depends: "#ec4899",
+  triggers: "#14b8a6",
 };
 
 const getEdgeColor = (data?: Record<string, unknown>): string => {
-  if (!data?.relationship_type) return '#64748b';
+  if (!data?.relationship_type) return "#64748b";
   const relType = String(data.relationship_type).toLowerCase();
-  return EDGE_COLORS[relType] || '#64748b';
+  return EDGE_COLORS[relType] || "#64748b";
 };
 
 const C4Edge = ({
@@ -39,9 +39,9 @@ const C4Edge = ({
 }: EdgeProps) => {
   const edgeColor = getEdgeColor(data as Record<string, unknown>);
   const labelPlacement =
-    data?.label_placement === 'source' ||
-    data?.label_placement === 'target' ||
-    data?.label_placement === 'center'
+    data?.label_placement === "source" ||
+    data?.label_placement === "target" ||
+    data?.label_placement === "center"
       ? data.label_placement
       : undefined;
   const geometry = getC4EdgeGeometry({
@@ -65,20 +65,19 @@ const C4Edge = ({
 
   const protocol = data?.protocol as string | undefined;
   const description =
-    typeof data?.description === 'string' ? data.description.trim() : undefined;
-  const fallbackLabel =
-    typeof label === 'string' ? label.trim() : undefined;
+    typeof data?.description === "string" ? data.description.trim() : undefined;
+  const fallbackLabel = typeof label === "string" ? label.trim() : undefined;
   const labelTitle =
-    typeof data?.label_title === 'string' ? data.label_title.trim() : undefined;
+    typeof data?.label_title === "string" ? data.label_title.trim() : undefined;
   const contextRole =
-    typeof data?.context_role === 'string' ? data.context_role : undefined;
+    typeof data?.context_role === "string" ? data.context_role : undefined;
   const primaryLabel = fallbackLabel || description || protocol;
   const secondaryDescription =
     protocol && protocol !== primaryLabel ? protocol : undefined;
 
   const hasContent = primaryLabel || secondaryDescription;
   const edgeLabelStyle = {
-    '--edge-accent': edgeColor,
+    "--edge-accent": edgeColor,
   } as CSSProperties;
 
   return (
@@ -89,10 +88,10 @@ const C4Edge = ({
         markerEnd={markerEnd}
         interactionWidth={interactionWidth ?? 20}
         style={{
-          stroke: 'rgba(248, 250, 252, 0.96)',
+          stroke: "rgba(248, 250, 252, 0.96)",
           strokeWidth: 8,
-          strokeLinecap: 'round',
-          strokeLinejoin: 'round',
+          strokeLinecap: "round",
+          strokeLinejoin: "round",
         }}
         className="c4-edge-halo"
       />
@@ -105,10 +104,11 @@ const C4Edge = ({
           stroke: edgeColor,
           strokeOpacity: 0.78,
           strokeWidth: 2.4,
-          strokeLinecap: 'round',
-          strokeLinejoin: 'round',
-          cursor: 'pointer',
-          transition: 'stroke 0.2s ease, stroke-width 0.2s ease, stroke-opacity 0.2s ease',
+          strokeLinecap: "round",
+          strokeLinejoin: "round",
+          cursor: "pointer",
+          transition:
+            "stroke 0.2s ease, stroke-width 0.2s ease, stroke-opacity 0.2s ease",
         }}
         className="c4-edge-line"
       />
@@ -116,7 +116,7 @@ const C4Edge = ({
         <EdgeLabelRenderer>
           <div
             className={`c4-edge-label${
-              contextRole ? ` c4-edge-label--${contextRole}` : ''
+              contextRole ? ` c4-edge-label--${contextRole}` : ""
             }`}
             style={{
               transform: `translate(-50%, -50%) translate(${geometry.labelX}px,${geometry.labelY}px)`,

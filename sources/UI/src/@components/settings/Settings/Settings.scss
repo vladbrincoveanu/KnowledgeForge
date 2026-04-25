@@ -40,8 +40,8 @@
   font-weight: 600;
 }
 
-.setting-item input[type='text'],
-.setting-item input[type='password'] {
+.setting-item input[type="text"],
+.setting-item input[type="password"] {
   flex: 1;
   width: 100%;
   min-height: 2.9rem;
@@ -53,11 +53,11 @@
   font-size: 0.98rem;
 }
 
-.setting-item input[type='range'] {
+.setting-item input[type="range"] {
   flex: 1;
 }
 
-.setting-item input[type='checkbox'] {
+.setting-item input[type="checkbox"] {
   width: 18px;
   height: 18px;
   margin-right: 0.55rem;

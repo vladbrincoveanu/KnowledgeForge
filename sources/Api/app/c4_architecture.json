@@ -1,0 +1,107 @@
+{
+  "c4_model_version": "1.0",
+  "system_context": {
+    "c4_level": 1,
+    "type": "system",
+    "name": "app",
+    "purpose": "Purpose not available",
+    "description": "Purpose not available",
+    "external_dependencies": [],
+    "external_dependency_review_items": [],
+    "deployment_dependencies": [],
+    "dependency_freshness_alerts": [],
+    "actors": [
+      {
+        "name": "User",
+        "type": "person",
+        "description": "Uses the system",
+        "detected_from": "repo_name",
+        "detection_method": "generic_fallback",
+        "evidence": "app"
+      }
+    ],
+    "languages": [
+      {
+        "language": "Python",
+        "file_count": 77
+      }
+    ],
+    "frameworks": [],
+    "repository_url": "",
+    "git": {},
+    "context_sources": {},
+    "regulatory_frameworks": [],
+    "domain": "Infrastructure",
+    "owner": "Unassigned",
+    "owner_provenance": {
+      "detection_source": "none",
+      "confidence": 0.0,
+      "evidence": []
+    },
+    "owner_contributors": [],
+    "owner_contributor_stats": [],
+    "contributor_count": null,
+    "status": "ACTIVE",
+    "status_evidence": {
+      "recent_files_90d": 77,
+      "newest_file_date": "2026-04-19",
+      "days_since_newest_file": 0,
+      "source": "file_mtime"
+    },
+    "tier": "Tier 3 - Development/Internal",
+    "data_class": "General",
+    "active_experts": null,
+    "compliance": "COMPLIANT",
+    "compliance_confidence": 1.0,
+    "compliance_factors": [
+      "Score: 2/7 checks passed",
+      "\u274c README presence",
+      "\u274c Tests present",
+      "\u274c CI/CD configured",
+      "\u274c Security checks",
+      "\u2705 Secrets detected",
+      "\u2705 Repository structure",
+      "\u274c Dependency management"
+    ],
+    "last_commit_date": null,
+    "commit_count_30d": null,
+    "commit_count_90d": null,
+    "commit_count_180d": null,
+    "dora_metrics": {
+      "deployment_frequency_per_day": 0.0,
+      "lead_time_days": null,
+      "mttr_hours": null,
+      "change_failure_rate": null,
+      "data_source": "git_commits",
+      "window_days": 30
+    },
+    "on_call_channel": null,
+    "owner_team": "Unassigned",
+    "business_domain": "Infrastructure",
+    "criticality": "Tier 3 - Development/Internal",
+    "llm_description": "Purpose not available"
+  },
+  "containers": [],
+  "components": [],
+  "relationships": {
+    "context": [
+      {
+        "source": "User",
+        "destination": "app",
+        "description": "Uses the system",
+        "relationship_type": "uses",
+        "llm_description": "User uses app."
+      }
+    ],
+    "containers": []
+  },
+  "metadata": {
+    "total_containers": 0,
+    "total_components": 0,
+    "extraction_approach": "c4_model",
+    "runtime": {
+      "platform": "Unknown",
+      "cluster": {}
+    }
+  }
+}

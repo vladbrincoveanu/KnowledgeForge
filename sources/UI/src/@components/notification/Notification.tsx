@@ -1,9 +1,9 @@
-import React from 'react';
-import './Notification.scss';
+import React from "react";
+import "./Notification.scss";
 
 interface NotificationProps {
   message: string;
-  type: 'success' | 'error' | 'info';
+  type: "success" | "error" | "info";
   onClose: () => void;
 }
 

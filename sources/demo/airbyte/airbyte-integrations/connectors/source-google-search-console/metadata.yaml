@@ -1,0 +1,58 @@
+data:
+  ab_internal:
+    ql: 400
+    sl: 300
+  allowedHosts:
+    hosts:
+      - "*.googleapis.com"
+  connectorBuildOptions:
+    baseImage: docker.io/airbyte/python-connector-base:1.2.2@sha256:57703de3b4c4204bd68a7b13c9300f8e03c0189bffddaffc796f1da25d2dbea0
+  connectorSubtype: api
+  connectorType: source
+  definitionId: eb4c9e00-db83-4d63-a386-39cfa91012a8
+  dockerImageTag: 1.4.5
+  dockerRepository: airbyte/source-google-search-console
+  documentationUrl: https://docs.airbyte.com/integrations/sources/google-search-console
+  githubIssueLabel: source-google-search-console
+  icon: googlesearchconsole.svg
+  license: Elv2
+  maxSecondsBetweenMessages: 86400
+  name: Google Search Console
+  remoteRegistries:
+    pypi:
+      enabled: true
+      packageName: airbyte-source-google-search-console
+  registries:
+    cloud:
+      enabled: true
+    oss:
+      enabled: true
+  releaseStage: generally_available
+  suggestedStreams:
+    streams:
+      - search_analytics_by_page
+      - search_analytics_by_date
+      - search_analytics_by_query
+      - search_analytics_by_device
+      - sitemaps
+      - sites
+      - search_analytics_all_fields
+  supportLevel: certified
+  tags:
+    - language:python
+    - cdk:python
+  connectorTestSuitesOptions:
+    - suite: unitTests
+    - suite: acceptanceTests
+      testSecrets:
+        - name: SECRET_GOOGLE_SEARCH_CONSOLE_CDK_CREDS_3
+          fileName: config.json
+          secretStore:
+            type: GSM
+            alias: airbyte-connector-testing-secret-store
+        - name: SECRET_SOURCE-GOOGLE-SEARCH-CONSOLE_SERVICE_ACCOUNT__CREDS
+          fileName: service_account_config.json
+          secretStore:
+            type: GSM
+            alias: airbyte-connector-testing-secret-store
+metadataSpecVersion: "1.0"

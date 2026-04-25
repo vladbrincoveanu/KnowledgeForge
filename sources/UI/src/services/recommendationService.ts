@@ -1,4 +1,4 @@
-import api from './api';
+import api from "./api";
 
 interface NodeRecommendation {
   id: string;
@@ -36,7 +36,7 @@ export const recommendationAPI = {
       if (value) {
         return String(value);
       }
-      if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+      if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
         return crypto.randomUUID();
       }
       return `rec-${Math.random().toString(36).slice(2)}`;
@@ -55,15 +55,15 @@ export const recommendationAPI = {
 
       return {
         id: ensureId(node.id ?? node.session_id),
-        name: node.recommended_name ?? node.name ?? 'Suggested Node',
-        entityType: node.entity_type ?? node.entityType ?? 'unknown',
+        name: node.recommended_name ?? node.name ?? "Suggested Node",
+        entityType: node.entity_type ?? node.entityType ?? "unknown",
         confidence:
-          typeof node.confidence_score === 'number'
+          typeof node.confidence_score === "number"
             ? node.confidence_score
-            : typeof node.confidence === 'number'
+            : typeof node.confidence === "number"
               ? node.confidence
               : 0,
-        reasoning: node.reasoning ?? 'No reasoning provided',
+        reasoning: node.reasoning ?? "No reasoning provided",
         sourceColumns,
         metadata: llmMetadata,
         llmMetadata,
@@ -76,39 +76,39 @@ export const recommendationAPI = {
       return {
         id: ensureId(edge.id),
         sourceNodeId:
-          edge.source_node_id ?? edge.sourceNodeId ?? 'unknown-source',
+          edge.source_node_id ?? edge.sourceNodeId ?? "unknown-source",
         targetNodeId:
-          edge.target_node_id ?? edge.targetNodeId ?? 'unknown-target',
+          edge.target_node_id ?? edge.targetNodeId ?? "unknown-target",
         relationshipType:
-          edge.relationship_type ?? edge.relationshipType ?? 'related_to',
+          edge.relationship_type ?? edge.relationshipType ?? "related_to",
         confidence:
-          typeof edge.confidence_score === 'number'
+          typeof edge.confidence_score === "number"
             ? edge.confidence_score
-            : typeof edge.confidence === 'number'
+            : typeof edge.confidence === "number"
               ? edge.confidence
               : 0,
-        reasoning: edge.reasoning ?? 'No reasoning provided',
+        reasoning: edge.reasoning ?? "No reasoning provided",
         metadata,
       };
     };
 
     return {
       node_recommendations: (session?.node_recommendations || []).map(
-        normalizeNode
+        normalizeNode,
       ),
       edge_recommendations: (session?.edge_recommendations || []).map(
-        normalizeEdge
+        normalizeEdge,
       ),
     };
   },
 
   submitRecommendationFeedback: async (
     taskId: string,
-    feedback: any
+    feedback: any,
   ): Promise<any> => {
     const response = await api.post(
       `/v1/extract/${taskId}/recommendations/feedback`,
-      feedback
+      feedback,
     );
     return response.data;
   },
@@ -116,7 +116,7 @@ export const recommendationAPI = {
   submitFeedback: async (taskId: string, feedback: any): Promise<any> => {
     const response = await api.post(
       `/v1/extract/${taskId}/recommendations/feedback`,
-      feedback
+      feedback,
     );
     return response.data;
   },
@@ -126,10 +126,10 @@ export const recommendationAPI = {
   },
 
   generateEdgeRecommendations: async (
-    taskId: string
+    taskId: string,
   ): Promise<RecommendationData> => {
     const response = await api.post(
-      `/v1/extract/${taskId}/generate-edge-recommendations`
+      `/v1/extract/${taskId}/generate-edge-recommendations`,
     );
     return response.data;
   },

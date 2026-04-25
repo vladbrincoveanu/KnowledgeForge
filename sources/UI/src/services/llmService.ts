@@ -22,7 +22,7 @@ interface LLMAnalysis {
   suggested_join_strategy: string;
   potential_issues: string[];
   recommendations: string[];
-  confidence_level: 'High' | 'Medium' | 'Low';
+  confidence_level: "High" | "Medium" | "Low";
 }
 
 interface OllamaRequest {
@@ -62,11 +62,11 @@ class LLMService {
 
   constructor() {
     this.ollamaUrl =
-      import.meta.env.VITE_OLLAMA_URL || 'http://localhost:11434';
-    this.model = import.meta.env.VITE_OLLAMA_MODEL || 'llama2';
+      import.meta.env.VITE_OLLAMA_URL || "http://localhost:11434";
+    this.model = import.meta.env.VITE_OLLAMA_MODEL || "llama2";
     this.disableOllama =
-      String(import.meta.env.VITE_OLLAMA_DISABLED || '').toLowerCase() ===
-      'true';
+      String(import.meta.env.VITE_OLLAMA_DISABLED || "").toLowerCase() ===
+      "true";
   }
 
   /**
@@ -74,7 +74,7 @@ class LLMService {
    */
   async analyzeConnections(
     connections: Connection[],
-    maxConnections = 5
+    maxConnections = 5,
   ): Promise<Connection[]> {
     try {
       // First, pre-filter connections using smart rules
@@ -89,8 +89,8 @@ class LLMService {
         if (!this.warnedUnavailable) {
           this.warnedUnavailable = true;
         }
-        const analyses = topConnections.map(connection =>
-          this.getFallbackAnalysis(connection)
+        const analyses = topConnections.map((connection) =>
+          this.getFallbackAnalysis(connection),
         );
         const scoredConnections = topConnections.map((connection, index) => ({
           ...connection,
@@ -104,8 +104,8 @@ class LLMService {
       }
 
       // Create analysis prompts for each connection
-      const analysisPromises = topConnections.map(connection =>
-        this.analyzeSingleConnection(connection)
+      const analysisPromises = topConnections.map((connection) =>
+        this.analyzeSingleConnection(connection),
       );
 
       // Run all analyses in parallel
@@ -134,7 +134,7 @@ class LLMService {
    * Analyze a single connection using Ollama
    */
   private async analyzeSingleConnection(
-    connection: Connection
+    connection: Connection,
   ): Promise<LLMAnalysis> {
     const prompt = this.buildAnalysisPrompt(connection);
 
@@ -146,9 +146,9 @@ class LLMService {
       }
 
       const response = await fetch(`${this.ollamaUrl}/api/generate`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           model: this.model,
@@ -187,7 +187,7 @@ Column: ${connection.source_column}
 DATASET B: ${connection.target_collection}
 Column: ${connection.target_column}
 
-Connection Type: ${connection.connection_type || 'unknown'}
+Connection Type: ${connection.connection_type || "unknown"}
 Confidence Score: ${connection.confidence_score || 0}
 
 Please analyze this connection and provide:
@@ -222,18 +222,17 @@ Format your response as JSON:
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         return {
-          reasoning: parsed.reasoning || 'AI analysis not available',
-          business_context: parsed.business_context || 'Context not available',
-          connection_type: parsed.connection_type || 'unknown',
+          reasoning: parsed.reasoning || "AI analysis not available",
+          business_context: parsed.business_context || "Context not available",
+          connection_type: parsed.connection_type || "unknown",
           suggested_join_strategy:
-            parsed.suggested_join_strategy || 'inner_join',
+            parsed.suggested_join_strategy || "inner_join",
           potential_issues: parsed.potential_issues || [],
           recommendations: parsed.recommendations || [],
-          confidence_level: parsed.confidence_level || 'Medium',
+          confidence_level: parsed.confidence_level || "Medium",
         };
       }
-    } catch (error) {
-    }
+    } catch (error) {}
 
     // Fallback parsing for non-JSON responses
     return this.parseTextResponse(response);
@@ -244,27 +243,27 @@ Format your response as JSON:
    */
   private parseTextResponse(response: string): LLMAnalysis {
     const analysis: LLMAnalysis = {
-      reasoning: 'AI analysis completed',
-      business_context: 'Connection analysis provided',
-      connection_type: 'foreign_key',
-      suggested_join_strategy: 'inner_join',
-      potential_issues: ['Data validation recommended'],
-      recommendations: ['Verify data types before joining'],
-      confidence_level: 'Medium',
+      reasoning: "AI analysis completed",
+      business_context: "Connection analysis provided",
+      connection_type: "foreign_key",
+      suggested_join_strategy: "inner_join",
+      potential_issues: ["Data validation recommended"],
+      recommendations: ["Verify data types before joining"],
+      confidence_level: "Medium",
     };
 
     // Extract insights from text response
-    if (response.includes('foreign key') || response.includes('foreign_key')) {
-      analysis.connection_type = 'foreign_key';
+    if (response.includes("foreign key") || response.includes("foreign_key")) {
+      analysis.connection_type = "foreign_key";
     }
-    if (response.includes('lookup') || response.includes('reference')) {
-      analysis.connection_type = 'lookup';
+    if (response.includes("lookup") || response.includes("reference")) {
+      analysis.connection_type = "lookup";
     }
-    if (response.includes('high') || response.includes('strong')) {
-      analysis.confidence_level = 'High';
+    if (response.includes("high") || response.includes("strong")) {
+      analysis.confidence_level = "High";
     }
-    if (response.includes('low') || response.includes('weak')) {
-      analysis.confidence_level = 'Low';
+    if (response.includes("low") || response.includes("weak")) {
+      analysis.confidence_level = "Low";
     }
 
     return analysis;
@@ -278,21 +277,21 @@ Format your response as JSON:
 
     // Adjust based on confidence level
     switch (analysis.confidence_level?.toLowerCase()) {
-      case 'high':
+      case "high":
         score += 0.3;
         break;
-      case 'medium':
+      case "medium":
         score += 0.1;
         break;
-      case 'low':
+      case "low":
         score -= 0.2;
         break;
     }
 
     // Adjust based on connection type
-    if (analysis.connection_type === 'foreign_key') {
+    if (analysis.connection_type === "foreign_key") {
       score += 0.2;
-    } else if (analysis.connection_type === 'lookup') {
+    } else if (analysis.connection_type === "lookup") {
       score += 0.1;
     }
 
@@ -309,13 +308,13 @@ Format your response as JSON:
    */
   private getFallbackAnalysis(connection: Connection): LLMAnalysis {
     return {
-      reasoning: 'Connection analysis using fallback logic',
-      business_context: 'Standard data relationship analysis',
-      connection_type: connection.connection_type || 'foreign_key',
-      suggested_join_strategy: 'inner_join',
-      potential_issues: ['Data validation recommended'],
-      recommendations: ['Verify data types and referential integrity'],
-      confidence_level: 'Medium',
+      reasoning: "Connection analysis using fallback logic",
+      business_context: "Standard data relationship analysis",
+      connection_type: connection.connection_type || "foreign_key",
+      suggested_join_strategy: "inner_join",
+      potential_issues: ["Data validation recommended"],
+      recommendations: ["Verify data types and referential integrity"],
+      confidence_level: "Medium",
     };
   }
 
@@ -323,13 +322,13 @@ Format your response as JSON:
    * Pre-filter connections using smart rules - NO MORE RANDOM CONNECTIONS!
    */
   private preFilterConnections(connections: Connection[]): Connection[] {
-    const filtered = connections.filter(connection => {
-      const sourceCol = connection.source_column?.toLowerCase() || '';
-      const targetCol = connection.target_column?.toLowerCase() || '';
+    const filtered = connections.filter((connection) => {
+      const sourceCol = connection.source_column?.toLowerCase() || "";
+      const targetCol = connection.target_column?.toLowerCase() || "";
       const sourceCollection =
-        connection.source_collection?.toLowerCase() || '';
+        connection.source_collection?.toLowerCase() || "";
       const targetCollection =
-        connection.target_collection?.toLowerCase() || '';
+        connection.target_collection?.toLowerCase() || "";
 
       // Rule 1: Exact name matches (highest priority)
       if (sourceCol === targetCol) {
@@ -337,16 +336,16 @@ Format your response as JSON:
       }
 
       // Rule 2: Common identifier patterns
-      const idPatterns = ['id', 'key', 'code', 'ref', 'num', 'no'];
+      const idPatterns = ["id", "key", "code", "ref", "num", "no"];
       for (const pattern of idPatterns) {
         if (sourceCol.includes(pattern) && targetCol.includes(pattern)) {
           // Check if they're related (e.g., customer_id and customer_id)
           const sourceBase = sourceCol
-            .replace(pattern, '')
-            .replace(/[_-]/g, '');
+            .replace(pattern, "")
+            .replace(/[_-]/g, "");
           const targetBase = targetCol
-            .replace(pattern, '')
-            .replace(/[_-]/g, '');
+            .replace(pattern, "")
+            .replace(/[_-]/g, "");
           if (
             sourceBase &&
             targetBase &&
@@ -359,27 +358,27 @@ Format your response as JSON:
 
       // Rule 3: Semantic matches (e.g., customer_name vs client_name)
       const semanticPairs: [string, string][] = [
-        ['customer', 'client'],
-        ['user', 'customer'],
-        ['user', 'client'],
-        ['order', 'purchase'],
-        ['sale', 'order'],
-        ['transaction', 'order'],
-        ['product', 'item'],
-        ['goods', 'product'],
-        ['service', 'product'],
-        ['date', 'created'],
-        ['date', 'timestamp'],
-        ['time', 'date'],
-        ['email', 'mail'],
-        ['phone', 'telephone'],
-        ['mobile', 'phone'],
-        ['name', 'title'],
-        ['description', 'details'],
-        ['price', 'cost'],
-        ['quantity', 'amount'],
-        ['total', 'sum'],
-        ['address', 'location'],
+        ["customer", "client"],
+        ["user", "customer"],
+        ["user", "client"],
+        ["order", "purchase"],
+        ["sale", "order"],
+        ["transaction", "order"],
+        ["product", "item"],
+        ["goods", "product"],
+        ["service", "product"],
+        ["date", "created"],
+        ["date", "timestamp"],
+        ["time", "date"],
+        ["email", "mail"],
+        ["phone", "telephone"],
+        ["mobile", "phone"],
+        ["name", "title"],
+        ["description", "details"],
+        ["price", "cost"],
+        ["quantity", "amount"],
+        ["total", "sum"],
+        ["address", "location"],
       ];
 
       for (const [word1, word2] of semanticPairs) {
@@ -395,8 +394,8 @@ Format your response as JSON:
       if (sourceCollection && targetCollection) {
         const sourceWords = sourceCollection.split(/[_\s-]/);
         const targetWords = targetCollection.split(/[_\s-]/);
-        const commonWords = sourceWords.filter(word =>
-          targetWords.includes(word)
+        const commonWords = sourceWords.filter((word) =>
+          targetWords.includes(word),
         );
         if (
           commonWords.length > 0 &&
@@ -455,8 +454,7 @@ Format your response as JSON:
         const data: OllamaModelsResponse = await response.json();
         return data.models || [];
       }
-    } catch (error) {
-    }
+    } catch (error) {}
     return [];
   }
 }

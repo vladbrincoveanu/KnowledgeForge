@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { codeArchitectureAPI, wsService } from '@/services/api';
-import { UploadedFile } from '@/types';
+import React, { useState, useEffect, useCallback } from "react";
+import { codeArchitectureAPI, wsService } from "@/services/api";
+import { UploadedFile } from "@/types";
 import {
   Github,
   Plus,
@@ -13,8 +13,8 @@ import {
   Loader,
   Package,
   Layers,
-} from 'lucide-react';
-import './FileUploader.scss';
+} from "lucide-react";
+import "./FileUploader.scss";
 
 interface FileUploaderProps {
   onFilesUploaded: (files: UploadedFile[]) => void;
@@ -22,16 +22,11 @@ interface FileUploaderProps {
   onExtractionStarted: (taskId: string, file: UploadedFile) => void;
   showNotification: (
     message: string,
-    type: 'success' | 'error' | 'info'
+    type: "success" | "error" | "info",
   ) => void;
 }
 
-type RepoStatus =
-  | 'idle'
-  | 'pending'
-  | 'scanning'
-  | 'completed'
-  | 'failed';
+type RepoStatus = "idle" | "pending" | "scanning" | "completed" | "failed";
 
 interface RepoEntry {
   url: string;
@@ -48,8 +43,8 @@ const isValidGitHubUrl = (url: string): boolean => {
   try {
     const u = new URL(url);
     return (
-      (u.hostname === 'github.com' || u.hostname === 'www.github.com') &&
-      u.pathname.split('/').filter(Boolean).length >= 2
+      (u.hostname === "github.com" || u.hostname === "www.github.com") &&
+      u.pathname.split("/").filter(Boolean).length >= 2
     );
   } catch {
     return false;
@@ -60,11 +55,13 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   onExtractionStarted,
   showNotification,
 }) => {
-  const [inputUrl, setInputUrl] = useState('');
-  const [inputError, setInputError] = useState('');
+  const [inputUrl, setInputUrl] = useState("");
+  const [inputError, setInputError] = useState("");
   const [repos, setRepos] = useState<RepoEntry[]>([]);
   const [isExtracting, setIsExtracting] = useState(false);
-  const pollIntervalsRef = React.useRef<Record<string, ReturnType<typeof setInterval>>>({});
+  const pollIntervalsRef = React.useRef<
+    Record<string, ReturnType<typeof setInterval>>
+  >({});
 
   const handleWebSocketMessage = useCallback((data?: unknown) => {
     const wsData = data as {
@@ -75,8 +72,8 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     };
     if (!wsData?.task_id) return;
 
-    setRepos(prev =>
-      prev.map(r => {
+    setRepos((prev) =>
+      prev.map((r) => {
         if (r.taskId !== wsData.task_id) return r;
         return {
           ...r,
@@ -84,72 +81,84 @@ const FileUploader: React.FC<FileUploaderProps> = ({
           message: wsData.message ?? r.message,
           progress: wsData.progress ?? r.progress,
         };
-      })
+      }),
     );
   }, []);
 
   useEffect(() => {
     wsService.connect();
-    wsService.on('message', handleWebSocketMessage);
+    wsService.on("message", handleWebSocketMessage);
     return () => {
-      wsService.off('message', handleWebSocketMessage);
+      wsService.off("message", handleWebSocketMessage);
       Object.values(pollIntervalsRef.current).forEach(clearInterval);
     };
   }, [handleWebSocketMessage]);
 
   const addRepo = () => {
-    const trimmed = inputUrl.trim().replace(/\.git\/?$/, '').replace(/\/$/, '');
+    const trimmed = inputUrl
+      .trim()
+      .replace(/\.git\/?$/, "")
+      .replace(/\/$/, "");
     if (!trimmed) {
-      setInputError('Please enter a GitHub URL.');
+      setInputError("Please enter a GitHub URL.");
       return;
     }
     if (!isValidGitHubUrl(trimmed)) {
-      setInputError('Enter a valid GitHub repository URL (e.g. https://github.com/owner/repo).');
+      setInputError(
+        "Enter a valid GitHub repository URL (e.g. https://github.com/owner/repo).",
+      );
       return;
     }
-    if (repos.some(r => r.url === trimmed)) {
-      setInputError('This repository has already been added.');
+    if (repos.some((r) => r.url === trimmed)) {
+      setInputError("This repository has already been added.");
       return;
     }
-    setInputError('');
-    setRepos(prev => [
+    setInputError("");
+    setRepos((prev) => [
       ...prev,
       {
         url: trimmed,
-        status: 'idle',
-        message: 'Ready to extract',
+        status: "idle",
+        message: "Ready to extract",
         progress: 0,
         containersCount: 0,
         componentsCount: 0,
       },
     ]);
-    setInputUrl('');
+    setInputUrl("");
   };
 
   const removeRepo = (url: string) => {
-    setRepos(prev => prev.filter(r => r.url !== url));
+    setRepos((prev) => prev.filter((r) => r.url !== url));
   };
 
   const clearAll = () => {
     Object.values(pollIntervalsRef.current).forEach(clearInterval);
     pollIntervalsRef.current = {};
     setRepos([]);
-    setInputUrl('');
-    setInputError('');
+    setInputUrl("");
+    setInputError("");
   };
 
   const pollStatus = (taskId: string) => {
     const interval = setInterval(async () => {
       try {
-        const raw = await codeArchitectureAPI.getExtractionStatus(taskId) as any;
-        const rawStatus: string = raw.status ?? 'pending';
+        const raw = (await codeArchitectureAPI.getExtractionStatus(
+          taskId,
+        )) as any;
+        const rawStatus: string = raw.status ?? "pending";
         const newStatus: RepoStatus =
-          rawStatus === 'scanning' ? 'scanning' :
-          rawStatus === 'completed' ? 'completed' :
-          rawStatus === 'failed' ? 'failed' :
-          rawStatus === 'pending' ? 'pending' : 'pending';
-        setRepos(prev =>
-          prev.map(r => {
+          rawStatus === "scanning"
+            ? "scanning"
+            : rawStatus === "completed"
+              ? "completed"
+              : rawStatus === "failed"
+                ? "failed"
+                : rawStatus === "pending"
+                  ? "pending"
+                  : "pending";
+        setRepos((prev) =>
+          prev.map((r) => {
             if (r.taskId !== taskId) return r;
             return {
               ...r,
@@ -159,9 +168,9 @@ const FileUploader: React.FC<FileUploaderProps> = ({
               containersCount: raw.containers_count ?? r.containersCount,
               componentsCount: raw.components_count ?? r.componentsCount,
             };
-          })
+          }),
         );
-        if (rawStatus === 'completed' || rawStatus === 'failed') {
+        if (rawStatus === "completed" || rawStatus === "failed") {
           clearInterval(interval);
           delete pollIntervalsRef.current[taskId];
         }
@@ -174,33 +183,45 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   };
 
   const extractAll = async () => {
-    const idleRepos = repos.filter(r => r.status === 'idle' || r.status === 'failed');
+    const idleRepos = repos.filter(
+      (r) => r.status === "idle" || r.status === "failed",
+    );
     if (idleRepos.length === 0) {
-      showNotification('No repositories to extract.', 'info');
+      showNotification("No repositories to extract.", "info");
       return;
     }
 
     setIsExtracting(true);
 
     for (const repo of idleRepos) {
-      setRepos(prev =>
-        prev.map(r =>
+      setRepos((prev) =>
+        prev.map((r) =>
           r.url === repo.url
-            ? { ...r, status: 'pending', message: 'Queuing extraction...' }
-            : r
-        )
+            ? { ...r, status: "pending", message: "Queuing extraction..." }
+            : r,
+        ),
       );
 
       try {
-        const result = await codeArchitectureAPI.extractFromGitHub(repo.url, true, true);
+        const result = await codeArchitectureAPI.extractFromGitHub(
+          repo.url,
+          true,
+          true,
+        );
         const taskId = result.task_id;
 
-        setRepos(prev =>
-          prev.map(r =>
+        setRepos((prev) =>
+          prev.map((r) =>
             r.url === repo.url
-              ? { ...r, taskId, status: 'pending', message: 'Extraction queued', progress: 0 }
-              : r
-          )
+              ? {
+                  ...r,
+                  taskId,
+                  status: "pending",
+                  message: "Extraction queued",
+                  progress: 0,
+                }
+              : r,
+          ),
         );
 
         // Notify parent with a synthetic file record so activeTaskId is tracked
@@ -210,21 +231,23 @@ const FileUploader: React.FC<FileUploaderProps> = ({
           data: [],
           size: 0,
           rowCount: 0,
-          type: 'github',
+          type: "github",
         });
 
         pollStatus(taskId);
-        showNotification(`Extraction started for ${repo.url}`, 'success');
+        showNotification(`Extraction started for ${repo.url}`, "success");
       } catch (err: any) {
-        const msg = err?.response?.data?.detail ?? err?.message ?? 'Extraction failed';
-        setRepos(prev =>
-          prev.map(r =>
-            r.url === repo.url
-              ? { ...r, status: 'failed', message: msg }
-              : r
-          )
+        const msg =
+          err?.response?.data?.detail ?? err?.message ?? "Extraction failed";
+        setRepos((prev) =>
+          prev.map((r) =>
+            r.url === repo.url ? { ...r, status: "failed", message: msg } : r,
+          ),
         );
-        showNotification(`Failed to start extraction for ${repo.url}: ${msg}`, 'error');
+        showNotification(
+          `Failed to start extraction for ${repo.url}: ${msg}`,
+          "error",
+        );
       }
     }
 
@@ -232,18 +255,35 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') addRepo();
+    if (e.key === "Enter") addRepo();
   };
 
-  const statusConfig: Record<RepoStatus, { icon: JSX.Element; color: string; label: string }> = {
-    idle: { icon: <Clock size={14} />, color: '#6c757d', label: 'Ready' },
-    pending: { icon: <Clock size={14} />, color: '#ffc107', label: 'Queued' },
-    scanning: { icon: <Loader size={14} className="spin" />, color: '#007bff', label: 'Scanning' },
-    completed: { icon: <CheckCircle size={14} />, color: '#28a745', label: 'Done' },
-    failed: { icon: <AlertCircle size={14} />, color: '#dc3545', label: 'Failed' },
+  const statusConfig: Record<
+    RepoStatus,
+    { icon: JSX.Element; color: string; label: string }
+  > = {
+    idle: { icon: <Clock size={14} />, color: "#6c757d", label: "Ready" },
+    pending: { icon: <Clock size={14} />, color: "#ffc107", label: "Queued" },
+    scanning: {
+      icon: <Loader size={14} className="spin" />,
+      color: "#007bff",
+      label: "Scanning",
+    },
+    completed: {
+      icon: <CheckCircle size={14} />,
+      color: "#28a745",
+      label: "Done",
+    },
+    failed: {
+      icon: <AlertCircle size={14} />,
+      color: "#dc3545",
+      label: "Failed",
+    },
   };
 
-  const idleCount = repos.filter(r => r.status === 'idle' || r.status === 'failed').length;
+  const idleCount = repos.filter(
+    (r) => r.status === "idle" || r.status === "failed",
+  ).length;
 
   return (
     <div className="repo-extractor">
@@ -254,12 +294,12 @@ const FileUploader: React.FC<FileUploaderProps> = ({
             <Github size={18} className="url-input-icon" />
             <input
               type="url"
-              className={`url-input ${inputError ? 'url-input--error' : ''}`}
+              className={`url-input ${inputError ? "url-input--error" : ""}`}
               placeholder="https://github.com/owner/repository"
               value={inputUrl}
-              onChange={e => {
+              onChange={(e) => {
                 setInputUrl(e.target.value);
-                if (inputError) setInputError('');
+                if (inputError) setInputError("");
               }}
               onKeyDown={handleKeyDown}
             />
@@ -275,37 +315,50 @@ const FileUploader: React.FC<FileUploaderProps> = ({
       {/* Repo List */}
       {repos.length > 0 && (
         <div className="repo-list">
-          {repos.map(repo => {
+          {repos.map((repo) => {
             const cfg = statusConfig[repo.status];
             return (
-              <div key={repo.url} className={`repo-item repo-item--${repo.status}`}>
+              <div
+                key={repo.url}
+                className={`repo-item repo-item--${repo.status}`}
+              >
                 <div className="repo-item__left">
                   <Github size={16} className="repo-item__icon" />
                   <div className="repo-item__info">
                     <span className="repo-item__url">{repo.url}</span>
                     <span className="repo-item__message">{repo.message}</span>
-                    {repo.status === 'scanning' && (
+                    {repo.status === "scanning" && (
                       <div className="repo-item__progress">
                         <div
                           className="repo-item__progress-fill"
-                          style={{ width: `${Math.round(repo.progress * 100)}%` }}
+                          style={{
+                            width: `${Math.round(repo.progress * 100)}%`,
+                          }}
                         />
                       </div>
                     )}
-                    {repo.status === 'completed' && (
+                    {repo.status === "completed" && (
                       <div className="repo-item__stats">
-                        <span><Package size={12} /> {repo.containersCount} containers</span>
-                        <span><Layers size={12} /> {repo.componentsCount} components</span>
+                        <span>
+                          <Package size={12} /> {repo.containersCount}{" "}
+                          containers
+                        </span>
+                        <span>
+                          <Layers size={12} /> {repo.componentsCount} components
+                        </span>
                       </div>
                     )}
                   </div>
                 </div>
                 <div className="repo-item__right">
-                  <span className="repo-item__status" style={{ color: cfg.color }}>
+                  <span
+                    className="repo-item__status"
+                    style={{ color: cfg.color }}
+                  >
                     {cfg.icon}
                     {cfg.label}
                   </span>
-                  {(repo.status === 'idle' || repo.status === 'failed') && (
+                  {(repo.status === "idle" || repo.status === "failed") && (
                     <button
                       className="btn-remove"
                       onClick={() => removeRepo(repo.url)}
@@ -326,7 +379,10 @@ const FileUploader: React.FC<FileUploaderProps> = ({
         <div className="empty-state">
           <Github size={48} className="empty-state__icon" />
           <p>Add one or more GitHub repository URLs above</p>
-          <p className="empty-state__hint">Each repo will be cloned, scanned, and added to the architecture graph</p>
+          <p className="empty-state__hint">
+            Each repo will be cloned, scanned, and added to the architecture
+            graph
+          </p>
         </div>
       )}
 
@@ -339,9 +395,16 @@ const FileUploader: React.FC<FileUploaderProps> = ({
             disabled={isExtracting || idleCount === 0}
           >
             {isExtracting ? (
-              <><Loader size={16} className="spin" /> Extracting...</>
+              <>
+                <Loader size={16} className="spin" /> Extracting...
+              </>
             ) : (
-              <><Play size={16} /> Extract {idleCount > 0 ? `${idleCount} Repo${idleCount > 1 ? 's' : ''}` : 'All'}</>
+              <>
+                <Play size={16} /> Extract{" "}
+                {idleCount > 0
+                  ? `${idleCount} Repo${idleCount > 1 ? "s" : ""}`
+                  : "All"}
+              </>
             )}
           </button>
           <button

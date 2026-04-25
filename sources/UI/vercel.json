@@ -1,4 +1,5 @@
 {
+  "name": "knowledgeforge",
   "framework": "vite",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }

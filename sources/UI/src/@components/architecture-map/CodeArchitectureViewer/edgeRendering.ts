@@ -188,7 +188,9 @@ export const buildRenderedEdges = (
         source: relationship.source_entity_id,
         target: relationship.target_entity_id!,
         label: isContextLevel
-          ? description || compactLabel || humanizeRelationshipType(relationship.relationship_type)
+          ? description ||
+            compactLabel ||
+            humanizeRelationshipType(relationship.relationship_type)
           : undefined,
         type: isContextLevel ? "C4Edge" : "smoothstep",
         animated: false,

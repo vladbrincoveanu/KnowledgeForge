@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from "react";
 import NodeRecommendationList, {
   EnhancedNodeRecommendation,
   NodeSelectionState,
-} from '../NodeRecommendations/NodeRecommendationList';
+} from "../NodeRecommendations/NodeRecommendationList";
 import EdgeRecommendationList, {
   EnhancedEdgeRecommendation,
   EdgeSelectionState,
-} from '../EdgeRecommendations/EdgeRecommendationList';
-import { recommendationAPI } from '@/services/recommendationService';
-import './RecommendationModal.scss';
+} from "../EdgeRecommendations/EdgeRecommendationList";
+import { recommendationAPI } from "@/services/recommendationService";
+import "./RecommendationModal.scss";
 
 interface RecommendationData {
   node_recommendations: EnhancedNodeRecommendation[];
@@ -23,7 +23,7 @@ interface RecommendationModalProps {
   taskId: string;
   showNotification: (
     message: string,
-    type: 'success' | 'error' | 'info'
+    type: "success" | "error" | "info",
   ) => void;
 }
 
@@ -44,10 +44,10 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
   const [edgeSelections, setEdgeSelections] = useState<
     Record<string, EdgeSelectionState>
   >({});
-  const [reviewNotes, setReviewNotes] = useState('');
+  const [reviewNotes, setReviewNotes] = useState("");
   const [currentPhase, setCurrentPhase] = useState<
-    'nodes' | 'edges' | 'completed'
-  >('nodes');
+    "nodes" | "edges" | "completed"
+  >("nodes");
   const [readyForEdges, setReadyForEdges] = useState(false);
 
   useEffect(() => {
@@ -55,16 +55,16 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
       setLoading(true);
       setNodeSelections({});
       setEdgeSelections({});
-      setReviewNotes('');
+      setReviewNotes("");
       recommendationAPI
         .getRecommendations(taskId)
-        .then(data => {
+        .then((data) => {
           setRecommendations(data);
-          setCurrentPhase(data.phase || 'nodes');
+          setCurrentPhase(data.phase || "nodes");
           setLoading(false);
           if (data.node_recommendations) {
             const initialNodes: Record<string, NodeSelectionState> = {};
-            data.node_recommendations.forEach(node => {
+            data.node_recommendations.forEach((node) => {
               initialNodes[node.id] = {
                 approved: true,
                 finalName: node.name,
@@ -79,7 +79,7 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
           }
           if (data.edge_recommendations) {
             const initialEdges: Record<string, EdgeSelectionState> = {};
-            data.edge_recommendations.forEach(edge => {
+            data.edge_recommendations.forEach((edge) => {
               initialEdges[edge.id] = {
                 approved: true,
                 relationshipType: edge.relationshipType,
@@ -91,8 +91,8 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
             setEdgeSelections(initialEdges);
           }
         })
-        .catch(error => {
-          console.error('Failed to load recommendations:', error);
+        .catch((error) => {
+          console.error("Failed to load recommendations:", error);
           setLoading(false);
         });
     }
@@ -100,7 +100,7 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
 
   const nodeLookup = useMemo(() => {
     const map: Record<string, EnhancedNodeRecommendation> = {};
-    recommendations?.node_recommendations.forEach(node => {
+    recommendations?.node_recommendations.forEach((node) => {
       map[node.id] = node;
     });
     return map;
@@ -108,7 +108,7 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
 
   const edgeLookup = useMemo(() => {
     const map: Record<string, EnhancedEdgeRecommendation> = {};
-    recommendations?.edge_recommendations.forEach(edge => {
+    recommendations?.edge_recommendations.forEach((edge) => {
       map[edge.id] = edge;
     });
     return map;
@@ -116,15 +116,15 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
 
   // Selection handling functions
   const handleNodeToggle = (nodeId: string) => {
-    setNodeSelections(prev => {
+    setNodeSelections((prev) => {
       const current = prev[nodeId];
       return {
         ...prev,
         [nodeId]: {
           ...(current || {
             approved: true,
-            finalName: nodeLookup[nodeId]?.name || 'Untitled node',
-            entityType: nodeLookup[nodeId]?.entityType || 'unknown',
+            finalName: nodeLookup[nodeId]?.name || "Untitled node",
+            entityType: nodeLookup[nodeId]?.entityType || "unknown",
             confidence: nodeLookup[nodeId]?.confidence || 0.75,
             sourceColumns: nodeLookup[nodeId]?.sourceColumns || [],
             metadata: nodeLookup[nodeId]?.metadata || {},
@@ -137,7 +137,7 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
   };
 
   const handleEdgeToggle = (edgeId: string) => {
-    setEdgeSelections(prev => {
+    setEdgeSelections((prev) => {
       const current = prev[edgeId];
       return {
         ...prev,
@@ -145,7 +145,7 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
           ...(current || {
             approved: true,
             relationshipType:
-              edgeLookup[edgeId]?.relationshipType || 'RELATED_TO',
+              edgeLookup[edgeId]?.relationshipType || "RELATED_TO",
             confidence: edgeLookup[edgeId]?.confidence || 0.7,
             metadata: edgeLookup[edgeId]?.metadata || {},
             reasoning: edgeLookup[edgeId]?.reasoning,
@@ -157,12 +157,12 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
   };
 
   const handleSelectAllNodes = () => {
-    setNodeSelections(prev => {
+    setNodeSelections((prev) => {
       const updated: Record<string, NodeSelectionState> = {};
       Object.entries(prev).forEach(([id, sel]) => {
         updated[id] = { ...sel, approved: true };
       });
-      recommendations?.node_recommendations.forEach(node => {
+      recommendations?.node_recommendations.forEach((node) => {
         if (!updated[node.id]) {
           updated[node.id] = {
             approved: true,
@@ -180,7 +180,7 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
   };
 
   const handleDeselectAllNodes = () => {
-    setNodeSelections(prev => {
+    setNodeSelections((prev) => {
       const updated: Record<string, NodeSelectionState> = {};
       Object.entries(prev).forEach(([id, sel]) => {
         updated[id] = { ...sel, approved: false };
@@ -190,12 +190,12 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
   };
 
   const handleSelectAllEdges = () => {
-    setEdgeSelections(prev => {
+    setEdgeSelections((prev) => {
       const updated: Record<string, EdgeSelectionState> = {};
       Object.entries(prev).forEach(([id, sel]) => {
         updated[id] = { ...sel, approved: true };
       });
-      recommendations?.edge_recommendations.forEach(edge => {
+      recommendations?.edge_recommendations.forEach((edge) => {
         if (!updated[edge.id]) {
           updated[edge.id] = {
             approved: true,
@@ -211,7 +211,7 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
   };
 
   const handleDeselectAllEdges = () => {
-    setEdgeSelections(prev => {
+    setEdgeSelections((prev) => {
       const updated: Record<string, EdgeSelectionState> = {};
       Object.entries(prev).forEach(([id, sel]) => {
         updated[id] = { ...sel, approved: false };
@@ -226,9 +226,9 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
     try {
       const data = await recommendationAPI.generateEdgeRecommendations(taskId);
       setRecommendations(data);
-      setCurrentPhase('edges');
+      setCurrentPhase("edges");
     } catch (err) {
-      console.error('Failed to generate edge recommendations:', err);
+      console.error("Failed to generate edge recommendations:", err);
     } finally {
       setLoading(false);
     }
@@ -284,22 +284,22 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
       const response = await recommendationAPI.submitFeedback(taskId, payload);
       if (response.ready_for_edges) {
         setReadyForEdges(true);
-        setCurrentPhase('nodes_completed');
+        setCurrentPhase("nodes_completed");
         showNotification(
-          'Nodes approved! Generating edge recommendations...',
-          'info'
+          "Nodes approved! Generating edge recommendations...",
+          "info",
         );
         // If edge recommendations are already available, switch to edge phase
         if (
           response.edge_recommendations &&
           response.edge_recommendations.length > 0
         ) {
-          setRecommendations(prev => ({
+          setRecommendations((prev) => ({
             ...prev,
             node_recommendations: prev?.node_recommendations || [],
             edge_recommendations: response.edge_recommendations,
           }));
-          setCurrentPhase('edges');
+          setCurrentPhase("edges");
         } else {
           // Otherwise, show loading and poll for edge recommendations
           setLoading(true);
@@ -307,17 +307,17 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
             try {
               const data = await recommendationAPI.getRecommendations(taskId);
               if (
-                data.phase === 'edges' &&
+                data.phase === "edges" &&
                 data.edge_recommendations.length > 0
               ) {
                 setRecommendations(data);
-                setCurrentPhase('edges');
+                setCurrentPhase("edges");
                 setLoading(false);
                 clearInterval(interval);
-                showNotification('Edge recommendations are ready!', 'success');
+                showNotification("Edge recommendations are ready!", "success");
               }
             } catch (error) {
-              console.error('Polling for edge recommendations failed:', error);
+              console.error("Polling for edge recommendations failed:", error);
               setLoading(false);
               clearInterval(interval);
             }
@@ -325,11 +325,11 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
         }
       } else {
         onApprove(payload.items);
-        showNotification('Feedback submitted successfully!', 'success');
+        showNotification("Feedback submitted successfully!", "success");
       }
     } catch (error) {
-      console.error('Failed to submit recommendation feedback:', error);
-      showNotification('Failed to submit feedback. Please try again.', 'error');
+      console.error("Failed to submit recommendation feedback:", error);
+      showNotification("Failed to submit feedback. Please try again.", "error");
     }
   };
 
@@ -340,12 +340,12 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
         notes: reviewNotes,
       });
       onReject();
-      showNotification('Recommendations rejected.', 'info');
+      showNotification("Recommendations rejected.", "info");
     } catch (error) {
-      console.error('Failed to reject recommendations:', error);
+      console.error("Failed to reject recommendations:", error);
       showNotification(
-        'Failed to reject recommendations. Please try again.',
-        'error'
+        "Failed to reject recommendations. Please try again.",
+        "error",
       );
     }
   };
@@ -364,21 +364,21 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
           <>
             {recommendations && (
               <>
-                {currentPhase === 'nodes' && (
+                {currentPhase === "nodes" && (
                   <NodeRecommendationList
                     recommendations={recommendations.node_recommendations}
                     selections={nodeSelections}
                     onNodeToggle={handleNodeToggle}
                     onUpdateSelection={(nodeId, update) =>
-                      setNodeSelections(prev => ({
+                      setNodeSelections((prev) => ({
                         ...prev,
                         [nodeId]: {
                           ...(prev[nodeId] ?? {
                             approved: true,
                             finalName:
-                              nodeLookup[nodeId]?.name || 'Untitled node',
+                              nodeLookup[nodeId]?.name || "Untitled node",
                             entityType:
-                              nodeLookup[nodeId]?.entityType || 'unknown',
+                              nodeLookup[nodeId]?.entityType || "unknown",
                             confidence: nodeLookup[nodeId]?.confidence || 0.75,
                             sourceColumns:
                               nodeLookup[nodeId]?.sourceColumns || [],
@@ -396,27 +396,27 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
                     onDeselectAll={handleDeselectAllNodes}
                   />
                 )}
-                {currentPhase === 'nodes_completed' && (
+                {currentPhase === "nodes_completed" && (
                   <div className="phase-transition">
                     <p>
                       Nodes approved. Generating relationships, please wait...
                     </p>
                   </div>
                 )}
-                {currentPhase === 'edges' && (
+                {currentPhase === "edges" && (
                   <EdgeRecommendationList
                     recommendations={recommendations.edge_recommendations}
                     selections={edgeSelections}
                     onEdgeToggle={handleEdgeToggle}
                     onUpdateSelection={(edgeId, update) =>
-                      setEdgeSelections(prev => ({
+                      setEdgeSelections((prev) => ({
                         ...prev,
                         [edgeId]: {
                           ...(prev[edgeId] ?? {
                             approved: true,
                             relationshipType:
                               edgeLookup[edgeId]?.relationshipType ||
-                              'RELATED_TO',
+                              "RELATED_TO",
                             confidence: edgeLookup[edgeId]?.confidence || 0.7,
                             metadata: edgeLookup[edgeId]?.metadata || {},
                             reasoning: edgeLookup[edgeId]?.reasoning,
@@ -438,7 +438,7 @@ const RecommendationModal: React.FC<RecommendationModalProps> = ({
                     id="review-notes"
                     rows={3}
                     value={reviewNotes}
-                    onChange={event => setReviewNotes(event.target.value)}
+                    onChange={(event) => setReviewNotes(event.target.value)}
                     placeholder="Document why you approved or adjusted these recommendations..."
                   />
                 </div>

@@ -1,0 +1,39 @@
+{
+  "task_id": "extract_1776589013",
+  "repository_url": "/app/app",
+  "timestamp": "2026-04-19T08:56:53.431097",
+  "total_duration_ms": 73773.93984794617,
+  "phases": [
+    {
+      "name": "L2_Containers",
+      "duration_ms": 114.07637596130371,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "L1_Context",
+      "duration_ms": 14519.75131034851,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "Container_Relationships",
+      "duration_ms": 0.4286766052246094,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "L3_Components",
+      "duration_ms": 0.010013580322265625,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "LLM_Enrichment",
+      "duration_ms": 59139.673471450806,
+      "success": true,
+      "error": null
+    }
+  ],
+  "sub_phases": {}
+}

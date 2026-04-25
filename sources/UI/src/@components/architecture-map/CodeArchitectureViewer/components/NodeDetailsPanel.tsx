@@ -379,7 +379,10 @@ export default function NodeDetailsPanel({
             )}
             {attrs.evidence && (
               <DetailRow label="Evidence">
-                <FormattedDetailValue value={attrs.evidence} preserveWhitespace />
+                <FormattedDetailValue
+                  value={attrs.evidence}
+                  preserveWhitespace
+                />
               </DetailRow>
             )}
           </div>
@@ -514,7 +517,9 @@ export default function NodeDetailsPanel({
               selectedNode?.id ||
               "Node Details"}
           </h3>
-          <span className="chat-subtitle">{nodeTypeLabel || "Node Details"}</span>
+          <span className="chat-subtitle">
+            {nodeTypeLabel || "Node Details"}
+          </span>
         </div>
         <button className="close-btn" onClick={onClose}>
           ×
@@ -1098,18 +1103,20 @@ export default function NodeDetailsPanel({
             </DetailRow>
           )}
 
-        {attrs.requires_human_review && reviewThresholdPercent !== undefined && (
-          <DetailRow
-            label="Human Review Threshold"
-            tooltip="Threshold below which the classifier requires manual confirmation before the dependency is trusted."
-          >
-            <span className="detail-value">{reviewThresholdPercent}%</span>
-          </DetailRow>
-        )}
+        {attrs.requires_human_review &&
+          reviewThresholdPercent !== undefined && (
+            <DetailRow
+              label="Human Review Threshold"
+              tooltip="Threshold below which the classifier requires manual confirmation before the dependency is trusted."
+            >
+              <span className="detail-value">{reviewThresholdPercent}%</span>
+            </DetailRow>
+          )}
 
         {/* Classification reasoning */}
         {attrs.classification_reasoning &&
-          (attrs.dependency_type !== "UNKNOWN" || attrs.requires_human_review) && (
+          (attrs.dependency_type !== "UNKNOWN" ||
+            attrs.requires_human_review) && (
             <DetailRow
               label="Classification Reasoning"
               tooltip="Explanation of why this dependency was classified as business or technical."

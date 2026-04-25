@@ -174,9 +174,7 @@ describe("NodeDetailsPanel", () => {
     fireEvent.change(textarea, {
       target: { value: "Should this stay at context level?" },
     });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Send chat message" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Send chat message" }));
 
     expect(onSendChat).toHaveBeenCalledWith(
       "Should this stay at context level?",

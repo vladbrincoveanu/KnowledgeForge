@@ -1,5 +1,5 @@
 // Common TypeScript interfaces and types for the application
-import React from 'react';
+import React from "react";
 
 // Base entity interfaces
 export interface Entity {
@@ -27,7 +27,7 @@ export interface Relationship {
 // Task and status interfaces
 export interface TaskStatus {
   task_id: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: "pending" | "running" | "completed" | "failed";
   progress?: number;
   message?: string;
   error?: string;
@@ -64,7 +64,7 @@ export interface SystemMetrics {
 }
 
 export interface HealthStatus {
-  status: 'healthy' | 'unhealthy';
+  status: "healthy" | "unhealthy";
   version?: string;
   timestamp: string;
   dependencies?: Record<string, boolean>;
@@ -116,7 +116,7 @@ export interface GraphData {
 export interface QueryNode {
   id: string;
   name: string;
-  node_type: 'table' | 'field' | 'join' | 'filter' | 'aggregate';
+  node_type: "table" | "field" | "join" | "filter" | "aggregate";
   position: { x: number; y: number };
   properties: Record<string, string | number | boolean>;
   metadata?: Record<string, string | number | boolean>;
@@ -128,7 +128,7 @@ export interface QueryEdge {
   id: string;
   source_node_id: string;
   target_node_id: string;
-  edge_type: 'select' | 'join' | 'filter' | 'group' | 'order';
+  edge_type: "select" | "join" | "filter" | "group" | "order";
   properties: Record<string, string | number | boolean>;
   conditions?: Record<string, unknown>;
   created_at: string;
@@ -238,7 +238,7 @@ export type MouseEventHandler = (event: React.MouseEvent) => void;
 export type ChangeEventHandler = (
   event: React.ChangeEvent<
     HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-  >
+  >,
 ) => void;
 export type FormEventHandler = (event: React.FormEvent) => void;
 export type KeyboardEventHandler = (event: React.KeyboardEvent) => void;

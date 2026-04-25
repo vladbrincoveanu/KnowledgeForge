@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Settings as _SettingsIcon } from 'lucide-react';
-import './Settings.scss';
+import React, { useState } from "react";
+import { Settings as _SettingsIcon } from "lucide-react";
+import "./Settings.scss";
 
 interface SettingsConfig {
   apiBaseUrl: string;
@@ -15,8 +15,8 @@ interface SettingsProps {
 
 const Settings: React.FC<SettingsProps> = ({ onSettingsChange }) => {
   const [settings, setSettings] = useState<SettingsConfig>({
-    apiBaseUrl: import.meta.env.VITE_API_URL || 'http://localhost:8000',
-    apiKey: import.meta.env.VITE_API_KEY || 'test-api-key-12345',
+    apiBaseUrl: import.meta.env.VITE_API_URL || "http://localhost:8000",
+    apiKey: import.meta.env.VITE_API_KEY || "test-api-key-12345",
     confidenceThreshold: 0.7,
     autoRefreshMetrics: true,
   });
@@ -25,7 +25,7 @@ const Settings: React.FC<SettingsProps> = ({ onSettingsChange }) => {
 
   const handleInputChange = (
     field: keyof SettingsConfig,
-    value: string | number | boolean
+    value: string | number | boolean,
   ) => {
     const newSettings = { ...settings, [field]: value };
     setSettings(newSettings);
@@ -39,8 +39,8 @@ const Settings: React.FC<SettingsProps> = ({ onSettingsChange }) => {
 
   const handleReset = () => {
     setSettings({
-      apiBaseUrl: 'http://localhost:8000',
-      apiKey: 'test-api-key-12345',
+      apiBaseUrl: "http://localhost:8000",
+      apiKey: "test-api-key-12345",
       confidenceThreshold: 0.7,
       autoRefreshMetrics: true,
     });
@@ -57,10 +57,10 @@ const Settings: React.FC<SettingsProps> = ({ onSettingsChange }) => {
             id="api-base-url"
             type="text"
             value={settings.apiBaseUrl}
-            onChange={e => handleInputChange('apiBaseUrl', e.target.value)}
-            onKeyDown={e => {
+            onChange={(e) => handleInputChange("apiBaseUrl", e.target.value)}
+            onKeyDown={(e) => {
               // Allow Ctrl+A / Cmd+A to select all
-              if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+              if ((e.ctrlKey || e.metaKey) && e.key === "a") {
                 e.stopPropagation();
               }
             }}
@@ -73,10 +73,10 @@ const Settings: React.FC<SettingsProps> = ({ onSettingsChange }) => {
             id="api-key"
             type="password"
             value={settings.apiKey}
-            onChange={e => handleInputChange('apiKey', e.target.value)}
-            onKeyDown={e => {
+            onChange={(e) => handleInputChange("apiKey", e.target.value)}
+            onKeyDown={(e) => {
               // Allow Ctrl+A / Cmd+A to select all
-              if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+              if ((e.ctrlKey || e.metaKey) && e.key === "a") {
                 e.stopPropagation();
               }
             }}
@@ -98,10 +98,10 @@ const Settings: React.FC<SettingsProps> = ({ onSettingsChange }) => {
             max="1.0"
             step="0.1"
             value={settings.confidenceThreshold}
-            onChange={e =>
+            onChange={(e) =>
               handleInputChange(
-                'confidenceThreshold',
-                parseFloat(e.target.value)
+                "confidenceThreshold",
+                parseFloat(e.target.value),
               )
             }
           />
@@ -112,8 +112,8 @@ const Settings: React.FC<SettingsProps> = ({ onSettingsChange }) => {
               id="auto-refresh"
               type="checkbox"
               checked={settings.autoRefreshMetrics}
-              onChange={e =>
-                handleInputChange('autoRefreshMetrics', e.target.checked)
+              onChange={(e) =>
+                handleInputChange("autoRefreshMetrics", e.target.checked)
               }
             />
             Auto-refresh Metrics

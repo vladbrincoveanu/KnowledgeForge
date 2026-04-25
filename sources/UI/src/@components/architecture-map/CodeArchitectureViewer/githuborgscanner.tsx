@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import './githuborgscanner.scss';
+import React, { useState } from "react";
+import "./githuborgscanner.scss";
 
 interface GitHubOrgScannerProps {
   onScanStart: (username: string, options: ScanOptions) => void;
@@ -15,46 +15,47 @@ const GitHubOrgScanner: React.FC<GitHubOrgScannerProps> = ({
   onScanStart,
   isScanning,
 }) => {
-  const [username, setUsername] = useState('venkataravuri');
+  const [username, setUsername] = useState("venkataravuri");
   const [includeForks, setIncludeForks] = useState(false);
   const [maxRepos, setMaxRepos] = useState(10);
-  const [inputError, setInputError] = useState('');
+  const [inputError, setInputError] = useState("");
 
   // Helper function to extract username from GitHub URL or return username as-is
   const extractUsername = (input: string): string => {
     const trimmed = input.trim();
-    
+
     // Handle various GitHub URL formats
     // https://github.com/username
     // http://github.com/username
     // github.com/username
     // @username
     // username
-    
-    const githubUrlPattern = /(?:https?:\/\/)?(?:www\.)?github\.com\/([^\/\s?#]+)/i;
+
+    const githubUrlPattern =
+      /(?:https?:\/\/)?(?:www\.)?github\.com\/([^\/\s?#]+)/i;
     const match = trimmed.match(githubUrlPattern);
-    
+
     if (match && match[1]) {
       return match[1]; // Extract username from URL
     }
-    
+
     // Remove @ symbol if present
-    if (trimmed.startsWith('@')) {
+    if (trimmed.startsWith("@")) {
       return trimmed.substring(1);
     }
-    
+
     return trimmed;
   };
 
   const handleScan = () => {
     const cleanUsername = extractUsername(username);
-    
+
     if (!cleanUsername) {
-      setInputError('Please enter a GitHub username or organization');
+      setInputError("Please enter a GitHub username or organization");
       return;
     }
-    
-    setInputError('');
+
+    setInputError("");
     onScanStart(cleanUsername, { includeForks, maxRepos });
   };
 
@@ -64,11 +65,11 @@ const GitHubOrgScanner: React.FC<GitHubOrgScannerProps> = ({
         <input
           type="text"
           value={username}
-          onChange={e => {
+          onChange={(e) => {
             setUsername(e.target.value);
-            setInputError('');
+            setInputError("");
           }}
-          onKeyPress={e => e.key === 'Enter' && handleScan()}
+          onKeyPress={(e) => e.key === "Enter" && handleScan()}
           placeholder="username, @username or github.com/username"
           className="org-input"
         />
@@ -81,7 +82,7 @@ const GitHubOrgScanner: React.FC<GitHubOrgScannerProps> = ({
           <input
             type="checkbox"
             checked={includeForks}
-            onChange={e => setIncludeForks(e.target.checked)}
+            onChange={(e) => setIncludeForks(e.target.checked)}
           />
           <span>Include forks</span>
         </label>
@@ -90,7 +91,7 @@ const GitHubOrgScanner: React.FC<GitHubOrgScannerProps> = ({
           <label>Max repositories:</label>
           <select
             value={maxRepos}
-            onChange={e => setMaxRepos(Number(e.target.value))}
+            onChange={(e) => setMaxRepos(Number(e.target.value))}
             className="max-repos-select"
           >
             <option value={5}>5</option>
@@ -106,7 +107,7 @@ const GitHubOrgScanner: React.FC<GitHubOrgScannerProps> = ({
         onClick={handleScan}
         disabled={isScanning || !username.trim()}
       >
-        Scan {username || 'Account'} Repositories
+        Scan {username || "Account"} Repositories
       </button>
 
       <div className="info-note">

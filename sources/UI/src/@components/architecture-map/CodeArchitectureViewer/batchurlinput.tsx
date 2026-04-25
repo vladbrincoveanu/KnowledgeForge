@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import './batchurlinput.scss';
+import React, { useState } from "react";
+import "./batchurlinput.scss";
 
 interface BatchUrlInputProps {
   onBatchExtract: (urls: string[]) => void;
@@ -9,7 +9,7 @@ interface BatchUrlInputProps {
 interface UrlItem {
   id: string;
   url: string;
-  status: 'pending' | 'extracting' | 'completed' | 'failed';
+  status: "pending" | "extracting" | "completed" | "failed";
   progress?: number;
   error?: string;
 }
@@ -18,9 +18,9 @@ const BatchUrlInput: React.FC<BatchUrlInputProps> = ({
   onBatchExtract,
   isExtracting,
 }) => {
-  const [inputUrl, setInputUrl] = useState('');
+  const [inputUrl, setInputUrl] = useState("");
   const [urlList, setUrlList] = useState<UrlItem[]>([]);
-  const [inputError, setInputError] = useState('');
+  const [inputError, setInputError] = useState("");
 
   const isValidGitHubUrl = (url: string): boolean => {
     return /^https?:\/\/(www\.)?github\.com\/[\w-]+\/[\w.-]+/.test(url);
@@ -28,11 +28,11 @@ const BatchUrlInput: React.FC<BatchUrlInputProps> = ({
 
   const handleAddUrl = () => {
     if (!isValidGitHubUrl(inputUrl)) {
-      setInputError('Invalid GitHub URL');
+      setInputError("Invalid GitHub URL");
       return;
     }
-    if (urlList.some(item => item.url === inputUrl)) {
-      setInputError('URL already added');
+    if (urlList.some((item) => item.url === inputUrl)) {
+      setInputError("URL already added");
       return;
     }
     setUrlList([
@@ -40,21 +40,21 @@ const BatchUrlInput: React.FC<BatchUrlInputProps> = ({
       {
         id: crypto.randomUUID(),
         url: inputUrl,
-        status: 'pending',
+        status: "pending",
       },
     ]);
-    setInputUrl('');
-    setInputError('');
+    setInputUrl("");
+    setInputError("");
   };
 
   const handleRemoveUrl = (id: string) => {
-    setUrlList(urlList.filter(item => item.id !== id));
+    setUrlList(urlList.filter((item) => item.id !== id));
   };
 
   const handleBatchExtract = () => {
     const pendingUrls = urlList
-      .filter(item => item.status === 'pending')
-      .map(item => item.url);
+      .filter((item) => item.status === "pending")
+      .map((item) => item.url);
     onBatchExtract(pendingUrls);
   };
 
@@ -64,8 +64,8 @@ const BatchUrlInput: React.FC<BatchUrlInputProps> = ({
         <input
           type="text"
           value={inputUrl}
-          onChange={e => setInputUrl(e.target.value)}
-          onKeyPress={e => e.key === 'Enter' && handleAddUrl()}
+          onChange={(e) => setInputUrl(e.target.value)}
+          onKeyPress={(e) => e.key === "Enter" && handleAddUrl()}
           placeholder="https://github.com/owner/repo"
           className="url-input"
         />
@@ -78,21 +78,21 @@ const BatchUrlInput: React.FC<BatchUrlInputProps> = ({
 
       {urlList.length > 0 && (
         <div className="url-list">
-          {urlList.map(item => (
+          {urlList.map((item) => (
             <div key={item.id} className={`url-chip status-${item.status}`}>
               <span className="url-text" title={item.url}>
-                {item.url.replace('https://github.com/', '')}
+                {item.url.replace("https://github.com/", "")}
               </span>
-              {item.status === 'extracting' && item.progress && (
+              {item.status === "extracting" && item.progress && (
                 <span className="progress-text">{item.progress}%</span>
               )}
-              {item.status === 'failed' && (
+              {item.status === "failed" && (
                 <span className="status-icon">❌</span>
               )}
-              {item.status === 'completed' && (
+              {item.status === "completed" && (
                 <span className="status-icon">✓</span>
               )}
-              {item.status === 'pending' && (
+              {item.status === "pending" && (
                 <button
                   className="remove-btn"
                   onClick={() => handleRemoveUrl(item.id)}
@@ -112,12 +112,12 @@ const BatchUrlInput: React.FC<BatchUrlInputProps> = ({
           className="batch-extract-btn"
           onClick={handleBatchExtract}
           disabled={
-            urlList.filter(i => i.status === 'pending').length === 0 ||
+            urlList.filter((i) => i.status === "pending").length === 0 ||
             isExtracting
           }
           type="button"
         >
-          Extract {urlList.filter(i => i.status === 'pending').length}{' '}
+          Extract {urlList.filter((i) => i.status === "pending").length}{" "}
           Repositories
         </button>
       )}

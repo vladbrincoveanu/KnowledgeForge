@@ -1,12 +1,12 @@
-import React from 'react';
-import BatchUrlInput from '../batchurlinput';
-import GitHubOrgScanner from '../githuborgscanner';
-import { codeArchitectureAPI } from '../../../../services/api';
+import React from "react";
+import BatchUrlInput from "../batchurlinput";
+import GitHubOrgScanner from "../githuborgscanner";
+import { codeArchitectureAPI } from "../../../../services/api";
 
 const AVAILABLE_LEVELS = [
-  'context_level',
-  'container_level',
-  'component_level',
+  "context_level",
+  "container_level",
+  "component_level",
 ];
 
 interface FiltersSidebarProps {
@@ -26,8 +26,8 @@ interface FiltersSidebarProps {
   // Externals + dependency view
   showExternal: boolean;
   setShowExternal: (val: boolean) => void;
-  dependencyViewFilter: 'all' | 'business' | 'technical';
-  setDependencyViewFilter: (val: 'all' | 'business' | 'technical') => void;
+  dependencyViewFilter: "all" | "business" | "technical";
+  setDependencyViewFilter: (val: "all" | "business" | "technical") => void;
 
   // Repo section
   repoSectionExpanded: boolean;
@@ -42,7 +42,7 @@ interface FiltersSidebarProps {
   handleBatchExtract: (urls: string[]) => void;
   handleGitHubOrgScan: (
     username: string,
-    options: { includeForks: boolean; maxRepos: number }
+    options: { includeForks: boolean; maxRepos: number },
   ) => void;
   setArchitecture: (data: any) => void;
   setNodes: (nodes: any) => void;
@@ -93,7 +93,7 @@ export default function FiltersSidebar({
           type="text"
           placeholder="Search entities..."
           value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
+          onChange={(e) => setSearchTerm(e.target.value)}
           className="search-input"
         />
       </div>
@@ -101,7 +101,7 @@ export default function FiltersSidebar({
       {/* C4 Levels */}
       <div className="filter-section">
         <h3>C4 Levels</h3>
-        {AVAILABLE_LEVELS.map(level => (
+        {AVAILABLE_LEVELS.map((level) => (
           <label key={level} className="checkbox-label">
             <input
               type="radio"
@@ -110,9 +110,7 @@ export default function FiltersSidebar({
               onChange={() => toggleLevel(level)}
             />
             <span>
-              {level
-                .replace('_', ' ')
-                .replace(/\b\w/g, l => l.toUpperCase())}
+              {level.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase())}
             </span>
           </label>
         ))}
@@ -122,7 +120,7 @@ export default function FiltersSidebar({
       <div className="filter-section">
         <h3>Relationship Types</h3>
         <div className="checkbox-group">
-          {relationshipTypes.map(type => (
+          {relationshipTypes.map((type) => (
             <label key={type} className="checkbox-label">
               <input
                 type="checkbox"
@@ -141,14 +139,14 @@ export default function FiltersSidebar({
           <input
             type="checkbox"
             checked={showExternal}
-            onChange={e => setShowExternal(e.target.checked)}
+            onChange={(e) => setShowExternal(e.target.checked)}
           />
           <span>Show External Dependencies</span>
         </label>
       </div>
 
       {/* Dependency View Filter */}
-      {selectedLevel === 'context_level' && showExternal && (
+      {selectedLevel === "context_level" && showExternal && (
         <div className="filter-section">
           <h3>Dependency View</h3>
           <div className="radio-group">
@@ -156,8 +154,8 @@ export default function FiltersSidebar({
               <input
                 type="radio"
                 name="dependency-view"
-                checked={dependencyViewFilter === 'business'}
-                onChange={() => setDependencyViewFilter('business')}
+                checked={dependencyViewFilter === "business"}
+                onChange={() => setDependencyViewFilter("business")}
               />
               <span>Context View (Business Systems)</span>
             </label>
@@ -165,8 +163,8 @@ export default function FiltersSidebar({
               <input
                 type="radio"
                 name="dependency-view"
-                checked={dependencyViewFilter === 'technical'}
-                onChange={() => setDependencyViewFilter('technical')}
+                checked={dependencyViewFilter === "technical"}
+                onChange={() => setDependencyViewFilter("technical")}
               />
               <span>Container View (Technical Infra)</span>
             </label>
@@ -174,8 +172,8 @@ export default function FiltersSidebar({
               <input
                 type="radio"
                 name="dependency-view"
-                checked={dependencyViewFilter === 'all'}
-                onChange={() => setDependencyViewFilter('all')}
+                checked={dependencyViewFilter === "all"}
+                onChange={() => setDependencyViewFilter("all")}
               />
               <span>Show All</span>
             </label>
@@ -190,7 +188,9 @@ export default function FiltersSidebar({
           onClick={() => setRepoSectionExpanded(!repoSectionExpanded)}
         >
           <h3>Add Repositories</h3>
-          <span className={`toggle-icon ${repoSectionExpanded ? 'expanded' : ''}`}>
+          <span
+            className={`toggle-icon ${repoSectionExpanded ? "expanded" : ""}`}
+          >
             ▼
           </span>
         </button>
@@ -203,16 +203,18 @@ export default function FiltersSidebar({
                 type="text"
                 placeholder="https://github.com/owner/repo"
                 value={githubUrl}
-                onChange={e => setGithubUrl(e.target.value)}
+                onChange={(e) => setGithubUrl(e.target.value)}
                 className="search-input"
-                onKeyPress={e => e.key === 'Enter' && handleExtractFromGithub()}
+                onKeyPress={(e) =>
+                  e.key === "Enter" && handleExtractFromGithub()
+                }
               />
               <button
                 className="fit-button"
                 onClick={handleExtractFromGithub}
                 disabled={isExtracting}
               >
-                {isExtracting ? 'Extracting...' : 'Add Repository'}
+                {isExtracting ? "Extracting..." : "Add Repository"}
               </button>
             </div>
 
@@ -222,9 +224,9 @@ export default function FiltersSidebar({
                 type="text"
                 placeholder="/cms  or  /cms/my-service"
                 value={localPath}
-                onChange={e => setLocalPath(e.target.value)}
+                onChange={(e) => setLocalPath(e.target.value)}
                 className="search-input"
-                onKeyPress={e => e.key === 'Enter' && handleScanLocalPath()}
+                onKeyPress={(e) => e.key === "Enter" && handleScanLocalPath()}
               />
               <button
                 className="fit-button"
@@ -232,7 +234,7 @@ export default function FiltersSidebar({
                 disabled={isExtracting || !localPath.trim()}
                 title="Scan a local folder mounted inside the container"
               >
-                {isExtracting ? 'Scanning...' : 'Scan Local Folder'}
+                {isExtracting ? "Scanning..." : "Scan Local Folder"}
               </button>
             </div>
 
@@ -260,7 +262,7 @@ export default function FiltersSidebar({
               onClick={async () => {
                 if (
                   confirm(
-                    '⚠️ Clear ALL repositories and start fresh? This will remove all accumulated architecture data.'
+                    "⚠️ Clear ALL repositories and start fresh? This will remove all accumulated architecture data.",
                   )
                 ) {
                   try {
@@ -268,13 +270,13 @@ export default function FiltersSidebar({
                     setArchitecture(null);
                     setNodes([]);
                     setEdges([]);
-                    setGithubUrl('');
+                    setGithubUrl("");
                     setExtractionStatus(
-                      'All repositories cleared - ready for fresh extraction'
+                      "All repositories cleared - ready for fresh extraction",
                     );
-                    setExtractionError('');
+                    setExtractionError("");
                   } catch (err) {
-                    setExtractionError('Failed to clear data');
+                    setExtractionError("Failed to clear data");
                   }
                 }
               }}

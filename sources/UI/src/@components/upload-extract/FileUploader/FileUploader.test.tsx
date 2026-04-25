@@ -4,21 +4,21 @@
  * @fileoverview Unit tests for FileUploader component (GitHub repo extraction)
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import * as matchers from '@testing-library/jest-dom/matchers';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import FileUploader from './FileUploader';
-import { codeArchitectureAPI } from '@/services/api';
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import * as matchers from "@testing-library/jest-dom/matchers";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import FileUploader from "./FileUploader";
+import { codeArchitectureAPI } from "@/services/api";
 
 expect.extend(matchers);
 
 // Test URLs
-const REPO_FACEBOOK = 'https://github.com/facebook/react';
-const REPO_MICROSOFT = 'https://github.com/microsoft/typescript';
+const REPO_FACEBOOK = "https://github.com/facebook/react";
+const REPO_MICROSOFT = "https://github.com/microsoft/typescript";
 const GITHUB_INPUT_PLACEHOLDER = /github\.com\/owner\/repository/i;
 
 // Mock the API service
-vi.mock('@/services/api', () => ({
+vi.mock("@/services/api", () => ({
   codeArchitectureAPI: {
     extractFromGitHub: vi.fn(),
     getExtractionStatus: vi.fn(),
@@ -31,17 +31,19 @@ vi.mock('@/services/api', () => ({
   },
 }));
 
-describe('FileUploader Component', () => {
+describe("FileUploader Component", () => {
   const mockOnFilesUploaded = vi.fn();
   const mockOnExtractionStarted = vi.fn();
   const mockShowNotification = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
-    codeArchitectureAPI.extractFromGitHub.mockResolvedValue({ task_id: 'mock-task-id' });
+    codeArchitectureAPI.extractFromGitHub.mockResolvedValue({
+      task_id: "mock-task-id",
+    });
     codeArchitectureAPI.getExtractionStatus.mockResolvedValue({
-      status: 'pending',
-      message: 'Queued',
+      status: "pending",
+      message: "Queued",
       progress: 0,
     });
   });
@@ -50,7 +52,7 @@ describe('FileUploader Component', () => {
     cleanup();
   });
 
-  it('renders empty state with GitHub URL input', () => {
+  it("renders empty state with GitHub URL input", () => {
     render(
       <FileUploader
         onFilesUploaded={mockOnFilesUploaded}
@@ -60,11 +62,15 @@ describe('FileUploader Component', () => {
       />,
     );
 
-    expect(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER)).toBeInTheDocument();
-    expect(screen.getByText(/Add one or more GitHub repository URLs above/i)).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Add one or more GitHub repository URLs above/i),
+    ).toBeInTheDocument();
   });
 
-  it('shows error for empty URL submission', () => {
+  it("shows error for empty URL submission", () => {
     render(
       <FileUploader
         onFilesUploaded={mockOnFilesUploaded}
@@ -74,12 +80,12 @@ describe('FileUploader Component', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /add/i }));
+    fireEvent.click(screen.getByRole("button", { name: /add/i }));
 
     expect(screen.getByText(/please enter a github url/i)).toBeInTheDocument();
   });
 
-  it('shows error for invalid GitHub URL', () => {
+  it("shows error for invalid GitHub URL", () => {
     render(
       <FileUploader
         onFilesUploaded={mockOnFilesUploaded}
@@ -90,14 +96,16 @@ describe('FileUploader Component', () => {
     );
 
     fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
-      target: { value: 'not-a-valid-url' },
+      target: { value: "not-a-valid-url" },
     });
-    fireEvent.click(screen.getByRole('button', { name: /add/i }));
+    fireEvent.click(screen.getByRole("button", { name: /add/i }));
 
-    expect(screen.getByText(/enter a valid github repository url/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/enter a valid github repository url/i),
+    ).toBeInTheDocument();
   });
 
-  it('adds a valid GitHub URL to the repo list', () => {
+  it("adds a valid GitHub URL to the repo list", () => {
     render(
       <FileUploader
         onFilesUploaded={mockOnFilesUploaded}
@@ -110,13 +118,13 @@ describe('FileUploader Component', () => {
     fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
       target: { value: REPO_FACEBOOK },
     });
-    fireEvent.click(screen.getByRole('button', { name: /add/i }));
+    fireEvent.click(screen.getByRole("button", { name: /add/i }));
 
     expect(screen.getByText(/facebook\/react/i)).toBeInTheDocument();
     expect(screen.getByText(/ready to extract/i)).toBeInTheDocument();
   });
 
-  it('strips .git suffix from GitHub URL', () => {
+  it("strips .git suffix from GitHub URL", () => {
     render(
       <FileUploader
         onFilesUploaded={mockOnFilesUploaded}
@@ -127,15 +135,15 @@ describe('FileUploader Component', () => {
     );
 
     fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
-      target: { value: 'https://github.com/facebook/react.git' },
+      target: { value: "https://github.com/facebook/react.git" },
     });
-    fireEvent.click(screen.getByRole('button', { name: /add/i }));
+    fireEvent.click(screen.getByRole("button", { name: /add/i }));
 
     expect(screen.getByText(/facebook\/react/i)).toBeInTheDocument();
     expect(screen.queryByText(/\.git/i)).not.toBeInTheDocument();
   });
 
-  it('shows error for duplicate GitHub URL', () => {
+  it("shows error for duplicate GitHub URL", () => {
     render(
       <FileUploader
         onFilesUploaded={mockOnFilesUploaded}
@@ -148,17 +156,19 @@ describe('FileUploader Component', () => {
     fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
       target: { value: REPO_FACEBOOK },
     });
-    fireEvent.click(screen.getByRole('button', { name: /add/i }));
+    fireEvent.click(screen.getByRole("button", { name: /add/i }));
 
     fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
       target: { value: REPO_FACEBOOK },
     });
-    fireEvent.click(screen.getByRole('button', { name: /add/i }));
+    fireEvent.click(screen.getByRole("button", { name: /add/i }));
 
-    expect(screen.getByText(/this repository has already been added/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/this repository has already been added/i),
+    ).toBeInTheDocument();
   });
 
-  it('removes a repo from the list', () => {
+  it("removes a repo from the list", () => {
     render(
       <FileUploader
         onFilesUploaded={mockOnFilesUploaded}
@@ -171,7 +181,7 @@ describe('FileUploader Component', () => {
     fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
       target: { value: REPO_FACEBOOK },
     });
-    fireEvent.click(screen.getByRole('button', { name: /add/i }));
+    fireEvent.click(screen.getByRole("button", { name: /add/i }));
 
     expect(screen.getByText(/facebook\/react/i)).toBeInTheDocument();
 
@@ -181,7 +191,7 @@ describe('FileUploader Component', () => {
     expect(screen.queryByText(/facebook\/react/i)).not.toBeInTheDocument();
   });
 
-  it('clears all repos', () => {
+  it("clears all repos", () => {
     render(
       <FileUploader
         onFilesUploaded={mockOnFilesUploaded}
@@ -194,23 +204,25 @@ describe('FileUploader Component', () => {
     fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
       target: { value: REPO_FACEBOOK },
     });
-    fireEvent.click(screen.getByRole('button', { name: /add/i }));
+    fireEvent.click(screen.getByRole("button", { name: /add/i }));
 
     fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
       target: { value: REPO_MICROSOFT },
     });
-    fireEvent.click(screen.getByRole('button', { name: /add/i }));
+    fireEvent.click(screen.getByRole("button", { name: /add/i }));
 
     expect(screen.getByText(/facebook\/react/i)).toBeInTheDocument();
     expect(screen.getByText(/microsoft\/typescript/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /clear all/i }));
+    fireEvent.click(screen.getByRole("button", { name: /clear all/i }));
 
     expect(screen.queryByText(/facebook\/react/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/microsoft\/typescript/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/microsoft\/typescript/i),
+    ).not.toBeInTheDocument();
   });
 
-  it('starts extraction when Extract button is clicked', () => {
+  it("starts extraction when Extract button is clicked", () => {
     render(
       <FileUploader
         onFilesUploaded={mockOnFilesUploaded}
@@ -223,14 +235,18 @@ describe('FileUploader Component', () => {
     fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
       target: { value: REPO_FACEBOOK },
     });
-    fireEvent.click(screen.getByRole('button', { name: /add/i }));
+    fireEvent.click(screen.getByRole("button", { name: /add/i }));
 
-    fireEvent.click(screen.getByRole('button', { name: /extract/i }));
+    fireEvent.click(screen.getByRole("button", { name: /extract/i }));
 
-    expect(codeArchitectureAPI.extractFromGitHub).toHaveBeenCalledWith(REPO_FACEBOOK, true, true);
+    expect(codeArchitectureAPI.extractFromGitHub).toHaveBeenCalledWith(
+      REPO_FACEBOOK,
+      true,
+      true,
+    );
   });
 
-  it('shows extract button enabled when repo is added', () => {
+  it("shows extract button enabled when repo is added", () => {
     render(
       <FileUploader
         onFilesUploaded={mockOnFilesUploaded}
@@ -243,12 +259,12 @@ describe('FileUploader Component', () => {
     fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
       target: { value: REPO_FACEBOOK },
     });
-    fireEvent.click(screen.getByRole('button', { name: /add/i }));
+    fireEvent.click(screen.getByRole("button", { name: /add/i }));
 
-    expect(screen.getByRole('button', { name: /extract/i })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: /extract/i })).not.toBeDisabled();
   });
 
-  it('adds repo via Enter key', () => {
+  it("adds repo via Enter key", () => {
     render(
       <FileUploader
         onFilesUploaded={mockOnFilesUploaded}
@@ -262,13 +278,13 @@ describe('FileUploader Component', () => {
       target: { value: REPO_FACEBOOK },
     });
     fireEvent.keyDown(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
-      key: 'Enter',
+      key: "Enter",
     });
 
     expect(screen.getByText(/facebook\/react/i)).toBeInTheDocument();
   });
 
-  it('shows ready to extract message after adding repo', () => {
+  it("shows ready to extract message after adding repo", () => {
     render(
       <FileUploader
         onFilesUploaded={mockOnFilesUploaded}
@@ -281,12 +297,12 @@ describe('FileUploader Component', () => {
     fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
       target: { value: REPO_FACEBOOK },
     });
-    fireEvent.click(screen.getByRole('button', { name: /add/i }));
+    fireEvent.click(screen.getByRole("button", { name: /add/i }));
 
     expect(screen.getByText(/ready to extract/i)).toBeInTheDocument();
   });
 
-  it('shows multiple repos with correct status labels', () => {
+  it("shows multiple repos with correct status labels", () => {
     render(
       <FileUploader
         onFilesUploaded={mockOnFilesUploaded}
@@ -299,19 +315,19 @@ describe('FileUploader Component', () => {
     fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
       target: { value: REPO_FACEBOOK },
     });
-    fireEvent.click(screen.getByRole('button', { name: /add/i }));
+    fireEvent.click(screen.getByRole("button", { name: /add/i }));
 
     fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
       target: { value: REPO_MICROSOFT },
     });
-    fireEvent.click(screen.getByRole('button', { name: /add/i }));
+    fireEvent.click(screen.getByRole("button", { name: /add/i }));
 
     // Each repo has "Ready to extract" message and "Ready" status label
     const readyLabels = screen.getAllByText(/ready/i);
     expect(readyLabels).toHaveLength(4);
   });
 
-  it('clears input after adding repo', () => {
+  it("clears input after adding repo", () => {
     render(
       <FileUploader
         onFilesUploaded={mockOnFilesUploaded}
@@ -325,8 +341,8 @@ describe('FileUploader Component', () => {
     fireEvent.change(input, {
       target: { value: REPO_FACEBOOK },
     });
-    fireEvent.click(screen.getByRole('button', { name: /add/i }));
+    fireEvent.click(screen.getByRole("button", { name: /add/i }));
 
-    expect(input).toHaveValue('');
+    expect(input).toHaveValue("");
   });
 });

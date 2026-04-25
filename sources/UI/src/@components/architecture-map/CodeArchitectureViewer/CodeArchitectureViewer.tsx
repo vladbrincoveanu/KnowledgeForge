@@ -135,15 +135,14 @@ export const generateC4Edges = (
   const edges: Edge[] = [];
   const relationshipEdgesAdded = new Set<string>();
 
-  const resolveId = (
-    name: string,
-  ): { id: string | null; isGhost: boolean } => {
+  const resolveId = (name: string): { id: string | null; isGhost: boolean } => {
     if (!name) return { id: null, isGhost: false };
     // 1. Direct container name lookup
     if (nameToId.has(name)) return { id: nameToId.get(name)!, isGhost: false };
     // 2. Strip omnipay- prefix and retry
     const stripped = name.startsWith("omnipay-") ? name.slice(8) : name;
-    if (nameToId.has(stripped)) return { id: nameToId.get(stripped)!, isGhost: false };
+    if (nameToId.has(stripped))
+      return { id: nameToId.get(stripped)!, isGhost: false };
     // 3. Check context externals (direct + normalised)
     const lowerName = name.toLowerCase();
     const normalised = lowerName.replace(/[-_\s]+/g, "");
@@ -210,7 +209,9 @@ export const generateC4Edges = (
     containers.forEach((container, idx) => {
       const sourceId = `container_${container.name || idx}`;
       const protocol =
-        typeof container?.protocol === "string" ? container.protocol.trim() : "";
+        typeof container?.protocol === "string"
+          ? container.protocol.trim()
+          : "";
       const label = protocol ? protocol.toUpperCase() : undefined;
       const deps: string[] = Array.isArray(container?.dependencies_internal)
         ? container.dependencies_internal.map(String)

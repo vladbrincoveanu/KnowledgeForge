@@ -28,18 +28,18 @@
     align-items: center;
     padding: 20px;
     border-bottom: 1px solid #eee;
-    
+
     h2 {
       margin: 0;
     }
-    
+
     .close-button {
       background: none;
       border: none;
       font-size: 24px;
       cursor: pointer;
       color: #666;
-      
+
       &:hover {
         color: #000;
       }
@@ -48,20 +48,20 @@
 
   .modal-body {
     padding: 20px;
-    
+
     .tabs {
       display: flex;
       gap: 16px;
       margin-bottom: 20px;
       border-bottom: 1px solid #eee;
-      
+
       button {
         padding: 8px 16px;
         background: none;
         border: none;
         cursor: pointer;
         border-bottom: 2px solid transparent;
-        
+
         &.active {
           border-bottom-color: #007bff;
           color: #007bff;

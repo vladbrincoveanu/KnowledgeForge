@@ -1,5 +1,5 @@
-import React from 'react';
-import './EdgeRecommendationList.scss';
+import React from "react";
+import "./EdgeRecommendationList.scss";
 
 export interface EdgeRecommendation {
   id: string;
@@ -27,7 +27,10 @@ interface EdgeRecommendationListProps {
   recommendations: EnhancedEdgeRecommendation[];
   selections: Record<string, EdgeSelectionState>;
   onEdgeToggle: (edgeId: string) => void;
-  onUpdateSelection: (edgeId: string, update: Partial<EdgeSelectionState>) => void;
+  onUpdateSelection: (
+    edgeId: string,
+    update: Partial<EdgeSelectionState>,
+  ) => void;
   nodeLookup: Record<string, any>;
   onSelectAll: () => void;
   onDeselectAll: () => void;
@@ -54,18 +57,23 @@ const EdgeRecommendationList: React.FC<EdgeRecommendationListProps> = ({
           </button>
         </div>
       </div>
-      
+
       {recommendations.length === 0 ? (
         <p>No edge recommendations available.</p>
       ) : (
         <ul className="edge-list">
           {recommendations.map((edge) => {
             const selection = selections[edge.id];
-            const sourceName = nodeLookup[edge.sourceNodeId]?.finalName || edge.sourceNodeId;
-            const targetName = nodeLookup[edge.targetNodeId]?.finalName || edge.targetNodeId;
-            
+            const sourceName =
+              nodeLookup[edge.sourceNodeId]?.finalName || edge.sourceNodeId;
+            const targetName =
+              nodeLookup[edge.targetNodeId]?.finalName || edge.targetNodeId;
+
             return (
-              <li key={edge.id} className={selection?.approved ? 'approved' : 'pending'}>
+              <li
+                key={edge.id}
+                className={selection?.approved ? "approved" : "pending"}
+              >
                 <div className="edge-header">
                   <input
                     type="checkbox"
@@ -74,7 +82,9 @@ const EdgeRecommendationList: React.FC<EdgeRecommendationListProps> = ({
                   />
                   <div className="edge-connection">
                     <span className="source-node">{sourceName}</span>
-                    <span className="relationship-type">{edge.relationshipType}</span>
+                    <span className="relationship-type">
+                      {edge.relationshipType}
+                    </span>
                     <span className="target-node">{targetName}</span>
                   </div>
                   <span className="confidence">

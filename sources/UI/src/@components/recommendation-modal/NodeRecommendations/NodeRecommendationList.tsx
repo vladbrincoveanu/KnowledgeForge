@@ -1,9 +1,9 @@
-import React from 'react';
+import React from "react";
 import NodeRecommendationCard, {
   NodeRecommendation,
   NodeSelectionState,
-} from './NodeRecommendationCard';
-import './NodeRecommendationList.scss';
+} from "./NodeRecommendationCard";
+import "./NodeRecommendationList.scss";
 
 export type { NodeRecommendation, NodeSelectionState };
 
@@ -15,7 +15,10 @@ interface NodeRecommendationListProps {
   recommendations: EnhancedNodeRecommendation[];
   selections: Record<string, NodeSelectionState>;
   onToggle: (nodeId: string) => void;
-  onUpdateSelection: (nodeId: string, update: Partial<NodeSelectionState>) => void;
+  onUpdateSelection: (
+    nodeId: string,
+    update: Partial<NodeSelectionState>,
+  ) => void;
   onEditToggle?: (nodeId: string, editing: boolean) => void;
 }
 

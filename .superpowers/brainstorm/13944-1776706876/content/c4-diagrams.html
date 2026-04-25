@@ -1,0 +1,122 @@
+<h2>C4 Altitude Diagrams — Current vs Correct</h2>
+<p class="subtitle">The current mockups show wrong C4 levels. Here's what they should actually look like.</p>
+
+<div class="split" style="margin-top: 2rem;">
+  <div class="mockup">
+    <div class="mockup-header" style="background: #dc2626;">❌ Current (Wrong)</div>
+    <div class="mockup-body" style="background: #0a0a0f; padding: 1rem;">
+      <div style="margin-bottom: 1.5rem;">
+        <div class="label" style="color: #60a5fa;">L1 — Ecosystem View</div>
+        <div style="border: 1px dashed #3b82f6; border-radius: 8px; padding: 0.75rem; margin-top: 0.5rem; font-size: 0.7rem; color: #94a3b8;">
+          Shows: API Gateway, Auth, Postgres, Kafka, Redis<br/>
+          <span style="color: #f87171;">Problem: These are INTERNAL containers, not external actors</span>
+        </div>
+      </div>
+      <div style="margin-bottom: 1.5rem;">
+        <div class="label" style="color: #4ade80;">L2 — Service View</div>
+        <div style="border: 1px dashed #22c55e; border-radius: 8px; padding: 0.75rem; margin-top: 0.5rem; font-size: 0.7rem; color: #94a3b8;">
+          Shows: api-gw, user-svc, pay-svc, notif, search<br/>
+          <span style="color: #f87171;">Problem: These are components/containers, not the system boundary</span>
+        </div>
+      </div>
+      <div>
+        <div class="label" style="color: #818cf8;">L3 — Internals View</div>
+        <div style="border: 1px dashed #6366f1; border-radius: 8px; padding: 0.75rem; margin-top: 0.5rem; font-size: 0.7rem; color: #94a3b8;">
+          Shows: main.rs, auth.rs, db.rs, handler, model, repo<br/>
+          <span style="color: #f87171;">Problem: This is Code-level (L4), not Component-level</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header" style="background: #16a34a;">✓ Correct C4 Model</div>
+    <div class="mockup-body" style="background: #0a0a0f; padding: 1rem;">
+      <div style="margin-bottom: 1.5rem;">
+        <div class="label" style="color: #60a5fa;">L1 — Context (Ecosystem)</div>
+        <div style="border: 2px solid #3b82f6; border-radius: 8px; padding: 0.75rem; margin-top: 0.5rem;">
+          <div style="display: flex; justify-content: center; gap: 2rem; align-items: center;">
+            <div style="text-align: center;">
+              <div style="background: #1e40af; border-radius: 8px; padding: 0.5rem 0.75rem; font-size: 0.7rem; margin-bottom: 0.25rem;">👤 User</div>
+              <div style="font-size: 0.6rem; color: #64748b;">Actor</div>
+            </div>
+            <div style="font-size: 1.5rem; color: #3b82f6;">→</div>
+            <div style="text-align: center;">
+              <div style="background: #0f172a; border: 2px solid #22c55e; border-radius: 12px; padding: 0.75rem 1rem; font-size: 0.75rem; font-weight: bold;">KnowledgeForge</div>
+              <div style="font-size: 0.6rem; color: #22c55e;">Software System</div>
+            </div>
+            <div style="font-size: 1.5rem; color: #3b82f6;">→</div>
+            <div style="text-align: center;">
+              <div style="background: #1e40af; border-radius: 8px; padding: 0.5rem 0.75rem; font-size: 0.7rem; margin-bottom: 0.25rem;">Stripe</div>
+              <div style="font-size: 0.6rem; color: #64748b;">External System</div>
+            </div>
+          </div>
+          <div style="font-size: 0.65rem; color: #22c55e; text-align: center; margin-top: 0.5rem;">Your software boundary + external actors/systems</div>
+        </div>
+      </div>
+      <div style="margin-bottom: 1.5rem;">
+        <div class="label" style="color: #4ade80;">L2 — Container (Service)</div>
+        <div style="border: 2px solid #22c55e; border-radius: 8px; padding: 0.75rem; margin-top: 0.5rem;">
+          <div style="display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap;">
+            <div style="background: #0f172a; border: 1px solid #3b82f6; border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.65rem; font-family: monospace;">API Gateway</div>
+            <div style="background: #0f172a; border: 1px solid #22c55e; border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.65rem; font-family: monospace;">User Service</div>
+            <div style="background: #0f172a; border: 1px solid #22c55e; border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.65rem; font-family: monospace;">Payment Service</div>
+            <div style="background: #0f172a; border: 1px solid #6b7280; border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.65rem; font-family: monospace;">PostgreSQL</div>
+            <div style="background: #0f172a; border: 1px solid #6b7280; border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.65rem; font-family: monospace;">Redis</div>
+          </div>
+          <div style="font-size: 0.65rem; color: #4ade80; text-align: center; margin-top: 0.5rem;">Technology choices + deployment units within the system</div>
+        </div>
+      </div>
+      <div>
+        <div class="label" style="color: #818cf8;">L3 — Component (Internals)</div>
+        <div style="border: 2px solid #6366f1; border-radius: 8px; padding: 0.75rem; margin-top: 0.5rem;">
+          <div style="text-align: center; font-size: 0.7rem; color: #94a3b8; margin-bottom: 0.5rem;">Within a single container (e.g., User Service)</div>
+          <div style="display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap;">
+            <div style="background: #1e1b4b; border-radius: 4px; padding: 0.3rem 0.5rem; font-size: 0.6rem; font-family: monospace;">UserController</div>
+            <div style="background: #1e1b4b; border-radius: 4px; padding: 0.3rem 0.5rem; font-size: 0.6rem; font-family: monospace;">UserService</div>
+            <div style="background: #1e1b4b; border-radius: 4px; padding: 0.3rem 0.5rem; font-size: 0.6rem; font-family: monospace;">UserRepository</div>
+            <div style="background: #1e1b4b; border-radius: 4px; padding: 0.3rem 0.5rem; font-size: 0.6rem; font-family: monospace;">UserValidator</div>
+          </div>
+          <div style="font-size: 0.65rem; color: #818cf8; text-align: center; margin-top: 0.5rem;">Classes/components within a single container</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3 style="margin-top: 2rem;">C4 Model Reference</h3>
+<table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+  <tr style="border-bottom: 1px solid #333;">
+    <th style="text-align: left; padding: 0.5rem; color: #94a3b8;">Level</th>
+    <th style="text-align: left; padding: 0.5rem; color: #94a3b8;">Name</th>
+    <th style="text-align: left; padding: 0.5rem; color: #94a3b8;">Shows</th>
+    <th style="text-align: left; padding: 0.5rem; color: #94a3b8;">Scope</th>
+  </tr>
+  <tr style="border-bottom: 1px solid #222;">
+    <td style="padding: 0.5rem; color: #60a5fa;">L1</td>
+    <td style="padding: 0.5rem;">Context</td>
+    <td style="padding: 0.5rem; color: #f8fafc;">External actors + your software system boundary</td>
+    <td style="padding: 0.5rem; color: #94a3b8;">Enterprise/landscape</td>
+  </tr>
+  <tr style="border-bottom: 1px solid #222;">
+    <td style="padding: 0.5rem; color: #4ade80;">L2</td>
+    <td style="padding: 0.5rem;">Container</td>
+    <td style="padding: 0.5rem; color: #f8fafc;">Applications, services, databases, queues</td>
+    <td style="padding: 0.5rem; color: #94a3b8;">The software system</td>
+  </tr>
+  <tr style="border-bottom: 1px solid #222;">
+    <td style="padding: 0.5rem; color: #818cf8;">L3</td>
+    <td style="padding: 0.5rem;">Component</td>
+    <td style="padding: 0.5rem; color: #f8fafc;">Classes/components within a container</td>
+    <td style="padding: 0.5rem; color: #94a3b8;">One container</td>
+  </tr>
+  <tr>
+    <td style="padding: 0.5rem; color: #f472b6;">L4</td>
+    <td style="padding: 0.5rem;">Code</td>
+    <td style="padding: 0.5rem; color: #f8fafc;">Actual code files (files, functions)</td>
+    <td style="padding: 0.5rem; color: #94a3b8;">One component</td>
+  </tr>
+</table>
+
+<div style="margin-top: 2rem; padding: 1rem; background: #1e293b; border-radius: 8px; border-left: 4px solid #f59e0b;">
+  <p style="margin: 0; font-size: 0.85rem; color: #f8fafc;"><strong style="color: #f59e0b;">Key Issue:</strong> The landing page currently shows L2/L3/L4 content but labels it as L1/L2/L3. This confuses the pitch — KnowledgeForge extracts ALL four levels, but the diagrams should accurately represent what each level means.</p>
+</div>

@@ -829,24 +829,23 @@ export const codeArchitectureAPI = {
       });
     }
 
-    const response = await fetch(
-      `${API_BASE_URL}/api/v1/code/chat/context`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${API_KEY}`,
-        },
-        body: JSON.stringify({
-          ...payload,
-          stream: true,
-        }),
-        signal,
+    const response = await fetch(`${API_BASE_URL}/api/v1/code/chat/context`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${API_KEY}`,
       },
-    );
+      body: JSON.stringify({
+        ...payload,
+        stream: true,
+      }),
+      signal,
+    });
 
     if (!response.ok || !response.body) {
-      throw new Error(`Architecture chat failed with status ${response.status}`);
+      throw new Error(
+        `Architecture chat failed with status ${response.status}`,
+      );
     }
 
     const reader = response.body.getReader();
@@ -885,7 +884,9 @@ export const codeArchitectureAPI = {
               completed = true;
               handlers.onComplete?.(source);
             } else if (chunk.type === "error") {
-              throw new Error(chunk.message || "Architecture chat stream failed");
+              throw new Error(
+                chunk.message || "Architecture chat stream failed",
+              );
             }
           }
 

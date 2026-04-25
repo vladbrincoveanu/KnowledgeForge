@@ -148,3 +148,4 @@ sources/data/c4_extractions/
 .env
 *.env
 !.env.example
+.vercel

@@ -1,5 +1,5 @@
-import React from 'react';
-import './SystemMetrics.scss';
+import React from "react";
+import "./SystemMetrics.scss";
 
 const SystemMetrics: React.FC = () => {
   return (

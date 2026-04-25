@@ -1,0 +1,100 @@
+<h2>L1 — Context (Ecosystem View)</h2>
+<p class="subtitle">The system in context — external actors and neighboring systems. What the board sees.</p>
+
+<div class="mockup" style="margin-top: 1.5rem;">
+  <div class="mockup-body" style="background: #020617; padding: 2rem;">
+    <svg viewBox="0 0 700 220" style="width: 100%; height: auto;">
+      <defs>
+        <filter id="glow-b" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000" flood-opacity="0.5"/></filter>
+      </defs>
+
+      <!-- External Actors -->
+      <g filter="url(#shadow)">
+        <rect x="20" y="60" width="80" height="100" rx="12" fill="#0f172a" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="60" y="95" text-anchor="middle" fill="#f8fafc" font-size="11" font-weight="600" font-family="system-ui">👤</text>
+        <text x="60" y="118" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui">Customer</text>
+        <text x="60" y="132" text-anchor="middle" fill="#64748b" font-size="8" font-family="system-ui">Actor</text>
+      </g>
+
+      <g filter="url(#shadow)">
+        <rect x="20" y="60" width="80" height="100" rx="12" fill="#0f172a" stroke="#3b82f6" stroke-width="1.5" opacity="0.5"/>
+        <text x="60" y="95" text-anchor="middle" fill="#f8fafc" font-size="11" font-weight="600" font-family="system-ui">🏢</text>
+        <text x="60" y="118" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui">Finance</text>
+        <text x="60" y="132" text-anchor="middle" fill="#64748b" font-size="8" font-family="system-ui">Dept.</text>
+      </g>
+
+      <!-- External Systems -->
+      <g filter="url(#shadow)">
+        <rect x="550" y="30" width="130" height="60" rx="10" fill="#0f172a" stroke="#6366f1" stroke-width="1.5"/>
+        <rect x="562" y="42" width="22" height="16" rx="4" fill="#6366f1" opacity="0.3"/>
+        <text x="615" y="55" text-anchor="middle" fill="#f8fafc" font-size="11" font-weight="600" font-family="system-ui">Stripe</text>
+        <text x="615" y="70" text-anchor="middle" fill="#64748b" font-size="8" font-family="system-ui">Payment</text>
+      </g>
+
+      <g filter="url(#shadow)">
+        <rect x="550" y="110" width="130" height="60" rx="10" fill="#0f172a" stroke="#6366f1" stroke-width="1.5"/>
+        <rect x="562" y="122" width="22" height="16" rx="4" fill="#6366f1" opacity="0.3"/>
+        <text x="615" y="135" text-anchor="middle" fill="#f8fafc" font-size="11" font-weight="600" font-family="system-ui">Salesforce</text>
+        <text x="615" y="150" text-anchor="middle" fill="#64748b" font-size="8" font-family="system-ui">CRM</text>
+      </g>
+
+      <!-- KNOWLEDGEFORGE SYSTEM BOUNDARY -->
+      <g>
+        <rect x="190" y="20" width="320" height="180" rx="16" fill="#0f172a" stroke="#22c55e" stroke-width="2" stroke-dasharray="8,4"/>
+        <text x="350" y="18" text-anchor="middle" fill="#22c55e" font-size="9" font-weight="700" font-family="system-ui" letter-spacing="0.1em">KNOWLEDGEFORGE</text>
+        <text x="350" y="32" text-anchor="middle" fill="#64748b" font-size="8" font-family="system-ui">Software System Boundary</text>
+
+        <!-- Internal containers -->
+        <g>
+          <rect x="210" y="50" width="90" height="60" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1"/>
+          <text x="255" y="78" text-anchor="middle" fill="#f8fafc" font-size="10" font-weight="600" font-family="system-ui">API Gateway</text>
+          <text x="255" y="93" text-anchor="middle" fill="#64748b" font-size="7" font-family="system-ui">REST / GraphQL</text>
+        </g>
+
+        <g>
+          <rect x="310" y="50" width="90" height="60" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="1"/>
+          <text x="355" y="78" text-anchor="middle" fill="#f8fafc" font-size="10" font-weight="600" font-family="system-ui">Extraction</text>
+          <text x="355" y="93" text-anchor="middle" fill="#64748b" font-size="7" font-family="system-ui">Core Engine</text>
+        </g>
+
+        <g>
+          <rect x="410" y="50" width="90" height="60" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="1"/>
+          <text x="455" y="78" text-anchor="middle" fill="#f8fafc" font-size="10" font-weight="600" font-family="system-ui">Ontology</text>
+          <text x="455" y="93" text-anchor="middle" fill="#64748b" font-size="7" font-family="system-ui">Neo4j Graph</text>
+        </g>
+
+        <g>
+          <rect x="230" y="130" width="260" height="50" rx="8" fill="#1e293b" stroke="#4b5563" stroke-width="1"/>
+          <text x="360" y="155" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui">GitHub · GitLab · Azure DevOps · Bitbucket</text>
+          <text x="360" y="170" text-anchor="middle" fill="#64748b" font-size="7" font-family="system-ui">Code Repositories</text>
+        </g>
+      </g>
+
+      <!-- Connections -->
+      <line x1="100" y1="110" x2="190" y2="90" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arrow)"/>
+      <line x1="100" y1="110" x2="190" y2="90" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="4,2" opacity="0.5"/>
+
+      <line x1="550" y1="60" x2="510" y2="80" stroke="#6366f1" stroke-width="1.5"/>
+      <line x1="550" y1="140" x2="510" y2="120" stroke="#6366f1" stroke-width="1.5"/>
+      <line x1="190" y1="80" x2="310" y2="80" stroke="#4b5563" stroke-width="1" stroke-dasharray="3,2"/>
+      <line x1="400" y1="80" x2="410" y2="80" stroke="#4b5563" stroke-width="1" stroke-dasharray="3,2"/>
+    </svg>
+  </div>
+</div>
+
+<div style="display: flex; gap: 1rem; margin-top: 1rem; font-size: 0.8rem; color: #94a3b8;">
+  <div style="flex: 1; padding: 0.75rem; background: #0f172a; border-radius: 8px; border-left: 3px solid #3b82f6;">
+    <strong style="color: #f8fafc;">External Actors</strong><br/>Users, departments, other humans that interact with the system
+  </div>
+  <div style="flex: 1; padding: 0.75rem; background: #0f172a; border-radius: 8px; border-left: 3px solid #6366f1;">
+    <strong style="color: #f8fafc;">External Systems</strong><br/>Stripe, Salesforce, legacy systems — outside your control
+  </div>
+  <div style="flex: 1; padding: 0.75rem; background: #0f172a; border-radius: 8px; border-left: 3px solid #22c55e;">
+    <strong style="color: #f8fafc;">Your System</strong><br/>KnowledgeForge boundary with internal containers
+  </div>
+</div>
+
+<div style="margin-top: 2rem; padding: 1rem; background: #1e293b; border-radius: 8px; border-left: 4px solid #22c55e;">
+  <p style="margin: 0; font-size: 0.85rem; color: #f8fafc;"><strong style="color: #22c55e;">L1 tells a story:</strong> "Customers initiate payments via the Finance Dept, which triggers Stripe. Salesforce gets notified. KnowledgeForge sees all of it."</p>
+</div>

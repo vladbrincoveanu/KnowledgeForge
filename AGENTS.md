@@ -1,100 +1,88 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
-KnowledgeForge is a monorepo with three active modules under `sources/`:
-- `sources/Api/`: FastAPI backend and C4 extraction services (`app/services/c4/`), tests in `sources/Api/tests/`.
-- `sources/UI/`: React + TypeScript + Vite frontend (`src/`), tests as `*.test.tsx`.
-- `sources/e2e/`: cross-service pipeline tests and fixtures.
-Use `docs/architecture/` for technical design docs and `docs/plans/` for planning/status files.
+## Project Structure
+KnowledgeForge is a C4 architecture extraction engine: analyze codebases → produce C4 graphs stored in Neo4j/PostgreSQL.
+
+**Stack:** FastAPI (Python 3.11) / React+TypeScript (Vite) / Neo4j / PostgreSQL / Docker
+
+- `sources/Api/` — FastAPI backend, C4 extraction services (`app/services/c4/`)
+- `sources/UI/` — React frontend (Vite + Cytoscape + ReactFlow)
+- `sources/demo/` — 23 OmniPay fixture repos used as extraction test inputs (read-only)
+- `sources/e2e/` — deprecated (actual E2E tests live in `sources/Api/tests/e2e/`)
+
+**Important:** There are two `package.json` files. The root `package.json` is a stale shadcn template — ignore it. All frontend tooling lives in `sources/UI/package.json`.
+
+## Workspace Boundary (the "iron curtain")
+- `sources/Api/app/services/c4/context/` — **our workspace**, can modify
+- `sources/Api/app/services/c4/containers/` — **do not modify** (parallel squad's territory)
 
 ## Build, Test, and Development Commands
-Use root Make targets for full-stack workflows:
-- `make up` / `make down`: start or stop UI, API, and infra via Docker.
-- `make quick-check`: mandatory regression gate after logical changes.
-- `make full-check`: full rebuild + E2E + validation for infra/Docker-level changes.
-- `make tests`: API + UI + e2e suites.
 
-Module-level development:
-- Backend: `cd sources/Api && python app.py`
-- Frontend: `cd sources/UI && npm run dev`
-- UI quality gate: `cd sources/UI && npm run check-all`
+### Root Make targets (run from repo root)
+- `make up` / `make down` — start/stop all services via Docker
+- `make quick-check` — fast restart + E2E tests (run after logical changes)
+- `make full-check` — full rebuild + E2E (run after infra/Docker-level changes)
+- `make tests` — API unit tests + pipeline + UI tests (does NOT include Docker E2E)
+- `make fix` — auto-format API (Black) + UI (Prettier + ESLint fix)
 
-## Workflows
-
-### Creating/Modifying API Endpoints
-
-When creating new API endpoints:
-
-1. First plan the new endpoint changes, including new/updated methods, paths and request payloads
-2. Confirm proposed changes with user
-3. Implement the endpoint
-4. Add/update endpoint in the .http file, including documenting endpoint and payloads
-5. Test the .http file using: `docker run --rm -i -t -v $PWD:/workdir jetbrains/intellij-http-client <http_file_name>`
-
-### Discovering Package Docs
-
-When working with an unfamiliar package or third-party API, first use `chub` to discover relevant docs and packages before writing code:
-
-```sh
-chub search "stripe payments"        # find relevant docs
-chub get stripe/api --lang js        # fetch the doc
-# Agent reads the doc, writes correct code. Done.
+### Local development (no Docker)
+```bash
+cd sources/Api && python3 main.py          # API server on :8000
+cd sources/UI && npm run dev               # Frontend on :3000
 ```
 
-## Coding Style & Naming Conventions
-- Python: Black (88 cols), Ruff, MyPy, strict type hints, and Pydantic models for API/domain schemas.
-- TypeScript/React: ESLint + Prettier (`singleQuote: true`, `tabWidth: 2`, `printWidth: 80`).
-- Naming: `snake_case` (Python), `PascalCase` (React components), `test_*.py` and `*.test.tsx`.
+### Frontend quality gates (run from `sources/UI/`)
+```bash
+npm run fix-all      # format + lint:fix + type-check
+npm run check-all    # type-check + lint + format:check
+npm run test         # vitest (run after any UI change)
+```
 
-## Code Style
+### Backend tests
+```bash
+cd sources/Api && python3 -m pytest tests/ -v           # unit tests
+cd sources/Api && python3 tests/test_pipeline.py        # pipeline integration
+docker compose exec api python tests/test_pipeline.py   # via Docker
+```
 
-- General:
-  - Prefer writing clear code and use inline comments sparingly
-- C#:
-  - 4-space indent
-  - `PascalCase` for classes/methods
-  - `_camelCase` for private fields
-  - `camelCase` for local variables, parameters
-  - Prefer primary constructors where possible
-  - Use auto-properties, and `field` if necessary
-  - Write XML comments on all classes, methods, properties and fields
-  - Tests:
-    - `<ClassName>Tests` for test class
-    - `<MethodName>_<Conditions>_<AssertedOutcome>` for test methods (never `Async` suffix)
-    - Arrange, Act, Assert pattern (comment each section in method)
-- TypeScript/JavaScript/CSS:
-  - 2-space indent
-  - Document all methods, types and interfaces with JSDoc comments
-  - Keep `*.test.ts` files in same directory as corresponding `*.ts` file
-- Commits:
-  - Use Conventional Commit format
-  - **Commit Types:** `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`
-  - **Scopes:** `web`, `api`, `docker`
+### E2E extraction tests (require Docker services running)
+```bash
+make test-e2e                    # OmniPay extraction benchmarks
+make test-e2e-omnipay-verbose    # with detailed output
+```
 
-## Documentation Principles
+## API Endpoint Workflow
+1. Plan endpoint changes, confirm with user
+2. Implement in `sources/Api/app/`
+3. Add/update request in `sources/Api/code_extraction.http`
+4. Test via: `docker run --rm -i -t -v $PWD:/workdir jetbrains/intellij-http-client sources/Api/code_extraction.http`
 
-- Domain-Specific Jargon
-- Architectural Decisions and Structure
-- Keep It Concise
-- Treat It Like a Living Document
+## Coding Conventions
 
-## Testing Guidelines
-- Backend unit/integration: `cd sources/Api && pytest tests/ -v`
-- Frontend: `cd sources/UI && npm run test`
-- End-to-end pipeline: `cd sources/e2e && ./run_tests.sh --verbose`
-- Add tests for every behavior change and ensure extraction benchmark tests remain green.
+### Python
+- Black (88 cols), Ruff, MyPy (strict type hints)
+- Pydantic V2 models for API/domain schemas (`validate_by_name`, NOT `allow_population_by_field_name`)
+- Typed exceptions from `app/domain/exceptions.py` — never bare `except Exception:` (except for 3rd-party LLM calls)
+- `snake_case`, `pathlib` over `os.path`, f-strings over `.format()`
 
-## Commit & Pull Request Guidelines
-- Prefer Conventional Commit style used in history: `feat(scope): ...`, `fix: ...`, `docs: ...`, `refactor: ...`.
-- Keep commits focused and imperative (one logical change per commit).
-- PRs should include:
-  - concise summary and motivation,
-  - linked issue/task,
-  - test evidence (commands + results),
-  - screenshots/GIFs for UI changes.
+### TypeScript/React
+- Prettier + ESLint: `singleQuote: true`, `tabWidth: 2`, `printWidth: 80`
+- Functional components with hooks, `React.memo()` for expensive components
+- `*.test.tsx` files co-located with source
+- Tests: Vitest + Testing Library
 
-## Security, Scope & Team Notes
-- Copy `.env.example` to `.env`; never commit secrets or tokens.
-- Use `GITHUB_TOKEN` locally for GitHub scanning rate limits.
-- Scope boundary: we own `sources/Api/app/services/c4/context/`; do not modify `sources/Api/app/services/c4/containers/` unless explicitly coordinated.
-- Keep extraction metadata complete (domain, owner, status/lifecycle, tier, data_class, experts, compliance) and preserve human-readable UI labels.
+### Commits
+Conventional Commit format: `feat(scope):`, `fix(scope):`, `docs:`, `refactor:`, `test:`, `chore:`
+Scopes: `web`, `api`, `docker`
+
+## Key Architecture Notes
+- Extraction pipeline: GitHub URL → ServiceDiscovery → ServiceEnhancers (8 phases) → Neo4j + PostgreSQL
+- Each service has 5 primary fields: domain, owner, status, tier, data_class
+- ServiceStatus canonical values: `ACTIVE`, `MAINTENANCE`, `DEPRECATED`, `ARCHIVED` (not old strings like "Active-Dev")
+- Owner detection requires `full_history=True` in github_downloader.py
+- Zip extraction must use `safe_extract_zip()` to block path traversal
+
+## Security
+- Copy `.env.example` to `.env`; never commit secrets or tokens
+- Sanitize user input to prevent XSS
+- Never expose internal error details to API consumers

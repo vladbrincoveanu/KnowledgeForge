@@ -1,0 +1,1912 @@
+{
+  "containers": [
+    {
+      "c4_level": 2,
+      "type": "container",
+      "name": "slurm",
+      "container_type": "Frontend (Node.js)",
+      "technology": "Unknown",
+      "protocol": "HTTP",
+      "path": "services/slurm",
+      "runtime_environment": null,
+      "deployment": null,
+      "description": "Based on https://github.com/giovtorres/slurm-docker-cluster Refinements:",
+      "repository_url": "https://github.com/ascii-supply-networks/dagster-slurm/-/tree/main/services/slurm",
+      "runtime_info": "Unknown",
+      "dependencies_internal": [],
+      "health_endpoint": "",
+      "endpoint": "",
+      "dockerfile": "services/slurm/Dockerfile",
+      "terraform": false,
+      "helm": false,
+      "kubernetes": false,
+      "owner": null,
+      "team": null,
+      "owner_team": null,
+      "relationships": []
+    }
+  ],
+  "context": {
+    "c4_level": 1,
+    "type": "system",
+    "name": "dagster-slurm-workspace",
+    "purpose": "Integration for running Dagster assets on Slurm HPC clusters.",
+    "description": "Integration for running Dagster assets on Slurm HPC clusters.",
+    "external_dependencies": [
+      {
+        "name": "Render",
+        "type": "paas",
+        "detected_from": "docs/package.json",
+        "context": "Dependency: prism-react-renderer",
+        "evidence_type": "package_reference",
+        "package_name": "prism-react-renderer",
+        "context_name": "Render",
+        "integration_surface": null,
+        "provider": "Render",
+        "company": "Render",
+        "category": "paas",
+        "dependency_type": "TECHNICAL_INFRA",
+        "classification_confidence": 0.98,
+        "classification_reasoning": "Matched provider catalog entry for Render",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "Render",
+          "confidence": 0.98,
+          "detection_source": "provider_catalog",
+          "decision_mode": "deterministic",
+          "review_status": "auto_accepted",
+          "evidence": [
+            {
+              "type": "package_reference",
+              "source": "docs/package.json",
+              "snippet": "Dependency: prism-react-renderer"
+            }
+          ],
+          "metadata": {
+            "provider": "Render",
+            "company": "Render",
+            "category": "paas",
+            "boundary": "TECHNICAL_INFRA",
+            "catalog_match": {
+              "provider": "Render",
+              "company": "Render",
+              "category": "paas",
+              "alias_field": "package_aliases",
+              "matched_alias": "render",
+              "input_value": "prism-react-renderer",
+              "normalized_value": "prism-react-renderer",
+              "match_strategy": "contains"
+            }
+          }
+        },
+        "confidence": 0.98,
+        "detection_source": "provider_catalog",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "package_reference",
+            "source": "docs/package.json",
+            "snippet": "Dependency: prism-react-renderer"
+          }
+        ],
+        "detected_from_all": [
+          "docs/package.json"
+        ]
+      },
+      {
+        "name": "MySQL",
+        "type": "database",
+        "detected_from": "services/slurm/Dockerfile",
+        "context": "Pattern match: mysql",
+        "evidence_type": "deployment_reference",
+        "context_name": "MySQL",
+        "integration_surface": null,
+        "provider": "MySQL",
+        "company": "Oracle",
+        "category": "database",
+        "dependency_type": "TECHNICAL_INFRA",
+        "classification_confidence": 0.98,
+        "classification_reasoning": "Matched provider catalog entry for MySQL",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "MySQL",
+          "confidence": 0.98,
+          "detection_source": "provider_catalog",
+          "decision_mode": "deterministic",
+          "review_status": "auto_accepted",
+          "evidence": [
+            {
+              "type": "deployment_reference",
+              "source": "services/slurm/Dockerfile",
+              "snippet": "Pattern match: mysql"
+            }
+          ],
+          "metadata": {
+            "provider": "MySQL",
+            "company": "Oracle",
+            "category": "database",
+            "boundary": "TECHNICAL_INFRA",
+            "catalog_match": {
+              "provider": "MySQL",
+              "company": "Oracle",
+              "category": "database",
+              "alias_field": "package_aliases",
+              "matched_alias": "mysql",
+              "input_value": "mysql",
+              "normalized_value": "mysql",
+              "match_strategy": "contains"
+            }
+          }
+        },
+        "confidence": 0.98,
+        "detection_source": "provider_catalog",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "deployment_reference",
+            "source": "services/slurm/Dockerfile",
+            "snippet": "Pattern match: mysql"
+          }
+        ],
+        "detected_from_all": [
+          "services/slurm/Dockerfile"
+        ]
+      },
+      {
+        "name": "MariaDB",
+        "type": "database",
+        "detected_from": "services/slurm/Dockerfile",
+        "context": "Pattern match: mariadb",
+        "evidence_type": "deployment_reference",
+        "context_name": "MariaDB",
+        "integration_surface": null,
+        "provider": "MariaDB",
+        "company": null,
+        "category": "database",
+        "dependency_type": "TECHNICAL_INFRA",
+        "classification_confidence": 0.9,
+        "classification_reasoning": "'MariaDB' is technical infrastructure (matched pattern: mariadb)",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "MariaDB",
+          "confidence": 0.9,
+          "detection_source": "rule_based_classifier",
+          "decision_mode": "deterministic",
+          "review_status": "auto_accepted",
+          "evidence": [
+            {
+              "type": "deployment_reference",
+              "source": "services/slurm/Dockerfile",
+              "snippet": "Pattern match: mariadb"
+            },
+            {
+              "type": "deployment_reference",
+              "source": "docker-compose.yml",
+              "snippet": "mariadb:12"
+            }
+          ],
+          "metadata": {
+            "provider": "MariaDB",
+            "company": null,
+            "category": "database",
+            "boundary": "TECHNICAL_INFRA",
+            "catalog_match": null
+          }
+        },
+        "confidence": 0.9,
+        "detection_source": "rule_based_classifier",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "deployment_reference",
+            "source": "services/slurm/Dockerfile",
+            "snippet": "Pattern match: mariadb"
+          },
+          {
+            "type": "deployment_reference",
+            "source": "docker-compose.yml",
+            "snippet": "mariadb:12"
+          }
+        ],
+        "detected_from_all": [
+          "docker-compose.yml",
+          "services/slurm/Dockerfile"
+        ]
+      },
+      {
+        "name": "GitHub",
+        "type": "developer-platform",
+        "detected_from": "services/slurm/Dockerfile",
+        "context": "https://github.com/giovtorres/slurm-docker-cluster",
+        "evidence_type": "deployment_reference",
+        "url": "https://github.com/giovtorres/slurm-docker-cluster",
+        "context_name": "GitHub",
+        "integration_surface": null,
+        "provider": "GitHub",
+        "company": "GitHub",
+        "category": "developer-platform",
+        "dependency_type": "BUSINESS_SYSTEM",
+        "classification_confidence": 0.98,
+        "classification_reasoning": "Matched provider catalog entry for GitHub",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "GitHub",
+          "confidence": 0.98,
+          "detection_source": "provider_catalog",
+          "decision_mode": "deterministic",
+          "review_status": "auto_accepted",
+          "evidence": [
+            {
+              "type": "deployment_reference",
+              "source": "services/slurm/Dockerfile",
+              "snippet": "https://github.com/giovtorres/slurm-docker-cluster"
+            },
+            {
+              "type": "deployment_reference",
+              "source": "services/slurm/Dockerfile",
+              "snippet": "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-${TARGETARCH}"
+            },
+            {
+              "type": "deployment_reference",
+              "source": "services/slurm/Dockerfile",
+              "snippet": "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-${TARGETARCH}.asc"
+            },
+            {
+              "type": "deployment_reference",
+              "source": "services/slurm/Dockerfile",
+              "snippet": "https://github.com/SchedMD/slurm.git"
+            },
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "https://camo.githubusercontent.com/6088cff6a8f948c7c271f5658fbb66f95c571bc67bf39df51043848cd3547f7e/68747470733a2f2f6a6f73732e7468656f6a2e6f72672f7061706572732f31302e32313130352f6a6f73732e30393739352f7374617475732e737667)](https://doi.org/10.21105/joss.09795)"
+            },
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)"
+            },
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "https://github.com/ascii-supply-networks/dagster-slurm/issues/22))."
+            },
+            {
+              "type": "documentation_reference",
+              "source": "docs/README.md",
+              "snippet": "https://github.com/ascii-supply-networks/dagster-slurm.git"
+            },
+            {
+              "type": "documentation_reference",
+              "source": "docs/paper.md",
+              "snippet": "https://github.com/ascii-supply-networks/dagster-slurm>."
+            },
+            {
+              "type": "documentation_reference",
+              "source": "docs/paper.md",
+              "snippet": "https://github.com/ascii-supply-networks/dagster-slurm/discussions)."
+            },
+            {
+              "type": "documentation_reference",
+              "source": "docs/docs/intro.md",
+              "snippet": "https://github.com/ascii-supply-networks/dagster-slurm.git"
+            },
+            {
+              "type": "documentation_reference",
+              "source": "docs/docs/intro.md",
+              "snippet": "https://github.com/ascii-supply-networks/dagster-slurm/blob/main/examples/projects/dagster-slurm-example/dagster_slurm_example/resources/__init__.py)"
+            },
+            {
+              "type": "documentation_reference",
+              "source": "docs/docs/intro.md",
+              "snippet": "https://github.com/l-mds/local-data-stack/)):"
+            },
+            {
+              "type": "documentation_reference",
+              "source": "docs/docs/intro.md",
+              "snippet": "https://github.com/ascii-supply-networks/dagster-slurm/blob/main/examples/projects/dagster-slurm-example/dagster_slurm_example/resources/__init__.py)."
+            }
+          ],
+          "metadata": {
+            "provider": "GitHub",
+            "company": "GitHub",
+            "category": "developer-platform",
+            "boundary": "BUSINESS_SYSTEM",
+            "catalog_match": {
+              "provider": "GitHub",
+              "company": "GitHub",
+              "category": "developer-platform",
+              "alias_field": "package_aliases",
+              "matched_alias": "github",
+              "input_value": "//github.com/giovtorres/slurm-docker-cluster",
+              "normalized_value": "//github.com/giovtorres/slurm-docker-cluster",
+              "match_strategy": "contains"
+            }
+          }
+        },
+        "confidence": 0.98,
+        "detection_source": "provider_catalog",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "deployment_reference",
+            "source": "services/slurm/Dockerfile",
+            "snippet": "https://github.com/giovtorres/slurm-docker-cluster"
+          },
+          {
+            "type": "deployment_reference",
+            "source": "services/slurm/Dockerfile",
+            "snippet": "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-${TARGETARCH}"
+          },
+          {
+            "type": "deployment_reference",
+            "source": "services/slurm/Dockerfile",
+            "snippet": "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-${TARGETARCH}.asc"
+          },
+          {
+            "type": "deployment_reference",
+            "source": "services/slurm/Dockerfile",
+            "snippet": "https://github.com/SchedMD/slurm.git"
+          },
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "https://camo.githubusercontent.com/6088cff6a8f948c7c271f5658fbb66f95c571bc67bf39df51043848cd3547f7e/68747470733a2f2f6a6f73732e7468656f6a2e6f72672f7061706572732f31302e32313130352f6a6f73732e30393739352f7374617475732e737667)](https://doi.org/10.21105/joss.09795)"
+          },
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)"
+          },
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "https://github.com/ascii-supply-networks/dagster-slurm/issues/22))."
+          },
+          {
+            "type": "documentation_reference",
+            "source": "docs/README.md",
+            "snippet": "https://github.com/ascii-supply-networks/dagster-slurm.git"
+          },
+          {
+            "type": "documentation_reference",
+            "source": "docs/paper.md",
+            "snippet": "https://github.com/ascii-supply-networks/dagster-slurm>."
+          },
+          {
+            "type": "documentation_reference",
+            "source": "docs/paper.md",
+            "snippet": "https://github.com/ascii-supply-networks/dagster-slurm/discussions)."
+          },
+          {
+            "type": "documentation_reference",
+            "source": "docs/docs/intro.md",
+            "snippet": "https://github.com/ascii-supply-networks/dagster-slurm.git"
+          },
+          {
+            "type": "documentation_reference",
+            "source": "docs/docs/intro.md",
+            "snippet": "https://github.com/ascii-supply-networks/dagster-slurm/blob/main/examples/projects/dagster-slurm-example/dagster_slurm_example/resources/__init__.py)"
+          },
+          {
+            "type": "documentation_reference",
+            "source": "docs/docs/intro.md",
+            "snippet": "https://github.com/l-mds/local-data-stack/)):"
+          },
+          {
+            "type": "documentation_reference",
+            "source": "docs/docs/intro.md",
+            "snippet": "https://github.com/ascii-supply-networks/dagster-slurm/blob/main/examples/projects/dagster-slurm-example/dagster_slurm_example/resources/__init__.py)."
+          }
+        ],
+        "detected_from_all": [
+          "README.md",
+          "docs/README.md",
+          "docs/docs/intro.md",
+          "docs/paper.md",
+          "services/slurm/Dockerfile"
+        ]
+      },
+      {
+        "name": "PostgreSQL",
+        "type": "external_service",
+        "detected_from": "services/slurm/Dockerfile",
+        "context": "hkps://keys.openpgp.org",
+        "evidence_type": "deployment_reference",
+        "url": "hkps://keys.openpgp.org",
+        "context_name": "PostgreSQL",
+        "integration_surface": null,
+        "provider": "PostgreSQL",
+        "company": "PostgreSQL Global Development Group",
+        "category": "database",
+        "dependency_type": "TECHNICAL_INFRA",
+        "classification_confidence": 0.98,
+        "classification_reasoning": "Matched provider catalog entry for PostgreSQL",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "PostgreSQL",
+          "confidence": 0.98,
+          "detection_source": "provider_catalog",
+          "decision_mode": "deterministic",
+          "review_status": "auto_accepted",
+          "evidence": [
+            {
+              "type": "deployment_reference",
+              "source": "services/slurm/Dockerfile",
+              "snippet": "hkps://keys.openpgp.org"
+            }
+          ],
+          "metadata": {
+            "provider": "PostgreSQL",
+            "company": "PostgreSQL Global Development Group",
+            "category": "database",
+            "boundary": "TECHNICAL_INFRA",
+            "catalog_match": {
+              "provider": "PostgreSQL",
+              "company": "PostgreSQL Global Development Group",
+              "category": "database",
+              "alias_field": "package_aliases",
+              "matched_alias": "pg",
+              "input_value": "//keys.openpgp.org",
+              "normalized_value": "//keys.openpgp.org",
+              "match_strategy": "contains"
+            }
+          }
+        },
+        "confidence": 0.98,
+        "detection_source": "provider_catalog",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "deployment_reference",
+            "source": "services/slurm/Dockerfile",
+            "snippet": "hkps://keys.openpgp.org"
+          }
+        ],
+        "detected_from_all": [
+          "services/slurm/Dockerfile"
+        ]
+      },
+      {
+        "name": "Shields",
+        "type": "external_service",
+        "detected_from": "README.md",
+        "context": "https://img.shields.io/pypi/v/dagster-slurm.svg)](https://pypi.python.org/pypi/dagster-slurm)",
+        "evidence_type": "documentation_reference",
+        "url": "https://img.shields.io/pypi/v/dagster-slurm.svg)](https://pypi.python.org/pypi/dagster-slurm)",
+        "context_name": "Shields",
+        "integration_surface": null,
+        "provider": "Shields",
+        "company": null,
+        "category": "external_service",
+        "dependency_type": "UNKNOWN",
+        "classification_confidence": 0.5,
+        "classification_reasoning": "Could not determine classification for 'Shields' with type 'external_service'",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "Shields",
+          "confidence": 0.5,
+          "detection_source": "rule_based_classifier",
+          "decision_mode": "deterministic",
+          "review_status": "needs_review",
+          "evidence": [
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "https://img.shields.io/pypi/v/dagster-slurm.svg)](https://pypi.python.org/pypi/dagster-slurm)"
+            },
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "https://img.shields.io/pypi/l/dagster-slurm.svg)](https://pypi.python.org/pypi/dagster-slurm)"
+            },
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "https://img.shields.io/pypi/pyversions/dagster-slurm.svg)](https://pypi.python.org/pypi/dagster-slurm)"
+            }
+          ],
+          "metadata": {
+            "provider": "Shields",
+            "company": null,
+            "category": "external_service",
+            "boundary": "UNKNOWN",
+            "catalog_match": null
+          }
+        },
+        "confidence": 0.5,
+        "detection_source": "rule_based_classifier",
+        "review_status": "needs_review",
+        "requires_human_review": true,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "https://img.shields.io/pypi/v/dagster-slurm.svg)](https://pypi.python.org/pypi/dagster-slurm)"
+          },
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "https://img.shields.io/pypi/l/dagster-slurm.svg)](https://pypi.python.org/pypi/dagster-slurm)"
+          },
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "https://img.shields.io/pypi/pyversions/dagster-slurm.svg)](https://pypi.python.org/pypi/dagster-slurm)"
+          }
+        ],
+        "review_item": {
+          "field": "external_dependencies",
+          "candidate_value": "Shields",
+          "confidence": 0.5,
+          "reason": "Could not determine classification for 'Shields' with type 'external_service'",
+          "repo_path": "/Users/vladbrincoveanu/Desktop/Startup/KnowledgeForge/sources/dagster-slurm",
+          "evidence": [
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "https://img.shields.io/pypi/pyversions/dagster-slurm.svg)](https://pypi.python.org/pypi/dagster-slurm)"
+            }
+          ],
+          "recommended_action": "human_review"
+        },
+        "review_options": [
+          {
+            "id": "context-business-system",
+            "label": "Keep At Context Level",
+            "value": "BUSINESS_SYSTEM",
+            "description": "Treat Shields as an external business company or SaaS that belongs in the system context."
+          },
+          {
+            "id": "container-technical-infra",
+            "label": "Move To Container Level",
+            "value": "TECHNICAL_INFRA",
+            "description": "Treat Shields as technical infrastructure or an implementation detail that should not stay in the context diagram."
+          }
+        ],
+        "suggested_prompts": [
+          "We currently use Shields for external_service. Compare whether it belongs at C4 context level or container level, and explain the tradeoffs.",
+          "We use Shields for a payment-platform workflow. Suggest up to three alternative providers and compare them on price, performance, and integration cost."
+        ],
+        "detected_from_all": [
+          "README.md"
+        ]
+      },
+      {
+        "name": "Geoheil",
+        "type": "external_service",
+        "detected_from": "README.md",
+        "context": "https://dagster-slurm.geoheil.com/)",
+        "evidence_type": "documentation_reference",
+        "url": "https://dagster-slurm.geoheil.com/)",
+        "context_name": "Geoheil",
+        "integration_surface": null,
+        "provider": "Geoheil",
+        "company": null,
+        "category": "external_service",
+        "dependency_type": "UNKNOWN",
+        "classification_confidence": 0.5,
+        "classification_reasoning": "Could not determine classification for 'Geoheil' with type 'external_service'",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "Geoheil",
+          "confidence": 0.5,
+          "detection_source": "rule_based_classifier",
+          "decision_mode": "deterministic",
+          "review_status": "needs_review",
+          "evidence": [
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "https://dagster-slurm.geoheil.com/)"
+            },
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "https://telemetry.dagster-slurm.geoheil.com/a.png?x-pxid=994a20b8-4be7-4297-9f42-657b0d1f1a07&page=README.md"
+            },
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "https://dagster-slurm.geoheil.com/docs/slides"
+            }
+          ],
+          "metadata": {
+            "provider": "Geoheil",
+            "company": null,
+            "category": "external_service",
+            "boundary": "UNKNOWN",
+            "catalog_match": null
+          }
+        },
+        "confidence": 0.5,
+        "detection_source": "rule_based_classifier",
+        "review_status": "needs_review",
+        "requires_human_review": true,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "https://dagster-slurm.geoheil.com/)"
+          },
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "https://telemetry.dagster-slurm.geoheil.com/a.png?x-pxid=994a20b8-4be7-4297-9f42-657b0d1f1a07&page=README.md"
+          },
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "https://dagster-slurm.geoheil.com/docs/slides"
+          }
+        ],
+        "review_item": {
+          "field": "external_dependencies",
+          "candidate_value": "Geoheil",
+          "confidence": 0.5,
+          "reason": "Could not determine classification for 'Geoheil' with type 'external_service'",
+          "repo_path": "/Users/vladbrincoveanu/Desktop/Startup/KnowledgeForge/sources/dagster-slurm",
+          "evidence": [
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "https://dagster-slurm.geoheil.com/docs/slides"
+            }
+          ],
+          "recommended_action": "human_review"
+        },
+        "review_options": [
+          {
+            "id": "context-business-system",
+            "label": "Keep At Context Level",
+            "value": "BUSINESS_SYSTEM",
+            "description": "Treat Geoheil as an external business company or SaaS that belongs in the system context."
+          },
+          {
+            "id": "container-technical-infra",
+            "label": "Move To Container Level",
+            "value": "TECHNICAL_INFRA",
+            "description": "Treat Geoheil as technical infrastructure or an implementation detail that should not stay in the context diagram."
+          }
+        ],
+        "suggested_prompts": [
+          "We currently use Geoheil for external_service. Compare whether it belongs at C4 context level or container level, and explain the tradeoffs.",
+          "We use Geoheil for a payment-platform workflow. Suggest up to three alternative providers and compare them on price, performance, and integration cost."
+        ],
+        "detected_from_all": [
+          "README.md"
+        ]
+      },
+      {
+        "name": "Georgheiler",
+        "type": "external_service",
+        "detected_from": "README.md",
+        "context": "https://georgheiler.com/post/dagster-slurm/",
+        "evidence_type": "documentation_reference",
+        "url": "https://georgheiler.com/post/dagster-slurm/",
+        "context_name": "Georgheiler",
+        "integration_surface": null,
+        "provider": "Georgheiler",
+        "company": null,
+        "category": "external_service",
+        "dependency_type": "UNKNOWN",
+        "classification_confidence": 0.5,
+        "classification_reasoning": "Could not determine classification for 'Georgheiler' with type 'external_service'",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "Georgheiler",
+          "confidence": 0.5,
+          "detection_source": "rule_based_classifier",
+          "decision_mode": "deterministic",
+          "review_status": "needs_review",
+          "evidence": [
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "https://georgheiler.com/post/dagster-slurm/"
+            }
+          ],
+          "metadata": {
+            "provider": "Georgheiler",
+            "company": null,
+            "category": "external_service",
+            "boundary": "UNKNOWN",
+            "catalog_match": null
+          }
+        },
+        "confidence": 0.5,
+        "detection_source": "rule_based_classifier",
+        "review_status": "needs_review",
+        "requires_human_review": true,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "https://georgheiler.com/post/dagster-slurm/"
+          }
+        ],
+        "review_item": {
+          "field": "external_dependencies",
+          "candidate_value": "Georgheiler",
+          "confidence": 0.5,
+          "reason": "Could not determine classification for 'Georgheiler' with type 'external_service'",
+          "repo_path": "/Users/vladbrincoveanu/Desktop/Startup/KnowledgeForge/sources/dagster-slurm",
+          "evidence": [
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "https://georgheiler.com/post/dagster-slurm/"
+            }
+          ],
+          "recommended_action": "human_review"
+        },
+        "review_options": [
+          {
+            "id": "context-business-system",
+            "label": "Keep At Context Level",
+            "value": "BUSINESS_SYSTEM",
+            "description": "Treat Georgheiler as an external business company or SaaS that belongs in the system context."
+          },
+          {
+            "id": "container-technical-infra",
+            "label": "Move To Container Level",
+            "value": "TECHNICAL_INFRA",
+            "description": "Treat Georgheiler as technical infrastructure or an implementation detail that should not stay in the context diagram."
+          }
+        ],
+        "suggested_prompts": [
+          "We currently use Georgheiler for external_service. Compare whether it belongs at C4 context level or container level, and explain the tradeoffs.",
+          "We use Georgheiler for a payment-platform workflow. Suggest up to three alternative providers and compare them on price, performance, and integration cost."
+        ],
+        "detected_from_all": [
+          "README.md"
+        ]
+      },
+      {
+        "name": "Ac",
+        "type": "external_service",
+        "detected_from": "README.md",
+        "context": "https://ascii.ac.at/)",
+        "evidence_type": "documentation_reference",
+        "url": "https://ascii.ac.at/)",
+        "context_name": "Ac",
+        "integration_surface": null,
+        "provider": "Ac",
+        "company": null,
+        "category": "external_service",
+        "dependency_type": "UNKNOWN",
+        "classification_confidence": 0.5,
+        "classification_reasoning": "Could not determine classification for 'Ac' with type 'external_service'",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "Ac",
+          "confidence": 0.5,
+          "detection_source": "rule_based_classifier",
+          "decision_mode": "deterministic",
+          "review_status": "needs_review",
+          "evidence": [
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "https://ascii.ac.at/)"
+            },
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "https://www.csh.ac.at/)"
+            },
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "https://asc.ac.at/home/)"
+            }
+          ],
+          "metadata": {
+            "provider": "Ac",
+            "company": null,
+            "category": "external_service",
+            "boundary": "UNKNOWN",
+            "catalog_match": null
+          }
+        },
+        "confidence": 0.5,
+        "detection_source": "rule_based_classifier",
+        "review_status": "needs_review",
+        "requires_human_review": true,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "https://ascii.ac.at/)"
+          },
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "https://www.csh.ac.at/)"
+          },
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "https://asc.ac.at/home/)"
+          }
+        ],
+        "review_item": {
+          "field": "external_dependencies",
+          "candidate_value": "Ac",
+          "confidence": 0.5,
+          "reason": "Could not determine classification for 'Ac' with type 'external_service'",
+          "repo_path": "/Users/vladbrincoveanu/Desktop/Startup/KnowledgeForge/sources/dagster-slurm",
+          "evidence": [
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "https://asc.ac.at/home/)"
+            }
+          ],
+          "recommended_action": "human_review"
+        },
+        "review_options": [
+          {
+            "id": "context-business-system",
+            "label": "Keep At Context Level",
+            "value": "BUSINESS_SYSTEM",
+            "description": "Treat Ac as an external business company or SaaS that belongs in the system context."
+          },
+          {
+            "id": "container-technical-infra",
+            "label": "Move To Container Level",
+            "value": "TECHNICAL_INFRA",
+            "description": "Treat Ac as technical infrastructure or an implementation detail that should not stay in the context diagram."
+          }
+        ],
+        "suggested_prompts": [
+          "We currently use Ac for external_service. Compare whether it belongs at C4 context level or container level, and explain the tradeoffs.",
+          "We use Ac for a payment-platform workflow. Suggest up to three alternative providers and compare them on price, performance, and integration cost."
+        ],
+        "detected_from_all": [
+          "README.md"
+        ]
+      },
+      {
+        "name": "Openhackathons",
+        "type": "external_service",
+        "detected_from": "README.md",
+        "context": "https://www.openhackathons.org/s/siteevent/a0CUP000013Tp8f2AC/se000375):",
+        "evidence_type": "documentation_reference",
+        "url": "https://www.openhackathons.org/s/siteevent/a0CUP000013Tp8f2AC/se000375):",
+        "context_name": "Openhackathons",
+        "integration_surface": null,
+        "provider": "Openhackathons",
+        "company": null,
+        "category": "external_service",
+        "dependency_type": "UNKNOWN",
+        "classification_confidence": 0.5,
+        "classification_reasoning": "Could not determine classification for 'Openhackathons' with type 'external_service'",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "Openhackathons",
+          "confidence": 0.5,
+          "detection_source": "rule_based_classifier",
+          "decision_mode": "deterministic",
+          "review_status": "needs_review",
+          "evidence": [
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "https://www.openhackathons.org/s/siteevent/a0CUP000013Tp8f2AC/se000375):"
+            }
+          ],
+          "metadata": {
+            "provider": "Openhackathons",
+            "company": null,
+            "category": "external_service",
+            "boundary": "UNKNOWN",
+            "catalog_match": null
+          }
+        },
+        "confidence": 0.5,
+        "detection_source": "rule_based_classifier",
+        "review_status": "needs_review",
+        "requires_human_review": true,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "https://www.openhackathons.org/s/siteevent/a0CUP000013Tp8f2AC/se000375):"
+          }
+        ],
+        "review_item": {
+          "field": "external_dependencies",
+          "candidate_value": "Openhackathons",
+          "confidence": 0.5,
+          "reason": "Could not determine classification for 'Openhackathons' with type 'external_service'",
+          "repo_path": "/Users/vladbrincoveanu/Desktop/Startup/KnowledgeForge/sources/dagster-slurm",
+          "evidence": [
+            {
+              "type": "documentation_reference",
+              "source": "README.md",
+              "snippet": "https://www.openhackathons.org/s/siteevent/a0CUP000013Tp8f2AC/se000375):"
+            }
+          ],
+          "recommended_action": "human_review"
+        },
+        "review_options": [
+          {
+            "id": "context-business-system",
+            "label": "Keep At Context Level",
+            "value": "BUSINESS_SYSTEM",
+            "description": "Treat Openhackathons as an external business company or SaaS that belongs in the system context."
+          },
+          {
+            "id": "container-technical-infra",
+            "label": "Move To Container Level",
+            "value": "TECHNICAL_INFRA",
+            "description": "Treat Openhackathons as technical infrastructure or an implementation detail that should not stay in the context diagram."
+          }
+        ],
+        "suggested_prompts": [
+          "We currently use Openhackathons for external_service. Compare whether it belongs at C4 context level or container level, and explain the tradeoffs.",
+          "We use Openhackathons for a payment-platform workflow. Suggest up to three alternative providers and compare them on price, performance, and integration cost."
+        ],
+        "detected_from_all": [
+          "README.md"
+        ]
+      },
+      {
+        "name": "Pixi",
+        "type": "external_service",
+        "detected_from": "docs/README.md",
+        "context": "https://pixi.sh/latest/installation/",
+        "evidence_type": "documentation_reference",
+        "url": "https://pixi.sh/latest/installation/",
+        "context_name": "Pixi",
+        "integration_surface": null,
+        "provider": "Pixi",
+        "company": null,
+        "category": "external_service",
+        "dependency_type": "UNKNOWN",
+        "classification_confidence": 0.5,
+        "classification_reasoning": "Could not determine classification for 'Pixi' with type 'external_service'",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "Pixi",
+          "confidence": 0.5,
+          "detection_source": "rule_based_classifier",
+          "decision_mode": "deterministic",
+          "review_status": "needs_review",
+          "evidence": [
+            {
+              "type": "documentation_reference",
+              "source": "docs/README.md",
+              "snippet": "https://pixi.sh/latest/installation/"
+            },
+            {
+              "type": "documentation_reference",
+              "source": "docs/README.md",
+              "snippet": "https://pixi.sh/install.sh"
+            },
+            {
+              "type": "documentation_reference",
+              "source": "docs/docs/intro.md",
+              "snippet": "https://pixi.sh/latest/installation/)"
+            },
+            {
+              "type": "documentation_reference",
+              "source": "docs/docs/intro.md",
+              "snippet": "https://pixi.sh/install.sh"
+            }
+          ],
+          "metadata": {
+            "provider": "Pixi",
+            "company": null,
+            "category": "external_service",
+            "boundary": "UNKNOWN",
+            "catalog_match": null
+          }
+        },
+        "confidence": 0.5,
+        "detection_source": "rule_based_classifier",
+        "review_status": "needs_review",
+        "requires_human_review": true,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "documentation_reference",
+            "source": "docs/README.md",
+            "snippet": "https://pixi.sh/latest/installation/"
+          },
+          {
+            "type": "documentation_reference",
+            "source": "docs/README.md",
+            "snippet": "https://pixi.sh/install.sh"
+          },
+          {
+            "type": "documentation_reference",
+            "source": "docs/docs/intro.md",
+            "snippet": "https://pixi.sh/latest/installation/)"
+          },
+          {
+            "type": "documentation_reference",
+            "source": "docs/docs/intro.md",
+            "snippet": "https://pixi.sh/install.sh"
+          }
+        ],
+        "review_item": {
+          "field": "external_dependencies",
+          "candidate_value": "Pixi",
+          "confidence": 0.5,
+          "reason": "Could not determine classification for 'Pixi' with type 'external_service'",
+          "repo_path": "/Users/vladbrincoveanu/Desktop/Startup/KnowledgeForge/sources/dagster-slurm",
+          "evidence": [
+            {
+              "type": "documentation_reference",
+              "source": "docs/docs/intro.md",
+              "snippet": "https://pixi.sh/install.sh"
+            }
+          ],
+          "recommended_action": "human_review"
+        },
+        "review_options": [
+          {
+            "id": "context-business-system",
+            "label": "Keep At Context Level",
+            "value": "BUSINESS_SYSTEM",
+            "description": "Treat Pixi as an external business company or SaaS that belongs in the system context."
+          },
+          {
+            "id": "container-technical-infra",
+            "label": "Move To Container Level",
+            "value": "TECHNICAL_INFRA",
+            "description": "Treat Pixi as technical infrastructure or an implementation detail that should not stay in the context diagram."
+          }
+        ],
+        "suggested_prompts": [
+          "We currently use Pixi for external_service. Compare whether it belongs at C4 context level or container level, and explain the tradeoffs.",
+          "We use Pixi for a payment-platform workflow. Suggest up to three alternative providers and compare them on price, performance, and integration cost."
+        ],
+        "detected_from_all": [
+          "docs/README.md",
+          "docs/docs/intro.md"
+        ]
+      },
+      {
+        "name": "AWS S3",
+        "type": "storage",
+        "detected_from": "docs/paper.md",
+        "context": "Pattern match: s3",
+        "evidence_type": "documentation_reference",
+        "context_name": "AWS S3",
+        "integration_surface": null,
+        "provider": "AWS S3",
+        "company": null,
+        "category": "storage",
+        "dependency_type": "TECHNICAL_INFRA",
+        "classification_confidence": 0.9,
+        "classification_reasoning": "'AWS S3' is technical infrastructure (matched pattern: s3)",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "AWS S3",
+          "confidence": 0.9,
+          "detection_source": "rule_based_classifier",
+          "decision_mode": "deterministic",
+          "review_status": "auto_accepted",
+          "evidence": [
+            {
+              "type": "documentation_reference",
+              "source": "docs/paper.md",
+              "snippet": "Pattern match: s3"
+            }
+          ],
+          "metadata": {
+            "provider": "AWS S3",
+            "company": null,
+            "category": "storage",
+            "boundary": "TECHNICAL_INFRA",
+            "catalog_match": null
+          }
+        },
+        "confidence": 0.9,
+        "detection_source": "rule_based_classifier",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "documentation_reference",
+            "source": "docs/paper.md",
+            "snippet": "Pattern match: s3"
+          }
+        ],
+        "detected_from_all": [
+          "docs/paper.md"
+        ]
+      },
+      {
+        "name": "Theoj",
+        "type": "external_service",
+        "detected_from": "docs/paper.md",
+        "context": "https://blog.joss.theoj.org/2018/12/a-new-collaboration-with-aas-publishing",
+        "evidence_type": "documentation_reference",
+        "url": "https://blog.joss.theoj.org/2018/12/a-new-collaboration-with-aas-publishing",
+        "context_name": "Theoj",
+        "integration_surface": null,
+        "provider": "Theoj",
+        "company": null,
+        "category": "external_service",
+        "dependency_type": "UNKNOWN",
+        "classification_confidence": 0.5,
+        "classification_reasoning": "Could not determine classification for 'Theoj' with type 'external_service'",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "Theoj",
+          "confidence": 0.5,
+          "detection_source": "rule_based_classifier",
+          "decision_mode": "deterministic",
+          "review_status": "needs_review",
+          "evidence": [
+            {
+              "type": "documentation_reference",
+              "source": "docs/paper.md",
+              "snippet": "https://blog.joss.theoj.org/2018/12/a-new-collaboration-with-aas-publishing"
+            }
+          ],
+          "metadata": {
+            "provider": "Theoj",
+            "company": null,
+            "category": "external_service",
+            "boundary": "UNKNOWN",
+            "catalog_match": null
+          }
+        },
+        "confidence": 0.5,
+        "detection_source": "rule_based_classifier",
+        "review_status": "needs_review",
+        "requires_human_review": true,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "documentation_reference",
+            "source": "docs/paper.md",
+            "snippet": "https://blog.joss.theoj.org/2018/12/a-new-collaboration-with-aas-publishing"
+          }
+        ],
+        "review_item": {
+          "field": "external_dependencies",
+          "candidate_value": "Theoj",
+          "confidence": 0.5,
+          "reason": "Could not determine classification for 'Theoj' with type 'external_service'",
+          "repo_path": "/Users/vladbrincoveanu/Desktop/Startup/KnowledgeForge/sources/dagster-slurm",
+          "evidence": [
+            {
+              "type": "documentation_reference",
+              "source": "docs/paper.md",
+              "snippet": "https://blog.joss.theoj.org/2018/12/a-new-collaboration-with-aas-publishing"
+            }
+          ],
+          "recommended_action": "human_review"
+        },
+        "review_options": [
+          {
+            "id": "context-business-system",
+            "label": "Keep At Context Level",
+            "value": "BUSINESS_SYSTEM",
+            "description": "Treat Theoj as an external business company or SaaS that belongs in the system context."
+          },
+          {
+            "id": "container-technical-infra",
+            "label": "Move To Container Level",
+            "value": "TECHNICAL_INFRA",
+            "description": "Treat Theoj as technical infrastructure or an implementation detail that should not stay in the context diagram."
+          }
+        ],
+        "suggested_prompts": [
+          "We currently use Theoj for external_service. Compare whether it belongs at C4 context level or container level, and explain the tradeoffs.",
+          "We use Theoj for a payment-platform workflow. Suggest up to three alternative providers and compare them on price, performance, and integration cost."
+        ],
+        "detected_from_all": [
+          "docs/paper.md"
+        ]
+      },
+      {
+        "name": "External Service",
+        "type": "external_service",
+        "detected_from": "docs/docs/intro.md",
+        "context": "http://localhost:3000](http://localhost:3000)",
+        "evidence_type": "documentation_reference",
+        "url": "http://localhost:3000](http://localhost:3000)",
+        "context_name": "External Service",
+        "integration_surface": null,
+        "provider": "External Service",
+        "company": null,
+        "category": "external_service",
+        "dependency_type": "UNKNOWN",
+        "classification_confidence": 0.5,
+        "classification_reasoning": "Could not determine classification for 'External Service' with type 'external_service'",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "External Service",
+          "confidence": 0.5,
+          "detection_source": "rule_based_classifier",
+          "decision_mode": "deterministic",
+          "review_status": "needs_review",
+          "evidence": [
+            {
+              "type": "documentation_reference",
+              "source": "docs/docs/intro.md",
+              "snippet": "http://localhost:3000](http://localhost:3000)"
+            }
+          ],
+          "metadata": {
+            "provider": "External Service",
+            "company": null,
+            "category": "external_service",
+            "boundary": "UNKNOWN",
+            "catalog_match": null
+          }
+        },
+        "confidence": 0.5,
+        "detection_source": "rule_based_classifier",
+        "review_status": "needs_review",
+        "requires_human_review": true,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "documentation_reference",
+            "source": "docs/docs/intro.md",
+            "snippet": "http://localhost:3000](http://localhost:3000)"
+          }
+        ],
+        "review_item": {
+          "field": "external_dependencies",
+          "candidate_value": "External Service",
+          "confidence": 0.5,
+          "reason": "Could not determine classification for 'External Service' with type 'external_service'",
+          "repo_path": "/Users/vladbrincoveanu/Desktop/Startup/KnowledgeForge/sources/dagster-slurm",
+          "evidence": [
+            {
+              "type": "documentation_reference",
+              "source": "docs/docs/intro.md",
+              "snippet": "http://localhost:3000](http://localhost:3000)"
+            }
+          ],
+          "recommended_action": "human_review"
+        },
+        "review_options": [
+          {
+            "id": "context-business-system",
+            "label": "Keep At Context Level",
+            "value": "BUSINESS_SYSTEM",
+            "description": "Treat External Service as an external business company or SaaS that belongs in the system context."
+          },
+          {
+            "id": "container-technical-infra",
+            "label": "Move To Container Level",
+            "value": "TECHNICAL_INFRA",
+            "description": "Treat External Service as technical infrastructure or an implementation detail that should not stay in the context diagram."
+          }
+        ],
+        "suggested_prompts": [
+          "We currently use External Service for external_service. Compare whether it belongs at C4 context level or container level, and explain the tradeoffs.",
+          "We use External Service for a payment-platform workflow. Suggest up to three alternative providers and compare them on price, performance, and integration cost."
+        ],
+        "detected_from_all": [
+          "docs/docs/intro.md"
+        ]
+      }
+    ],
+    "external_dependency_review_items": [
+      {
+        "field": "external_dependencies",
+        "candidate_value": "Shields",
+        "confidence": 0.5,
+        "reason": "Could not determine classification for 'Shields' with type 'external_service'",
+        "repo_path": "/Users/vladbrincoveanu/Desktop/Startup/KnowledgeForge/sources/dagster-slurm",
+        "evidence": [
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "https://img.shields.io/pypi/pyversions/dagster-slurm.svg)](https://pypi.python.org/pypi/dagster-slurm)"
+          }
+        ],
+        "recommended_action": "human_review"
+      },
+      {
+        "field": "external_dependencies",
+        "candidate_value": "Geoheil",
+        "confidence": 0.5,
+        "reason": "Could not determine classification for 'Geoheil' with type 'external_service'",
+        "repo_path": "/Users/vladbrincoveanu/Desktop/Startup/KnowledgeForge/sources/dagster-slurm",
+        "evidence": [
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "https://dagster-slurm.geoheil.com/docs/slides"
+          }
+        ],
+        "recommended_action": "human_review"
+      },
+      {
+        "field": "external_dependencies",
+        "candidate_value": "Georgheiler",
+        "confidence": 0.5,
+        "reason": "Could not determine classification for 'Georgheiler' with type 'external_service'",
+        "repo_path": "/Users/vladbrincoveanu/Desktop/Startup/KnowledgeForge/sources/dagster-slurm",
+        "evidence": [
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "https://georgheiler.com/post/dagster-slurm/"
+          }
+        ],
+        "recommended_action": "human_review"
+      },
+      {
+        "field": "external_dependencies",
+        "candidate_value": "Ac",
+        "confidence": 0.5,
+        "reason": "Could not determine classification for 'Ac' with type 'external_service'",
+        "repo_path": "/Users/vladbrincoveanu/Desktop/Startup/KnowledgeForge/sources/dagster-slurm",
+        "evidence": [
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "https://asc.ac.at/home/)"
+          }
+        ],
+        "recommended_action": "human_review"
+      },
+      {
+        "field": "external_dependencies",
+        "candidate_value": "Openhackathons",
+        "confidence": 0.5,
+        "reason": "Could not determine classification for 'Openhackathons' with type 'external_service'",
+        "repo_path": "/Users/vladbrincoveanu/Desktop/Startup/KnowledgeForge/sources/dagster-slurm",
+        "evidence": [
+          {
+            "type": "documentation_reference",
+            "source": "README.md",
+            "snippet": "https://www.openhackathons.org/s/siteevent/a0CUP000013Tp8f2AC/se000375):"
+          }
+        ],
+        "recommended_action": "human_review"
+      },
+      {
+        "field": "external_dependencies",
+        "candidate_value": "Pixi",
+        "confidence": 0.5,
+        "reason": "Could not determine classification for 'Pixi' with type 'external_service'",
+        "repo_path": "/Users/vladbrincoveanu/Desktop/Startup/KnowledgeForge/sources/dagster-slurm",
+        "evidence": [
+          {
+            "type": "documentation_reference",
+            "source": "docs/docs/intro.md",
+            "snippet": "https://pixi.sh/install.sh"
+          }
+        ],
+        "recommended_action": "human_review"
+      },
+      {
+        "field": "external_dependencies",
+        "candidate_value": "Theoj",
+        "confidence": 0.5,
+        "reason": "Could not determine classification for 'Theoj' with type 'external_service'",
+        "repo_path": "/Users/vladbrincoveanu/Desktop/Startup/KnowledgeForge/sources/dagster-slurm",
+        "evidence": [
+          {
+            "type": "documentation_reference",
+            "source": "docs/paper.md",
+            "snippet": "https://blog.joss.theoj.org/2018/12/a-new-collaboration-with-aas-publishing"
+          }
+        ],
+        "recommended_action": "human_review"
+      },
+      {
+        "field": "external_dependencies",
+        "candidate_value": "External Service",
+        "confidence": 0.5,
+        "reason": "Could not determine classification for 'External Service' with type 'external_service'",
+        "repo_path": "/Users/vladbrincoveanu/Desktop/Startup/KnowledgeForge/sources/dagster-slurm",
+        "evidence": [
+          {
+            "type": "documentation_reference",
+            "source": "docs/docs/intro.md",
+            "snippet": "http://localhost:3000](http://localhost:3000)"
+          }
+        ],
+        "recommended_action": "human_review"
+      }
+    ],
+    "deployment_dependencies": [
+      {
+        "name": "MySQL",
+        "type": "database",
+        "detected_from": "services/slurm/Dockerfile",
+        "context": "Pattern match: mysql",
+        "evidence_type": "deployment_reference",
+        "context_name": "MySQL",
+        "integration_surface": null,
+        "provider": "MySQL",
+        "company": "Oracle",
+        "category": "database",
+        "dependency_type": "TECHNICAL_INFRA",
+        "classification_confidence": 0.98,
+        "classification_reasoning": "Matched provider catalog entry for MySQL",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "MySQL",
+          "confidence": 0.98,
+          "detection_source": "provider_catalog",
+          "decision_mode": "deterministic",
+          "review_status": "auto_accepted",
+          "evidence": [
+            {
+              "type": "deployment_reference",
+              "source": "services/slurm/Dockerfile",
+              "snippet": "Pattern match: mysql"
+            }
+          ],
+          "metadata": {
+            "provider": "MySQL",
+            "company": "Oracle",
+            "category": "database",
+            "boundary": "TECHNICAL_INFRA",
+            "catalog_match": {
+              "provider": "MySQL",
+              "company": "Oracle",
+              "category": "database",
+              "alias_field": "package_aliases",
+              "matched_alias": "mysql",
+              "input_value": "mysql",
+              "normalized_value": "mysql",
+              "match_strategy": "contains"
+            }
+          }
+        },
+        "confidence": 0.98,
+        "detection_source": "provider_catalog",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "deployment_reference",
+            "source": "services/slurm/Dockerfile",
+            "snippet": "Pattern match: mysql"
+          }
+        ],
+        "detected_from_all": [
+          "services/slurm/Dockerfile"
+        ]
+      },
+      {
+        "name": "MariaDB",
+        "type": "database",
+        "detected_from": "services/slurm/Dockerfile",
+        "context": "Pattern match: mariadb",
+        "evidence_type": "deployment_reference",
+        "context_name": "MariaDB",
+        "integration_surface": null,
+        "provider": "MariaDB",
+        "company": null,
+        "category": "database",
+        "dependency_type": "TECHNICAL_INFRA",
+        "classification_confidence": 0.9,
+        "classification_reasoning": "'MariaDB' is technical infrastructure (matched pattern: mariadb)",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "MariaDB",
+          "confidence": 0.9,
+          "detection_source": "rule_based_classifier",
+          "decision_mode": "deterministic",
+          "review_status": "auto_accepted",
+          "evidence": [
+            {
+              "type": "deployment_reference",
+              "source": "services/slurm/Dockerfile",
+              "snippet": "Pattern match: mariadb"
+            },
+            {
+              "type": "deployment_reference",
+              "source": "docker-compose.yml",
+              "snippet": "mariadb:12"
+            }
+          ],
+          "metadata": {
+            "provider": "MariaDB",
+            "company": null,
+            "category": "database",
+            "boundary": "TECHNICAL_INFRA",
+            "catalog_match": null
+          }
+        },
+        "confidence": 0.9,
+        "detection_source": "rule_based_classifier",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "deployment_reference",
+            "source": "services/slurm/Dockerfile",
+            "snippet": "Pattern match: mariadb"
+          },
+          {
+            "type": "deployment_reference",
+            "source": "docker-compose.yml",
+            "snippet": "mariadb:12"
+          }
+        ],
+        "detected_from_all": [
+          "docker-compose.yml",
+          "services/slurm/Dockerfile"
+        ]
+      },
+      {
+        "name": "GitHub",
+        "type": "developer-platform",
+        "detected_from": "services/slurm/Dockerfile",
+        "context": "https://github.com/giovtorres/slurm-docker-cluster",
+        "evidence_type": "deployment_reference",
+        "url": "https://github.com/giovtorres/slurm-docker-cluster",
+        "context_name": "GitHub",
+        "integration_surface": null,
+        "provider": "GitHub",
+        "company": "GitHub",
+        "category": "developer-platform",
+        "dependency_type": "BUSINESS_SYSTEM",
+        "classification_confidence": 0.98,
+        "classification_reasoning": "Matched provider catalog entry for GitHub",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "GitHub",
+          "confidence": 0.98,
+          "detection_source": "provider_catalog",
+          "decision_mode": "deterministic",
+          "review_status": "auto_accepted",
+          "evidence": [
+            {
+              "type": "deployment_reference",
+              "source": "services/slurm/Dockerfile",
+              "snippet": "https://github.com/giovtorres/slurm-docker-cluster"
+            },
+            {
+              "type": "deployment_reference",
+              "source": "services/slurm/Dockerfile",
+              "snippet": "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-${TARGETARCH}"
+            },
+            {
+              "type": "deployment_reference",
+              "source": "services/slurm/Dockerfile",
+              "snippet": "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-${TARGETARCH}.asc"
+            },
+            {
+              "type": "deployment_reference",
+              "source": "services/slurm/Dockerfile",
+              "snippet": "https://github.com/SchedMD/slurm.git"
+            }
+          ],
+          "metadata": {
+            "provider": "GitHub",
+            "company": "GitHub",
+            "category": "developer-platform",
+            "boundary": "BUSINESS_SYSTEM",
+            "catalog_match": {
+              "provider": "GitHub",
+              "company": "GitHub",
+              "category": "developer-platform",
+              "alias_field": "package_aliases",
+              "matched_alias": "github",
+              "input_value": "//github.com/giovtorres/slurm-docker-cluster",
+              "normalized_value": "//github.com/giovtorres/slurm-docker-cluster",
+              "match_strategy": "contains"
+            }
+          }
+        },
+        "confidence": 0.98,
+        "detection_source": "provider_catalog",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "deployment_reference",
+            "source": "services/slurm/Dockerfile",
+            "snippet": "https://github.com/giovtorres/slurm-docker-cluster"
+          },
+          {
+            "type": "deployment_reference",
+            "source": "services/slurm/Dockerfile",
+            "snippet": "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-${TARGETARCH}"
+          },
+          {
+            "type": "deployment_reference",
+            "source": "services/slurm/Dockerfile",
+            "snippet": "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-${TARGETARCH}.asc"
+          },
+          {
+            "type": "deployment_reference",
+            "source": "services/slurm/Dockerfile",
+            "snippet": "https://github.com/SchedMD/slurm.git"
+          }
+        ],
+        "detected_from_all": [
+          "services/slurm/Dockerfile"
+        ]
+      },
+      {
+        "name": "PostgreSQL",
+        "type": "external_service",
+        "detected_from": "services/slurm/Dockerfile",
+        "context": "hkps://keys.openpgp.org",
+        "evidence_type": "deployment_reference",
+        "url": "hkps://keys.openpgp.org",
+        "context_name": "PostgreSQL",
+        "integration_surface": null,
+        "provider": "PostgreSQL",
+        "company": "PostgreSQL Global Development Group",
+        "category": "database",
+        "dependency_type": "TECHNICAL_INFRA",
+        "classification_confidence": 0.98,
+        "classification_reasoning": "Matched provider catalog entry for PostgreSQL",
+        "decision_mode": "deterministic",
+        "decision": {
+          "value": "PostgreSQL",
+          "confidence": 0.98,
+          "detection_source": "provider_catalog",
+          "decision_mode": "deterministic",
+          "review_status": "auto_accepted",
+          "evidence": [
+            {
+              "type": "deployment_reference",
+              "source": "services/slurm/Dockerfile",
+              "snippet": "hkps://keys.openpgp.org"
+            }
+          ],
+          "metadata": {
+            "provider": "PostgreSQL",
+            "company": "PostgreSQL Global Development Group",
+            "category": "database",
+            "boundary": "TECHNICAL_INFRA",
+            "catalog_match": {
+              "provider": "PostgreSQL",
+              "company": "PostgreSQL Global Development Group",
+              "category": "database",
+              "alias_field": "package_aliases",
+              "matched_alias": "pg",
+              "input_value": "//keys.openpgp.org",
+              "normalized_value": "//keys.openpgp.org",
+              "match_strategy": "contains"
+            }
+          }
+        },
+        "confidence": 0.98,
+        "detection_source": "provider_catalog",
+        "review_status": "auto_accepted",
+        "requires_human_review": false,
+        "review_threshold": 0.7,
+        "evidence": [
+          {
+            "type": "deployment_reference",
+            "source": "services/slurm/Dockerfile",
+            "snippet": "hkps://keys.openpgp.org"
+          }
+        ],
+        "detected_from_all": [
+          "services/slurm/Dockerfile"
+        ]
+      }
+    ],
+    "dependency_freshness_alerts": [],
+    "actors": [
+      {
+        "name": "CLI User",
+        "type": "person",
+        "description": "Uses the command-line interface",
+        "detected_from": "docs/paper.md",
+        "detection_method": "documentation_mention",
+        "evidence": "The Slurm Pipes client handles environment packaging (on demand or via pre-deployed bundles), transfers scripts, triggers `sbatch` or session jobs, and streams logs/metrics back through Dagster Pipes [@dagsterpipes]. Custom launchers can be added by extending the `ComputeLauncher` base class."
+      },
+      {
+        "name": "Developer experience benefits",
+        "type": "person",
+        "description": "Configonly mobility: Toggle DAGSTERDEPLOYMENT to jump between local execution, staging Slurm, and production supercomputers\u2014no code forks.",
+        "detected_from": "docs/docs/intro.md",
+        "detection_method": "documentation_heading",
+        "evidence": "## Developer experience benefits"
+      },
+      {
+        "name": "User plane (remote workload)",
+        "type": "person",
+        "description": "python",
+        "detected_from": "docs/docs/intro.md",
+        "detection_method": "documentation_heading",
+        "evidence": "### User plane (remote workload)"
+      }
+    ],
+    "languages": [
+      {
+        "language": "Python",
+        "file_count": 87
+      },
+      {
+        "language": "TypeScript",
+        "file_count": 3
+      },
+      {
+        "language": "TypeScript",
+        "file_count": 3
+      }
+    ],
+    "frameworks": [
+      {
+        "language": "TypeScript",
+        "framework": "React",
+        "detected_from": "docs/package.json"
+      },
+      {
+        "language": "JavaScript",
+        "framework": "Vue.js",
+        "detected_from": "slides/package.json"
+      }
+    ],
+    "repository_url": "https://github.com/ascii-supply-networks/dagster-slurm",
+    "git": {
+      "branch": "main",
+      "commit_hash": "3769493ab91e5a4d6976c92786f4f206b36497db",
+      "last_commit_date": "2026-03-20T07:48:29Z",
+      "first_commit_date": "2026-03-20T07:48:29Z",
+      "total_commits": 158,
+      "commits_30d": 18,
+      "commits_90d": 27,
+      "commits_180d": 76,
+      "top_contributors": [
+        {
+          "name": "semantic-release",
+          "email": "",
+          "commit_count": 63
+        },
+        {
+          "name": "Georg Heiler",
+          "email": "",
+          "commit_count": 54
+        },
+        {
+          "name": "geoHeil",
+          "email": "",
+          "commit_count": 39
+        },
+        {
+          "name": "GitHub Action",
+          "email": "",
+          "commit_count": 4
+        },
+        {
+          "name": "HPicatto",
+          "email": "",
+          "commit_count": 4
+        }
+      ]
+    },
+    "context_sources": {
+      "readme_files": [
+        "README.md",
+        "docs/README.md",
+        "docs/paper.md",
+        "docs/docs/intro.md"
+      ],
+      "deployment_files": [
+        "services/slurm/Dockerfile",
+        "docker-compose.ci.yml",
+        "docker-compose.yml"
+      ],
+      "framework_files": [
+        "docs/package.json",
+        "slides/package.json"
+      ]
+    },
+    "regulatory_frameworks": [],
+    "domain": "Infrastructure",
+    "owner": "22",
+    "owner_provenance": {
+      "detection_source": "readme",
+      "confidence": 0.8,
+      "evidence": [
+        {
+          "type": "readme",
+          "source": "/Users/vladbrincoveanu/Desktop/Startup/KnowledgeForge/sources/dagster-slurm/README.md",
+          "snippet": "22"
+        }
+      ]
+    },
+    "owner_contributors": [
+      "georg.kf.heiler@gmail.com",
+      "1694964+geoHeil@users.noreply.github.com",
+      "action@github.com",
+      "h.picatto@gmail.com",
+      "martin-pfister@users.noreply.github.com"
+    ],
+    "owner_contributor_stats": [
+      {
+        "email": "georg.kf.heiler@gmail.com",
+        "name": "Georg Heiler",
+        "commit_count": 54
+      },
+      {
+        "email": "1694964+geoHeil@users.noreply.github.com",
+        "name": "geoHeil",
+        "commit_count": 39
+      },
+      {
+        "email": "action@github.com",
+        "name": "GitHub Action",
+        "commit_count": 4
+      },
+      {
+        "email": "h.picatto@gmail.com",
+        "name": "HPicatto",
+        "commit_count": 4
+      },
+      {
+        "email": "martin-pfister@users.noreply.github.com",
+        "name": "Martin Pfister",
+        "commit_count": 2
+      }
+    ],
+    "contributor_count": 9,
+    "status": "ACTIVE",
+    "status_evidence": {
+      "commits_30d": 18,
+      "commits_90d": 27,
+      "commits_180d": 76,
+      "last_commit_date": "2026-03-20T07:48:29Z",
+      "days_since_last_commit": 1,
+      "git_repos_scanned": 1
+    },
+    "tier": "Tier 2 - Production Standard",
+    "data_class": "General",
+    "active_experts": 0,
+    "compliance": "AT_RISK",
+    "compliance_confidence": 1.0,
+    "compliance_factors": [
+      "Score: 5/7 checks passed",
+      "\u2705 README presence",
+      "\u2705 Tests present",
+      "\u2705 CI/CD configured",
+      "\u274c Security checks",
+      "\u274c Secrets detected",
+      "\u2705 Repository structure",
+      "\u2705 Dependency management"
+    ],
+    "last_commit_date": "2026-03-20T07:48:29Z",
+    "commit_count_30d": 18,
+    "commit_count_90d": 27,
+    "commit_count_180d": 76,
+    "dora_metrics": {
+      "deployment_frequency_per_day": 0.6,
+      "lead_time_days": 1.4717,
+      "mttr_hours": null,
+      "change_failure_rate": null,
+      "data_source": "git_commits",
+      "window_days": 30
+    },
+    "on_call_channel": null,
+    "owner_team": "22",
+    "business_domain": "Infrastructure",
+    "criticality": "Tier 2 - Production Standard"
+  }
+}
