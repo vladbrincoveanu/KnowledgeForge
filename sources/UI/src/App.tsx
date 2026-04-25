@@ -23,6 +23,7 @@ import Settings from "./@components/settings/Settings/Settings";
 import LandingPage from "./@components/landing/LandingPage/LandingPage";
 import { wsService } from "./services/api";
 import { IncrementalSummary } from "@/types";
+import { ReviewDashboard } from "./pages/ReviewDashboard";
 
 // TypeScript interfaces
 interface NavItem {
@@ -93,6 +94,12 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab }) => {
       label: "Settings",
       icon: <SettingsIcon size={20} />,
       path: "/settings",
+    },
+    {
+      id: "review",
+      label: "Review Queue",
+      icon: <Activity size={20} />,
+      path: "/review",
     },
   ];
 
@@ -204,6 +211,7 @@ const MainContent: React.FC = () => {
     if (path.startsWith("/code-architecture")) return "code-architecture";
     if (path.startsWith("/metrics")) return "metrics";
     if (path.startsWith("/settings")) return "settings";
+    if (path.startsWith("/review")) return "review";
     return "home";
   };
 
@@ -353,6 +361,11 @@ const MainContent: React.FC = () => {
                   <Settings />
                 </div>
               }
+            />
+
+            <Route
+              path="/review"
+              element={<ReviewDashboard />}
             />
           </Routes>
         </main>
