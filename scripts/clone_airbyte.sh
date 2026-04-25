@@ -4,7 +4,7 @@ set -e
 AIRBYTE_TAG="v0.63.1"  # pinned release tag
 TARGET_DIR="$(dirname "$0")/../sources/demo/airbyte"
 
-if [ -f "$TARGET_DIR/.airbyte-tag" ]; then
+if [ -d "$TARGET_DIR/.git" ]; then
     echo "Airbyte fixture already exists at $TARGET_DIR"
     exit 0
 fi
