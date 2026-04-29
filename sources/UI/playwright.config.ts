@@ -22,11 +22,18 @@ export default defineConfig({
     {
       name: 'setup',
       testMatch: '**/01-extraction.setup.ts',
+      timeout: 120000,
     },
     {
       name: 'chromium',
       dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'smoke',
+      testMatch: '**/06-omnipay-smoke.spec.ts',
+      use: { ...devices['Desktop Chrome'] },
+      timeout: 120000,
     },
   ],
   webServer: {
