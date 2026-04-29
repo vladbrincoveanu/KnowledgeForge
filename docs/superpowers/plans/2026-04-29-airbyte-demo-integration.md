@@ -4,7 +4,7 @@
 
 **Goal:** Make Airbyte the primary demo fixture in Playwright and Python E2E tests, with an OmniPay regression guard.
 
-**Architecture:** The bundled `sources/Api/c4_architecture.json` already contains Airbyte extraction results (436KB, 12 containers). No extraction pipeline changes needed. We update the test suite to scan Airbyte via the API, save extraction results for downstream test reuse, and add a self-contained OmniPay smoke test.
+**Architecture:** The extraction code already works against Airbyte — `sources/Api/c4_architecture.json` (436KB, tracked in git) has 12 containers, 20 components, 19 deps from Airbyte. The scan API already accepts `/app/sources/demo/airbyte`. The cold-start demo already renders Airbyte. This plan updates the test suite to match the actual demo and adds an OmniPay regression guard.
 
 **Tech Stack:** Playwright (TypeScript), pytest (Python), FastAPI scan/poll endpoints
 
@@ -519,14 +519,14 @@ git commit -m "test(e2e): replace Airbyte file-existence checks with full extrac
 
 ---
 
-### Task 7: Set Playwright setup project timeout to 120s
+### Task 7: Set Playwright setup timeout to 120s and add smoke project
 
 **Files:**
 - Modify: `sources/UI/playwright.config.ts`
 
-- [ ] **Step 1: Add timeout to the setup project**
+- [ ] **Step 1: Add timeout to setup + add smoke project in the `projects` array**
 
-In the `projects` array, add `timeout: 120000` to the setup project:
+Replace the projects array:
 
 ```typescript
   projects: [
@@ -540,14 +540,22 @@ In the `projects` array, add `timeout: 120000` to the setup project:
       dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'] },
     },
+    {
+      name: 'smoke',
+      testMatch: '**/06-omnipay-smoke.spec.ts',
+      use: { ...devices['Desktop Chrome'] },
+      timeout: 120000,
+    },
   ],
 ```
+
+The `smoke` project has **no dependency** on `setup` — it runs independently. If Airbyte extraction fails, OmniPay smoke still runs.
 
 - [ ] **Step 2: Commit**
 
 ```bash
 git add sources/UI/playwright.config.ts
-git commit -m "test(e2e): set Playwright setup timeout to 120s for Airbyte extraction"
+git commit -m "test(e2e): add OmniPay smoke project, set 120s setup timeout"
 ```
 
 ---
@@ -579,9 +587,9 @@ docker compose exec api python -m pytest tests/e2e/test_airbyte_extraction.py -v
 - [ ] **Step 4: Run Python unit tests (must not regress)**
 
 ```bash
-cd sources/Api && python3 -m pytest tests/unit/ -v --ignore=tests/unit/services/c4/containers
-# Ignore containers/ to avoid circular import issues on host
-# Expected: all tests pass, no regressions from OmniPay fixture changes
+cd sources/Api && python3 -m pytest tests/unit/ -v
+# Expected: tests pass or skip with documented failures in containers/ module (pre-existing)
+# Document any container module failures — these are in the do-not-modify zone
 ```
 
 - [ ] **Step 5: Run TypeScript/Vitest unit tests (must not regress)**
