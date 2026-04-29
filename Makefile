@@ -554,6 +554,12 @@ ci:
 	@echo "  ✅ Import checks passed"
 	@echo "  ✅ Git status clean"
 
+# Regenerate the bundled c4_architecture.json from the demo directory
+generate-demo:
+	@echo "🔨 Regenerating bundled C4 architecture demo..."
+	docker compose exec api python -m app.services.code_extraction.c4_extractor
+	@echo "✅ Bundled demo regenerated at sources/Api/c4_architecture.json"
+
 # Shortcut aliases
 check: quick-check
 full: full-check
