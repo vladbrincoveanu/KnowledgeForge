@@ -32,7 +32,7 @@ export default defineConfig({
     {
       name: 'smoke',
       testMatch: '**/06-omnipay-smoke.spec.ts',
-      use: { ...devices['Desktop Chrome'] },
+      use: { ...devices['Desktop Chrome'], baseURL: 'http://localhost:8000' },
       timeout: 120000,
     },
   ],
