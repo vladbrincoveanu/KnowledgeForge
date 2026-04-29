@@ -14,7 +14,7 @@ The Airbyte v0.63.1 monorepo exists at `sources/demo/airbyte/` and the bundled `
 **No code changes needed.** The bundled demo is already Airbyte. This section documents the current state and adds quality verification.
 
 ### Extraction cost
-Current Airbyte extraction produces 12 containers in ~30s. Verified from logs and JSON size. The component extraction (tree-sitter parsing) produces 20 components from entry-point files.
+Current Airbyte extraction produces 12 containers in estimated ~30s. The component extraction (tree-sitter parsing) produces 20 components from entry-point files. Actual timing to be measured on first run.
 
 ### `c4_architecture.json` lifecycle
 Already tracked in git (9 commits). No `.gitignore` change needed — the file is NOT excluded. Developers regenerate via `make generate-demo`.
@@ -113,12 +113,12 @@ Set the setup project's `timeout: 120_000` in `playwright.config.ts` projects ar
 
 ### Module: `06-omnipay-smoke.spec.ts` (new)
 - **Responsibility:** Verify OmniPay extraction still works (regression guard)
-- **Interface:** Scans `omnipay-payment-processor`, verifies ≥ 1 container extracted
+- **Interface:** Self-contained — calls `POST /api/v1/code/scan` with `omnipay-payment-processor`, polls, asserts ≥ 1 container extracted. No dependency on `01-extraction.setup.ts` (which scans Airbyte)
 - **Dependencies:** Docker API service, OmniPay fixture
 - **Size target:** ~40 lines
 
 ### Remaining spec files
-`03-chat.spec.ts`, `04-llm-enrichment.spec.ts`, `05-review-queue.spec.ts` are already generic — they check structural elements (detail panel, metadata fields, chat input, review queue) rather than hardcoded values. These should work unchanged if the extraction produces valid architecture data. The `06-omnipay-smoke.spec.ts` shares the same setup as the main suite (both need `01-extraction.setup.ts` to run first).
+`03-chat.spec.ts`, `04-llm-enrichment.spec.ts`, `05-review-queue.spec.ts` are already generic — they check structural elements (detail panel, metadata fields, chat input, review queue) rather than hardcoded values. These should work unchanged if the extraction produces valid architecture data.
 
 ## Section 4: What Stays the Same
 
@@ -135,7 +135,7 @@ Set the setup project's `timeout: 120_000` in `playwright.config.ts` projects ar
 2. Add `e2e/.extraction-result.json` to `.gitignore`
 3. Update `01-extraction.setup.ts` (scan Airbyte, save result)
 4. Update `02-architecture-graph.spec.ts` (dynamic node names from saved result)
-5. Add `06-omnipay-smoke.spec.ts` (OmniPay regression guard)
+5. Add `06-omnipay-smoke.spec.ts` (self-contained OmniPay extraction + assertion)
 6. Update `test_airbyte_extraction.py` (file-existence → integration test)
 7. Set Playwright setup timeout to 120s
 8. Run full test suite: `npm run test:e2e` + `make tests` + `npm run test` (Vitest)
