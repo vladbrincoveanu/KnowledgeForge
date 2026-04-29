@@ -845,7 +845,7 @@ async def scan_repository(
     try:
         repo_path = validate_local_repo_path(
             request.repo_path,
-            allowed_prefixes=["/tmp", "/repos", "/data", "/cms", "/app/data"],
+            allowed_prefixes=["/tmp", "/repos", "/data", "/cms", "/app/data", "/app/sources/demo"],
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
