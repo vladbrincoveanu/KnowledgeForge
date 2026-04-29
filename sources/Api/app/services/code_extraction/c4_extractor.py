@@ -320,6 +320,7 @@ class C4ArchitectureExtractor:
 def main():
     """Test C4 extractor."""
     import sys
+    import os
 
     def find_repo_root(start: Path) -> Path:
         for parent in [start] + list(start.parents):
@@ -332,13 +333,16 @@ def main():
 
     from infrastructure.llm.llm_manager import LLMManager
 
-    repo_root = find_repo_root(app_path)
-    demo_path = repo_root / "sources" / "demo"
-    monorepo_path = repo_root / "monorepo"
-    target_repo = demo_path if demo_path.exists() else (monorepo_path if monorepo_path.exists() else repo_root)
+    demo_path_env = os.getenv("DEMO_REPO_PATH", "")
+    if demo_path_env and Path(demo_path_env).exists():
+        target_repo = Path(demo_path_env)
+    else:
+        repo_root = find_repo_root(app_path)
+        demo_path = repo_root / "sources" / "demo"
+        monorepo_path = repo_root / "monorepo"
+        target_repo = demo_path if demo_path.exists() else (monorepo_path if monorepo_path.exists() else repo_root)
 
     try:
-        import os
         provider = os.getenv("LLM_PROVIDER", "lmstudio")
         base_url = os.getenv("LLM_BASE_URL", "http://localhost:1234/v1")
         model = os.getenv("LLM_MODEL", "qwen/qwen2.5-vl-7b")
@@ -351,8 +355,8 @@ def main():
     extractor = C4ArchitectureExtractor(target_repo, llm_manager=llm)
     c4_architecture = extractor.extract()
 
-    api_root = repo_root / "sources" / "Api"
-    output_file = api_root / "c4_architecture.json" if api_root.exists() else repo_root / "c4_architecture.json"
+    api_root = app_path / "Api"
+    output_file = api_root / "c4_architecture.json" if (api_root / "c4_architecture.json").exists() else app_path / "c4_architecture.json"
     extractor.save(c4_architecture, output_file)
 
     print(f"\nContainers: {len(c4_architecture['containers'])}")
