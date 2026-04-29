@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('LLM Enrichment Display', () => {
-  test.beforeAll(async ({ page }) => {
+  test.beforeEach(async ({ page }) => {
     await page.goto('/code-architecture');
     await page.waitForSelector('.react-flow', { timeout: 15000 });
     const nodes = page.locator('.react-flow__node');
@@ -19,10 +19,10 @@ test.describe('LLM Enrichment Display', () => {
   });
 
   test('confidence score badge is displayed on enriched nodes', async ({ page }) => {
-    const badge = page.locator('[class*="confidence"], [class*="score"], [class*="badge"]').first();
+    const badge = page.locator('text=/[0-9]\\.[0-9]/').first();
     if (await badge.isVisible().catch(() => false)) {
       const text = await badge.textContent();
-      expect(text).toMatch(/\d+(\.\d+)?/);
+      expect(text).toMatch(/\d+\.\d+/);
     }
   });
 

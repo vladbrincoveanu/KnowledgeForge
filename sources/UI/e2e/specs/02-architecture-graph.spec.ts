@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Architecture Graph', () => {
-  test.beforeAll(async ({ page }) => {
+  test.beforeEach(async ({ page }) => {
     await page.goto('/code-architecture');
     await page.waitForSelector('.react-flow', { timeout: 15000 });
   });
@@ -19,9 +19,9 @@ test.describe('Architecture Graph', () => {
   });
 
   test('shows level switcher pills', async ({ page }) => {
-    const contextPill = page.getByRole('button', { name: /context/i });
-    const containerPill = page.getByRole('button', { name: /container/i });
-    const componentPill = page.getByRole('button', { name: /component/i });
+    const contextPill = page.getByRole('button', { name: 'Context', exact: true });
+    const containerPill = page.getByRole('button', { name: 'Container', exact: true });
+    const componentPill = page.getByRole('button', { name: 'Component', exact: true });
 
     await expect(contextPill).toBeVisible();
     await expect(containerPill).toBeVisible();

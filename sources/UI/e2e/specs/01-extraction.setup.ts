@@ -1,7 +1,10 @@
 import { test as setup, expect } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const STATE_FILE = path.join(__dirname, '..', '.extraction-state.json');
 
 async function pollExtraction(baseURL: string, taskId: string, maxRetries = 30): Promise<void> {
