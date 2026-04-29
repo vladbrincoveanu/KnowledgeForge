@@ -31,7 +31,7 @@ setup('extract Airbyte demo fixture', async ({ request }) => {
 
   const demoPath = '/app/sources/demo/airbyte';
 
-  const response = await request.post('/api/v1/code/scan', {
+  const response = await request.post('http://localhost:8000/api/v1/code/scan', {
     data: {
       repo_path: demoPath,
       use_c4_model: true,
@@ -52,7 +52,7 @@ setup('extract Airbyte demo fixture', async ({ request }) => {
     timestamp: Date.now(),
   }));
 
-  const resultResponse = await fetch(`${API_BASE}/api/v1/code/scan/${body.task_id}/results`);
+  const resultResponse = await fetch(`http://localhost:8000/api/v1/code/scan/${body.task_id}/results`);
   expect(resultResponse.ok()).toBeTruthy();
   const resultData = await resultResponse.json();
   fs.writeFileSync(RESULT_FILE, JSON.stringify(resultData, null, 2));
