@@ -6,7 +6,7 @@ KnowledgeForge is a C4 architecture extraction engine: analyze codebases → pro
 **Stack:** FastAPI (Python 3.11) / React+TypeScript (Vite) / Neo4j / PostgreSQL / Docker
 
 - `sources/Api/` — FastAPI backend, C4 extraction services (`app/services/c4/`)
-- `sources/UI/` — React frontend (Vite + Cytoscape + ReactFlow)
+- `sources/UI/` — React frontend (Vite + Cytoscape + ReactFlow), Playwright E2E tests in `e2e/specs/`
 - `sources/demo/` — 23 OmniPay fixture repos used as extraction test inputs (read-only)
 - `sources/e2e/` — deprecated (actual E2E tests live in `sources/Api/tests/e2e/`)
 
@@ -36,6 +36,8 @@ cd sources/UI && npm run dev               # Frontend on :3000
 npm run fix-all      # format + lint:fix + type-check
 npm run check-all    # type-check + lint + format:check
 npm run test         # vitest (run after any UI change)
+npm run test:e2e     # Playwright E2E tests (requires: make up)
+npm run test:e2e:ui  # Playwright UI mode for debugging
 ```
 
 ### Backend tests
@@ -47,8 +49,9 @@ docker compose exec api python tests/test_pipeline.py   # via Docker
 
 ### E2E extraction tests (require Docker services running)
 ```bash
-make test-e2e                    # OmniPay extraction benchmarks
+make test-e2e                    # OmniPay extraction benchmarks (Python)
 make test-e2e-omnipay-verbose    # with detailed output
+npm run test:e2e                 # Playwright browser E2E tests (from sources/UI/)
 ```
 
 ## API Endpoint Workflow
