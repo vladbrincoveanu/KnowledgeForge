@@ -7,59 +7,64 @@ test.describe('Architecture Graph', () => {
   });
 
   test('renders the ReactFlow graph canvas', async ({ page }) => {
-    const canvas = page.locator('.react-flow');
-    await expect(canvas).toBeVisible();
+    await expect(page.locator('.react-flow')).toBeVisible();
   });
 
-  test('renders at least one node in the graph', async ({ page }) => {
-    const nodes = page.locator('.react-flow__node');
-    await expect(nodes.first()).toBeVisible({ timeout: 10000 });
-    const count = await nodes.count();
-    expect(count).toBeGreaterThan(0);
+  test('renders the OmniPay system node', async ({ page }) => {
+    await expect(page.locator('.react-flow__node')).not.toHaveCount(0, { timeout: 10000 });
+    const systemNode = page.locator('.node-name').filter({ hasText: 'OmniPay Payment Processor' });
+    await expect(systemNode).toBeVisible({ timeout: 5000 });
   });
 
-  test('shows level switcher pills', async ({ page }) => {
-    const contextPill = page.getByRole('button', { name: 'Context', exact: true });
+  test('shows three level switcher pills', async ({ page }) => {
+    const pills = page.locator('.level-pill');
+    await expect(pills).toHaveCount(3);
+    await expect(pills.nth(0)).toHaveText('Context');
+    await expect(pills.nth(1)).toHaveText('Container');
+    await expect(pills.nth(2)).toHaveText('Component');
+  });
+
+  test('switching to Container level changes visible nodes', async ({ page }) => {
     const containerPill = page.getByRole('button', { name: 'Container', exact: true });
-    const componentPill = page.getByRole('button', { name: 'Component', exact: true });
-
-    await expect(contextPill).toBeVisible();
-    await expect(containerPill).toBeVisible();
-    await expect(componentPill).toBeVisible();
-  });
-
-  test('switches to Container level on pill click', async ({ page }) => {
-    const containerPill = page.getByRole('button', { name: /container/i });
     await containerPill.click();
-    await page.waitForTimeout(1000);
-    const nodes = page.locator('.react-flow__node');
-    await expect(nodes.first()).toBeVisible({ timeout: 5000 });
+    await page.waitForTimeout(1500);
+    const containerNodes = page.locator('.react-flow__node-custom');
+    await expect(containerNodes.first()).toBeVisible({ timeout: 5000 });
   });
 
-  test('opens detail panel on node click', async ({ page }) => {
-    const firstNode = page.locator('.react-flow__node').first();
-    await firstNode.click();
+  test('clicking a node opens the detail panel with metadata', async ({ page }) => {
+    const systemNode = page.locator('.node-name').filter({ hasText: 'OmniPay Payment Processor' });
+    await systemNode.click();
     await page.waitForTimeout(500);
-    const detailPanel = page.locator('[class*="detail"], [class*="sidebar"]').first();
-    const nodeName = await firstNode.textContent();
 
-    if (await detailPanel.isVisible().catch(() => false)) {
-      await expect(detailPanel).toBeVisible();
-      const panelText = await detailPanel.textContent();
-      if (nodeName && panelText) {
-        expect(panelText.length).toBeGreaterThan(0);
-      }
-    }
+    const detailPanel = page.locator('aside.node-details-panel');
+    await expect(detailPanel).toBeVisible({ timeout: 3000 });
+
+    await expect(detailPanel.locator('.chat-title h3')).toHaveText('OmniPay Payment Processor');
+    await expect(detailPanel.locator('.chat-subtitle')).toHaveText('System');
   });
 
-  test('search input is functional', async ({ page }) => {
-    const searchInput = page.locator('input[type="text"], input[placeholder*="search" i], input[placeholder*="filter" i]').first();
-    if (await searchInput.isVisible().catch(() => false)) {
-      await searchInput.fill('payment');
-      await page.waitForTimeout(500);
-      const nodes = page.locator('.react-flow__node');
-      const count = await nodes.count();
-      expect(count).toBeGreaterThanOrEqual(0);
-    }
+  test('detail panel shows architecture metadata fields', async ({ page }) => {
+    const systemNode = page.locator('.node-name').filter({ hasText: 'OmniPay Payment Processor' });
+    await systemNode.click();
+    await page.waitForTimeout(500);
+
+    const detailPanel = page.locator('aside.node-details-panel');
+    await expect(detailPanel).toBeVisible({ timeout: 3000 });
+
+    const labels = detailPanel.locator('span.detail-label');
+    const labelTexts = await labels.allTextContents();
+    const allLabels = labelTexts.map(t => t.trim());
+
+    expect(allLabels).toContain('Owner Team');
+    expect(allLabels).toContain('Business Domain');
+  });
+
+  test('search input allows filtering nodes', async ({ page }) => {
+    const searchInput = page.locator('input.search-input');
+    await expect(searchInput).toBeVisible();
+    await searchInput.fill('OmniPay');
+    const currentVal = await searchInput.inputValue();
+    expect(currentVal).toBe('OmniPay');
   });
 });

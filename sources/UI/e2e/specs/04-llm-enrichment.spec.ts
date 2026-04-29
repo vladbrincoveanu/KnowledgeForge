@@ -4,32 +4,56 @@ test.describe('LLM Enrichment Display', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/code-architecture');
     await page.waitForSelector('.react-flow', { timeout: 15000 });
-    const nodes = page.locator('.react-flow__node');
-    await expect(nodes.first()).toBeVisible({ timeout: 10000 });
-    await nodes.first().click();
+    const systemNode = page.locator('.node-name').filter({ hasText: 'OmniPay Payment Processor' });
+    await systemNode.click();
     await page.waitForTimeout(500);
   });
 
-  test('detail panel shows enrichment fields', async ({ page }) => {
-    const detailPanel = page.locator('text=/confidence|decision mode|review status|llm_score|enrichment/i');
-    const hasEnrichmentSection = await detailPanel.isVisible().catch(() => false);
-    if (hasEnrichmentSection) {
-      await expect(detailPanel).toBeVisible();
+  test('detail panel is visible with metadata for the selected node', async ({ page }) => {
+    const detailPanel = page.locator('aside.node-details-panel');
+    await expect(detailPanel).toBeVisible({ timeout: 3000 });
+    await expect(detailPanel.locator('.chat-title h3')).not.toBeEmpty();
+  });
+
+  test('compliance fields are present in the metadata', async ({ page }) => {
+    const detailPanel = page.locator('aside.node-details-panel');
+    await expect(detailPanel).toBeVisible({ timeout: 3000 });
+
+    const labels = detailPanel.locator('span.detail-label');
+    const labelTexts = await labels.allTextContents();
+    const allLabels = labelTexts.map(t => t.trim());
+
+    expect(allLabels).toContain('Compliance Confidence');
+    expect(allLabels).toContain('Architectural Compliance');
+  });
+
+  test('decision mode label is rendered when enrichment data exists', async ({ page }) => {
+    const detailPanel = page.locator('aside.node-details-panel');
+    await expect(detailPanel).toBeVisible({ timeout: 3000 });
+
+    const decisionModeRow = detailPanel.locator('.detail-row').filter({
+      has: page.locator('span.detail-label', { hasText: 'Decision Mode' }),
+    });
+    const rowCount = await decisionModeRow.count();
+
+    if (rowCount > 0) {
+      const value = await decisionModeRow.locator('span.detail-value').textContent();
+      expect(['Deterministic', 'LLM Adjudicated', 'Human Reviewed']).toContain(value?.trim());
     }
   });
 
-  test('confidence score badge is displayed on enriched nodes', async ({ page }) => {
-    const badge = page.locator('text=/[0-9]\\.[0-9]/').first();
-    if (await badge.isVisible().catch(() => false)) {
-      const text = await badge.textContent();
-      expect(text).toMatch(/\d+\.\d+/);
-    }
-  });
+  test('review status label is rendered when enrichment data exists', async ({ page }) => {
+    const detailPanel = page.locator('aside.node-details-panel');
+    await expect(detailPanel).toBeVisible({ timeout: 3000 });
 
-  test('review status indicator is visible', async ({ page }) => {
-    const statusIndicator = page.locator('text=/auto.accepted|needs.review|approved|rejected/i');
-    if (await statusIndicator.isVisible().catch(() => false)) {
-      await expect(statusIndicator).toBeVisible();
+    const reviewStatusRow = detailPanel.locator('.detail-row').filter({
+      has: page.locator('span.detail-label', { hasText: 'Review Status' }),
+    });
+    const rowCount = await reviewStatusRow.count();
+
+    if (rowCount > 0) {
+      const value = await reviewStatusRow.locator('span.detail-value').textContent();
+      expect(['Auto Accepted', 'Needs Human Review', 'Approved', 'Rejected']).toContain(value?.trim());
     }
   });
 });
