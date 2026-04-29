@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -36,7 +36,9 @@ const C4Edge = ({
   label,
   data,
   interactionWidth,
+  selected,
 }: EdgeProps) => {
+  const [isHovered, setIsHovered] = useState(false);
   const edgeColor = getEdgeColor(data as Record<string, unknown>);
   const labelPlacement =
     data?.label_placement === 'source' ||
@@ -81,38 +83,45 @@ const C4Edge = ({
     '--edge-accent': edgeColor,
   } as CSSProperties;
 
+  const showLabel = hasContent && (isHovered || selected);
+
   return (
     <>
-      <BaseEdge
-        id={id}
-        path={edgePath}
-        markerEnd={markerEnd}
-        interactionWidth={interactionWidth ?? 20}
-        style={{
-          stroke: 'rgba(248, 250, 252, 0.96)',
-          strokeWidth: 8,
-          strokeLinecap: 'round',
-          strokeLinejoin: 'round',
-        }}
-        className="c4-edge-halo"
-      />
-      <BaseEdge
-        id={`${id}-foreground`}
-        path={edgePath}
-        markerEnd={markerEnd}
-        interactionWidth={interactionWidth ?? 20}
-        style={{
-          stroke: edgeColor,
-          strokeOpacity: 0.78,
-          strokeWidth: 2.4,
-          strokeLinecap: 'round',
-          strokeLinejoin: 'round',
-          cursor: 'pointer',
-          transition: 'stroke 0.2s ease, stroke-width 0.2s ease, stroke-opacity 0.2s ease',
-        }}
-        className="c4-edge-line"
-      />
-      {hasContent ? (
+      <g
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        <BaseEdge
+          id={id}
+          path={edgePath}
+          markerEnd={markerEnd}
+          interactionWidth={interactionWidth ?? 20}
+          style={{
+            stroke: 'rgba(248, 250, 252, 0.96)',
+            strokeWidth: 8,
+            strokeLinecap: 'round',
+            strokeLinejoin: 'round',
+          }}
+          className="c4-edge-halo"
+        />
+        <BaseEdge
+          id={`${id}-foreground`}
+          path={edgePath}
+          markerEnd={markerEnd}
+          interactionWidth={interactionWidth ?? 20}
+          style={{
+            stroke: edgeColor,
+            strokeOpacity: isHovered || selected ? 0.95 : 0.5,
+            strokeWidth: isHovered || selected ? 3 : 2.2,
+            strokeLinecap: 'round',
+            strokeLinejoin: 'round',
+            cursor: 'pointer',
+            transition: 'stroke 0.15s ease, stroke-width 0.15s ease, stroke-opacity 0.15s ease',
+          }}
+          className="c4-edge-line"
+        />
+      </g>
+      {showLabel ? (
         <EdgeLabelRenderer>
           <div
             className={`c4-edge-label${

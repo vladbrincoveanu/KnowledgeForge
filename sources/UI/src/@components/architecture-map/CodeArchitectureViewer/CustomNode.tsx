@@ -136,7 +136,7 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data }) => {
   };
 
   const isContainer = data.type === "container";
-  const { bg, color, stereotype } = getC4Style(data.type);
+  const { bg, color, stereotype, isC4 } = getC4Style(data.type);
   const isGhostExternal = data.attributes?.isGhostExternal === true;
 
   const ghostStyle = isGhostExternal
