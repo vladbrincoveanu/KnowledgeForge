@@ -86,7 +86,7 @@ NUGET_DEPENDENCY_MAP: dict[str, tuple[str, str]] = {
     "Consul": ("Consul", "service-discovery"),
 }
 
-GENERIC_URL_PATTERN = r"[A-Za-z][A-Za-z0-9+.-]*://[^\s\"']+"
+GENERIC_URL_PATTERN = r"[A-Za-z][A-Za-z0-9+.-]*://[^\s\"')\];,}<>]+"
 REVIEW_THRESHOLD = 0.70
 CONTEXT_NAME_SUFFIXES: tuple[tuple[str, str], ...] = (
     (" gateway api", "Gateway API"),
@@ -1112,6 +1112,7 @@ class DependencyDetector:
         host = parsed.hostname or parsed.netloc or parsed.path
         if not host:
             return "External Service"
+        host = host.rstrip('.)')
         parts = host.split(".")
         if len(parts) >= 2:
             return parts[-2].replace("-", " ").replace("_", " ").title()

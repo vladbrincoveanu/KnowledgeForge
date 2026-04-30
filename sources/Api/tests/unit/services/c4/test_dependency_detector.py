@@ -275,6 +275,22 @@ class TestDependencyDetectorDetect:
         assert isinstance(result, list)
 
 
+@pytest.mark.parametrize("url,expected", [
+    ("https://api.airbyte.com).", "Airbyte"),
+    ("https://stripe.com).", "Stripe"),
+    ("https://docs.aws.amazon.com", "Amazon"),
+    ("https://api.openai.com).", "Openai"),
+    ("https://github.com/user/repo", "Github"),
+    ("https://api.stripe.com/v1/charges", "Stripe"),
+])
+def test_extract_service_name_from_url_strips_trailing_junk(temp_repo, url, expected):
+    """URLs extracted from markdown often have trailing punctuation; name must be clean."""
+    from app.services.c4.context.dependency_detector import DependencyDetector
+    detector = DependencyDetector(repo_path=temp_repo)
+    result = detector._extract_service_name_from_url(url)
+    assert result == expected, f"URL {url!r} → {result!r}, expected {expected!r}"
+
+
 class TestDependencyDetectorClassification:
     """Test dependency type classification."""
 
