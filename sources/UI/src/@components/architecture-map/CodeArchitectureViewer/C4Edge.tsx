@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from 'react';
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -8,7 +8,6 @@ import {
 
 import { getC4EdgeGeometry } from "./c4EdgeGeometry";
 
-// Color palette for different relationship types
 const EDGE_COLORS: Record<string, string> = {
   uses: "#6366f1",
   calls: "#10b981",
@@ -36,7 +35,9 @@ const C4Edge = ({
   label,
   data,
   interactionWidth,
+  selected,
 }: EdgeProps) => {
+  const [isHovered, setIsHovered] = useState(false);
   const edgeColor = getEdgeColor(data as Record<string, unknown>);
   const labelPlacement =
     data?.label_placement === "source" ||
@@ -79,6 +80,8 @@ const C4Edge = ({
   const edgeLabelStyle = {
     "--edge-accent": edgeColor,
   } as CSSProperties;
+
+  const showLabel = hasContent && (isHovered || selected);
 
   return (
     <>

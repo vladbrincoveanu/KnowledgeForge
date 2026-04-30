@@ -112,6 +112,205 @@ const nodeTypes = {
   container: ContainerNode,
 };
 
+type ContainerTier = "entry" | "service" | "infra";
+
+const INFRA_TYPE_KEYWORDS = [
+  "database",
+  "data store",
+  "datastore",
+  "cache",
+  "message broker",
+  "broker",
+  "queue",
+  "event bus",
+];
+
+const ENTRY_TYPE_KEYWORDS = [
+  "frontend",
+  "gateway",
+  "api gateway",
+  "edge",
+  "load balancer",
+  "ingress",
+  "bff",
+];
+
+const ENTRY_NAME_KEYWORDS = ["gateway", "edge", "ingress", "auth", "bff"];
+
+// Match a keyword as a whole token within a kebab/space/underscore-delimited
+// name. Prevents false matches like "edge" inside "ledger".
+const matchesNameToken = (haystack: string, keyword: string): boolean => {
+  const tokens = haystack.split(/[\s\-_./]+/).filter(Boolean);
+  return tokens.includes(keyword);
+};
+
+const classifyContainerTier = (node: Node): ContainerTier => {
+  const data = (node.data ?? {}) as Record<string, unknown>;
+  const meta = (data.containerMeta ?? {}) as Record<string, unknown>;
+  const containerType = String(
+    meta.container_type ?? data.containerType ?? "",
+  ).toLowerCase();
+  const tech = String(meta.technology ?? data.technology ?? "").toLowerCase();
+  const label = String(data.label ?? "").toLowerCase();
+  const fullName = String(data.fullName ?? "").toLowerCase();
+  const haystack = `${label} ${fullName}`;
+
+  if (INFRA_TYPE_KEYWORDS.some((k) => containerType.includes(k))) {
+    return "infra";
+  }
+  // Tech-based fallback for raw infra detected by name (kafka, redis, …).
+  // Match technology by substring (allows "SQL Server" → matches "sql server"),
+  // but match the haystack by whole token to avoid false positives.
+  const INFRA_TECH = [
+    "kafka",
+    "rabbitmq",
+    "redis",
+    "memcached",
+    "mongodb",
+    "mongo",
+    "postgres",
+    "postgresql",
+    "mysql",
+    "mariadb",
+    "sql server",
+    "sqlserver",
+    "elastic",
+    "cassandra",
+    "dynamodb",
+  ];
+  if (
+    INFRA_TECH.some(
+      (k) => tech.includes(k) || matchesNameToken(haystack, k),
+    )
+  ) {
+    return "infra";
+  }
+
+  if (ENTRY_TYPE_KEYWORDS.some((k) => containerType.includes(k))) {
+    return "entry";
+  }
+  // Entry-tier name match must be a whole token — prevents "edge" matching
+  // inside "ledger" or "auth" matching inside "authority", etc.
+  if (ENTRY_NAME_KEYWORDS.some((k) => matchesNameToken(haystack, k))) {
+    return "entry";
+  }
+
+  return "service";
+};
+
+// Semantic 3-tier layout for C4 L2:
+//   entry tier   → top   (gateways, auth, frontends)
+//   service tier → middle (business services)
+//   infra tier   → bottom (databases, brokers, caches)
+// Ghost/external nodes get placed to the right of the service tier.
+const layoutContainerTiers = (
+  nodes: Node[],
+  edges: Edge[],
+): { nodes: Node[]; edges: Edge[] } => {
+  if (nodes.length === 0) return { nodes: [], edges };
+
+  const NODE_WIDTH = 260;
+  const NODE_HEIGHT = 140;
+  const COL_GAP = 60;
+  const ROW_GAP = 100;
+  const ENTRY_Y = 60;
+  const SERVICE_Y = ENTRY_Y + NODE_HEIGHT + ROW_GAP + 40;
+  const ORIGIN_X = 80;
+
+  const containerNodes = nodes.filter(
+    (n) => (n.data as any)?.type === "container",
+  );
+  const externalNodes = nodes.filter(
+    (n) =>
+      (n.data as any)?.type !== "container" &&
+      !(n.data as any)?.attributes?.isGhostExternal,
+  );
+  const ghostNodes = nodes.filter(
+    (n) => (n.data as any)?.attributes?.isGhostExternal,
+  );
+
+  const tiered: Record<ContainerTier, Node[]> = {
+    entry: [],
+    service: [],
+    infra: [],
+  };
+  containerNodes.forEach((n) => tiered[classifyContainerTier(n)].push(n));
+
+  // Sort each tier alphabetically for stable, predictable placement
+  const sortByLabel = (a: Node, b: Node) =>
+    String((a.data as any)?.label ?? "").localeCompare(
+      String((b.data as any)?.label ?? ""),
+    );
+  tiered.entry.sort(sortByLabel);
+  tiered.service.sort(sortByLabel);
+  tiered.infra.sort(sortByLabel);
+
+  // Lay out a single row of nodes centered horizontally
+  const placeRow = (rowNodes: Node[], y: number, startX: number) => {
+    rowNodes.forEach((node, idx) => {
+      node.position = {
+        x: startX + idx * (NODE_WIDTH + COL_GAP),
+        y,
+      };
+      node.sourcePosition = Position.Bottom;
+      node.targetPosition = Position.Top;
+    });
+  };
+
+  // Service tier may need to wrap if there are too many — limit per row
+  const SERVICES_PER_ROW = 5;
+  const serviceRows: Node[][] = [];
+  for (let i = 0; i < tiered.service.length; i += SERVICES_PER_ROW) {
+    serviceRows.push(tiered.service.slice(i, i + SERVICES_PER_ROW));
+  }
+
+  placeRow(tiered.entry, ENTRY_Y, ORIGIN_X);
+  serviceRows.forEach((row, rowIdx) => {
+    placeRow(row, SERVICE_Y + rowIdx * (NODE_HEIGHT + ROW_GAP), ORIGIN_X);
+  });
+  const adjustedInfraY =
+    SERVICE_Y +
+    Math.max(0, serviceRows.length - 1) * (NODE_HEIGHT + ROW_GAP) +
+    NODE_HEIGHT +
+    ROW_GAP +
+    40;
+  placeRow(tiered.infra, adjustedInfraY, ORIGIN_X);
+
+  // Place ghost externals as a column on the right side of the diagram
+  const maxRowWidth = Math.max(
+    tiered.entry.length,
+    SERVICES_PER_ROW,
+    tiered.infra.length,
+  );
+  const ghostX =
+    ORIGIN_X + maxRowWidth * (NODE_WIDTH + COL_GAP) + 80;
+  ghostNodes.forEach((node, idx) => {
+    node.position = {
+      x: ghostX,
+      y: ENTRY_Y + idx * (NODE_HEIGHT + 40),
+    };
+    node.sourcePosition = Position.Left;
+    node.targetPosition = Position.Left;
+  });
+
+  // Any remaining (non-container, non-ghost) entities — keep simple grid below
+  externalNodes.forEach((node, idx) => {
+    if (node.position && (node.position.x !== 0 || node.position.y !== 0)) {
+      return;
+    }
+    node.position = {
+      x: ORIGIN_X + (idx % 4) * (NODE_WIDTH + COL_GAP),
+      y: adjustedInfraY + NODE_HEIGHT + ROW_GAP * 1.5 +
+        Math.floor(idx / 4) * (NODE_HEIGHT + ROW_GAP),
+    };
+  });
+
+  return {
+    nodes: [...containerNodes, ...externalNodes, ...ghostNodes],
+    edges,
+  };
+};
+
 // Layout function - grid layout for components in containers
 const getLayoutedElements = (
   nodes: Node[],
@@ -796,8 +995,9 @@ const CodeArchitectureViewerInner: React.FC = () => {
         compliance_confidence: sysCtx.compliance_confidence,
         compliance_factors: sysCtx.compliance_factors,
       };
-      const containerEntities: CodeEntity[] = data.containers.map(
-        (container: any, idx: number) => ({
+      const containerEntities: CodeEntity[] = data.containers
+        .filter((container: any) => !container.is_infrastructure_only)
+        .map((container: any, idx: number) => ({
           id: `container_${container.name || idx}`,
           name: container.name,
           entity_type: "container",
@@ -813,10 +1013,10 @@ const CodeArchitectureViewerInner: React.FC = () => {
             technology: container.technology,
             repository_url: container.repository_url,
             health_endpoint: container.health_endpoint,
+            is_infrastructure_only: container.is_infrastructure_only,
             ...inheritedAttrs,
           },
-        }),
-      );
+        }));
 
       // Create relationships from containers
       const containerRelationships: CodeRelationship[] = [];
@@ -1566,8 +1766,9 @@ const CodeArchitectureViewerInner: React.FC = () => {
       selectedLevel === "container_level" &&
       architecture.containers?.length
     ) {
-      const fallbackContainers = architecture.containers.map(
-        (container: any, idx: number) => ({
+      const fallbackContainers = architecture.containers
+        .filter((container: any) => !container.is_infrastructure_only)
+        .map((container: any, idx: number) => ({
           id: `container_${container.name || idx}`,
           name: container.name,
           entity_type: "container",
@@ -1579,10 +1780,10 @@ const CodeArchitectureViewerInner: React.FC = () => {
             runtime_info: container.runtime_info,
             runtime_environment: container.runtime_environment,
             deployment: container.deployment,
+            is_infrastructure_only: container.is_infrastructure_only,
           },
           level: selectedLevel,
-        }),
-      );
+        }));
       allEntities.push(...fallbackContainers);
     }
 
@@ -1852,11 +2053,9 @@ const CodeArchitectureViewerInner: React.FC = () => {
         });
       });
     } else {
-      // Container-level framing for Kubernetes
-      const hasContainerLevel = selectedLevel === "container_level";
-      const containerEntities = filteredEntities.filter(
-        (e) => e.entity_type === "container",
-      );
+      // Container-level (and other non-component levels): build node data and let
+      // the layout dispatch decide positioning. The K8s cluster is no longer a
+      // positioning parent — the 3-tier semantic layout groups infra naturally.
       const containerInfoByName = new Map(
         (architecture?.containers || []).map((container: any) => [
           container.name,
@@ -1864,72 +2063,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
         ]),
       );
 
-      const isKubernetesEntity = (entity: CodeEntity) => {
-        const tech = String(entity.language || "").toLowerCase();
-        const containerType = String(
-          entity.attributes?.container_type || "",
-        ).toLowerCase();
-        const runtimeEnv = String(
-          entity.attributes?.runtime_environment || "",
-        ).toLowerCase();
-        const deployment = String(
-          entity.attributes?.deployment || "",
-        ).toLowerCase();
 
-        return (
-          tech.includes("kubernetes") ||
-          containerType.includes("helm") ||
-          containerType.includes("kubernetes") ||
-          runtimeEnv.includes("kubernetes") ||
-          deployment.includes("helm") ||
-          deployment.includes("kustomize") ||
-          deployment.includes("manifest")
-        );
-      };
-
-      let clusterNodeId: string | null = null;
-
-      if (hasContainerLevel && containerEntities.length > 0) {
-        const kubernetesContainers =
-          containerEntities.filter(isKubernetesEntity);
-
-        if (kubernetesContainers.length > 0) {
-          const columns = Math.min(
-            4,
-            Math.max(2, Math.ceil(kubernetesContainers.length / 2)),
-          );
-          const rows = Math.ceil(kubernetesContainers.length / columns);
-          const clusterWidth = Math.max(720, columns * 240 + 200);
-          const clusterHeight = Math.max(420, rows * 140 + 180);
-          const clusterMeta = architecture?.metadata?.runtime?.cluster;
-          clusterNodeId = "cluster_kubernetes";
-          rfNodes.push({
-            id: clusterNodeId,
-            type: "container",
-            position: { x: 80, y: 80 },
-            className: "cluster-frame",
-            draggable: false,
-            selectable: false,
-            data: {
-              label: "Kubernetes Cluster",
-              containerType: "Runtime Environment",
-              technology: "Kubernetes",
-              clusterMeta,
-            },
-            style: {
-              width: clusterWidth,
-              height: clusterHeight,
-              backgroundColor: "rgba(148, 163, 184, 0.08)",
-              border: "2px dashed #cbd5e1",
-              borderRadius: "16px",
-              padding: "20px",
-              pointerEvents: "none",
-            },
-          });
-        }
-      }
-
-      // Original logic for non-component entities
       filteredEntities.forEach((e) => {
         let shortName = e.name.includes(".")
           ? e.name.split(".").pop() || e.name
@@ -2003,15 +2137,6 @@ const CodeArchitectureViewerInner: React.FC = () => {
           },
         };
 
-        if (
-          clusterNodeId &&
-          e.entity_type === "container" &&
-          isKubernetesEntity(e)
-        ) {
-          node.parentNode = clusterNodeId;
-          node.extent = "parent";
-        }
-
         rfNodes.push(node);
       });
     }
@@ -2023,15 +2148,54 @@ const CodeArchitectureViewerInner: React.FC = () => {
       filteredEntities,
     );
 
-    const mergedEdges = rfEdges;
-    const mergedNodes = rfNodes;
+// Build context external entities from system_context for linking container edges to context-level externals
+    const contextExternalEntities = (
+      architecture.system_context?.external_dependencies || []
+    ).map((dep: any, idx: number) => ({
+      id: `context_external_${idx}`,
+      name: dep.context_name || dep.name,
+      entity_type: "external_system",
+    }));
 
-    // Apply layout — use star layout for C4 context level, dagre for everything else
+    const visibleContainers = (architecture?.containers || []).filter(
+      (c: any) => !c.is_infrastructure_only,
+    );
+    const hiddenContainerNames = new Set(
+      (architecture?.containers || [])
+        .filter((c: any) => c.is_infrastructure_only)
+        .map((c: any) => String(c.name)),
+    );
+    const visibleContainerRelationships = (
+      architecture?.relationships?.containers || []
+    ).filter((rel: any) => {
+      const src = String(rel?.from ?? rel?.source ?? "");
+      const dst = String(rel?.to ?? rel?.destination ?? "");
+      return !hiddenContainerNames.has(src) && !hiddenContainerNames.has(dst);
+    });
+    const { nodes: ghostNodes, edges: dependencyEdges } =
+      selectedLevel === "container_level" &&
+      (visibleContainers.length > 0 || visibleContainerRelationships.length > 0)
+        ? generateC4Edges(
+            visibleContainers,
+            visibleContainerRelationships,
+            contextExternalEntities,
+          )
+        : { nodes: [], edges: [] };
+
+    const mergedEdges = [...rfEdges, ...dependencyEdges];
+    const mergedNodes = [...rfNodes, ...ghostNodes];
+
+    // Apply layout: star layout for L1 context, semantic 3-tier for L2 containers,
+    // dagre fallback for component (L3) and other cases.
     let layoutedNodes: Node[];
     let layoutedEdges: Edge[];
     if (selectedLevel === "context_level") {
       layoutedNodes = layoutContextLevel([...mergedNodes]);
       layoutedEdges = mergedEdges;
+    } else if (selectedLevel === "container_level") {
+      const result = layoutContainerTiers(mergedNodes, mergedEdges);
+      layoutedNodes = result.nodes;
+      layoutedEdges = result.edges;
     } else {
       const result = getLayoutedElements(mergedNodes, mergedEdges);
       layoutedNodes = result.nodes;
