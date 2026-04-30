@@ -229,30 +229,83 @@ const getLayoutedElements = (
   const hasRelationships = edges.length > 0;
 
   if (!hasRelationships && nodes.length > 0) {
+    // Build connected components from edges to cluster related nodes
+    const adjacency = new Map<string, Set<string>>();
+    nodes.forEach((n) => adjacency.set(n.id, new Set()));
+    edges.forEach((e) => {
+      adjacency.get(e.source)?.add(e.target);
+      adjacency.get(e.target)?.add(e.source);
+    });
+
+    const visited = new Set<string>();
+    const components: Node[][] = [];
+
+    const dfs = (nodeId: string, component: Node[]) => {
+      if (visited.has(nodeId)) return;
+      visited.add(nodeId);
+      const node = nodesById.get(nodeId);
+      if (node) component.push(node);
+      adjacency.get(nodeId)?.forEach((neighbor) => dfs(neighbor, component));
+    };
+
+    const nodesById = new Map(nodes.map((n) => [n.id, n]));
+    nodes.forEach((n) => {
+      if (!visited.has(n.id)) {
+        const component: Node[] = [];
+        dfs(n.id, component);
+        components.push(component);
+      }
+    });
+
+    // Sort: largest connected components first, isolated nodes last
+    components.sort((a, b) => {
+      const aConnected = a.some((n) => adjacency.get(n.id)!.size > 0);
+      const bConnected = b.some((n) => adjacency.get(n.id)!.size > 0);
+      if (aConnected && !bConnected) return -1;
+      if (!aConnected && bConnected) return 1;
+      return b.length - a.length;
+    });
+
     const nodeW = 200;
     const nodeH = 100;
     const gapX = 40;
     const gapY = 40;
-    const cols = Math.min(6, Math.ceil(Math.sqrt(nodes.length)));
-    const rows = Math.ceil(nodes.length / cols);
     const viewportW = typeof window !== "undefined" ? window.innerWidth : 1400;
-    const startX = Math.max(40, (viewportW - cols * (nodeW + gapX)) / 2);
-    const startY = 40;
 
-    const layoutedNodes = nodes.map((node, idx) => {
-      const row = Math.floor(idx / cols);
-      const col = idx % cols;
-      return {
-        ...node,
-        position: {
+    // Place connected cluster first (center-left), isolated nodes to the right
+    let currentY = 40;
+    let maxX = 0;
+
+    components.forEach((component) => {
+      const isConnected = component.some(
+        (n) => (adjacency.get(n.id)?.size ?? 0) > 0,
+      );
+      const cols = isConnected
+        ? Math.min(4, Math.max(2, Math.ceil(Math.sqrt(component.length))))
+        : Math.min(5, Math.ceil(Math.sqrt(component.length)));
+      const startX = isConnected
+        ? 40
+        : Math.max(40, (viewportW - cols * (nodeW + gapX)) / 2);
+
+      component.forEach((node, idx) => {
+        const row = Math.floor(idx / cols);
+        const col = idx % cols;
+        node.position = {
           x: startX + col * (nodeW + gapX),
-          y: startY + row * (nodeH + gapY),
-        },
-        sourcePosition: Position.Right,
-        targetPosition: Position.Left,
-      };
+          y: currentY + row * (nodeH + gapY),
+        };
+        node.sourcePosition = Position.Right;
+        node.targetPosition = Position.Left;
+      });
+
+      const rows = Math.ceil(component.length / cols);
+      const height = rows * (nodeH + gapY);
+      currentY += height + gapY;
+      const width = cols * (nodeW + gapX);
+      maxX = Math.max(maxX, startX + width);
     });
-    return { nodes: layoutedNodes, edges };
+
+    return { nodes, edges };
   }
 
   // Hierarchical layout with dagre for connected graphs
