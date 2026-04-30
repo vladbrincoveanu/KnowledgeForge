@@ -337,3 +337,61 @@ class TestDependencyDetectorClassification:
             "TECHNICAL_INFRA",
         ]
         assert dep["suggested_prompts"]
+
+
+def test_build_review_prompts_uses_actual_evidence(temp_repo):
+    """When LLM unavailable, fallback prompts must reference actual dep evidence."""
+    from app.services.c4.context.dependency_detector import DependencyDetector
+    detector = DependencyDetector(repo_path=temp_repo, llm_manager=None)
+    dep = {
+        "name": "api.airbyte.com",
+        "context": "docs/terraform-documentation.md",
+        "type": "external_service",
+        "classification_confidence": 0.6,
+        "review_threshold": 0.7,
+    }
+    prompts = detector._build_review_prompts("api.airbyte.com", "external_service", dep)
+    assert len(prompts) == 2
+    assert "payment-platform" not in prompts[0]      # No generic template
+    assert "terraform" in prompts[1]                  # Uses actual evidence source
+    assert "0.7" in prompts[0] or "70%" in prompts[0]  # Uses actual threshold
+
+
+def test_build_review_prompts_llm_success(temp_repo):
+    """LLM returns valid JSON array → prompts returned directly."""
+    from unittest.mock import MagicMock
+    mock_llm = MagicMock()
+    mock_llm.generate_text.return_value = (
+        '["Is api.airbyte.com a SaaS API or internal infra?", "What services does it provide?"]'
+    )
+    detector = DependencyDetector(repo_path=temp_repo, llm_manager=mock_llm)
+    dep = {"name": "x", "context": "...", "type": "service",
+           "classification_confidence": 0.6, "review_threshold": 0.7}
+    prompts = detector._build_review_prompts("api.airbyte.com", "external_service", dep)
+    assert len(prompts) == 2
+
+
+def test_build_review_prompts_handles_markdown_fence(temp_repo):
+    """LLM sometimes wraps JSON in ```json fences — must extract correctly."""
+    from unittest.mock import MagicMock
+    mock_llm = MagicMock()
+    mock_llm.generate_text.return_value = '```json\n["Prompt one?", "Prompt two?"]\n```'
+    detector = DependencyDetector(repo_path=temp_repo, llm_manager=mock_llm)
+    dep = {"name": "x", "context": "...", "type": "service",
+           "classification_confidence": 0.6, "review_threshold": 0.7}
+    prompts = detector._build_review_prompts("x", "service", dep)
+    assert len(prompts) == 2
+    assert prompts[0] == "Prompt one?"
+
+
+def test_build_review_prompts_corrupt_json_falls_back(temp_repo):
+    """LLM returns malformed text → fallback prompts used."""
+    from unittest.mock import MagicMock
+    mock_llm = MagicMock()
+    mock_llm.generate_text.return_value = "Here are your prompts, I'm not sure..."
+    detector = DependencyDetector(repo_path=temp_repo, llm_manager=mock_llm)
+    dep = {"name": "x", "context": "src/main.rs", "type": "service",
+           "classification_confidence": 0.6, "review_threshold": 0.7}
+    prompts = detector._build_review_prompts("x", "service", dep)
+    assert len(prompts) == 2
+    assert "payment-platform" not in prompts[0]  # Still no generic template

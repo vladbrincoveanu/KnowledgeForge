@@ -743,7 +743,7 @@ class DependencyDetector:
         if needs_review:
             enriched["review_options"] = self._build_review_options(context_name)
             enriched["suggested_prompts"] = self._build_review_prompts(
-                context_name, final_type,
+                context_name, final_type, dep,
             )
         if internal_hint:
             enriched["internal_hint"] = internal_hint
@@ -797,17 +797,53 @@ class DependencyDetector:
             },
         ]
 
-    def _build_review_prompts(self, context_name: str, dep_type: str) -> list[str]:
-        """Return prompt starters the UI can offer for ambiguous dependencies."""
+    def _build_review_prompts(
+        self, context_name: str, dep_type: str, dep: dict[str, Any]
+    ) -> list[str]:
+        """Generate context-specific prompt starters for ambiguous dependencies.
+
+        Uses LLM if available to generate tailored prompts based on actual
+        dependency evidence (source file, URL, classification confidence).
+        Falls back to static prompts using actual dep evidence if LLM unavailable.
+        """
+        evidence = dep.get("context") or dep.get("url") or dep.get("name") or "unknown source"
+        confidence = dep.get("classification_confidence", 0.5)
+        review_threshold = dep.get("review_threshold", 0.7)
+        prompt = (
+            f"A C4 architecture dependency was detected:\n"
+            f"- Name: {context_name}\n"
+            f"- Type: {dep_type}\n"
+            f"- Evidence: {evidence}\n"
+            f"- Classification confidence: {confidence:.0%} "
+            f"(below {review_threshold:.0%} threshold)\n\n"
+            f"Generate exactly 2 short prompt starters (25 words or fewer each) "
+            f"to help a human decide:\n"
+            f"1. Whether this belongs at Context level (external business actor/SaaS) "
+            f"or Container level (technical infra)\n"
+            f"2. What specific architectural role this dependency likely plays\n"
+            f'Return ONLY a JSON array of strings, no markdown: ["prompt1", "prompt2"]'
+        )
+        try:
+            if self.llm_manager:
+                response = self.llm_manager.generate_text(
+                    prompt, max_tokens=200, temperature=0.3
+                )
+                text = response.strip()
+                # Strip markdown code fences
+                text = text.removeprefix("```json").strip().removeprefix("```").strip()
+                # Find first JSON array [...] in response
+                match = re.search(r'\[[\s\S]*\]', text)
+                if match:
+                    parsed = json.loads(match.group())
+                    if isinstance(parsed, list) and len(parsed) >= 2:
+                        return parsed[:2]
+        except Exception:
+            pass
+        # Fallback: static prompts using actual evidence
         return [
-            (
-                f"We currently use {context_name} for {dep_type}. Compare whether it "
-                "belongs at C4 context level or container level, and explain the tradeoffs."
-            ),
-            (
-                f"We use {context_name} for a payment-platform workflow. Suggest up to "
-                "three alternative providers and compare them on price, performance, and integration cost."
-            ),
+            f"Is {context_name} ({dep_type}) a business actor or technical detail "
+            f"given confidence {confidence:.0%} (threshold {review_threshold:.0%})?",
+            f"What role does {context_name} play given it was found in: {evidence[:80]}?",
         ]
 
     def _resolve_catalog_match(self, dep: dict[str, Any]) -> ProviderMatchResult | None:
