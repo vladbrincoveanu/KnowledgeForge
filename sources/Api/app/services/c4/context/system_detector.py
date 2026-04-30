@@ -321,6 +321,29 @@ Your answer:"""
                     for indicator, (lang, fw) in FRAMEWORK_INDICATORS.items():
                         if indicator in dep_text:
                             add_framework(lang, fw, rel_path)
+                elif manifest.name == "pyproject.toml":
+                    content = manifest.read_text(encoding="utf-8", errors="ignore")
+                    try:
+                        pyproject = tomli.loads(content)
+                    except Exception:
+                        content_lower = content.lower()
+                        for indicator, (lang, fw) in FRAMEWORK_INDICATORS.items():
+                            if indicator in content_lower:
+                                add_framework(lang, fw, rel_path)
+                        continue
+                    deps: list[str] = []
+                    project = pyproject.get("project", {})
+                    deps.extend(project.get("dependencies", []))
+                    for extras in project.get("optional-dependencies", {}).values():
+                        deps.extend(extras)
+                    dep_names = set()
+                    for dep in deps:
+                        name = dep.split("/")[0].split(" ")[0].lower()
+                        dep_names.add(name)
+                    dep_text = " ".join(dep_names)
+                    for indicator, (lang, fw) in FRAMEWORK_INDICATORS.items():
+                        if indicator in dep_text:
+                            add_framework(lang, fw, rel_path)
                 else:
                     content = manifest.read_text(encoding="utf-8", errors="ignore").lower()
                     for indicator, (lang, fw) in FRAMEWORK_INDICATORS.items():
