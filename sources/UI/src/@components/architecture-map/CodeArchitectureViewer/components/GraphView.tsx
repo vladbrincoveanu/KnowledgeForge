@@ -55,12 +55,7 @@ export default function GraphView({
           edgeTypes={edgeTypes}
           elementsSelectable
           edgesFocusable
-          fitView
-          fitViewOptions={{
-            padding: 0.18,
-            minZoom: 0.5,
-            maxZoom: 1.5,
-          }}
+          fitView={false}
           attributionPosition="bottom-left"
           minZoom={0.1}
           maxZoom={2.5}
