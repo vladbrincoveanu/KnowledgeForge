@@ -1058,13 +1058,13 @@ async def get_code_architecture():
     """
     Get the active C4 architecture payload.
 
-    Runtime extractions take precedence. When the server has not yet processed
-    an extraction in the current session, return the bundled OmniPay demo.
+    Bundled demo (Airbyte) is the default. Runtime extractions are only used
+    when explicitly requested via a scan task.
     """
     try:
-        c4_data = _load_latest_runtime_c4()
+        c4_data = _load_default_c4_from_json()
         if not c4_data:
-            c4_data = _load_default_c4_from_json()
+            c4_data = _load_latest_runtime_c4()
         if not c4_data:
             c4_data = _load_latest_c4_from_json()
 
