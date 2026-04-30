@@ -87,9 +87,7 @@ vi.mock("../../../services/api", () => ({
   },
 }));
 
-import CodeArchitectureViewer, {
-  generateC4Edges,
-} from "./CodeArchitectureViewer";
+import CodeArchitectureViewer from "./CodeArchitectureViewer";
 
 const emptyArchitecture = {
   c4_model_version: "1.0",
@@ -254,66 +252,4 @@ describe("CodeArchitectureViewer", () => {
   }
 });
 
-describe("generateC4Edges", () => {
-  test("resolves helm name mismatch via prefix-strip fallback", () => {
-    const containers = [
-      { name: "omnipay-settlement-orchestrator", container_type: "Service" },
-    ];
-    const relationships = [
-      {
-        from: "settlement-orchestrator",
-        to: "kafka",
-        type: "uses",
-        protocol: "Kafka",
-      },
-    ];
-    const { nodes, edges } = generateC4Edges(containers, relationships, []);
-    expect(edges).toHaveLength(1);
-    expect(edges[0].source).toBe("container_omnipay-settlement-orchestrator");
-    expect(edges[0].target).toBe("ghost_external_kafka");
-  });
 
-  test("creates ghost external node when target is unresolved and not in context externals", () => {
-    const containers = [{ name: "omnipay-event-projections" }];
-    const relationships = [
-      {
-        from: "omnipay-event-projections",
-        to: "kafka",
-        type: "uses",
-        protocol: "Kafka",
-      },
-    ];
-    const { nodes, edges } = generateC4Edges(containers, relationships, []);
-    expect(edges).toHaveLength(1);
-    expect(nodes).toHaveLength(1);
-    expect(nodes[0].id).toBe("ghost_external_kafka");
-    expect(nodes[0].data.attributes.isGhostExternal).toBe(true);
-  });
-
-  test("links to context external node instead of creating ghost when target matches", () => {
-    const containers = [{ name: "omnipay-settlement-orchestrator" }];
-    const relationships = [
-      {
-        from: "omnipay-settlement-orchestrator",
-        to: "kafka",
-        type: "uses",
-        protocol: "Kafka",
-      },
-    ];
-    const contextExternals = [
-      {
-        id: "context_external_0",
-        name: "kafka",
-        entity_type: "external_system",
-      },
-    ];
-    const { nodes, edges } = generateC4Edges(
-      containers,
-      relationships,
-      contextExternals,
-    );
-    expect(edges).toHaveLength(1);
-    expect(edges[0].target).toBe("context_external_0");
-    expect(nodes).toHaveLength(0); // no ghost created
-  });
-});
