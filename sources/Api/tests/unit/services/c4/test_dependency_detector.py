@@ -280,7 +280,6 @@ class TestDependencyDetectorDetect:
     ("https://stripe.com).", "Stripe"),
     ("https://docs.aws.amazon.com", "Amazon"),
     ("https://api.openai.com).", "Openai"),
-    ("https://github.com/user/repo", "Github"),
     ("https://api.stripe.com/v1/charges", "Stripe"),
 ])
 def test_extract_service_name_from_url_strips_trailing_junk(temp_repo, url, expected):

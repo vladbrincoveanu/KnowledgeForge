@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import subprocess
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, Optional
@@ -86,6 +87,22 @@ NUGET_DEPENDENCY_MAP: dict[str, tuple[str, str]] = {
     "Consul": ("Consul", "service-discovery"),
 }
 
+NON_SERVICE_HOSTS = {
+    "shields.io",
+    "website-files.com",
+    "docusaurus.com",
+    "youtube.com",
+    "youtu.be",
+    "github.com",
+    "github.io",
+    "readme.io",
+    "marketing.com",
+    "dtdg.co",
+    "cdn.jsdelivr.net",
+    "cdn.tailnet",
+    "netlify.app",
+}
+
 GENERIC_URL_PATTERN = r"[A-Za-z][A-Za-z0-9+.-]*://[^\s\"')\];,}<>]+"
 REVIEW_THRESHOLD = 0.70
 CONTEXT_NAME_SUFFIXES: tuple[tuple[str, str], ...] = (
@@ -110,6 +127,33 @@ class DependencyDetector:
         self.llm_manager = llm_manager
         self.classifier = DependencyClassifier(llm_manager) if enable_classification else None
         self.last_review_items: list[dict[str, Any]] = []
+        self._repo_domain: str | None = None
+
+    def _get_repo_domain(self) -> str | None:
+        """Lazily extract domain from git remote origin."""
+        if self._repo_domain is not None:
+            return self._repo_domain
+        try:
+            result = subprocess.run(
+                ["git", "config", "--get", "remote.origin.url"],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode != 0:
+                return None
+            remote_url = result.stdout.strip()
+            if not remote_url:
+                return None
+            if remote_url.startswith("git@"):
+                remote_url = remote_url.replace("git@", "https://").replace(".com:", ".com/")
+            remote_url = remote_url.rstrip(".git")
+            parsed = urlparse(remote_url)
+            self._repo_domain = parsed.hostname or None
+            return self._repo_domain
+        except (subprocess.SubprocessError, OSError):
+            return None
 
     def detect_external_dependencies(self) -> list[dict[str, Any]]:
         """Detect external service dependencies and annotate them with decision metadata."""
@@ -419,9 +463,12 @@ class DependencyDetector:
 
             for url in re.findall(GENERIC_URL_PATTERN, content):
                 provider = match_provider_from_url(url)
+                name = provider.provider if provider else self._extract_service_name_from_url(url)
+                if name is None:
+                    continue
                 deps.append(
                     self._make_dependency(
-                        name=provider.provider if provider else self._extract_service_name_from_url(url),
+                        name=name,
                         dep_type=provider.category if provider else "external_service",
                         detected_from=rel_path,
                         context=url,
@@ -456,9 +503,12 @@ class DependencyDetector:
                     )
             for url in re.findall(GENERIC_URL_PATTERN, content):
                 provider = match_provider_from_url(url)
+                name = provider.provider if provider else self._extract_service_name_from_url(url)
+                if name is None:
+                    continue
                 deps.append(
                     self._make_dependency(
-                        name=provider.provider if provider else self._extract_service_name_from_url(url),
+                        name=name,
                         dep_type=provider.category if provider else "external_service",
                         detected_from=rel_path,
                         context=url,
@@ -523,9 +573,12 @@ class DependencyDetector:
             rel_path = str(values_file.relative_to(self.repo_path))
             for url in self._find_external_urls(data):
                 provider = match_provider_from_url(url)
+                name = provider.provider if provider else self._extract_service_name_from_url(url)
+                if name is None:
+                    continue
                 deps.append(
                     self._make_dependency(
-                        name=provider.provider if provider else self._extract_service_name_from_url(url),
+                        name=name,
                         dep_type=provider.category if provider else "external_service",
                         detected_from=rel_path,
                         context=url,
@@ -570,9 +623,12 @@ class DependencyDetector:
 
                 for url in re.findall(GENERIC_URL_PATTERN, env_value):
                     url_provider = match_provider_from_url(url)
+                    name = url_provider.provider if url_provider else self._extract_service_name_from_url(url)
+                    if name is None:
+                        continue
                     deps.append(
                         self._make_dependency(
-                            name=url_provider.provider if url_provider else self._extract_service_name_from_url(url),
+                            name=name,
                             dep_type=url_provider.category if url_provider else "external_service",
                             detected_from=env_file.name,
                             context=f"{env_key}={url}",
@@ -610,9 +666,12 @@ class DependencyDetector:
                     )
                 for url in re.findall(GENERIC_URL_PATTERN, value):
                     provider = match_provider_from_url(url)
+                    name = provider.provider if provider else self._extract_service_name_from_url(url)
+                    if name is None:
+                        continue
                     deps.append(
                         self._make_dependency(
-                            name=provider.provider if provider else self._extract_service_name_from_url(url),
+                            name=name,
                             dep_type=provider.category if provider else "external_service",
                             detected_from=rel_path,
                             context=f"{key_path}={url}",
@@ -1140,8 +1199,8 @@ class DependencyDetector:
                 urls.extend(self._find_external_urls(item, path))
         return urls
 
-    def _extract_service_name_from_url(self, url: str) -> str:
-        """Extract a display name from a URL."""
+    def _extract_service_name_from_url(self, url: str) -> str | None:
+        """Extract a display name from a URL, or None if blocklisted/self-referencing."""
         try:
             parsed = urlparse(url)
         except ValueError:
@@ -1149,7 +1208,12 @@ class DependencyDetector:
         host = parsed.hostname or parsed.netloc or parsed.path
         if not host:
             return "External Service"
-        host = host.rstrip('.)')
+        host = host.rstrip('.)').lower()
+        if host in NON_SERVICE_HOSTS:
+            return None
+        repo_domain = self._get_repo_domain()
+        if repo_domain and (host == repo_domain or host.endswith(f".{repo_domain}")):
+            return None
         parts = host.split(".")
         if len(parts) >= 2:
             return parts[-2].replace("-", " ").replace("_", " ").title()
