@@ -107,6 +107,7 @@ class DependencyDetector:
     def __init__(self, repo_path: Path, llm_manager=None, enable_classification: bool = True):
         """Initialize dependency detector."""
         self.repo_path = Path(repo_path).resolve()
+        self.llm_manager = llm_manager
         self.classifier = DependencyClassifier(llm_manager) if enable_classification else None
         self.last_review_items: list[dict[str, Any]] = []
 
