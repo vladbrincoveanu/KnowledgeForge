@@ -28,6 +28,8 @@ from app.domain.constants.technologies import LANGUAGE_EXTENSIONS, FRAMEWORK_IND
 
 logger = logging.getLogger(__name__)
 
+STEP_HEADING_PATTERN = re.compile(r'^(?:Step|Chapter|Section|Part)\s+\d+', re.IGNORECASE)
+
 
 class SystemDetector:
     """Detects system-level information for C4 Context."""
@@ -474,6 +476,8 @@ Your answer:"""
                     # Prefer headings for roles/personas
                     if line.strip().startswith('#'):
                         heading_text = line.strip()
+                        if STEP_HEADING_PATTERN.match(heading_text):
+                            continue
                         for key, (label, desc) in role_keywords.items():
                             if key in line_lower:
                                 remember_actor(
