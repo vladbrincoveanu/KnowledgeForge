@@ -1209,7 +1209,7 @@ class DependencyDetector:
         if not host:
             return "External Service"
         host = host.rstrip('.)').lower()
-        if host in NON_SERVICE_HOSTS:
+        if any(blocked in host for blocked in NON_SERVICE_HOSTS):
             return None
         repo_domain = self._get_repo_domain()
         if repo_domain and (host == repo_domain or host.endswith(f".{repo_domain}")):
