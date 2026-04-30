@@ -512,11 +512,11 @@ class ContainerManager:
                 if key not in seen:
                     seen.add(key)
                     result.append({
-                        "from": container_name,
-                        "to": dep_name,
+                        "source": container_name,
+                        "destination": dep_name,
                         "type": "uses",
                         "protocol": container.get("protocol", "HTTP"),
-                        "source": "internal-dependencies",
+                        "detection_source": "internal-dependencies",
                     })
 
         return result

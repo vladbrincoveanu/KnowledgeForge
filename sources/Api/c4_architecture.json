@@ -8980,29 +8980,29 @@
     ],
     "containers": [
       {
-        "from": "openapi2jsonschema",
-        "to": "docker",
+        "source": "openapi2jsonschema",
+        "destination": "docker",
         "type": "uses",
         "protocol": "HTTP",
-        "source": "internal-dependencies",
+        "detection_source": "internal-dependencies",
         "description": "openapi2jsonschema uses docker over HTTP.",
         "llm_description": "openapi2jsonschema uses docker over HTTP."
       },
       {
-        "from": "base-normalization",
-        "to": "docker",
+        "source": "base-normalization",
+        "destination": "docker",
         "type": "uses",
         "protocol": "HTTP",
-        "source": "internal-dependencies",
+        "detection_source": "internal-dependencies",
         "description": "base-normalization uses docker over HTTP.",
         "llm_description": "base-normalization uses docker over HTTP."
       },
       {
-        "from": "docusaurus",
-        "to": "generator",
+        "source": "docusaurus",
+        "destination": "generator",
         "type": "uses",
         "protocol": "HTTP",
-        "source": "internal-dependencies",
+        "detection_source": "internal-dependencies",
         "description": "docusaurus uses generator over HTTP.",
         "llm_description": "docusaurus uses generator over HTTP."
       }
