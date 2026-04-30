@@ -1,0 +1,39 @@
+{
+  "task_id": "extract_1777565943",
+  "repository_url": "/tmp/code_arch_51b2dea7-856a-4e2e-a320-efb3a9a7095f_gxumnwwv/datasette",
+  "timestamp": "2026-04-30T16:19:03.672868",
+  "total_duration_ms": 86.06815338134766,
+  "phases": [
+    {
+      "name": "L2_Containers",
+      "duration_ms": 24.27983283996582,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "L1_Context",
+      "duration_ms": 61.339378356933594,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "Container_Relationships",
+      "duration_ms": 0.016450881958007812,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "L3_Components",
+      "duration_ms": 0.41937828063964844,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "LLM_Enrichment",
+      "duration_ms": 0.013113021850585938,
+      "success": true,
+      "error": null
+    }
+  ],
+  "sub_phases": {}
+}
