@@ -915,7 +915,9 @@ export default function NodeDetailsPanel({
           >
             <span className="detail-value">
               {[
-                ...(systemAttributes?.languages || []),
+                ...(systemAttributes?.languages || []).map((l: any) =>
+                  typeof l === "string" ? l : l?.language || l?.name || "",
+                ),
                 ...(systemAttributes?.frameworks || []).map((f: any) =>
                   typeof f === "string" ? f : f?.name || "",
                 ),
