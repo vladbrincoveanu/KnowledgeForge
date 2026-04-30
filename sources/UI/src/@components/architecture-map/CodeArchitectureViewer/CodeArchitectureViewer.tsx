@@ -132,7 +132,7 @@ const getLayoutedElements = (
   // Layout child nodes within their parent containers
   if (containerNodes.length > 0) {
     // Position containers with MUCH more spacing
-    const containerSpacing = 180;
+    const containerSpacing = 80;
     let currentX = 200;
 
     const childNodeWidth = 240;
@@ -178,8 +178,8 @@ const getLayoutedElements = (
 
         container.style = {
           ...container.style,
-          width: Math.max(800, contentWidth),
-          height: Math.max(520, contentHeight),
+          width: Math.max(400, contentWidth),
+          height: Math.max(280, contentHeight),
         };
       }
 
@@ -229,47 +229,29 @@ const getLayoutedElements = (
   const hasRelationships = edges.length > 0;
 
   if (!hasRelationships && nodes.length > 0) {
-    // Grid layout for independent components
-    const methodGroups = new Map<string, Node[]>();
-    nodes.forEach((node) => {
-      const method =
-        node.data.type === "component"
-          ? node.data.fullName?.split(" ")[0] || "OTHER"
-          : "OTHER";
+    const nodeW = 240;
+    const nodeH = 130;
+    const gapX = 60;
+    const gapY = 60;
+    const cols = Math.min(6, Math.ceil(Math.sqrt(nodes.length)));
+    const rows = Math.ceil(nodes.length / cols);
+    const viewportW = typeof window !== "undefined" ? window.innerWidth : 1400;
+    const startX = Math.max(40, (viewportW - cols * (nodeW + gapX)) / 2);
+    const startY = 60;
 
-      if (!methodGroups.has(method)) {
-        methodGroups.set(method, []);
-      }
-      methodGroups.get(method)!.push(node);
-    });
-
-    // Layout in columns by method
-    const methodOrder = ["GET", "POST", "PUT", "PATCH", "DELETE", "OTHER"];
-    let columnX = 100;
-    const columnWidth = 280;
-    const rowHeight = 150;
-
-    const layoutedNodes = nodes.map((node) => {
-      const method =
-        node.data.type === "component"
-          ? node.data.fullName?.split(" ")[0] || "OTHER"
-          : "OTHER";
-
-      const methodIndex = methodOrder.indexOf(method);
-      const groupNodes = methodGroups.get(method) || [];
-      const nodeIndex = groupNodes.indexOf(node);
-
+    const layoutedNodes = nodes.map((node, idx) => {
+      const row = Math.floor(idx / cols);
+      const col = idx % cols;
       return {
         ...node,
         position: {
-          x: columnX + methodIndex * columnWidth,
-          y: 100 + nodeIndex * rowHeight,
+          x: startX + col * (nodeW + gapX),
+          y: startY + row * (nodeH + gapY),
         },
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
       };
     });
-
     return { nodes: layoutedNodes, edges };
   }
 
@@ -279,15 +261,14 @@ const getLayoutedElements = (
     const dagreGraph = new dagre.graphlib.Graph();
     dagreGraph.setDefaultEdgeLabel(() => ({}));
 
-    // Enhanced dagre config - MUCH larger spacing to prevent overlapping
     dagreGraph.setGraph({
       rankdir: direction,
       align: "UL",
-      ranksep: 240, // More room for context labels and edge curves
-      nodesep: 155, // Keep neighboring nodes from pinching labels
-      edgesep: 70, // Give parallel edges enough breathing room
-      marginx: 150, // Larger margins
-      marginy: 150, // Larger margins
+      ranksep: 160,
+      nodesep: 100,
+      edgesep: 50,
+      marginx: 80,
+      marginy: 80,
       ranker: "network-simplex",
     });
 
@@ -2037,10 +2018,10 @@ const CodeArchitectureViewerInner: React.FC = () => {
           setTimeout(() => {
             try {
               fitView({
-                padding: 0.2,
+                padding: 0.1,
                 includeHiddenNodes: false,
                 duration: attempt === 1 ? 600 : 400,
-                maxZoom: 1.5,
+                maxZoom: 2.0,
                 minZoom: 0.5,
               });
             } catch (e) {
