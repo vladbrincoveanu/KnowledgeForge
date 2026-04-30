@@ -290,6 +290,22 @@ def test_extract_service_name_from_url_strips_trailing_junk(temp_repo, url, expe
     assert result == expected, f"URL {url!r} → {result!r}, expected {expected!r}"
 
 
+@pytest.mark.parametrize("url", [
+    "https://shields.io/badge/version-1.0-green",
+    "https://website-files.com/image.png",
+    "https://docusaurus.com/docs",
+    "https://youtube.com/watch?v=abc",
+    "https://github.com/user/repo",
+    "https://readme.io/",
+])
+def test_extract_service_name_blocks_non_service_hosts(temp_repo, url):
+    """Non-service hostnames return None to filter garbage dependencies."""
+    from app.services.c4.context.dependency_detector import DependencyDetector
+    detector = DependencyDetector(repo_path=temp_repo)
+    result = detector._extract_service_name_from_url(url)
+    assert result is None, f"URL {url!r} → {result!r}, expected None"
+
+
 class TestDependencyDetectorClassification:
     """Test dependency type classification."""
 

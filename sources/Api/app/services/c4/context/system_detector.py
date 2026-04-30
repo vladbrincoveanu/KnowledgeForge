@@ -340,9 +340,8 @@ Your answer:"""
                     for dep in deps:
                         name = dep.split("/")[0].split(" ")[0].lower()
                         dep_names.add(name)
-                    dep_text = " ".join(dep_names)
                     for indicator, (lang, fw) in FRAMEWORK_INDICATORS.items():
-                        if indicator in dep_text:
+                        if indicator in dep_names:
                             add_framework(lang, fw, rel_path)
                 else:
                     content = manifest.read_text(encoding="utf-8", errors="ignore").lower()
@@ -498,7 +497,8 @@ Your answer:"""
 
                     # Prefer headings for roles/personas
                     if line.strip().startswith('#'):
-                        heading_text = line.strip()
+                        raw_heading = line.strip()
+                        heading_text = raw_heading.lstrip('#').strip()
                         if STEP_HEADING_PATTERN.match(heading_text):
                             continue
                         for key, (label, desc) in role_keywords.items():
@@ -508,7 +508,7 @@ Your answer:"""
                                     clean_actor_description(supporting_line, desc),
                                     detected_from=rel_path,
                                     detection_method="documentation_heading",
-                                    evidence=heading_text,
+                                    evidence=raw_heading,
                                 )
                     # Catch inline mentions of CLI or SDK usage
                     if 'cli' in line_lower:
