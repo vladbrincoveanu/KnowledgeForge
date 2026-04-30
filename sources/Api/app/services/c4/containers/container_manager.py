@@ -516,7 +516,7 @@ class ContainerManager:
                         "to": dep_name,
                         "type": "uses",
                         "protocol": container.get("protocol", "HTTP"),
-                        "source": "runtime",
+                        "source": "internal-dependencies",
                     })
 
         return result
