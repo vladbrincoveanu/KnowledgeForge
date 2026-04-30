@@ -229,15 +229,15 @@ const getLayoutedElements = (
   const hasRelationships = edges.length > 0;
 
   if (!hasRelationships && nodes.length > 0) {
-    const nodeW = 240;
-    const nodeH = 130;
-    const gapX = 60;
-    const gapY = 60;
+    const nodeW = 200;
+    const nodeH = 100;
+    const gapX = 40;
+    const gapY = 40;
     const cols = Math.min(6, Math.ceil(Math.sqrt(nodes.length)));
     const rows = Math.ceil(nodes.length / cols);
     const viewportW = typeof window !== "undefined" ? window.innerWidth : 1400;
     const startX = Math.max(40, (viewportW - cols * (nodeW + gapX)) / 2);
-    const startY = 60;
+    const startY = 40;
 
     const layoutedNodes = nodes.map((node, idx) => {
       const row = Math.floor(idx / cols);
@@ -361,7 +361,7 @@ function layoutContextLevel(nodes: Node[]): Node[] {
   const nodeWidth = 260;
   const nodeHeight = 140;
   const personsX = 80; // Far left
-  const externalsX = cx + 400; // Far right
+  const externalsX = cx + 150; // Closer to center
   const systemX = cx - nodeWidth / 2; // Center
   const systemY = cy - nodeHeight / 2;
 
