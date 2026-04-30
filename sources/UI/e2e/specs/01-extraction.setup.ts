@@ -53,7 +53,7 @@ setup('extract Airbyte demo fixture', async ({ request }) => {
   }));
 
   const resultResponse = await fetch(`http://localhost:8000/api/v1/code/scan/${body.task_id}/results`);
-  expect(resultResponse.ok()).toBeTruthy();
+  expect(resultResponse.ok).toBeTruthy();
   const resultData = await resultResponse.json();
   fs.writeFileSync(RESULT_FILE, JSON.stringify(resultData, null, 2));
   console.log(`Saved extraction result: ${resultData.statistics?.total_containers || 0} containers, ${resultData.statistics?.total_components || 0} components`);
