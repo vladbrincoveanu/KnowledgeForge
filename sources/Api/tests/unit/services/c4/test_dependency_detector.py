@@ -292,6 +292,7 @@ def test_extract_service_name_from_url_strips_trailing_junk(temp_repo, url, expe
 
 @pytest.mark.parametrize("url", [
     "https://shields.io/badge/version-1.0-green",
+    "https://img.shields.io/pypi/v/datasette.svg",
     "https://website-files.com/image.png",
     "https://docusaurus.com/docs",
     "https://youtube.com/watch?v=abc",
