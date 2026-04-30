@@ -85,6 +85,21 @@ def test_extract_service_name_from_url_strips_trailing_junk(url, expected):
     assert result == expected
 ```
 
+### Additional Fix: Broader regex exclusion
+
+The spec proposes adding only `)` to the exclusion set. A broader set prevents more Markdown-delimiter characters from entering the pipeline upstream:
+
+```python
+# Before
+GENERIC_URL_PATTERN = r"[A-Za-z][A-Za-z0-9+.-]*://[^\s\"']+"
+# After — also exclude ] ; , } { > which commonly follow URLs in Markdown/code
+GENERIC_URL_PATTERN = r"[A-Za-z][A-Za-z0-9+.-]*://[^\s\"')\];,}<>]+"
+```
+    detector = DependencyDetector(...)
+    result = detector._extract_service_name_from_url(url)
+    assert result == expected
+```
+
 ---
 
 ## Fix 2: Smarter Review Prompts
@@ -98,8 +113,25 @@ def test_extract_service_name_from_url_strips_trailing_junk(url, expected):
 - **File:** `sources/Api/app/services/c4/context/dependency_detector.py`
 - **Responsibility:** Generate 2-3 context-specific prompt starters for ambiguous dependency classification
 - **Interface:** Input: `context_name`, `dep_type`, `dep` dict. Output: `list[str]`
-- **Dependencies:** `LLMManager` (existing), dep evidence from caller
-- **Size target:** ~40 lines
+- **Dependencies:** `LLMManager` (stored as `self.llm_manager` on the detector), dep evidence from caller
+- **Size target:** ~50 lines
+
+### Pre-requisite: Store `llm_manager` in `DependencyDetector`
+
+**Change 0 — Line 111:** Add `self.llm_manager = llm_manager` to `__init__`:
+
+```python
+# Before
+def __init__(self, repo_path: Path, llm_manager=None, enable_classification: bool = True):
+    self.repo_path = Path(repo_path).resolve()
+    self.classifier = DependencyClassifier(llm_manager) if enable_classification else None
+
+# After
+def __init__(self, repo_path: Path, llm_manager=None, enable_classification: bool = True):
+    self.repo_path = Path(repo_path).resolve()
+    self.llm_manager = llm_manager          # NEW: store for use in _build_review_prompts
+    self.classifier = DependencyClassifier(llm_manager) if enable_classification else None
+```
 
 ### Changes
 
@@ -119,24 +151,30 @@ def _build_review_prompts(self, context_name: str, dep_type: str, dep: dict) -> 
     """Generate context-specific prompt starters for ambiguous dependencies."""
     evidence = dep.get("context") or dep.get("url") or dep.get("name") or "unknown source"
     confidence = dep.get("classification_confidence", 0.5)
+    review_threshold = dep.get("review_threshold", 0.7)
     prompt = (
         f"A C4 architecture dependency was detected:\n"
         f"- Name: {context_name}\n"
         f"- Type: {dep_type}\n"
         f"- Evidence: {evidence}\n"
-        f"- Classification confidence: {confidence:.0%} (below 70% threshold)\n\n"
+        f"- Classification confidence: {confidence:.0%} (below {review_threshold:.0%} threshold)\n\n"
         f"Generate exactly 2 short prompt starters (≤25 words each) to help a human decide:\n"
         f"1. Whether this belongs at Context level (external business actor/SaaS) or Container level (technical infra)\n"
         f"2. What specific architectural role this dependency likely plays\n"
         f"Return ONLY a JSON array of strings, no markdown: [\"prompt1\", \"prompt2\"]"
     )
     try:
-        llm = get_llm_manager()
-        if llm:
-            response = llm.generate_text(prompt, max_tokens=200, temperature=0.3)
-            parsed = json.loads(response.strip())
-            if isinstance(parsed, list) and len(parsed) >= 2:
-                return parsed[:2]
+        if self.llm_manager:
+            response = self.llm_manager.generate_text(prompt, max_tokens=200, temperature=0.3)
+            # Strip markdown fences and extract first JSON array found
+            text = response.strip().strip("```json").strip("```").strip()
+            # Find first [ ... ] JSON array in response
+            import re
+            match = re.search(r'\[[\s\S]*\]', text)
+            if match:
+                parsed = json.loads(match.group())
+                if isinstance(parsed, list) and len(parsed) >= 2:
+                    return parsed[:2]
     except Exception:
         pass
     # Fallback: static prompt using actual evidence
@@ -152,26 +190,38 @@ def _build_review_prompts(self, context_name: str, dep_type: str, dep: dict) -> 
 
 ```python
 def test_build_review_prompts_uses_actual_evidence(mocker):
-    detector = DependencyDetector(...)
+    detector = DependencyDetector(..., llm_manager=None)  # No LLM → fallback
     dep = {
         "name": "api.airbyte.com",
         "context": "docs/terraform-documentation.md",
         "type": "external_service",
         "classification_confidence": 0.6,
+        "review_threshold": 0.7,
     }
-    # With mock LLM unavailable → fallback
-    mocker.patch.object(detector, "_get_llm", return_value=None)
     prompts = detector._build_review_prompts("api.airbyte.com", "external_service", dep)
     assert "payment-platform" not in prompts[0]  # No generic template
     assert "docs/terraform-documentation.md" in prompts[1]  # Uses actual evidence
+    assert "0.7" in prompts[0] or "70%" in prompts[0]       # Uses actual threshold
 
 def test_build_review_prompts_llm_success(mocker):
-    detector = DependencyDetector(...)
     mock_llm = mocker.MagicMock()
     mock_llm.generate_text.return_value = '["Is api.airbyte.com a SaaS API or internal infra?", "What services does it provide to the codebase?"]'
-    mocker.patch.object(detector, "_get_llm", return_value=mock_llm)
+    detector = DependencyDetector(..., llm_manager=mock_llm)
+    dep = {"name": "api.airbyte.com", "context": "...", "type": "external_service",
+           "classification_confidence": 0.6, "review_threshold": 0.7}
     prompts = detector._build_review_prompts("api.airbyte.com", "external_service", dep)
     assert len(prompts) == 2
+
+def test_build_review_prompts_handles_markdown_fence(mocker):
+    """LLM sometimes returns ```json ... ``` — must extract array correctly."""
+    mock_llm = mocker.MagicMock()
+    mock_llm.generate_text.return_value = '```json\n["Prompt one?", "Prompt two?"]\n```'
+    detector = DependencyDetector(..., llm_manager=mock_llm)
+    dep = {"name": "x", "context": "...", "type": "service",
+           "classification_confidence": 0.6, "review_threshold": 0.7}
+    prompts = detector._build_review_prompts("x", "service", dep)
+    assert len(prompts) == 2
+    assert prompts[0] == "Prompt one?"
 ```
 
 ---
@@ -190,7 +240,7 @@ Pipeline B was designed for OmniPay's `omnipay-` prefixed container names and ha
 
 **Decision:** Kill Pipeline B entirely. Fix Pipeline A to correctly populate `container_level` from the extraction pipeline, and fix the UI to render containers properly from Pipeline A's entity data.
 
----
+> **Hard dependency:** Fix 3A (relationship extraction) must complete and produce valid edges before Fix 3B (kill Pipeline B) can be validated. Without valid edges, the graph renders as a disconnected grid regardless of which pipeline remains. See Phase 2 in Migration Plan.
 
 ### Sub-module 3A: Fix Relationship Extraction (Backend)
 
@@ -245,7 +295,7 @@ Pipeline B was designed for OmniPay's `omnipay-` prefixed container names and ha
    ```
    Replace with: `const ghostNodes = []; const dependencyEdges = [];`
 
-3. **Remove `contextExternalEntities` building** (lines 2132-2138) — no longer needed since ghost nodes are gone.
+3. **Remove `contextExternalEntities` building** (lines 2132-2138) — no longer needed since ghost nodes are gone. **Verification required:** Confirm that Pipeline A's `container_level.entities` already includes external system nodes from `system_context.external_dependencies` via the `entity_type: "external_system"` path. If not, the external dependency nodes will disappear from the context-level view and 3A must be updated to include them in Pipeline A.
 
 4. **Remove `ghostNodeIds` and `ghostNodes` from merged nodes** (line 2152):
    ```typescript
@@ -295,8 +345,9 @@ if (!hasRelationships && nodes.length > 0) {
   const gapY = 60;
   const cols = Math.min(6, Math.ceil(Math.sqrt(nodes.length)));
   const rows = Math.ceil(nodes.length / cols);
-  const canvasW = 1400; // approximate viewport width
-  const startX = Math.max(40, (canvasW - cols * (nodeW + gapX)) / 2);
+  // Use ReactFlow viewport width if available; fallback to reasonable desktop width
+  const viewportW = typeof window !== 'undefined' ? window.innerWidth : 1400;
+  const startX = Math.max(40, (viewportW - cols * (nodeW + gapX)) / 2);
   const startY = 60;
 
   nodes.forEach((node, idx) => {
@@ -315,6 +366,8 @@ if (!hasRelationships && nodes.length > 0) {
   return { nodes: layoutedNodes, edges };
 }
 ```
+
+> **Note:** The dagre spacing reduction (ranksep 160, nodesep 100) may cause node label overlap for very dense connected graphs (15+ nodes). If Playwright visual inspection shows overlap, revert ranksep to 200 and nodesep to 130 as a middle ground. The disconnected grid path is unaffected.
 
 #### Change 3: Container frame sizing (no minimum)
 
@@ -354,36 +407,44 @@ fitView({
 | Fix | Test Type | Test Location |
 |-----|-----------|--------------|
 | 1 — `Com)` URL fix | Unit (parametrized, 3 cases) | `test_dependency_detector.py` |
-| 2 — Review prompts | Unit (mock LLM + fallback) | `test_dependency_detector.py` |
+| 2 — Review prompts | Unit (mock LLM + fallback + markdown fence) | `test_dependency_detector.py` |
 | 3A — Relationship extraction | Integration (regenerate JSON, verify edges) | `test_airbyte_extraction.py` |
 | 3B — Kill Pipeline B | Existing Playwright E2E (01, 02, 03, 04, 05) must pass | `sources/UI/e2e/specs/` |
 | 3C — Smarter layout | Visual inspection + Playwright screenshot | `02-architecture-graph.spec.ts` |
+
+> **Note on OmniPay compatibility:** `06-omnipay-smoke.spec.ts` extracts OmniPay and verifies the graph. After killing Pipeline B, verify this test still passes — the OmniPay scan result must display correctly via Pipeline A. If it fails, the test needs updating to match Pipeline A's entity ID format.
 
 ---
 
 ## Migration Plan
 
+> **Hard dependency:** Phase 3 (3B — kill Pipeline B) **cannot be validated** until Phase 2 (3A — relationship extraction) is complete. Without valid edges in the JSON, the graph renders as a disconnected grid regardless of layout algorithm. Do not proceed to Phase 3 if Phase 2 produces zero edges.
+
 ### Phase 1: Backend fixes (no UI impact)
-1. Fix 1 — `Com)` URL parsing
-2. Fix 2 — LLM review prompts
-3. Run unit tests
+1. Fix 1 — `Com)` URL parsing (regex + `rstrip`)
+2. Fix 2 — LLM review prompts (store `llm_manager` + LLM call + JSON extraction + dynamic threshold)
+3. Run unit tests: `cd sources/Api && python3 -m pytest tests/unit/services/c4/test_dependency_detector.py -v`
 4. Commit: `fix(api): Com) entity name + smarter review prompts`
 
 ### Phase 2: Relationship data fix
-5. Fix 3A — Investigate and fix relationship extraction pipeline
-6. Regenerate `c4_architecture.json` via `make generate-demo`
-7. Verify `relationships.containers[].source` and `.destination` are valid container names
-8. Commit: `fix(api): correct container relationship source/destination fields`
+5. **Investigate** — Trace where `source: "runtime"` and `destination: None` are produced in the relationship builder (likely `context_manager.py` or `dependency_detector.py`)
+6. Fix 3A — Repair the relationship extraction so `from`/`to` map to actual container names
+7. Regenerate `c4_architecture.json`: `DEMO_REPO_PATH=/app/sources/demo/airbyte LLM_PROVIDER=none make generate-demo` (sets env var before calling the Docker exec command inside `make generate-demo`)
+8. Verify: `relationships.containers[].source` and `.destination` are valid non-None strings matching `containers[]` names
+9. Commit: `fix(api): correct container relationship source/destination fields`
 
 ### Phase 3: UI Pipeline B removal
-9. Fix 3B — Remove `generateC4Edges` and all Pipeline B code
-10. Verify Playwright E2E passes: `npm run test:e2e`
-11. Commit: `refactor(ui): remove legacy OmniPay pipeline B from graph rendering`
+> **Prerequisite:** Phase 2 must produce valid edges. If `relationships.containers` is still empty/None after Phase 2, revert 3B changes and re-examine 3A.
+10. Fix 3B — Remove `generateC4Edges` and all Pipeline B code
+11. **Verify context externals** (see Issue 7 above) — confirm Pipeline A populates external dependency nodes for context-level view
+12. Verify Playwright E2E passes: `npm run test:e2e` (including `06-omnipay-smoke.spec.ts`)
+13. Commit: `refactor(ui): remove legacy OmniPay pipeline B from graph rendering`
 
 ### Phase 4: Layout improvements
-12. Fix 3C — Apply dagre spacing, centered grid, tighter containers
-13. Visual verification at `http://localhost:3000/code-architecture` (container level)
-14. Commit: `feat(ui): denser container-level graph layout`
+14. Fix 3C — Apply dagre spacing, centered grid, tighter containers
+15. Visual verification at `http://localhost:3000/code-architecture` (container level)
+16. If dagre overlap observed, revert ranksep to 200, nodesep to 130
+17. Commit: `feat(ui): denser container-level graph layout`
 
 ---
 
