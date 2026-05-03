@@ -1205,3 +1205,21 @@ async def chat_with_architecture_context(request: ArchitectureChatRequest):
         "message": _build_architecture_chat_fallback(request),
         "source": "heuristic",
     }
+
+
+@router.post(
+    "/debug/neo4j/query",
+    summary="Debug endpoint: query Neo4j directly",
+    description="Only for testing. Allows direct Neo4j Cypher queries.",
+    responses={
+        200: {"description": "Neo4j query results"},
+        500: {"description": "Neo4j query failed"},
+    },
+)
+def debug_neo4j_query(body: dict):
+    """Debug endpoint: query Neo4j directly. Only for testing."""
+    from app.infrastructure.graph.neo4j_client import Neo4jClient
+    client = Neo4jClient.from_config()
+    result = client.query(body["cypher"], body.get("params", {}))
+    client.close()
+    return result
