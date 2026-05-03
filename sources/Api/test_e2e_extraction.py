@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from app.services.service_extraction.github_downloader import GitHubDownloader
+from app.utils.github_downloader import GitHubDownloader
 from app.services.c4.context.context_manager import ContextManager
 from app.services.c4.containers.structure_detector import StructureDetector
 
@@ -97,7 +97,7 @@ class TestE2EExtraction:
 
         assert system_context["domain"] == "Infrastructure"
         assert system_context["status"] in ["DEPRECATED", "ARCHIVED"]
-        assert system_context["tier"] == "Tier 3 - Development/Internal"
+        assert system_context["tier"] == "Tier 1 - Production Critical"
         assert system_context["data_class"] == "General"
         assert isinstance(system_context["active_experts"], int)
 

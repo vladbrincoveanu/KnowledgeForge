@@ -12,6 +12,8 @@ import json
 import logging
 import time
 from collections import defaultdict
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
@@ -24,9 +26,50 @@ from app.infrastructure.graph.neo4j_client import Neo4jClient
 from app.domain.exceptions import GraphDatabaseError
 from app.services.code_extraction.llm_enrichment import enrich_with_llm_descriptions
 from app.services.code_extraction.component_extractor import link_components_to_containers
-from app.utils.performance_tracker import PerformanceTracker
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class TimingResult:
+    name: str
+    duration_ms: float
+    success: bool = True
+    error: Optional[str] = None
+
+
+@dataclass
+class BenchmarkResults:
+    task_id: str
+    repository_url: str
+    timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    total_duration_ms: float = 0.0
+    phases: list[TimingResult] = field(default_factory=list)
+
+    def add_phase(self, name: str, duration_ms: float, success: bool = True, error: Optional[str] = None):
+        self.phases.append(TimingResult(name=name, duration_ms=duration_ms, success=success, error=error))
+        self.total_duration_ms += duration_ms
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    def save(self, output_dir: Path):
+        output_dir.mkdir(parents=True, exist_ok=True)
+        filepath = output_dir / f"{self.task_id}_benchmark.json"
+        with open(filepath, "w") as f:
+            json.dump(self.to_dict(), f, indent=2)
+        return filepath
+
+
+class PerformanceTracker:
+    def __init__(self, task_id: str, repository_url: str, output_dir: Optional[Path] = None):
+        self.task_id = task_id
+        self.repository_url = repository_url
+        self.results = BenchmarkResults(task_id=task_id, repository_url=repository_url)
+        self.output_dir = output_dir or Path("sources/data/benchmarks")
+
+    def save(self) -> Path:
+        return self.results.save(self.output_dir)
 
 
 class C4ArchitectureExtractor:

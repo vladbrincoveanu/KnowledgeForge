@@ -18,7 +18,7 @@ GITHUB_URL = "https://github.com/venkataravuri/e-commerce-microservices-sample.g
 def run_extraction():
     """Run C4 extraction directly and return (c4_architecture, task_id)."""
     from app.services.code_extraction.c4_extractor import C4ArchitectureExtractor
-    from app.services.service_extraction.github_downloader import GitHubDownloader
+    from app.utils.github_downloader import GitHubDownloader
 
     print(f"📥 Cloning: {GITHUB_URL}")
     temp_dir = Path(tempfile.mkdtemp(prefix="c4_test_"))
