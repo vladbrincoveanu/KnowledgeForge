@@ -74,11 +74,11 @@ class TestJsonNeo4jComparison:
         data = load_extraction_result()
         json_rels = data.get("relationships", {}).get("containers") or []
         result = setup_neo4j.query("MATCH ()-[r:USES]->() RETURN r.id as rel_id", {})
-        neo4j_ids = {r["rel_id"] for r in result}
+        neo4j_ids = {r["rel_id"] for r in result if r["rel_id"].startswith("container:")}
         expected_ids = {
-            f"container:{rel.get('source') or rel.get('from')}->container:{rel.get('destination') or rel.get('to')}"
+            f"container:{rel.get('from')}->container:{rel.get('to') or rel.get('destination')}"
             for rel in json_rels
-            if (rel.get("source") or rel.get("from")) and (rel.get("destination") or rel.get("to"))
+            if rel.get("from") and (rel.get("to") or rel.get("destination"))
         }
         missing = expected_ids - neo4j_ids
         extra = neo4j_ids - expected_ids

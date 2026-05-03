@@ -107,8 +107,8 @@ class GraphWriter:
             )
 
         for rel in relationships:
-            src_name = rel.get("source") or rel.get("from")
-            dst_name = rel.get("destination") or rel.get("to")
+            src_name = rel.get("from")
+            dst_name = rel.get("to") or rel.get("destination")
             if not src_name or not dst_name:
                 continue
             src_id = container_id_by_name.get(src_name)
