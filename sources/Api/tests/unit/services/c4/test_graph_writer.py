@@ -79,7 +79,7 @@ class TestGraphWriterValidation:
             "relationships": {
                 "context": [],
                 "containers": [
-                    {"source": "containerA", "destination": "containerB", "description": "uses containerB"},
+                    {"from": "containerA", "to": "containerB", "description": "uses containerB"},
                 ],
             },
         }
