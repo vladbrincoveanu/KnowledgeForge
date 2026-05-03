@@ -8,6 +8,7 @@ from app.infrastructure.graph.neo4j_client import Neo4jClient
 
 logger = logging.getLogger(__name__)
 
+
 class GraphWriter:
     def __init__(self, neo4j_client: Neo4jClient) -> None:
         self._client = neo4j_client
@@ -27,7 +28,12 @@ class GraphWriter:
         )
         self._write_component_level(task_id, c4_data.get("components") or [])
 
-    def _write_context_level(self, task_id: str, system_context: dict[str, Any], relationships: list[dict[str, Any]]) -> None:
+    def _write_context_level(
+        self,
+        task_id: str,
+        system_context: dict[str, Any],
+        relationships: list[dict[str, Any]],
+    ) -> None:
         sys_name = system_context.get("name", "System") or "System"
         system_id = f"context:{sys_name}"
         self._upsert_node(
@@ -60,7 +66,9 @@ class GraphWriter:
                 f"{actor_id}->{system_id}",
                 actor_id,
                 system_id,
-                {"description": f"{actor.get('name', 'Unknown')} interacts with system"},
+                {
+                    "description": f"{actor.get('name', 'Unknown')} interacts with system"
+                },
             )
 
         for idx, dep in enumerate(system_context.get("external_dependencies") or []):
@@ -86,9 +94,18 @@ class GraphWriter:
                 {"description": f"System uses {dep.get('name') or 'external service'}"},
             )
 
-    def _write_container_level(self, task_id: str, containers: list[dict[str, Any]], relationships: list[dict[str, Any]]) -> None:
-        infra_names = {c.get("name") for c in containers if c.get("is_infrastructure_only")}
-        visible_containers = [c for c in containers if not c.get("is_infrastructure_only")]
+    def _write_container_level(
+        self,
+        task_id: str,
+        containers: list[dict[str, Any]],
+        relationships: list[dict[str, Any]],
+    ) -> None:
+        infra_names = {
+            c.get("name") for c in containers if c.get("is_infrastructure_only")
+        }
+        visible_containers = [
+            c for c in containers if not c.get("is_infrastructure_only")
+        ]
 
         container_id_by_name = {}
         for c in visible_containers:
@@ -114,7 +131,9 @@ class GraphWriter:
             src_id = container_id_by_name.get(src_name)
             dst_id = container_id_by_name.get(dst_name)
             if not src_id or not dst_id:
-                logger.warning(f"Skipping relationship {src_name}->{dst_name}: node not found")
+                logger.warning(
+                    f"Skipping relationship {src_name}->{dst_name}: node not found"
+                )
                 continue
             rel_id = f"{src_id}->{dst_id}"
             self._upsert_relationship(
@@ -128,7 +147,9 @@ class GraphWriter:
                 },
             )
 
-    def _write_component_level(self, task_id: str, components: list[dict[str, Any]]) -> None:
+    def _write_component_level(
+        self, task_id: str, components: list[dict[str, Any]]
+    ) -> None:
         for comp in components or []:
             comp_type = comp.get("type", "component")
             if comp_type == "component_group":
@@ -137,7 +158,9 @@ class GraphWriter:
             else:
                 self._write_component(task_id, comp, comp.get("container") or "")
 
-    def _write_component(self, task_id: str, comp: dict[str, Any], container_name: str) -> None:
+    def _write_component(
+        self, task_id: str, comp: dict[str, Any], container_name: str
+    ) -> None:
         comp_id = f"component:{comp.get('name', 'unknown')}"
         container_id = f"container:{container_name}" if container_name else None
         self._upsert_node(
@@ -166,10 +189,16 @@ class GraphWriter:
                 {},
             )
         else:
-            logger.warning(f"Skipping CONTAINS relationship for component '{comp.get('name', 'unknown')}': no container")
+            logger.warning(
+                f"Skipping CONTAINS relationship for component '{comp.get('name', 'unknown')}': no container"
+            )
 
-    def _write_evidence_nodes(self, external_system_id: str, evidence: list[dict[str, Any]], task_id: str) -> None:
-        assert isinstance(evidence, list), f"evidence must be a list, got {type(evidence)}"
+    def _write_evidence_nodes(
+        self, external_system_id: str, evidence: list[dict[str, Any]], task_id: str
+    ) -> None:
+        assert isinstance(
+            evidence, list
+        ), f"evidence must be a list, got {type(evidence)}"
         for idx, ev in enumerate(evidence):
             ev_id = f"evidence:{external_system_id}:{idx}"
             self._upsert_node(
@@ -200,7 +229,14 @@ class GraphWriter:
         props = node_data.get("properties", {})
         self._client.upsert_node(label, node_id, props)
 
-    def _upsert_relationship(self, rel_type: str, rel_id: str, from_id: str, to_id: str, properties: dict[str, Any]) -> None:
+    def _upsert_relationship(
+        self,
+        rel_type: str,
+        rel_id: str,
+        from_id: str,
+        to_id: str,
+        properties: dict[str, Any],
+    ) -> None:
         self._client.upsert_relationship(rel_type, rel_id, from_id, to_id, properties)
 
 
