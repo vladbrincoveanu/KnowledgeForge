@@ -19,6 +19,9 @@ from app.services.c4.containers import ContainerManager
 from app.services.c4.context import ContextManager
 from app.services.c4.components.component_extractor import ComponentExtractor
 from app.services.c4.components.models import ComponentObject
+from app.services.c4.graph_writer import GraphWriter
+from app.infrastructure.graph.neo4j_client import Neo4jClient
+from app.domain.exceptions import GraphDatabaseError
 from app.services.code_extraction.llm_enrichment import enrich_with_llm_descriptions
 from app.services.code_extraction.component_extractor import link_components_to_containers
 from app.utils.performance_tracker import PerformanceTracker
@@ -155,6 +158,14 @@ class C4ArchitectureExtractor:
         logger.info(f"Level 1 (Context): 1 system, {len(self.system_context.get('external_dependencies', []))} external deps")
         logger.info(f"Level 2 (Containers): {len(self.containers)} deployable units")
         logger.info(f"Level 3 (Components): {len(self.components)} public entry points")
+
+        # Write to Neo4j (extraction fails if Neo4j unavailable)
+        try:
+            graph_writer = GraphWriter(Neo4jClient.from_config())
+            graph_writer.write(task_id, c4_architecture)
+        except GraphDatabaseError as e:
+            logger.error(f"Neo4j write failed for extraction {task_id}: {e}")
+            raise
 
         return c4_architecture
 
