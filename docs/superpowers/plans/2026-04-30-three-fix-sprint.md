@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **⚠️ Post-impl note (2026-05-03):** The plan's description of "Pipeline A uses `container_level.entities`" was factually incorrect. The `container_level` key does not exist anywhere in the codebase. The actual architecture: Python extraction → JSON `containers[]` + `relationships.containers[]` → UI transforms into `container_level` structure on-the-fly. See spec `2026-04-30-three-fix-sprint-design.md` for full architectural correction.
+
 **Goal:** Fix the `Com)` garbled entity name, upgrade review prompts to use LLM with actual evidence, and replace the sparse disconnected graph layout with denser packing — including killing the legacy OmniPay-specific Pipeline B.
 
 **Architecture:** Three independent fixes. Fixes 1 and 2 are backend-only, touching `dependency_detector.py`. Fix 3 is split: 3A (backend relationship extraction investigation), 3B (UI Pipeline B removal), 3C (UI layout refactor). Fix 3B and 3C require Fix 3A to produce valid edges first.
@@ -521,7 +523,7 @@ Check the error. If it says a container name is not found, the entity ID format 
 
 - [ ] **Step 2: Inspect Pipeline A's entity IDs for OmniPay**
 
-After extracting OmniPay, the API response at `containers[]` shows the container names. The entity IDs used in Pipeline A's `container_level.entities` will be `container_${name}` (from the fallback entity creation) or the actual entity IDs if `container_level` is populated.
+After extracting OmniPay, the API response at `containers[]` shows the container names. The entity IDs in the UI's transformed `container_level` structure are `container_${name}` (built from `containers[]` in the transformation step at CodeArchitectureViewer.tsx lines 985-1061). Note: `container_level.entities` does not exist in the backend JSON — it is constructed on-the-fly by the UI.
 
 Check what `02-architecture-graph.spec.ts` and `06-omnipay-smoke.spec.ts` are looking for vs what's in the API response. Update test selectors to use dynamic container names from the API response (as `02-architecture-graph.spec.ts` already does for Airbyte).
 

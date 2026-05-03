@@ -206,27 +206,12 @@
             {
               "type": "documentation_reference",
               "source": "README.md",
-              "snippet": "https://img.shields.io/github/stars/airbytehq/airbyte?style=social&label=Star&maxAge=2592000"
-            },
-            {
-              "type": "documentation_reference",
-              "source": "README.md",
               "snippet": "https://github.com/airbytehq/airbyte/releases"
             },
             {
               "type": "documentation_reference",
               "source": "README.md",
-              "snippet": "https://img.shields.io/github/v/release/airbytehq/airbyte?color=white"
-            },
-            {
-              "type": "documentation_reference",
-              "source": "README.md",
               "snippet": "https://github.com/airbytehq/airbyte/actions/workflows/gradle.yml"
-            },
-            {
-              "type": "documentation_reference",
-              "source": "README.md",
-              "snippet": "https://img.shields.io/github/actions/workflow/status/airbytehq/airbyte/gradle.yml?branch=master"
             },
             {
               "type": "documentation_reference",
@@ -262,11 +247,6 @@
               "type": "documentation_reference",
               "source": "README.md",
               "snippet": "https://github.com/airbytehq/airbyte/graphs/contributors"
-            },
-            {
-              "type": "documentation_reference",
-              "source": "docs/readme.md",
-              "snippet": "https://img.shields.io/github/stars/airbytehq/airbyte?style=social&label=Star&maxAge=2592000"
             },
             {
               "type": "documentation_reference",
@@ -2795,27 +2775,12 @@
           {
             "type": "documentation_reference",
             "source": "README.md",
-            "snippet": "https://img.shields.io/github/stars/airbytehq/airbyte?style=social&label=Star&maxAge=2592000"
-          },
-          {
-            "type": "documentation_reference",
-            "source": "README.md",
             "snippet": "https://github.com/airbytehq/airbyte/releases"
           },
           {
             "type": "documentation_reference",
             "source": "README.md",
-            "snippet": "https://img.shields.io/github/v/release/airbytehq/airbyte?color=white"
-          },
-          {
-            "type": "documentation_reference",
-            "source": "README.md",
             "snippet": "https://github.com/airbytehq/airbyte/actions/workflows/gradle.yml"
-          },
-          {
-            "type": "documentation_reference",
-            "source": "README.md",
-            "snippet": "https://img.shields.io/github/actions/workflow/status/airbytehq/airbyte/gradle.yml?branch=master"
           },
           {
             "type": "documentation_reference",
@@ -2851,11 +2816,6 @@
             "type": "documentation_reference",
             "source": "README.md",
             "snippet": "https://github.com/airbytehq/airbyte/graphs/contributors"
-          },
-          {
-            "type": "documentation_reference",
-            "source": "docs/readme.md",
-            "snippet": "https://img.shields.io/github/stars/airbytehq/airbyte?style=social&label=Star&maxAge=2592000"
           },
           {
             "type": "documentation_reference",
@@ -5609,92 +5569,6 @@
         ]
       },
       {
-        "name": "Dtdg",
-        "type": "external_service",
-        "detected_from": "airbyte-integrations/bases/base-java/Dockerfile",
-        "context": "https://dtdg.co/latest-java-tracer",
-        "evidence_type": "deployment_reference",
-        "url": "https://dtdg.co/latest-java-tracer",
-        "context_name": "Dtdg",
-        "integration_surface": null,
-        "provider": "Dtdg",
-        "company": null,
-        "category": "external_service",
-        "dependency_type": "UNKNOWN",
-        "classification_confidence": 0.5,
-        "classification_reasoning": "Could not determine classification for 'Dtdg' with type 'external_service'",
-        "decision_mode": "deterministic",
-        "decision": {
-          "value": "Dtdg",
-          "confidence": 0.5,
-          "detection_source": "rule_based_classifier",
-          "decision_mode": "deterministic",
-          "review_status": "needs_review",
-          "evidence": [
-            {
-              "type": "deployment_reference",
-              "source": "airbyte-integrations/bases/base-java/Dockerfile",
-              "snippet": "https://dtdg.co/latest-java-tracer"
-            }
-          ],
-          "metadata": {
-            "provider": "Dtdg",
-            "company": null,
-            "category": "external_service",
-            "boundary": "UNKNOWN",
-            "catalog_match": null
-          }
-        },
-        "confidence": 0.5,
-        "detection_source": "rule_based_classifier",
-        "review_status": "needs_review",
-        "requires_human_review": true,
-        "review_threshold": 0.7,
-        "evidence": [
-          {
-            "type": "deployment_reference",
-            "source": "airbyte-integrations/bases/base-java/Dockerfile",
-            "snippet": "https://dtdg.co/latest-java-tracer"
-          }
-        ],
-        "review_item": {
-          "field": "external_dependencies",
-          "candidate_value": "Dtdg",
-          "confidence": 0.5,
-          "reason": "Could not determine classification for 'Dtdg' with type 'external_service'",
-          "repo_path": "/app/sources/demo/airbyte",
-          "evidence": [
-            {
-              "type": "deployment_reference",
-              "source": "airbyte-integrations/bases/base-java/Dockerfile",
-              "snippet": "https://dtdg.co/latest-java-tracer"
-            }
-          ],
-          "recommended_action": "human_review"
-        },
-        "review_options": [
-          {
-            "id": "context-business-system",
-            "label": "Keep At Context Level",
-            "value": "BUSINESS_SYSTEM",
-            "description": "Treat Dtdg as an external business company or SaaS that belongs in the system context."
-          },
-          {
-            "id": "container-technical-infra",
-            "label": "Move To Container Level",
-            "value": "TECHNICAL_INFRA",
-            "description": "Treat Dtdg as technical infrastructure or an implementation detail that should not stay in the context diagram."
-          }
-        ],
-        "suggested_prompts": [
-          "Is Dtdg (external_service) a business actor or technical detail given confidence 50% (threshold 70%)?",
-          "What role does Dtdg play given it was found in: https://dtdg.co/latest-java-tracer?"
-        ],
-        "detected_from_all": [
-          "airbyte-integrations/bases/base-java/Dockerfile"
-        ]
-      },
-      {
         "name": "Elastic",
         "type": "search",
         "detected_from": "airbyte-integrations/connectors/destination-elasticsearch/docker-compose.yaml",
@@ -6577,325 +6451,6 @@
         ]
       },
       {
-        "name": "Website Files",
-        "type": "external_service",
-        "detected_from": "README.md",
-        "context": "https://assets.website-files.com/605e01bc25f7e19a82e74788/624d9c4a375a55100be6b257_Airbyte_logo_color_dark.svg",
-        "evidence_type": "documentation_reference",
-        "url": "https://assets.website-files.com/605e01bc25f7e19a82e74788/624d9c4a375a55100be6b257_Airbyte_logo_color_dark.svg",
-        "context_name": "Website Files",
-        "integration_surface": null,
-        "provider": "Website Files",
-        "company": null,
-        "category": "external_service",
-        "dependency_type": "UNKNOWN",
-        "classification_confidence": 0.5,
-        "classification_reasoning": "Could not determine classification for 'Website Files' with type 'external_service'",
-        "decision_mode": "deterministic",
-        "decision": {
-          "value": "Website Files",
-          "confidence": 0.5,
-          "detection_source": "rule_based_classifier",
-          "decision_mode": "deterministic",
-          "review_status": "needs_review",
-          "evidence": [
-            {
-              "type": "documentation_reference",
-              "source": "README.md",
-              "snippet": "https://assets.website-files.com/605e01bc25f7e19a82e74788/624d9c4a375a55100be6b257_Airbyte_logo_color_dark.svg"
-            }
-          ],
-          "metadata": {
-            "provider": "Website Files",
-            "company": null,
-            "category": "external_service",
-            "boundary": "UNKNOWN",
-            "catalog_match": null
-          }
-        },
-        "confidence": 0.5,
-        "detection_source": "rule_based_classifier",
-        "review_status": "needs_review",
-        "requires_human_review": true,
-        "review_threshold": 0.7,
-        "evidence": [
-          {
-            "type": "documentation_reference",
-            "source": "README.md",
-            "snippet": "https://assets.website-files.com/605e01bc25f7e19a82e74788/624d9c4a375a55100be6b257_Airbyte_logo_color_dark.svg"
-          }
-        ],
-        "review_item": {
-          "field": "external_dependencies",
-          "candidate_value": "Website Files",
-          "confidence": 0.5,
-          "reason": "Could not determine classification for 'Website Files' with type 'external_service'",
-          "repo_path": "/app/sources/demo/airbyte",
-          "evidence": [
-            {
-              "type": "documentation_reference",
-              "source": "README.md",
-              "snippet": "https://assets.website-files.com/605e01bc25f7e19a82e74788/624d9c4a375a55100be6b257_Airbyte_logo_color_dark.svg"
-            }
-          ],
-          "recommended_action": "human_review"
-        },
-        "review_options": [
-          {
-            "id": "context-business-system",
-            "label": "Keep At Context Level",
-            "value": "BUSINESS_SYSTEM",
-            "description": "Treat Website Files as an external business company or SaaS that belongs in the system context."
-          },
-          {
-            "id": "container-technical-infra",
-            "label": "Move To Container Level",
-            "value": "TECHNICAL_INFRA",
-            "description": "Treat Website Files as technical infrastructure or an implementation detail that should not stay in the context diagram."
-          }
-        ],
-        "suggested_prompts": [
-          "Is Website Files (external_service) a business actor or technical detail given confidence 50% (threshold 70%)?",
-          "What role does Website Files play given it was found in: https://assets.website-files.com/605e01bc25f7e19a82e74788/624d9c4a375a55100be6b2?"
-        ],
-        "detected_from_all": [
-          "README.md"
-        ]
-      },
-      {
-        "name": "Shields",
-        "type": "external_service",
-        "detected_from": "README.md",
-        "context": "https://img.shields.io/badge/slack-join-white.svg?logo=slack",
-        "evidence_type": "documentation_reference",
-        "url": "https://img.shields.io/badge/slack-join-white.svg?logo=slack",
-        "context_name": "Shields",
-        "integration_surface": null,
-        "provider": "Shields",
-        "company": null,
-        "category": "external_service",
-        "dependency_type": "UNKNOWN",
-        "classification_confidence": 0.5,
-        "classification_reasoning": "Could not determine classification for 'Shields' with type 'external_service'",
-        "decision_mode": "deterministic",
-        "decision": {
-          "value": "Shields",
-          "confidence": 0.5,
-          "detection_source": "rule_based_classifier",
-          "decision_mode": "deterministic",
-          "review_status": "needs_review",
-          "evidence": [
-            {
-              "type": "documentation_reference",
-              "source": "README.md",
-              "snippet": "https://img.shields.io/badge/slack-join-white.svg?logo=slack"
-            },
-            {
-              "type": "documentation_reference",
-              "source": "README.md",
-              "snippet": "https://img.shields.io/youtube/channel/views/UCQ_JWEFzs1_INqdhIO3kmrw?style=social"
-            },
-            {
-              "type": "documentation_reference",
-              "source": "README.md",
-              "snippet": "https://img.shields.io/static/v1?label=license&message=MIT&color=white"
-            },
-            {
-              "type": "documentation_reference",
-              "source": "README.md",
-              "snippet": "https://img.shields.io/static/v1?label=license&message=ELv2&color=white"
-            },
-            {
-              "type": "documentation_reference",
-              "source": "docs/readme.md",
-              "snippet": "https://img.shields.io/static/v1?label=license&message=MIT&color=brightgreen"
-            },
-            {
-              "type": "documentation_reference",
-              "source": "docs/readme.md",
-              "snippet": "https://img.shields.io/static/v1?label=license&message=ELv2&color=brightgreen"
-            }
-          ],
-          "metadata": {
-            "provider": "Shields",
-            "company": null,
-            "category": "external_service",
-            "boundary": "UNKNOWN",
-            "catalog_match": null
-          }
-        },
-        "confidence": 0.5,
-        "detection_source": "rule_based_classifier",
-        "review_status": "needs_review",
-        "requires_human_review": true,
-        "review_threshold": 0.7,
-        "evidence": [
-          {
-            "type": "documentation_reference",
-            "source": "README.md",
-            "snippet": "https://img.shields.io/badge/slack-join-white.svg?logo=slack"
-          },
-          {
-            "type": "documentation_reference",
-            "source": "README.md",
-            "snippet": "https://img.shields.io/youtube/channel/views/UCQ_JWEFzs1_INqdhIO3kmrw?style=social"
-          },
-          {
-            "type": "documentation_reference",
-            "source": "README.md",
-            "snippet": "https://img.shields.io/static/v1?label=license&message=MIT&color=white"
-          },
-          {
-            "type": "documentation_reference",
-            "source": "README.md",
-            "snippet": "https://img.shields.io/static/v1?label=license&message=ELv2&color=white"
-          },
-          {
-            "type": "documentation_reference",
-            "source": "docs/readme.md",
-            "snippet": "https://img.shields.io/static/v1?label=license&message=MIT&color=brightgreen"
-          },
-          {
-            "type": "documentation_reference",
-            "source": "docs/readme.md",
-            "snippet": "https://img.shields.io/static/v1?label=license&message=ELv2&color=brightgreen"
-          }
-        ],
-        "review_item": {
-          "field": "external_dependencies",
-          "candidate_value": "Shields",
-          "confidence": 0.5,
-          "reason": "Could not determine classification for 'Shields' with type 'external_service'",
-          "repo_path": "/app/sources/demo/airbyte",
-          "evidence": [
-            {
-              "type": "documentation_reference",
-              "source": "docs/readme.md",
-              "snippet": "https://img.shields.io/static/v1?label=license&message=ELv2&color=brightgreen"
-            }
-          ],
-          "recommended_action": "human_review"
-        },
-        "review_options": [
-          {
-            "id": "context-business-system",
-            "label": "Keep At Context Level",
-            "value": "BUSINESS_SYSTEM",
-            "description": "Treat Shields as an external business company or SaaS that belongs in the system context."
-          },
-          {
-            "id": "container-technical-infra",
-            "label": "Move To Container Level",
-            "value": "TECHNICAL_INFRA",
-            "description": "Treat Shields as technical infrastructure or an implementation detail that should not stay in the context diagram."
-          }
-        ],
-        "suggested_prompts": [
-          "Is Shields (external_service) a business actor or technical detail given confidence 50% (threshold 70%)?",
-          "What role does Shields play given it was found in: https://img.shields.io/badge/slack-join-white.svg?logo=slack?"
-        ],
-        "detected_from_all": [
-          "README.md",
-          "docs/readme.md"
-        ]
-      },
-      {
-        "name": "Youtube",
-        "type": "external_service",
-        "detected_from": "README.md",
-        "context": "https://www.youtube.com/c/AirbyteHQ/?sub_confirmation=1",
-        "evidence_type": "documentation_reference",
-        "url": "https://www.youtube.com/c/AirbyteHQ/?sub_confirmation=1",
-        "context_name": "Youtube",
-        "integration_surface": null,
-        "provider": "Youtube",
-        "company": null,
-        "category": "external_service",
-        "dependency_type": "UNKNOWN",
-        "classification_confidence": 0.5,
-        "classification_reasoning": "Could not determine classification for 'Youtube' with type 'external_service'",
-        "decision_mode": "deterministic",
-        "decision": {
-          "value": "Youtube",
-          "confidence": 0.5,
-          "detection_source": "rule_based_classifier",
-          "decision_mode": "deterministic",
-          "review_status": "needs_review",
-          "evidence": [
-            {
-              "type": "documentation_reference",
-              "source": "README.md",
-              "snippet": "https://www.youtube.com/c/AirbyteHQ/?sub_confirmation=1"
-            },
-            {
-              "type": "documentation_reference",
-              "source": "README.md",
-              "snippet": "https://www.youtube.com/c/AirbyteHQ"
-            }
-          ],
-          "metadata": {
-            "provider": "Youtube",
-            "company": null,
-            "category": "external_service",
-            "boundary": "UNKNOWN",
-            "catalog_match": null
-          }
-        },
-        "confidence": 0.5,
-        "detection_source": "rule_based_classifier",
-        "review_status": "needs_review",
-        "requires_human_review": true,
-        "review_threshold": 0.7,
-        "evidence": [
-          {
-            "type": "documentation_reference",
-            "source": "README.md",
-            "snippet": "https://www.youtube.com/c/AirbyteHQ/?sub_confirmation=1"
-          },
-          {
-            "type": "documentation_reference",
-            "source": "README.md",
-            "snippet": "https://www.youtube.com/c/AirbyteHQ"
-          }
-        ],
-        "review_item": {
-          "field": "external_dependencies",
-          "candidate_value": "Youtube",
-          "confidence": 0.5,
-          "reason": "Could not determine classification for 'Youtube' with type 'external_service'",
-          "repo_path": "/app/sources/demo/airbyte",
-          "evidence": [
-            {
-              "type": "documentation_reference",
-              "source": "README.md",
-              "snippet": "https://www.youtube.com/c/AirbyteHQ"
-            }
-          ],
-          "recommended_action": "human_review"
-        },
-        "review_options": [
-          {
-            "id": "context-business-system",
-            "label": "Keep At Context Level",
-            "value": "BUSINESS_SYSTEM",
-            "description": "Treat Youtube as an external business company or SaaS that belongs in the system context."
-          },
-          {
-            "id": "container-technical-infra",
-            "label": "Move To Container Level",
-            "value": "TECHNICAL_INFRA",
-            "description": "Treat Youtube as technical infrastructure or an implementation detail that should not stay in the context diagram."
-          }
-        ],
-        "suggested_prompts": [
-          "Is Youtube (external_service) a business actor or technical detail given confidence 50% (threshold 70%)?",
-          "What role does Youtube play given it was found in: https://www.youtube.com/c/AirbyteHQ/?sub_confirmation=1?"
-        ],
-        "detected_from_all": [
-          "README.md"
-        ]
-      },
-      {
         "name": "Contrib",
         "type": "external_service",
         "detected_from": "README.md",
@@ -7182,21 +6737,6 @@
       },
       {
         "field": "external_dependencies",
-        "candidate_value": "Dtdg",
-        "confidence": 0.5,
-        "reason": "Could not determine classification for 'Dtdg' with type 'external_service'",
-        "repo_path": "/app/sources/demo/airbyte",
-        "evidence": [
-          {
-            "type": "deployment_reference",
-            "source": "airbyte-integrations/bases/base-java/Dockerfile",
-            "snippet": "https://dtdg.co/latest-java-tracer"
-          }
-        ],
-        "recommended_action": "human_review"
-      },
-      {
-        "field": "external_dependencies",
         "candidate_value": "Airbyte",
         "confidence": 0.5,
         "reason": "Could not determine classification for 'Airbyte' with type 'external_service'",
@@ -7206,51 +6746,6 @@
             "type": "documentation_reference",
             "source": "airbyte-integrations/bases/connector-acceptance-test/unit_tests/data/docs/correct.md",
             "snippet": "https://docs.airbyte.com/understanding-airbyte/connections/incremental-append-deduped"
-          }
-        ],
-        "recommended_action": "human_review"
-      },
-      {
-        "field": "external_dependencies",
-        "candidate_value": "Website Files",
-        "confidence": 0.5,
-        "reason": "Could not determine classification for 'Website Files' with type 'external_service'",
-        "repo_path": "/app/sources/demo/airbyte",
-        "evidence": [
-          {
-            "type": "documentation_reference",
-            "source": "README.md",
-            "snippet": "https://assets.website-files.com/605e01bc25f7e19a82e74788/624d9c4a375a55100be6b257_Airbyte_logo_color_dark.svg"
-          }
-        ],
-        "recommended_action": "human_review"
-      },
-      {
-        "field": "external_dependencies",
-        "candidate_value": "Shields",
-        "confidence": 0.5,
-        "reason": "Could not determine classification for 'Shields' with type 'external_service'",
-        "repo_path": "/app/sources/demo/airbyte",
-        "evidence": [
-          {
-            "type": "documentation_reference",
-            "source": "docs/readme.md",
-            "snippet": "https://img.shields.io/static/v1?label=license&message=ELv2&color=brightgreen"
-          }
-        ],
-        "recommended_action": "human_review"
-      },
-      {
-        "field": "external_dependencies",
-        "candidate_value": "Youtube",
-        "confidence": 0.5,
-        "reason": "Could not determine classification for 'Youtube' with type 'external_service'",
-        "repo_path": "/app/sources/demo/airbyte",
-        "evidence": [
-          {
-            "type": "documentation_reference",
-            "source": "README.md",
-            "snippet": "https://www.youtube.com/c/AirbyteHQ"
           }
         ],
         "recommended_action": "human_review"
@@ -7700,92 +7195,6 @@
         ]
       },
       {
-        "name": "Dtdg",
-        "type": "external_service",
-        "detected_from": "airbyte-integrations/bases/base-java/Dockerfile",
-        "context": "https://dtdg.co/latest-java-tracer",
-        "evidence_type": "deployment_reference",
-        "url": "https://dtdg.co/latest-java-tracer",
-        "context_name": "Dtdg",
-        "integration_surface": null,
-        "provider": "Dtdg",
-        "company": null,
-        "category": "external_service",
-        "dependency_type": "UNKNOWN",
-        "classification_confidence": 0.5,
-        "classification_reasoning": "Could not determine classification for 'Dtdg' with type 'external_service'",
-        "decision_mode": "deterministic",
-        "decision": {
-          "value": "Dtdg",
-          "confidence": 0.5,
-          "detection_source": "rule_based_classifier",
-          "decision_mode": "deterministic",
-          "review_status": "needs_review",
-          "evidence": [
-            {
-              "type": "deployment_reference",
-              "source": "airbyte-integrations/bases/base-java/Dockerfile",
-              "snippet": "https://dtdg.co/latest-java-tracer"
-            }
-          ],
-          "metadata": {
-            "provider": "Dtdg",
-            "company": null,
-            "category": "external_service",
-            "boundary": "UNKNOWN",
-            "catalog_match": null
-          }
-        },
-        "confidence": 0.5,
-        "detection_source": "rule_based_classifier",
-        "review_status": "needs_review",
-        "requires_human_review": true,
-        "review_threshold": 0.7,
-        "evidence": [
-          {
-            "type": "deployment_reference",
-            "source": "airbyte-integrations/bases/base-java/Dockerfile",
-            "snippet": "https://dtdg.co/latest-java-tracer"
-          }
-        ],
-        "review_item": {
-          "field": "external_dependencies",
-          "candidate_value": "Dtdg",
-          "confidence": 0.5,
-          "reason": "Could not determine classification for 'Dtdg' with type 'external_service'",
-          "repo_path": "/app/sources/demo/airbyte",
-          "evidence": [
-            {
-              "type": "deployment_reference",
-              "source": "airbyte-integrations/bases/base-java/Dockerfile",
-              "snippet": "https://dtdg.co/latest-java-tracer"
-            }
-          ],
-          "recommended_action": "human_review"
-        },
-        "review_options": [
-          {
-            "id": "context-business-system",
-            "label": "Keep At Context Level",
-            "value": "BUSINESS_SYSTEM",
-            "description": "Treat Dtdg as an external business company or SaaS that belongs in the system context."
-          },
-          {
-            "id": "container-technical-infra",
-            "label": "Move To Container Level",
-            "value": "TECHNICAL_INFRA",
-            "description": "Treat Dtdg as technical infrastructure or an implementation detail that should not stay in the context diagram."
-          }
-        ],
-        "suggested_prompts": [
-          "Is Dtdg (external_service) a business actor or technical detail given confidence 50% (threshold 70%)?",
-          "What role does Dtdg play given it was found in: https://dtdg.co/latest-java-tracer?"
-        ],
-        "detected_from_all": [
-          "airbyte-integrations/bases/base-java/Dockerfile"
-        ]
-      },
-      {
         "name": "Elastic",
         "type": "search",
         "detected_from": "airbyte-integrations/connectors/destination-elasticsearch/docker-compose.yaml",
@@ -8023,14 +7432,6 @@
         "detected_from": "docs/readme.md",
         "detection_method": "documentation_heading",
         "evidence": "## For Airbyte contributors"
-      },
-      {
-        "name": "Step 2.5: Setup User",
-        "type": "person",
-        "description": "1.",
-        "detected_from": "airbyte-integrations/bases/connector-acceptance-test/unit_tests/data/docs/with_not_required_steps.md",
-        "detection_method": "documentation_heading",
-        "evidence": "#### Step 2.5: Setup User"
       }
     ],
     "languages": [
@@ -8051,13 +7452,7 @@
         "file_count": 1
       }
     ],
-    "frameworks": [
-      {
-        "language": "Python",
-        "framework": "Django",
-        "detected_from": "pyproject.toml"
-      }
-    ],
+    "frameworks": [],
     "repository_url": "",
     "git": {},
     "context_sources": {
@@ -8080,9 +7475,6 @@
         "airbyte-integrations/connectors/destination-sftp-json/Dockerfile",
         "airbyte-integrations/connectors/source-google-directory/Dockerfile",
         "airbyte-integrations/connectors/source-amazon-sqs/Dockerfile"
-      ],
-      "framework_files": [
-        "pyproject.toml"
       ]
     },
     "regulatory_frameworks": [],
@@ -8108,7 +7500,7 @@
       "commits_90d": 2,
       "commits_180d": 2,
       "last_commit_date": "2026-04-25T20:29:59+02:00",
-      "days_since_last_commit": 4,
+      "days_since_last_commit": 7,
       "git_repos_scanned": 1
     },
     "tier": "Tier 1 - Production Critical",
@@ -8957,13 +8349,6 @@
         "llm_description": "For Airbyte contributors uses airbyte."
       },
       {
-        "source": "Step 2.5: Setup User",
-        "destination": "airbyte",
-        "description": "1",
-        "relationship_type": "uses",
-        "llm_description": "Step 2.5: Setup User uses airbyte."
-      },
-      {
         "source": "airbyte",
         "destination": "Github",
         "description": "Uses Github for developer platform workflows",
@@ -8980,29 +8365,29 @@
     ],
     "containers": [
       {
-        "source": "openapi2jsonschema",
-        "destination": "docker",
+        "from": "openapi2jsonschema",
+        "to": "docker",
         "type": "uses",
         "protocol": "HTTP",
-        "detection_source": "internal-dependencies",
+        "source": "internal-dependencies",
         "description": "openapi2jsonschema uses docker over HTTP.",
         "llm_description": "openapi2jsonschema uses docker over HTTP."
       },
       {
-        "source": "base-normalization",
-        "destination": "docker",
+        "from": "base-normalization",
+        "to": "docker",
         "type": "uses",
         "protocol": "HTTP",
-        "detection_source": "internal-dependencies",
+        "source": "internal-dependencies",
         "description": "base-normalization uses docker over HTTP.",
         "llm_description": "base-normalization uses docker over HTTP."
       },
       {
-        "source": "docusaurus",
-        "destination": "generator",
+        "from": "docusaurus",
+        "to": "generator",
         "type": "uses",
         "protocol": "HTTP",
-        "detection_source": "internal-dependencies",
+        "source": "internal-dependencies",
         "description": "docusaurus uses generator over HTTP.",
         "llm_description": "docusaurus uses generator over HTTP."
       }

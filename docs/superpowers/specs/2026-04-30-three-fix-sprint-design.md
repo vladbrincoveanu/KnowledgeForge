@@ -228,6 +228,22 @@ def test_build_review_prompts_handles_markdown_fence(mocker):
 
 ## Fix 3: Graph Layout & Pipeline Cleanup
 
+> **⚠️ ARCHITECTURAL CORRECTION (added post-impl):** The plan's description of "Pipeline A uses `container_level.entities`" is **factually incorrect**. The `container_level` key does not exist anywhere in the codebase (Python or TypeScript).
+>
+> **Actual architecture:**
+> ```
+> Python extraction (ContainerManager, DependencyDetector)
+>   → JSON root: containers[] + relationships.containers[]
+>   → UI transformation (CodeArchitectureViewer.tsx lines 985-1061)
+>     → builds container_level.entities[] and container_level.relationships[]
+>       on-the-fly from containers[] + relationships.containers[]
+>   → ReactFlow nodes/edges via buildRenderedEdges()
+> ```
+>
+> The "Pipeline A" (buildRenderedEdges) and "Pipeline B" (generateC4Edges) distinction was real (two code paths), but the plan's description of the data model was wrong. The UI transforms flat container data into the hierarchical C4 structure dynamically.
+>
+> **Impact on plan:** Fix 3A's analysis was chasing a phantom — the `source: "runtime"` bug was likely a UI name-mapping issue, not a backend extraction issue. The JSON was manually patched. Fresh extraction confirms relationships are now valid.
+
 ### Root Cause (Twofold)
 
 **Data problem:** The bundled `c4_architecture.json` has no `container_level` key. All 3 edges in `relationships.containers` are malformed: `source: "runtime"`, `destination: None`. Investigation needed — "runtime" is not a container name in Airbyte's dataset, and `destination: None` indicates the YAML/JSON relationship parser is failing to extract the `to` field.
@@ -295,7 +311,7 @@ Pipeline B was designed for OmniPay's `omnipay-` prefixed container names and ha
    ```
    Replace with: `const ghostNodes = []; const dependencyEdges = [];`
 
-3. **Remove `contextExternalEntities` building** (lines 2132-2138) — no longer needed since ghost nodes are gone. **Verification required:** Confirm that Pipeline A's `container_level.entities` already includes external system nodes from `system_context.external_dependencies` via the `entity_type: "external_system"` path. If not, the external dependency nodes will disappear from the context-level view and 3A must be updated to include them in Pipeline A.
+3. **Remove `contextExternalEntities` building** (lines 2152-2158) — no longer needed since ghost nodes are gone. **Verified:** Pipeline A handles external system nodes through the context-level entity transformation (CodeArchitectureViewer.tsx lines 1160-1172), which maps `system_context.external_dependencies` into entities with `entity_type: "external_system"`. Safe to remove.
 
 4. **Remove `ghostNodeIds` and `ghostNodes` from merged nodes** (line 2152):
    ```typescript
@@ -448,8 +464,12 @@ fitView({
 
 ---
 
-## Open Questions
+## Open Questions (resolved)
 
-1. **3A root cause:** The exact file and line producing `source: "runtime"` is not yet confirmed. The investigation step may reveal a different fix than described above.
-2. **OmniPay compatibility:** Removing Pipeline B's `omnipay-` prefix stripping may break OmniPay demo. Verify that OmniPay containers are named consistently in the entity ID scheme after the extraction pipeline fix.
-3. **LLM availability:** Fix 2 requires `LLMManager` to be available. A graceful fallback (static prompts using actual evidence) is included, but the LLM path should be tested when LM Studio is running.
+1. **3A root cause:** ~~The exact file and line producing `source: "runtime"` is not yet confirmed.~~ **RESOLVED:** Fresh extraction (`LLM_PROVIDER=none make generate-demo`) produces valid relationships with no `source: "runtime"` or `destination: None`. The bug appears to have been incidentally fixed by other code changes since Apr 30. Root cause was never explicitly traced — the JSON was manually patched in `dcc9df36`.
+
+2. **OmniPay compatibility:** ~~Removing Pipeline B's `omnipay-` prefix stripping may break OmniPay demo.~~ **PENDING VERIFICATION:** Docker-based Playwright E2E test (`06-omnipay-smoke.spec.ts`) not run yet. OmniPay extraction should be verified when Docker is available.
+
+3. **LLM availability:** Fix 2 requires `LLMManager` to be available. A graceful fallback (static prompts using actual evidence) is included, but the LLM path should be tested when LM Studio is running. **Status:** Implementation complete with fallback — LLM path untested in production.
+
+4. **Architecture correction:** `container_level` key does not exist anywhere in the codebase. The plan's description of "Pipeline A uses `container_level.entities`" was factually incorrect. The UI transforms `containers[]` + `relationships.containers[]` into the C4 structure on-the-fly.

@@ -2148,16 +2148,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
       filteredEntities,
     );
 
-// Build context external entities from system_context for linking container edges to context-level externals
-    const contextExternalEntities = (
-      architecture.system_context?.external_dependencies || []
-    ).map((dep: any, idx: number) => ({
-      id: `context_external_${idx}`,
-      name: dep.context_name || dep.name,
-      entity_type: "external_system",
-    }));
-
-    const visibleContainers = (architecture?.containers || []).filter(
+const visibleContainers = (architecture?.containers || []).filter(
       (c: any) => !c.is_infrastructure_only,
     );
     const hiddenContainerNames = new Set(
@@ -2172,18 +2163,8 @@ const CodeArchitectureViewerInner: React.FC = () => {
       const dst = String(rel?.to ?? rel?.destination ?? "");
       return !hiddenContainerNames.has(src) && !hiddenContainerNames.has(dst);
     });
-    const { nodes: ghostNodes, edges: dependencyEdges } =
-      selectedLevel === "container_level" &&
-      (visibleContainers.length > 0 || visibleContainerRelationships.length > 0)
-        ? generateC4Edges(
-            visibleContainers,
-            visibleContainerRelationships,
-            contextExternalEntities,
-          )
-        : { nodes: [], edges: [] };
-
-    const mergedEdges = [...rfEdges, ...dependencyEdges];
-    const mergedNodes = [...rfNodes, ...ghostNodes];
+    const mergedEdges = rfEdges;
+    const mergedNodes = rfNodes;
 
     // Apply layout: star layout for L1 context, semantic 3-tier for L2 containers,
     // dagre fallback for component (L3) and other cases.
