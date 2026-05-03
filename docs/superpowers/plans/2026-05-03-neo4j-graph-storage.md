@@ -404,12 +404,20 @@ class GraphWriter:
     def write(self, task_id: str, c4_data: dict[str, Any]) -> None:
         self._client.clear_extraction(task_id)
 
-        self._write_context_level(task_id, c4_data.get("system_context", {}), c4_data.get("relationships", {}).get("context", []))
-        self._write_container_level(task_id, c4_data.get("containers", []), c4_data.get("relationships", {}).get("containers", []))
-        self._write_component_level(task_id, c4_data.get("components", []))
+        self._write_context_level(
+            task_id,
+            c4_data.get("system_context") or {},
+            (c4_data.get("relationships") or {}).get("context") or [],
+        )
+        self._write_container_level(
+            task_id,
+            c4_data.get("containers") or [],
+            (c4_data.get("relationships") or {}).get("containers") or [],
+        )
+        self._write_component_level(task_id, c4_data.get("components") or [])
 
     def _write_context_level(self, task_id: str, system_context: dict[str, Any], relationships: list[dict[str, Any]]) -> None:
-        sys_name = system_context.get("name", "System")
+        sys_name = system_context.get("name", "System") or "System"
         system_id = f"context:{sys_name}"
         self._upsert_node(
             "System",
@@ -423,7 +431,7 @@ class GraphWriter:
             },
         )
 
-        for actor in system_context.get("actors", []):
+        for actor in system_context.get("actors") or []:
             actor_id = f"person:{actor.get('name', 'Unknown')}"
             self._upsert_node(
                 "Person",
@@ -444,26 +452,26 @@ class GraphWriter:
                 {"description": f"{actor.get('name', 'Unknown')} interacts with system"},
             )
 
-        for dep in system_context.get("external_dependencies", []):
-            ext_id = f"external_system:{dep.get('name', dep.get('context_name', 'Unknown'))}"
+        for dep in system_context.get("external_dependencies") or []:
+            ext_id = f"external_system:{dep.get('name') or dep.get('context_name') or 'Unknown'}"
             self._upsert_node(
                 "ExternalSystem",
                 {
                     "id": ext_id,
-                    "name": dep.get("name", dep.get("context_name", "Unknown")),
+                    "name": dep.get("name") or dep.get("context_name") or "Unknown",
                     "entity_type": dep.get("type", "external_system"),
                     "level": "context",
                     "extraction_task_id": task_id,
                     "properties": _external_dependency_properties(dep),
                 },
             )
-            self._write_evidence_nodes(ext_id, dep.get("evidence", []), task_id)
+            self._write_evidence_nodes(ext_id, dep.get("evidence") or [], task_id)
             self._upsert_relationship(
                 "USES",
                 f"{system_id}->{ext_id}",
                 system_id,
                 ext_id,
-                {"description": f"System uses {dep.get('name', 'external service')}"},
+                {"description": f"System uses {dep.get('name') or 'external service'}"},
             )
 
     def _write_container_level(self, task_id: str, containers: list[dict[str, Any]], relationships: list[dict[str, Any]]) -> None:
@@ -509,13 +517,13 @@ class GraphWriter:
             )
 
     def _write_component_level(self, task_id: str, components: list[dict[str, Any]]) -> None:
-        for comp in components:
+        for comp in components or []:
             comp_type = comp.get("type", "component")
             if comp_type == "component_group":
-                for sub in comp.get("components", []):
-                    self._write_component(task_id, sub, comp.get("container", ""))
+                for sub in comp.get("components") or []:
+                    self._write_component(task_id, sub, comp.get("container") or "")
             else:
-                self._write_component(task_id, comp, comp.get("container", ""))
+                self._write_component(task_id, comp, comp.get("container") or "")
 
     def _write_component(self, task_id: str, comp: dict[str, Any], container_name: str) -> None:
         comp_id = f"component:{comp.get('name', 'unknown')}"
@@ -547,6 +555,7 @@ class GraphWriter:
             )
 
     def _write_evidence_nodes(self, external_system_id: str, evidence: list[dict[str, Any]], task_id: str) -> None:
+        assert isinstance(evidence, list), f"evidence must be a list, got {type(evidence)}"
         for idx, ev in enumerate(evidence):
             ev_id = f"evidence:{external_system_id}:{idx}"
             self._upsert_node(
@@ -905,9 +914,11 @@ def debug_neo4j_query(body: dict):
 Run: `cd /Users/vladbrincoveanu/Desktop/Startup/KnowledgeForge/sources/UI && npm run test:e2e -- e2e/specs/07-neo4j-consistency.spec.ts --reporter=line 2>&1 | tail -20`
 Expected: FAIL (endpoint may not exist yet)
 
-- [ ] **Step 3: If endpoint needed, add it to code_extraction.py**
+- [ ] **Step 3: Add debug endpoint to code_extraction.py**
 
 Add the debug endpoint to `app/endpoint/v1/routes/code_extraction.py`. Look for existing debug routes or add near the bottom of the file.
+
+**Decision confirmed:** Option A — Playwright E2E uses `/api/v1/debug/neo4j/query` endpoint to query Neo4j directly.
 
 - [ ] **Step 4: Re-run test**
 

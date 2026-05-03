@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
@@ -214,8 +215,8 @@ def _system_context_properties(sc: dict[str, Any]) -> dict[str, Any]:
         "status": sc.get("status", ""),
         "data_class": sc.get("data_class", ""),
         "compliance": sc.get("compliance", ""),
-        "languages": sc.get("languages", []),
-        "frameworks": sc.get("frameworks", []),
+        "languages": json.dumps(sc.get("languages", [])),
+        "frameworks": json.dumps(sc.get("frameworks", [])),
         "repository_url": sc.get("repository_url", ""),
     }
 
