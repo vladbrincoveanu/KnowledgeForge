@@ -9,6 +9,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 # Router instance
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 # Keep track of active connections
@@ -42,6 +43,9 @@ class ConnectionManager:
 
     def disconnect(self, websocket: WebSocket):
         """Remove a WebSocket connection."""
+        task_id = getattr(self, "_websocket_to_task", {}).pop(websocket, None)
+        if task_id:
+            self.unregister_task(task_id)
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
         if websocket in self.connection_info:
@@ -76,6 +80,31 @@ class ConnectionManager:
         """Get the number of active connections."""
         return len(self.active_connections)
 
+    def register_task(self, task_id: str, websocket: WebSocket) -> None:
+        """Register a WebSocket connection for a specific task."""
+        if not hasattr(self, "_task_connections"):
+            self._task_connections: dict[str, WebSocket] = {}
+        self._task_connections[task_id] = websocket
+        if not hasattr(self, "_websocket_to_task"):
+            self._websocket_to_task: dict[WebSocket, str] = {}
+        self._websocket_to_task[websocket] = task_id
+
+    def unregister_task(self, task_id: str) -> None:
+        """Unregister a task's WebSocket connection."""
+        if hasattr(self, "_task_connections"):
+            ws = self._task_connections.pop(task_id, None)
+            if ws and hasattr(self, "_websocket_to_task"):
+                self._websocket_to_task.pop(ws, None)
+
+    async def broadcast_to_task(self, task_id: str, message: dict) -> None:
+        """Send a message to a specific task's WebSocket connection."""
+        task_conns = getattr(self, "_task_connections", {})
+        ws = task_conns.get(task_id)
+        if ws:
+            await self.send_personal_message(message, ws)
+        else:
+            logger.debug("no ws registered for task %s", task_id)
+
 
 # Global connection manager instance
 manager = ConnectionManager()
@@ -85,66 +114,77 @@ manager = ConnectionManager()
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time communication."""
     try:
-        await websocket.accept()
-        logging.info("WebSocket connection accepted successfully")
+        await manager.connect(websocket)
+    except Exception:
+        return
 
-        # Send welcome message
-        await websocket.send_text(
-            json.dumps(
-                {
-                    "type": "connection",
-                    "status": "connected",
-                    "message": "WebSocket connection established",
-                    "timestamp": datetime.now().isoformat(),
-                }
-            )
-        )
-
-        # Keep connection alive and handle messages
+    try:
         while True:
             data = await websocket.receive_text()
-            logging.info(f"Received: {data}")
+            logging.info(f"Received: %s", data)
 
             try:
-                # Parse the incoming message
                 message = json.loads(data)
-                message_type = message.get("type", "unknown")
+                msg_type = message.get("type", "unknown")
 
-                # Handle different message types
-                if message_type == "ping":
-                    response = {"type": "pong", "timestamp": datetime.now().isoformat()}
-                elif message_type == "subscribe":
-                    response = {
-                        "type": "subscription",
-                        "status": "subscribed",
-                        "events": message.get("events", []),
-                        "timestamp": datetime.now().isoformat(),
-                    }
+                if msg_type == "register_task":
+                    task_id = message.get("task_id")
+                    if task_id:
+                        manager.register_task(task_id, websocket)
+                        await manager.send_personal_message(
+                            {
+                                "type": "task_registered",
+                                "task_id": task_id,
+                                "timestamp": datetime.now().isoformat(),
+                            },
+                            websocket,
+                        )
+                elif msg_type == "ping":
+                    await manager.send_personal_message(
+                        {"type": "pong", "timestamp": datetime.now().isoformat()},
+                        websocket,
+                    )
+                elif msg_type == "subscribe":
+                    await manager.send_personal_message(
+                        {
+                            "type": "subscription",
+                            "status": "subscribed",
+                            "events": message.get("events", []),
+                            "timestamp": datetime.now().isoformat(),
+                        },
+                        websocket,
+                    )
                 else:
-                    response = {
-                        "type": "echo",
-                        "original_message": message,
-                        "timestamp": datetime.now().isoformat(),
-                    }
-
-                await websocket.send_text(json.dumps(response))
-
-            except json.JSONDecodeError:
-                # Echo the raw message back if it's not JSON
-                await websocket.send_text(
-                    json.dumps(
+                    await manager.send_personal_message(
                         {
                             "type": "echo",
-                            "message": data,
+                            "original_message": message,
                             "timestamp": datetime.now().isoformat(),
-                        }
+                        },
+                        websocket,
                     )
+
+            except json.JSONDecodeError:
+                await manager.send_personal_message(
+                    {
+                        "type": "echo",
+                        "message": data,
+                        "timestamp": datetime.now().isoformat(),
+                    },
+                    websocket,
                 )
 
     except WebSocketDisconnect:
-        logging.info("WebSocket client disconnected")
+        task_id = getattr(manager, "_websocket_to_task", {}).get(websocket)
+        if task_id:
+            manager.unregister_task(task_id)
+        manager.disconnect(websocket)
     except (OSError, json.JSONDecodeError, ValueError) as e:
-        logging.error(f"WebSocket error: {e}")
+        logger.error("WebSocket error: %s", e)
+        task_id = getattr(manager, "_websocket_to_task", {}).get(websocket)
+        if task_id:
+            manager.unregister_task(task_id)
+        manager.disconnect(websocket)
 
 
 # Utility function to broadcast task updates
