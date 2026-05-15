@@ -1,5 +1,6 @@
 import React, { memo } from "react";
 import { Handle, Position } from "reactflow";
+import { EnrichmentBadge } from "../../../../components/CodeArchitectureViewer/EnrichmentBadge";
 
 interface ContainerMeta {
   container_type?: string;
@@ -21,6 +22,7 @@ interface CustomNodeProps {
     isExternal?: boolean;
     decorators?: string[];
     containerMeta?: ContainerMeta;
+    decision_mode?: string;
   };
 }
 
@@ -230,6 +232,7 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data }) => {
       <div className="node-content">
         <div className="node-name" title={data.label}>
           {formatLabel(data.label)}
+          <EnrichmentBadge decisionMode={data.decision_mode} />
         </div>
         {data.isExternal && (
           <div className="node-badge external-badge">External</div>

@@ -21,6 +21,7 @@ import axios from "axios";
 import "./CodeArchitectureViewer.scss";
 import type { ArchitectureChatMessage } from "../../../services/api";
 import { codeArchitectureAPI } from "../../../services/api";
+import { useEnrichmentWS } from "../../../hooks/useEnrichmentWS";
 import CustomNode from "./CustomNode";
 import ContainerNode from "./ContainerNode";
 import C4Edge from "./C4Edge";
@@ -179,9 +180,7 @@ const classifyContainerTier = (node: Node): ContainerTier => {
     "dynamodb",
   ];
   if (
-    INFRA_TECH.some(
-      (k) => tech.includes(k) || matchesNameToken(haystack, k),
-    )
+    INFRA_TECH.some((k) => tech.includes(k) || matchesNameToken(haystack, k))
   ) {
     return "infra";
   }
@@ -282,8 +281,7 @@ const layoutContainerTiers = (
     SERVICES_PER_ROW,
     tiered.infra.length,
   );
-  const ghostX =
-    ORIGIN_X + maxRowWidth * (NODE_WIDTH + COL_GAP) + 80;
+  const ghostX = ORIGIN_X + maxRowWidth * (NODE_WIDTH + COL_GAP) + 80;
   ghostNodes.forEach((node, idx) => {
     node.position = {
       x: ghostX,
@@ -300,7 +298,10 @@ const layoutContainerTiers = (
     }
     node.position = {
       x: ORIGIN_X + (idx % 4) * (NODE_WIDTH + COL_GAP),
-      y: adjustedInfraY + NODE_HEIGHT + ROW_GAP * 1.5 +
+      y:
+        adjustedInfraY +
+        NODE_HEIGHT +
+        ROW_GAP * 1.5 +
         Math.floor(idx / 4) * (NODE_HEIGHT + ROW_GAP),
     };
   });
@@ -913,6 +914,9 @@ const CodeArchitectureViewerInner: React.FC = () => {
     repoSectionExpanded,
   } = exState;
 
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const { enrichedNodes: wsEnrichedNodes } = useEnrichmentWS(activeTaskId);
+
   const pollIntervalRef = useRef<number | null>(null);
 
   // ── Shim setters (keep child prop interfaces unchanged) ───────────────────
@@ -1434,6 +1438,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
         true,
       );
       const taskId = response.task_id;
+      setActiveTaskId(taskId);
 
       if (!taskId) {
         throw new Error("No task id returned from extraction");
@@ -1510,6 +1515,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
     try {
       const response = await codeArchitectureAPI.scanLocalPath(path);
       const taskId = response.task_id;
+      setActiveTaskId(taskId);
 
       if (!taskId) {
         throw new Error("No task id returned from scan");
@@ -2063,7 +2069,6 @@ const CodeArchitectureViewerInner: React.FC = () => {
         ]),
       );
 
-
       filteredEntities.forEach((e) => {
         let shortName = e.name.includes(".")
           ? e.name.split(".").pop() || e.name
@@ -2148,7 +2153,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
       filteredEntities,
     );
 
-const visibleContainers = (architecture?.containers || []).filter(
+    const visibleContainers = (architecture?.containers || []).filter(
       (c: any) => !c.is_infrastructure_only,
     );
     const hiddenContainerNames = new Set(
@@ -2204,7 +2209,27 @@ const visibleContainers = (architecture?.containers || []).filter(
       return node;
     });
 
-    setNodes(nodesWithValidPositions);
+    const wsEnrichedNodeIds = new Set(
+      wsEnrichedNodes.map((n) => n.canonical_name),
+    );
+    const nodesWithEnrichment = nodesWithValidPositions.map((node) => {
+      const match = wsEnrichedNodes.find(
+        (n) => n.name === node.id || n.canonical_name === node.id,
+      );
+      if (match && node.data) {
+        return {
+          ...node,
+          data: { ...node.data, decision_mode: match.decision_mode },
+        };
+      }
+      return node;
+    });
+    const finalNodes =
+      wsEnrichedNodes.length > 0
+        ? nodesWithEnrichment
+        : nodesWithValidPositions;
+
+    setNodes(finalNodes);
     setEdges(layoutedEdges);
 
     // Fit view after layout to show entire graph
