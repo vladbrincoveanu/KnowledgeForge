@@ -100,8 +100,9 @@ class C4ArchitectureExtractor:
 
     def extract(self, max_components_per_domain: int = 10, group_components_by_domain: bool = False, task_id: Optional[str] = None, repo_url: Optional[str] = None) -> dict[str, Any]:
         """Extract C4 architecture."""
+        self.task_id = task_id or f"extract_{int(time.time())}"
         tracker = PerformanceTracker(
-            task_id=task_id or f"extract_{int(time.time())}",
+            task_id=self.task_id,
             repository_url=repo_url or str(self.repo_path)
         )
 
@@ -216,6 +217,7 @@ class C4ArchitectureExtractor:
         """Extract Level 1: System Context using ContextManager."""
         context_manager = ContextManager(
             self.repo_path, self.llm_manager, self.containers,
+            task_id=getattr(self, 'task_id', None),
         )
         self.system_context = context_manager.extract_context()
         self.context_relationships = context_manager.build_context_relationships(

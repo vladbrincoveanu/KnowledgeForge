@@ -21,6 +21,9 @@ from pathlib import Path
 from typing import Any, Optional
 from uuid import uuid4
 
+from app.services.c4.enrichment import worker as enrichment_worker
+from app.services.c4.enrichment.evidence_corpus import EvidenceCorpus, DepEvidence
+
 from .system_detector import SystemDetector
 from .dependency_detector import DependencyDetector
 from .metadata_detector import MetadataDetector
@@ -32,17 +35,21 @@ logger = logging.getLogger(__name__)
 class ContextManager:
     """Manages Level 1 Context extraction for C4 Model."""
 
-    def __init__(self, repo_path: Path, llm_manager=None, containers: dict[str, Any] = None):
+    def __init__(self, repo_path: Path, llm_manager=None,
+                 containers: dict[str, Any] = None,
+                 task_id: str = None):
         """Initialize Context Manager.
 
         Args:
             repo_path: Path to repository
             llm_manager: Optional LLM for generating descriptions
             containers: Optional dictionary of detected containers (for domain inference)
+            task_id: Optional task ID for enrichment worker enqueue
         """
         self.repo_path = Path(repo_path).resolve()
         self.llm_manager = llm_manager
         self.containers = containers or {}
+        self.task_id = task_id
 
         # Initialize detectors
         self.system_detector = SystemDetector(repo_path, llm_manager)
@@ -192,6 +199,36 @@ class ContextManager:
         logger.info(f"✓ Domain: {business_domain}")
         logger.info(f"✓ Status: {status}")
         logger.info(f"✓ External dependencies: {len(external_deps)}")
+
+        if self.task_id:
+            evidence = EvidenceCorpus(
+                repo_path=self.repo_path,
+                task_id=self.task_id,
+                languages=[l.get("language", "") for l in languages],
+                frameworks=[f.get("framework", "") for f in frameworks],
+                deterministic_deps=[
+                    DepEvidence(
+                        name=d.get("name") or d.get("context_name") or "",
+                        type=d.get("dependency_type") or d.get("type") or "",
+                        confidence=float(d.get("confidence", 0.5)),
+                        files_found_in=[],
+                    )
+                    for d in external_deps
+                ],
+                entrypoints=[],
+                detected_urls=[d.get("url") for d in external_deps if d.get("url")],
+                env_vars=[],
+                docker_images=[],
+                package_files=[],
+            )
+            try:
+                enrichment_worker.enqueue(
+                    task_id=self.task_id,
+                    repo_path=self.repo_path,
+                    evidence=evidence,
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.warning("enrichment enqueue failed: %s", e)
 
         return context
 
