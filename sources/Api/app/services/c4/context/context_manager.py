@@ -23,6 +23,7 @@ from uuid import uuid4
 
 from app.services.c4.enrichment import worker as enrichment_worker
 from app.services.c4.enrichment.evidence_corpus import EvidenceCorpus, DepEvidence
+from app.services.c4.context.decision_models import C4ElementType
 
 from .system_detector import SystemDetector
 from .dependency_detector import DependencyDetector
@@ -56,6 +57,31 @@ class ContextManager:
         self.dependency_detector = DependencyDetector(repo_path, llm_manager)
         self.metadata_detector = MetadataDetector(repo_path, llm_manager, containers)
 
+    def _enrich_actors_with_element_type(self, actors: list[dict]) -> list[dict]:
+        """Tag each actor with c4_element_type = Person."""
+        for actor in actors:
+            actor["c4_element_type"] = C4ElementType.PERSON
+        return actors
+
+    def _enrich_deps_with_element_type(self, deps: list[dict]) -> list[dict]:
+        """Tag each dependency with its C4 element type.
+
+        BUSINESS_SYSTEM → SoftwareSystem
+        OWNED_CONTAINER → Container
+        TECHNICAL_INFRA → Container (it's infrastructure you run, not an external SaaS)
+        UNKNOWN         → SoftwareSystem (safer default for context diagram)
+        """
+        _type_map = {
+            "BUSINESS_SYSTEM": C4ElementType.SOFTWARE_SYSTEM,
+            "OWNED_CONTAINER": C4ElementType.CONTAINER,
+            "TECHNICAL_INFRA": C4ElementType.CONTAINER,
+            "UNKNOWN": C4ElementType.SOFTWARE_SYSTEM,
+        }
+        for dep in deps:
+            dep_type = dep.get("dependency_type", "UNKNOWN")
+            dep["c4_element_type"] = _type_map.get(dep_type, C4ElementType.SOFTWARE_SYSTEM)
+        return deps
+
     def extract_context(self) -> dict[str, Any]:
         """Extract complete system context (Level 1).
 
@@ -73,6 +99,7 @@ class ContextManager:
 
         # External dependencies
         external_deps = self.dependency_detector.detect_external_dependencies()
+        external_deps = self._enrich_deps_with_element_type(external_deps)
         external_dep_reviews = self.dependency_detector.get_last_review_items()
         deployment_deps = self.dependency_detector.detect_deployment_dependencies()
         dependency_freshness_alerts = self.dependency_detector.detect_dependency_freshness_alerts()
@@ -83,6 +110,7 @@ class ContextManager:
 
         # Actors
         actors = self.system_detector.detect_context_actors()
+        actors = self._enrich_actors_with_element_type(actors)
 
         # Git and repository metadata
         git_metadata = self.system_detector.extract_git_metadata()
@@ -148,6 +176,7 @@ class ContextManager:
 
         context = {
             "c4_level": 1,
+            "c4_element_type": C4ElementType.SOFTWARE_SYSTEM,
             "type": "system",
             "name": system_name,
             "purpose": system_purpose,

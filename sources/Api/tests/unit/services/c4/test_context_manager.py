@@ -82,3 +82,35 @@ class TestContextManagerRelationships:
                 "relationship_type": "uses",
             }
         ]
+
+
+class TestC4ElementTypeLabels:
+    def test_actors_have_person_element_type(self, tmp_path):
+        manager = ContextManager(tmp_path)
+        ctx = {
+            "name": "MySystem",
+            "actors": [{"name": "Admin", "description": "manages the system"}],
+            "external_dependencies": [],
+        }
+        rels = manager.build_context_relationships(ctx)
+        # actor is the source of the relationship; check the raw context enrichment
+        actor_types = manager._enrich_actors_with_element_type(ctx["actors"])
+        assert all(a["c4_element_type"] == "Person" for a in actor_types)
+
+    def test_business_system_deps_have_software_system_type(self, tmp_path):
+        manager = ContextManager(tmp_path)
+        deps = [{"name": "Stripe", "dependency_type": "BUSINESS_SYSTEM"}]
+        enriched = manager._enrich_deps_with_element_type(deps)
+        assert enriched[0]["c4_element_type"] == "SoftwareSystem"
+
+    def test_owned_container_deps_have_container_type(self, tmp_path):
+        manager = ContextManager(tmp_path)
+        deps = [{"name": "PostgreSQL", "dependency_type": "OWNED_CONTAINER"}]
+        enriched = manager._enrich_deps_with_element_type(deps)
+        assert enriched[0]["c4_element_type"] == "Container"
+
+    def test_technical_infra_deps_have_container_type(self, tmp_path):
+        manager = ContextManager(tmp_path)
+        deps = [{"name": "Redis", "dependency_type": "TECHNICAL_INFRA"}]
+        enriched = manager._enrich_deps_with_element_type(deps)
+        assert enriched[0]["c4_element_type"] == "Container"
