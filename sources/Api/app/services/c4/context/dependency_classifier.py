@@ -10,18 +10,22 @@ Supports both OpenAI and local LLM (LM Studio).
 
 import logging
 from enum import Enum
+from pathlib import Path
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
+
+from app.services.c4.context.ownership_classifier import OwnershipSignalDetector
 
 logger = logging.getLogger(__name__)
 
 
 class DependencyType(str, Enum):
     """Classification types for external dependencies."""
-    
+
     BUSINESS_SYSTEM = "BUSINESS_SYSTEM"
     TECHNICAL_INFRA = "TECHNICAL_INFRA"
+    OWNED_CONTAINER = "OWNED_CONTAINER"
     UNKNOWN = "UNKNOWN"
 
 
@@ -106,14 +110,16 @@ Examples:
 Return ONLY valid JSON:
 {{"type": "BUSINESS_SYSTEM", "confidence": 0.95, "reasoning": "Brief explanation"}}"""
     
-    def __init__(self, llm_manager: Optional[Any] = None):
+    def __init__(self, llm_manager: Optional[Any] = None, repo_path: Optional[Path] = None):
         """Initialize dependency classifier with LLM manager.
-        
+
         Args:
             llm_manager: Optional LLMManager instance. If None, uses fallback rules only.
+            repo_path: Optional path to repository for ownership detection.
         """
         self.llm_manager = llm_manager
-        
+        self._ownership_detector = OwnershipSignalDetector(repo_path) if repo_path else None
+
         if not self.llm_manager:
             logger.info("Dependency classifier initialized with fallback rules only (no LLM)")
         else:
@@ -127,25 +133,27 @@ Return ONLY valid JSON:
         context: str = ""
     ) -> DependencyClassification:
         """Classify a dependency as BUSINESS_SYSTEM or TECHNICAL_INFRA.
-        
+
         Args:
             name: Dependency name (e.g., "PostgreSQL", "Stripe")
             dep_type: Type hint from detector (e.g., "database", "payment", "authentication")
             detected_from: Where dependency was found (e.g., "package.json", "docker-compose.yml")
             context: Additional context (import statements, README mentions, etc.)
-        
+
         Returns:
             DependencyClassification with type, confidence, and reasoning
         """
         # Try LLM classification first
         if self.llm_manager:
             try:
-                return self._classify_with_llm(name, dep_type, detected_from, context)
+                result = self._classify_with_llm(name, dep_type, detected_from, context)
+                return self._apply_ownership_promotion(result, name, dep_type)
             except Exception as e:
                 logger.warning(f"LLM classification failed for {name}: {e}, falling back to rules")
-        
+
         # Fallback to rule-based classification
-        return self._classify_with_rules(name, dep_type)
+        result = self._classify_with_rules(name, dep_type)
+        return self._apply_ownership_promotion(result, name, dep_type)
     
     def _classify_with_llm(
         self,
@@ -287,7 +295,29 @@ Return ONLY valid JSON:
             reasoning=f"Could not determine classification for '{name}' with type '{dep_type}'",
             detection_source="rule_based_classifier",
         )
-    
+
+    def _apply_ownership_promotion(
+        self,
+        result: DependencyClassification,
+        name: str,
+        dep_type: str
+    ) -> DependencyClassification:
+        """Promote TECHNICAL_INFRA to OWNED_CONTAINER when ownership signals exist."""
+        if result.type != DependencyType.TECHNICAL_INFRA or not self._ownership_detector:
+            return result
+
+        is_owned, confidence, reason = self._ownership_detector.is_owned(name, dep_type)
+        if is_owned:
+            return DependencyClassification(
+                type=DependencyType.OWNED_CONTAINER,
+                confidence=confidence,
+                reasoning=f"Promoted from TECHNICAL_INFRA: {reason}",
+                decision_mode="deterministic",
+                detection_source="ownership_signal_detector",
+            )
+
+        return result
+
     def classify_batch(
         self,
         dependencies: list[dict[str, Any]]
