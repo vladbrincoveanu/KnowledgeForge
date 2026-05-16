@@ -3,12 +3,30 @@
 import pytest
 
 from app.services.c4.context.decision_models import (
+    C4ElementType,
     DecisionMode,
     EvidenceItem,
     ExtractionDecision,
     ReviewItem,
     ReviewStatus,
 )
+
+
+class TestC4ElementType:
+    def test_has_person(self):
+        assert C4ElementType.PERSON == "Person"
+
+    def test_has_software_system(self):
+        assert C4ElementType.SOFTWARE_SYSTEM == "SoftwareSystem"
+
+    def test_has_container(self):
+        assert C4ElementType.CONTAINER == "Container"
+
+    def test_has_component(self):
+        assert C4ElementType.COMPONENT == "Component"
+
+    def test_is_string_enum(self):
+        assert isinstance(C4ElementType.PERSON, str)
 
 
 class TestDecisionMode:

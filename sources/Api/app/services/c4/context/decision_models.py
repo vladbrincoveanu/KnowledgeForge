@@ -22,6 +22,19 @@ class ReviewStatus(str, Enum):
     REJECTED = "rejected"
 
 
+class C4ElementType(str, Enum):
+    """Canonical C4 element type labels (from the C4 book).
+
+    Every element in the extraction output carries one of these labels
+    so consumers (frontend, Neo4j, API clients) can render correct C4 notation.
+    """
+
+    PERSON = "Person"
+    SOFTWARE_SYSTEM = "SoftwareSystem"
+    CONTAINER = "Container"
+    COMPONENT = "Component"
+
+
 @dataclass
 class EvidenceItem:
     """A single evidence item supporting an extracted value."""
