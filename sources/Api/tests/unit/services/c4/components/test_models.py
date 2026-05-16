@@ -9,6 +9,7 @@ from app.services.c4.components.models import (
     CodeElementKind,
     ComponentObject,
     ComponentRelationship,
+    ComponentType,
     DependencyEdge,
     DependencyType,
     ExtractionMethod,
@@ -135,3 +136,25 @@ def test_dependency_edge_weight_validation():
         weight=0.5,
     )
     assert edge.weight == 0.5
+
+
+class TestComponentObjectC4Label:
+    def test_component_has_c4_element_type_field(self):
+        obj = ComponentObject(
+            component_id="order-controller",
+            name="OrderController",
+            component_type=ComponentType.CONTROLLER,
+            description="Handles order requests",
+            confidence=0.9,
+        )
+        assert obj.c4_element_type == "Component"
+
+    def test_c4_element_type_is_always_component(self):
+        obj = ComponentObject(
+            component_id="payment-repository",
+            name="PaymentRepository",
+            component_type=ComponentType.REPOSITORY,
+            description="Stores payment records",
+            confidence=0.8,
+        )
+        assert obj.c4_element_type == "Component"

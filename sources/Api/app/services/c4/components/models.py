@@ -115,6 +115,10 @@ class ComponentObject(BaseModel):
     relationships: list[ComponentRelationship] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    c4_element_type: str = Field(
+        default="Component",
+        description="C4 canonical element type label. Always 'Component' at Level 3.",
+    )
 
 
 class FrameworkResult(BaseModel):
