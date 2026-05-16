@@ -8,6 +8,8 @@ from typing import Any, Optional, Tuple
 import yaml
 
 from . import utils
+from app.services.c4.context.decision_models import C4ElementType
+from .c4_types import C4ContainerType, classify_c4_container_type
 from .llm_enrichment import enrich_containers
 
 from .structure_detector import StructureDetector
@@ -638,15 +640,37 @@ class ContainerManager:
     def detect_cluster_metadata(self) -> dict[str, Any]:
         """Detect cluster metadata from GitOps configurations."""
         metadata = {}
-        
+
         gitops_files = []
         for gitops_dir in ["gitops", "argo", "argocd"]:
             gitops_path = self.repo_path / gitops_dir
             if gitops_path.exists():
                 gitops_files.extend([str(f.relative_to(self.repo_path)) for f in gitops_path.rglob("*.y*ml")])
-        
+
         if gitops_files:
             metadata["gitops_files_count"] = len(gitops_files)
             metadata["gitops_directories"] = list(set([str(Path(f).parent) for f in gitops_files]))
-        
+
         return metadata
+
+    def _enrich_containers_with_c4_metadata(self, containers: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        """Add C4 element type label and c4_container_type to each container.
+
+        Adds:
+        - c4_element_type = "Container"  (C4 canonical label for L2)
+        - c4_container_type             (book-canonical ContainerType)
+        """
+        for name, container in containers.items():
+            container["c4_element_type"] = C4ElementType.CONTAINER.value
+            container["c4_container_type"] = classify_c4_container_type(container).value
+        return containers
+
+    def _enrich_relationships_with_protocol(self, relationships: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Ensure every relationship carries a technology/protocol field.
+
+        Adds 'technology' (alias for protocol) to each relationship dict,
+        defaulting to the container's own protocol when available.
+        """
+        for rel in relationships:
+            rel.setdefault("technology", rel.get("protocol", ""))
+        return relationships
