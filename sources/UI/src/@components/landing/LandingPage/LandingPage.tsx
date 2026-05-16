@@ -5,16 +5,24 @@ import React, { useMemo, useState } from "react";
  * Scheme: shift char codes +1, then reverse — so @ and . never appear literally
  * ───────────────────────────────────────────────────────────────────────────── */
 const encodeEmail = (s: string) =>
-  s.split("").map((c) => String.fromCharCode(c.charCodeAt(0) + 1)).reverse().join("");
+  s
+    .split("")
+    .map((c) => String.fromCharCode(c.charCodeAt(0) + 1))
+    .reverse()
+    .join("");
 
 const decodeEmail = (encoded: string) =>
-  encoded.split("").reverse().map((c) => String.fromCharCode(c.charCodeAt(0) - 1)).join("");
+  encoded
+    .split("")
+    .reverse()
+    .map((c) => String.fromCharCode(c.charCodeAt(0) - 1))
+    .join("");
 
-const MailTo: React.FC<{ encoded: string; className?: string; children: React.ReactNode }> = ({
-  encoded,
-  className,
-  children,
-}) => (
+const MailTo: React.FC<{
+  encoded: string;
+  className?: string;
+  children: React.ReactNode;
+}> = ({ encoded, className, children }) => (
   <a href={`mailto:${decodeEmail(encoded)}`} className={className}>
     {children}
   </a>
@@ -652,8 +660,8 @@ const HeroSection: React.FC = () => (
         <h1>Bridging the gap between engineering and leadership.</h1>
         <p className="lp-hero__lede">
           KnowledgeForge turns your source code into a living map of your
-          software. Self-updating, queryable in plain English, and accurate
-          at every altitude — from boardroom to function call.
+          software. Self-updating, queryable in plain English, and accurate at
+          every altitude — from boardroom to function call.
         </p>
         <div className="lp-hero__actions">
           <a href="#partners" className="lp-btn lp-btn--primary lp-btn--pill">
@@ -668,8 +676,8 @@ const HeroSection: React.FC = () => (
         <div className="lp-hero__note">
           <CheckCircle2 size={15} />
           <span>
-            MVP live. Extraction engine running across multi-language
-            codebases today.
+            MVP live. Extraction engine running across multi-language codebases
+            today.
           </span>
         </div>
       </div>
@@ -1614,9 +1622,9 @@ const RiskSection: React.FC = () => (
       <span className="lp-eyebrow">The Intelligence</span>
       <h2>We turn architecture into a risk register.</h2>
       <p>
-        Every node on the graph carries the four metrics that keep CIOs awake
-        at night — continuously computed from your code, not gathered by
-        quarterly survey.
+        Every node on the graph carries the four metrics that keep CIOs awake at
+        night — continuously computed from your code, not gathered by quarterly
+        survey.
       </p>
     </div>
     <div className="lp-risks__grid">
@@ -1625,13 +1633,9 @@ const RiskSection: React.FC = () => (
           <span className="lp-risk-card__icon">{risk.icon}</span>
           <h3>{risk.title}</h3>
           <span className="lp-risk-card__stat">{risk.stat}</span>
-          <span className="lp-risk-card__caption">
-            {risk.statCaption}
-          </span>
+          <span className="lp-risk-card__caption">{risk.statCaption}</span>
           <p>{risk.description}</p>
-          <span className="lp-risk-card__source">
-            {risk.source}
-          </span>
+          <span className="lp-risk-card__source">{risk.source}</span>
         </article>
       ))}
     </div>
@@ -1644,8 +1648,8 @@ const TeamSection: React.FC = () => (
       <span className="lp-eyebrow">Team &amp; Ask</span>
       <h2>Built by engineers. Run from Vienna.</h2>
       <p>
-        Where we are — and the doors we need opened. No consultants,
-        no decks-first theatrics, just practitioners shipping against real
+        Where we are — and the doors we need opened. No consultants, no
+        decks-first theatrics, just practitioners shipping against real
         codebases.
       </p>
     </div>
@@ -1866,10 +1870,7 @@ const LandingPage: React.FC = () => {
               ["Risk metrics overlaid on architecture", "—", "—", "~", "✓"],
               ["C4-compliant ontology", "~", "—", "—", "✓"],
             ].map(([capability, diag, dev, ea, kf]) => (
-              <div
-                key={capability}
-                className="lp-market__matrix-row"
-              >
+              <div key={capability} className="lp-market__matrix-row">
                 <span className="lp-market__cat">{capability}</span>
                 <span className="lp-market__matrix-cell">
                   {diag === "✓" ? (
@@ -1899,11 +1900,7 @@ const LandingPage: React.FC = () => {
                   )}
                 </span>
                 <span className="lp-market__matrix-cell lp-market__matrix-cell--strong">
-                  {kf === "✓" ? (
-                    <CheckCircle2 size={20} color="#22C55E" />
-                  ) : (
-                    kf
-                  )}
+                  {kf === "✓" ? <CheckCircle2 size={20} color="#22C55E" /> : kf}
                 </span>
               </div>
             ))}

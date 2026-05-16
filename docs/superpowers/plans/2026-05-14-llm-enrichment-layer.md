@@ -2,6 +2,16 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Grill findings (2026-05-15):**
+- Q1: `websocket_endpoint` bypasses `manager.connect()`, breaking all broadcasts. Fixed: refactor endpoint to use `manager.connect/disconnect`, add `register_task` in WS message loop.
+- Q6: `_DATA_DIR` used `parents[4] / "sources" / "data"` → double `sources`. Fixed: `parents[5] / "data" / "c4_enrichments"`.
+- Q7: Setup code outside `try` block — constructor failure leaves no `enrichment_failed` event. Fixed: move all setup inside `try`.
+- Q10: `enqueue()` overwrites active task on duplicate call. Fixed: guard with `ValueError` if task already running.
+- Q11: `C4Extractor` has no `task_id` at construction time — `task_id` comes from `extract()`. Fixed: store `self.task_id` in `extract()`, pass via `getattr(self, 'task_id', None)` in `_extract_level1_context()`.
+- Q16: `GraphView` is dumb; enrichment merge happens in `CodeArchitectureViewer` parent. `CustomNode` already reads `decision_mode`. Badge goes in `CustomNode.render`.
+- ws_events: `broadcast_to_task` fallback removed — log and drop when no WS for task.
+- e2e test path: `sources/data/c4_enrichments` not `sources/data/c4_enrichments`. Fixed.
+
 **Goal:** Add an async, bounded agentic LLM layer that enriches the deterministic C4 Context extraction with LLM-discovered dependencies — streams results progressively through the existing WebSocket, persists to Neo4j + JSON, and never touches deterministic detector logic.
 
 **Architecture:** Phase 1 (deterministic, unchanged) writes initial graph. Phase 2 (async worker via `asyncio.create_task`) runs `WarmContextBuilder → LLMAgentLoop (tool_use against MiniMax Anthropic proxy) → GraphMerger`. Per-emit nodes tagged with `enrichment_run_id` for rollback. Partial emits kept on budget/timeout/429; rollback only on persistence/internal errors.
@@ -63,8 +73,12 @@ sources/UI/src/components/CodeArchitectureViewer/
 
 **Modified files:**
 - `sources/Api/app/services/c4/context/context_manager.py` — append one line at end of `extract_context()` to enqueue worker (T11)
-- `sources/Api/app/endpoint/v1/routes/websocket.py` — register enrichment event types (T9)
-- `sources/UI/src/components/CodeArchitectureViewer/GraphView.tsx` — wire `useEnrichmentWS` (T12)
+- `sources/Api/app/endpoint/v1/routes/websocket.py` — refactor endpoint to use `manager.connect/disconnect`, add `register_task` message handling (T9)
+- `sources/Api/app/services/code_extraction/c4_extractor.py` — store `self.task_id` in `extract()`, pass to `ContextManager` in `_extract_level1_context()` (T11)
+- `sources/UI/src/@components/architecture-map/CodeArchitectureViewer/CodeArchitectureViewer.tsx` — merge enrichment nodes via `useEnrichmentWS` (T12)
+- `sources/UI/src/@components/architecture-map/CodeArchitectureViewer/CustomNode.tsx` — render `<EnrichmentBadge>` for LLM-adjudicated nodes (T12)
+
+**Note (Q17 — module dependency chain):** Tasks 1–8 create the modules that Tasks 9–12 import. Before running tests, verify all imports resolve: `EvidenceCorpus`, `EnrichmentJSONPersister`, `EnrichmentGraphWriter`, `GraphMerger`, `WarmContextBuilder`, `ExtractionToolRegistry`, `EnrichmentLLMClient`, `get_rate_counter`. If any are missing, implement the corresponding task first.
 
 **Untouched (Iron Curtain):**
 - `sources/Api/app/services/c4/context/dependency_detector.py`
@@ -1489,48 +1503,115 @@ git commit -m "feat(enrichment): bounded agentic tool_use loop"
 
 ---
 
-## Task 9: EnrichmentWSEvents + register events on existing WS router
+## Task 9: EnrichmentWSEvents + add broadcast_to_task to ConnectionManager
 
 **Files:**
+- Modify: `sources/Api/app/endpoint/v1/routes/websocket.py` — add `task_connections` map + `register_task`/`unregister_task`/`broadcast_to_task` to `ConnectionManager`
 - Create: `sources/Api/app/services/c4/enrichment/ws_events.py`
-- Modify: `sources/Api/app/endpoint/v1/routes/websocket.py` — add accepted event types to whitelist if any (otherwise just import-side-effect free wrapper)
 - Test: `sources/Api/tests/unit/services/c4/enrichment/test_ws_events.py`
 
-**Note for engineer:** Inspect `websocket.py` first to see how the existing connection manager broadcasts. The wrapper `EnrichmentWSEvents.emit(task_id, event, payload)` must call into the existing manager — do NOT create a new WS endpoint.
+**Inspection done (grill session):** `ConnectionManager` has `broadcast()` (all) and `send_personal_message()` (one WS object). Neither is per-task. `broadcast_to_task()` must be added. `emit()` stays sync via `asyncio.create_task()` fire-and-forget — WS drops must not stall the enrichment worker.
 
-- [ ] **Step 1: Inspect existing WS module**
+**Critical (Q1):** `websocket_endpoint` calls `await websocket.accept()` directly, bypassing `manager.connect()`. `manager.active_connections` stays empty → `broadcast()` drops all messages → enrichment events never reach clients. T9 Step 1b refactors the WS endpoint to use `manager.connect/disconnect` and `register_task`. Without this, nothing works.
 
+- [ ] **Step 1: Extend ConnectionManager in `websocket.py`**
+
+Add to `ConnectionManager` class (after `get_connection_count`):
+
+```python
+def register_task(self, task_id: str, websocket: WebSocket) -> None:
+    if not hasattr(self, "_task_connections"):
+        self._task_connections: dict[str, WebSocket] = {}
+    self._task_connections[task_id] = websocket
+    # Reverse mapping so disconnect() can unregister
+    if not hasattr(self, "_websocket_to_task"):
+        self._websocket_to_task: dict[WebSocket, str] = {}
+    self._websocket_to_task[websocket] = task_id
+
+def unregister_task(self, task_id: str) -> None:
+    if hasattr(self, "_task_connections"):
+        ws = self._task_connections.pop(task_id, None)
+        if ws and hasattr(self, "_websocket_to_task"):
+            self._websocket_to_task.pop(ws, None)
+
+async def broadcast_to_task(self, task_id: str, message: dict) -> None:
+    task_conns = getattr(self, "_task_connections", {})
+    ws = task_conns.get(task_id)
+    if ws:
+        await self.send_personal_message(message, ws)
+    else:
+        logger.debug("no ws registered for task %s", task_id)
 ```
-grep -n "class\|broadcast\|send_to_task\|connection_manager\|websocket" sources/Api/app/endpoint/v1/routes/websocket.py | head -40
+
+- [ ] **Step 1b: Refactor `websocket_endpoint` to use `manager.connect/disconnect`**
+
+The existing endpoint calls `await websocket.accept()` directly, bypassing `manager.connect()`. This means `manager.active_connections` stays empty and `broadcast()` drops all messages. Refactor the WS route handler:
+
+```python
+@router.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    try:
+        await manager.connect(websocket)  # registers with ConnectionManager
+    except Exception:
+        return
+
+    try:
+        while True:
+            data = await websocket.receive_text()
+            message = json.loads(data)
+            msg_type = message.get("type", "unknown")
+            if msg_type == "register_task":
+                task_id = message.get("task_id")
+                if task_id:
+                    manager.register_task(task_id, websocket)
+            # ... existing ping/subscribe/echo handlers
+    except WebSocketDisconnect:
+        task_id = manager._websocket_to_task.get(websocket)
+        if task_id:
+            manager.unregister_task(task_id)
+        manager.disconnect(websocket)
 ```
 
-Note the broadcast function name. Adapt the import in step 3 accordingly.
+Also update `ConnectionManager.disconnect()` to auto-unregister:
+
+```python
+def disconnect(self, websocket: WebSocket):
+    task_id = getattr(self, "_websocket_to_task", {}).pop(websocket, None)
+    if task_id:
+        self.unregister_task(task_id)
+    if websocket in self.active_connections:
+        self.active_connections.remove(websocket)
+    if websocket in self.connection_info:
+        del self.connection_info[websocket]
+```
+
+- [ ] **Step 1c: Add `from functools import reduce` if not present; `logger` already imported**
 
 - [ ] **Step 2: Write failing test**
 
 ```python
 # tests/unit/services/c4/enrichment/test_ws_events.py
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from app.services.c4.enrichment.ws_events import EnrichmentWSEvents
 
 
-def test_emit_delegates_to_manager():
+def test_emit_fires_and_forgets_broadcast(monkeypatch):
     mgr = MagicMock()
+    mgr.broadcast_to_task = AsyncMock()
     ws = EnrichmentWSEvents(manager=mgr, task_id="t1")
-    ws.emit("node_added", {"name": "X"})
-    mgr.broadcast_to_task.assert_called_once()
-    args = mgr.broadcast_to_task.call_args
-    payload = args.kwargs.get("payload") or args.args[1]
-    assert payload["event"] == "node_added"
-    assert payload["task_id"] == "t1"
-    assert payload["data"]["name"] == "X"
+    with patch("asyncio.create_task") as ct:
+        ws.emit("node_added", {"name": "X"})
+    ct.assert_called_once()
+    coro = ct.call_args.args[0]
+    assert hasattr(coro, "cr_code")  # is a coroutine
 
 
-def test_emit_handles_manager_failure_silently():
+def test_emit_handles_create_task_failure_silently():
     mgr = MagicMock()
-    mgr.broadcast_to_task.side_effect = RuntimeError("ws gone")
+    mgr.broadcast_to_task = AsyncMock()
     ws = EnrichmentWSEvents(manager=mgr, task_id="t1")
-    ws.emit("x", {})  # must not raise
+    with patch("asyncio.create_task", side_effect=RuntimeError("no loop")):
+        ws.emit("x", {})  # must not raise
 ```
 
 - [ ] **Step 3: Verify failure**
@@ -1544,6 +1625,7 @@ Expected: FAIL.
 
 ```python
 # app/services/c4/enrichment/ws_events.py
+import asyncio
 import logging
 from typing import Any
 
@@ -1552,7 +1634,8 @@ logger = logging.getLogger(__name__)
 
 class EnrichmentWSEvents:
     """Thin wrapper that pushes enrichment events through the existing
-    websocket connection manager. Does NOT register a new endpoint."""
+    websocket connection manager. Does NOT register a new endpoint.
+    emit() is sync fire-and-forget — WS failures never block the worker."""
 
     def __init__(self, manager: Any, task_id: str):
         self.manager = manager
@@ -1561,8 +1644,10 @@ class EnrichmentWSEvents:
     def emit(self, event: str, data: dict[str, Any]) -> None:
         payload = {"task_id": self.task_id, "event": event, "data": data}
         try:
-            self.manager.broadcast_to_task(self.task_id, payload)
-        except Exception as e:  # WS drop must not kill the worker
+            asyncio.create_task(
+                self.manager.broadcast_to_task(self.task_id, payload)
+            )
+        except Exception as e:  # noqa: BLE001 — WS drop must not kill worker
             logger.warning("ws emit failed: %s", e)
 ```
 
@@ -1576,9 +1661,10 @@ Expected: 2 passed.
 - [ ] **Step 6: Commit**
 
 ```
-git add sources/Api/app/services/c4/enrichment/ws_events.py \
+git add sources/Api/app/endpoint/v1/routes/websocket.py \
+        sources/Api/app/services/c4/enrichment/ws_events.py \
         sources/Api/tests/unit/services/c4/enrichment/test_ws_events.py
-git commit -m "feat(enrichment): WS events wrapper over existing manager"
+git commit -m "feat(enrichment): broadcast_to_task on ConnectionManager + WS events wrapper"
 ```
 
 ---
@@ -1621,28 +1707,32 @@ def _wire_env(monkeypatch):
 
 def test_skipped_when_disabled(tmp_path, monkeypatch):
     monkeypatch.setenv("ENRICHMENT_ENABLED", "false")
-    w = LLMEnrichmentWorker(driver=MagicMock(), ws_manager=MagicMock())
+    w = LLMEnrichmentWorker()
     asyncio.run(w.run(task_id="t1", repo_path=tmp_path, evidence=_ec(tmp_path)))
     # no exception, no events
 
 
 def test_skipped_when_no_key(tmp_path, monkeypatch):
     monkeypatch.delenv("MINIMAX_API_KEY", raising=False)
-    mgr = MagicMock()
-    w = LLMEnrichmentWorker(driver=MagicMock(), ws_manager=mgr)
-    asyncio.run(w.run(task_id="t1", repo_path=tmp_path, evidence=_ec(tmp_path)))
+    with patch("app.services.c4.enrichment.worker._get_ws_manager") as gws:
+        mgr = MagicMock()
+        gws.return_value = mgr
+        w = LLMEnrichmentWorker()
+        asyncio.run(w.run(task_id="t1", repo_path=tmp_path, evidence=_ec(tmp_path)))
     args = mgr.broadcast_to_task.call_args_list
     assert any(c.args[1]["event"] == "enrichment_skipped" for c in args)
 
 
 def test_happy_path_emits_started_and_complete(tmp_path):
-    mgr = MagicMock()
-    with patch("app.services.c4.enrichment.worker.LLMAgentLoop") as L, \
+    with patch("app.services.c4.enrichment.worker._get_ws_manager") as gws, \
+         patch("app.services.c4.enrichment.worker.LLMAgentLoop") as L, \
          patch("app.services.c4.enrichment.worker.EnrichmentLLMClient.from_env") as fe:
+        mgr = MagicMock()
+        gws.return_value = mgr
         L.return_value.run = AsyncMock(return_value=LoopResult(
             stop_reason=StopReason.natural_stop, tool_calls_used=3, tokens_used=2000))
         fe.return_value = MagicMock()
-        w = LLMEnrichmentWorker(driver=MagicMock(), ws_manager=mgr)
+        w = LLMEnrichmentWorker()
         asyncio.run(w.run(task_id="t1", repo_path=tmp_path, evidence=_ec(tmp_path)))
     events = [c.args[1]["event"] for c in mgr.broadcast_to_task.call_args_list]
     assert events[0] == "enrichment_started"
@@ -1650,13 +1740,15 @@ def test_happy_path_emits_started_and_complete(tmp_path):
 
 
 def test_budget_exceeded_marks_partial(tmp_path):
-    mgr = MagicMock()
-    with patch("app.services.c4.enrichment.worker.LLMAgentLoop") as L, \
+    with patch("app.services.c4.enrichment.worker._get_ws_manager") as gws, \
+         patch("app.services.c4.enrichment.worker.LLMAgentLoop") as L, \
          patch("app.services.c4.enrichment.worker.EnrichmentLLMClient.from_env") as fe:
+        mgr = MagicMock()
+        gws.return_value = mgr
         L.return_value.run = AsyncMock(return_value=LoopResult(
             stop_reason=StopReason.budget_exceeded, tool_calls_used=15, tokens_used=50000))
         fe.return_value = MagicMock()
-        w = LLMEnrichmentWorker(driver=MagicMock(), ws_manager=mgr)
+        w = LLMEnrichmentWorker()
         asyncio.run(w.run(task_id="t1", repo_path=tmp_path, evidence=_ec(tmp_path)))
     final = mgr.broadcast_to_task.call_args_list[-1].args[1]
     assert final["event"] == "enrichment_complete"
@@ -1665,16 +1757,18 @@ def test_budget_exceeded_marks_partial(tmp_path):
 
 
 def test_exception_triggers_rollback_and_failed_event(tmp_path):
-    mgr = MagicMock()
-    with patch("app.services.c4.enrichment.worker.LLMAgentLoop") as L, \
+    with patch("app.services.c4.enrichment.worker._get_ws_manager") as gws, \
+         patch("app.services.c4.enrichment.worker.LLMAgentLoop") as L, \
          patch("app.services.c4.enrichment.worker.EnrichmentLLMClient.from_env") as fe, \
          patch("app.services.c4.enrichment.worker.EnrichmentGraphWriter") as W, \
          patch("app.services.c4.enrichment.worker.EnrichmentJSONPersister") as P:
+        mgr = MagicMock()
+        gws.return_value = mgr
         L.return_value.run = AsyncMock(side_effect=RuntimeError("boom"))
         fe.return_value = MagicMock()
         w_inst = MagicMock(); p_inst = MagicMock()
         W.return_value = w_inst; P.return_value = p_inst
-        w = LLMEnrichmentWorker(driver=MagicMock(), ws_manager=mgr)
+        w = LLMEnrichmentWorker()
         asyncio.run(w.run(task_id="t1", repo_path=tmp_path, evidence=_ec(tmp_path)))
     w_inst.rollback.assert_called_once()
     p_inst.rollback.assert_called_once()
@@ -1683,16 +1777,18 @@ def test_exception_triggers_rollback_and_failed_event(tmp_path):
 
 
 def test_timeout_marks_partial(tmp_path):
-    mgr = MagicMock()
     async def _slow(*a, **k):
         await asyncio.sleep(10)
-    with patch("app.services.c4.enrichment.worker.LLMAgentLoop") as L, \
+    with patch("app.services.c4.enrichment.worker._get_ws_manager") as gws, \
+         patch("app.services.c4.enrichment.worker.LLMAgentLoop") as L, \
          patch("app.services.c4.enrichment.worker.EnrichmentLLMClient.from_env") as fe, \
          patch("app.services.c4.enrichment.worker.config.ENRICHMENT_TIMEOUT_S",
                return_value=0.05):
+        mgr = MagicMock()
+        gws.return_value = mgr
         L.return_value.run = AsyncMock(side_effect=_slow)
         fe.return_value = MagicMock()
-        w = LLMEnrichmentWorker(driver=MagicMock(), ws_manager=mgr)
+        w = LLMEnrichmentWorker()
         asyncio.run(w.run(task_id="t1", repo_path=tmp_path, evidence=_ec(tmp_path)))
     final = mgr.broadcast_to_task.call_args_list[-1].args[1]
     assert final["data"].get("reason") == "timeout"
@@ -1766,6 +1862,11 @@ EXAMPLE FLOW:
 _ACTIVE: dict[str, asyncio.Task] = {}
 _SEMAPHORE: Optional[asyncio.Semaphore] = None
 
+# Resolved via grill: enqueue() imports global singletons at call time.
+# Callers pass only (task_id, repo_path, evidence) — no threading of driver/ws_manager needed.
+# parents[5] from worker.py lands at repo root: sources/Api/app/services/c4/enrichment/ → sources/Api/ → sources/ → repo root
+_DATA_DIR = Path(__file__).resolve().parents[5] / "data" / "c4_enrichments"
+
 
 def _semaphore() -> asyncio.Semaphore:
     global _SEMAPHORE
@@ -1774,9 +1875,21 @@ def _semaphore() -> asyncio.Semaphore:
     return _SEMAPHORE
 
 
-def enqueue(driver, ws_manager, task_id: str, repo_path: Path,
+def _get_ws_manager():
+    from app.endpoint.v1.routes.websocket import manager  # global singleton
+    return manager
+
+
+def _get_neo4j_driver():
+    from app.infrastructure.graph.neo4j_client import Neo4jClient
+    return Neo4jClient.from_config()
+
+
+def enqueue(task_id: str, repo_path: Path,
             evidence: EvidenceCorpus) -> asyncio.Task:
-    worker = LLMEnrichmentWorker(driver=driver, ws_manager=ws_manager)
+    if task_id in _ACTIVE and not _ACTIVE[task_id].done():
+        raise ValueError(f"enrichment already running for task: {task_id}")
+    worker = LLMEnrichmentWorker()
     task = asyncio.create_task(worker.run(task_id, repo_path, evidence))
     _ACTIVE[task_id] = task
     task.add_done_callback(lambda _t: _ACTIVE.pop(task_id, None))
@@ -1792,14 +1905,13 @@ def cancel(task_id: str) -> bool:
 
 
 class LLMEnrichmentWorker:
-    def __init__(self, driver, ws_manager):
-        self.driver = driver
-        self.ws_manager = ws_manager
+    def __init__(self):
+        pass
 
     async def run(self, task_id: str, repo_path: Path,
                   evidence: EvidenceCorpus) -> None:
         run_id = str(uuid.uuid4())
-        ws = EnrichmentWSEvents(manager=self.ws_manager, task_id=task_id)
+        ws = EnrichmentWSEvents(manager=_get_ws_manager(), task_id=task_id)
 
         if not config.ENRICHMENT_ENABLED():
             return
@@ -1816,25 +1928,25 @@ class LLMEnrichmentWorker:
 
         ws.emit("enrichment_started", {"run_id": run_id})
 
-        persister = EnrichmentJSONPersister(
-            base_dir=Path("sources/data/c4_enrichments"),
-            task_id=task_id, run_id=run_id,
-        )
-        writer = EnrichmentGraphWriter(driver=self.driver, task_id=task_id,
-                                       run_id=run_id)
-        merger = GraphMerger(evidence=evidence, writer=writer, persister=persister)
-        registry = ExtractionToolRegistry(repo_path=repo_path, graph_writer=writer,
-                                          persister=persister, ws_emit=ws.emit)
-        warm = WarmContextBuilder().build(repo_path, evidence,
-                                          top_k=config.ENRICHMENT_TOP_K())
-        loop = LLMAgentLoop(client=client, tool_registry=registry,
-                            system_prompt=_SYSTEM_PROMPT)
-
-        timeout = config.ENRICHMENT_TIMEOUT_S()
-        partial_reason: str | None = None
-        partial = False
-        nodes_added = len(registry._emitted_nodes)
         try:
+            persister = EnrichmentJSONPersister(
+                base_dir=_DATA_DIR,
+                task_id=task_id, run_id=run_id,
+            )
+            writer = EnrichmentGraphWriter(driver=_get_neo4j_driver(), task_id=task_id,
+                                           run_id=run_id)
+            merger = GraphMerger(evidence=evidence, writer=writer, persister=persister)
+            registry = ExtractionToolRegistry(repo_path=repo_path, graph_writer=writer,
+                                             persister=persister, ws_emit=ws.emit)
+            warm = WarmContextBuilder().build(repo_path, evidence,
+                                              top_k=config.ENRICHMENT_TOP_K())
+            loop = LLMAgentLoop(client=client, tool_registry=registry,
+                                system_prompt=_SYSTEM_PROMPT)
+
+            timeout = config.ENRICHMENT_TIMEOUT_S()
+            partial_reason: str | None = None
+            partial = False
+            nodes_added = len(registry._emitted_nodes)
             async with _semaphore():
                 result: LoopResult = await asyncio.wait_for(
                     loop.run(warm_payload=self._render_warm(warm),
@@ -1851,7 +1963,10 @@ class LLMEnrichmentWorker:
             partial, partial_reason = True, "timeout"
         except Exception as e:  # noqa: BLE001
             logger.exception("enrichment failed")
-            merger.rollback()
+            if "merger" in dir():
+                merger.rollback()
+            else:
+                persister.rollback() if "persister" in dir() else None
             ws.emit("enrichment_failed", {"reason": "internal",
                                           "error": type(e).__name__})
             return
@@ -1910,15 +2025,15 @@ from app.services.c4.context.context_manager import ContextManager
 
 def test_extract_context_enqueues_worker(tmp_path):
     (tmp_path / "main.py").write_text("print(1)")
-    mgr = ContextManager(repo_path=tmp_path)
+    mgr = ContextManager(repo_path=tmp_path, task_id="t1")
     with patch("app.services.c4.enrichment.worker.enqueue") as enq:
         ctx = mgr.extract_context()
     assert "name" in ctx
     enq.assert_called_once()
     kwargs = enq.call_args.kwargs or {}
     args = enq.call_args.args
-    # signature: enqueue(driver, ws_manager, task_id, repo_path, evidence)
-    assert len(args) + len(kwargs) >= 5
+    # signature: enqueue(task_id, repo_path, evidence)
+    assert len(args) + len(kwargs) == 3
 
 
 def test_extract_context_does_not_block_on_worker(tmp_path):
@@ -1950,18 +2065,15 @@ Extend `__init__` signature:
 ```python
 def __init__(self, repo_path: Path, llm_manager=None,
              containers: dict[str, Any] = None,
-             task_id: str = None,
-             neo4j_driver=None, ws_manager=None):
+             task_id: str = None):
     ...
     self.task_id = task_id
-    self.neo4j_driver = neo4j_driver
-    self.ws_manager = ws_manager
 ```
 
 At the bottom of `extract_context()`, immediately before `return context`, add:
 
 ```python
-        if self.task_id and self.neo4j_driver and self.ws_manager:
+        if self.task_id:
             evidence = EvidenceCorpus(
                 repo_path=self.repo_path,
                 task_id=self.task_id,
@@ -1984,8 +2096,6 @@ At the bottom of `extract_context()`, immediately before `return context`, add:
             )
             try:
                 enrichment_worker.enqueue(
-                    driver=self.neo4j_driver,
-                    ws_manager=self.ws_manager,
                     task_id=self.task_id,
                     repo_path=self.repo_path,
                     evidence=evidence,
@@ -1994,11 +2104,10 @@ At the bottom of `extract_context()`, immediately before `return context`, add:
                 logger.warning("enrichment enqueue failed: %s", e)
 ```
 
-Test 1 calls `ContextManager(repo_path=tmp_path)` without `task_id` — must still work. Therefore: skip the enqueue when task_id is None. Update the test to pass `task_id`, `neo4j_driver`, `ws_manager`. Re-read your own implementation; if absence of `task_id` causes no enqueue (correct behavior), update test_extract_context_enqueues_worker to pass these:
+Test 1 calls `ContextManager(repo_path=tmp_path)` without `task_id` — must still work. Therefore: skip the enqueue when task_id is None. Update the test to pass `task_id`:
 
 ```python
-mgr = ContextManager(repo_path=tmp_path, task_id="t1",
-                     neo4j_driver=MagicMock(), ws_manager=MagicMock())
+mgr = ContextManager(repo_path=tmp_path, task_id="t1")
 ```
 
 - [ ] **Step 4: Update caller in extraction route**
@@ -2008,7 +2117,27 @@ grep -n "ContextManager(" sources/Api/app/endpoint/v1/routes/code_extraction.py
 grep -rn "ContextManager(" sources/Api/app/services/code_extraction/ sources/Api/app/services/c4/ | grep -v test_
 ```
 
-For every construction site, thread through `task_id`, `neo4j_driver`, `ws_manager` from the existing extractor wiring. If a site cannot supply them (e.g., a CLI tool), pass `None` — enqueue is gated on all three being present.
+For every construction site, thread `task_id` through from the existing extractor wiring. Worker imports its own singletons; callers do NOT pass `neo4j_driver` or `ws_manager`.
+
+**Critical edit for `c4_extractor.py`:** `C4Extractor.__init__` takes no `task_id`. `task_id` is passed to `extract()`. The plan stores it on `self.task_id` at the top of `extract()`, so `_extract_level1_context()` can reach it without a signature change:
+
+In `extract()`, right after `tracker = PerformanceTracker(...)`:
+```python
+self.task_id = task_id or f"extract_{int(time.time())}"
+```
+
+In `_extract_level1_context()`, pass `task_id`:
+```python
+def _extract_level1_context(self):
+    """Extract Level 1: System Context using ContextManager."""
+    context_manager = ContextManager(
+        self.repo_path, self.llm_manager, self.containers,
+        task_id=getattr(self, 'task_id', None),
+    )
+    ...
+```
+
+If `task_id` is None, `enqueue` skips gracefully — correct behavior for callers that don't provide it.
 
 - [ ] **Step 5: Run all c4 tests**
 
@@ -2034,6 +2163,10 @@ git commit -m "feat(enrichment): wire LLMEnrichmentWorker enqueue into ContextMa
 - Create: `sources/UI/src/hooks/useEnrichmentWS.ts`
 - Create: `sources/UI/src/components/CodeArchitectureViewer/EnrichmentBadge.tsx`
 - Modify: `sources/UI/src/components/CodeArchitectureViewer/GraphView.tsx` — wire `useEnrichmentWS`, render `EnrichmentBadge` on nodes where `decision_mode === "LLM_ADJUDICATED"` or `"NEEDS_REVIEW"`
+
+**wsService assumption:** The project already has `wsService` (exported from `sources/UI/src/services/api.ts`) with `on(event, callback)` / `off(event, callback)` pattern. T12 uses `wsService.on/off` directly — no new WebSocket connection needed.
+
+**Note (Q16 — GraphView merge):** `enrichedNodes` arrive async after initial graph render. `GraphView` must merge them into its elements array. Show a concrete implementation: keep `enrichedNodes` in state, combine with existing graph nodes in a derived computation or in the render, and pass merged elements to the graph library. Do not leave "wire useEnrichmentWS" as a vague instruction — show the state merging pattern.
 
 - [ ] **Step 1: Find existing WS client hook**
 
@@ -2094,6 +2227,7 @@ Expected: FAIL.
 ```typescript
 // sources/UI/src/hooks/useEnrichmentWS.ts
 import { useEffect, useState, useCallback } from "react";
+import { wsService } from "../services/api";
 
 export type EnrichedNode = {
   type: string;
@@ -2140,20 +2274,15 @@ export function useEnrichmentWS(taskId: string | null) {
   }, [taskId]);
 
   useEffect(() => {
-    // Subscribe to existing WS connection - use the existing event bus
-    // (see project's existing useWebSocket hook for the listener API).
+    // Subscribe to existing WS connection via the app's wsService singleton.
     if (!taskId) return;
-    const listener = (e: MessageEvent) => {
-      try {
-        const data = JSON.parse(e.data);
-        if (data && typeof data === "object" && "event" in data) {
-          handle(data as EnrichmentEvent);
-        }
-      } catch { /* not JSON, ignore */ }
+    const listener = (msg: any) => {
+      if (msg && typeof msg === "object" && "event" in msg) {
+        handle(msg as EnrichmentEvent);
+      }
     };
-    window.addEventListener("knowledgeforge-ws-message" as any, listener as any);
-    return () => window.removeEventListener("knowledgeforge-ws-message" as any,
-                                            listener as any);
+    wsService.on("message", listener);
+    return () => wsService.off("message", listener);
   }, [taskId, handle]);
 
   return {
@@ -2163,7 +2292,7 @@ export function useEnrichmentWS(taskId: string | null) {
 }
 ```
 
-**Note:** Adjust the subscription mechanism in Step 4 to match the existing project's WS event bus (custom event name, RxJS subject, Zustand selector — whichever exists). The `_inject` test seam is the contract guarantee; the integration with the real socket is project-specific.
+**Note:** `wsService` is already imported in `App.tsx` and `FileUploader.tsx` with `on/off("message")` pattern. T12 uses the same pattern. The `_inject` test seam is the contract guarantee; the integration with the real socket is project-specific.
 
 - [ ] **Step 5: Implement EnrichmentBadge**
 
@@ -2196,22 +2325,37 @@ export const EnrichmentBadge: React.FC<Props> = ({ decisionMode }) => {
 };
 ```
 
-- [ ] **Step 6: Wire into GraphView**
+- [ ] **Step 6: Wire into CodeArchitectureViewer + merge enrichment nodes**
 
-In `GraphView.tsx`, near the existing node-render block, add:
+The plan merges enrichment nodes into the ReactFlow `nodes` array inside `CodeArchitectureViewer.tsx` — NOT inside `GraphView.tsx`. `GraphView` receives `nodes` and `edges` as props from the parent and is intentionally dumb. Enrichment logic lives in the parent.
+
+**T12 Step 6 edit goes into `CodeArchitectureViewer.tsx`, not `GraphView.tsx`.**
+
+In `CodeArchitectureViewer.tsx`, add a `useEnrichmentWS` hook and merge:
 
 ```typescript
-import { useEnrichmentWS } from "../../hooks/useEnrichmentWS";
-import { EnrichmentBadge } from "./EnrichmentBadge";
+// At top of component (after existing hooks, around line 900):
+const taskIdForEnrichment = /* extract from existing taskId ref or state */;
+const enrichment = useEnrichmentWS(taskIdForEnrichment);
 
-// inside the component, where taskId is available:
-const enrichment = useEnrichmentWS(taskId);
-
-// Merge enrichment.enrichedNodes into the existing nodes prop for ReactFlow.
-// On each node render, if node.data.decisionMode exists, render <EnrichmentBadge/>.
+// When building nodes from architecture (around line 1750),
+// merge enrichedNodes into the existing node array:
+const allNodes = [
+  ...architectureNodes,
+  ...enrichment.enrichedNodes.map(en => ({
+    id: en.canonical_name,  // or en.name
+    type: "custom",
+    data: { ...en, decision_mode: en.decision_mode },
+    position: { x: 0, y: 0 },  // layout will position it
+  })),
+];
 ```
 
-The engineer must inspect `GraphView.tsx` for the existing nodes-state slice and merge enriched nodes into it. Use existing reducer pattern (`exState`/`archState` per CLAUDE.md).
+The key insight: `enrichedNodes` are added as extra nodes in the ReactFlow graph. `CustomNode` already reads `data.decision_mode` (line 1188 already references `dep.decision_mode`). So the EnrichmentBadge only needs to be added to `CustomNode`'s render — no GraphView changes needed.
+
+**EnrichmentBadge in CustomNode:**
+
+In `CustomNode.tsx`, where `data.decision_mode` is already available (around line 129), render `<EnrichmentBadge decisionMode={data.decision_mode} />` if the mode is `"LLM_ADJUDICATED"` or `"NEEDS_REVIEW"`.
 
 - [ ] **Step 7: Run frontend tests + lint**
 
@@ -2322,8 +2466,12 @@ def test_worker_e2e_emits_acme_payments(tmp_path, monkeypatch):
                               package_files=[Path("requirements.txt")])
 
     with patch("app.services.c4.enrichment.worker.EnrichmentLLMClient.from_env",
-               return_value=fake_client):
-        w = LLMEnrichmentWorker(driver=driver, ws_manager=ws_mgr)
+               return_value=fake_client), \
+         patch("app.services.c4.enrichment.worker._get_ws_manager",
+               return_value=ws_mgr), \
+         patch("app.services.c4.enrichment.worker._get_neo4j_driver",
+               return_value=driver):
+        w = LLMEnrichmentWorker()
         asyncio.run(w.run("t1", repo, evidence))
 
     events = [c.args[1]["event"] for c in ws_mgr.broadcast_to_task.call_args_list]
@@ -2335,8 +2483,8 @@ def test_worker_e2e_emits_acme_payments(tmp_path, monkeypatch):
                       if c.args[1]["event"] == "node_added")
     assert node_event["data"]["name"] == "Acme Payments"
 
-    jsonl = tmp_path / "sources" / "data" / "c4_enrichments" / "t1.jsonl"
-    json_ = tmp_path / "sources" / "data" / "c4_enrichments" / "t1.json"
+    jsonl = tmp_path / "data" / "c4_enrichments" / "t1.jsonl"
+    json_ = tmp_path / "data" / "c4_enrichments" / "t1.json"
     assert jsonl.exists() and json_.exists()
 ```
 

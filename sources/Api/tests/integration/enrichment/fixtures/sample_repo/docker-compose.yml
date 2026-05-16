@@ -1,0 +1,5 @@
+services:
+  api:
+    image: python:3.11
+    environment:
+      - PAYMENT_URL=https://api.acme-payments.io

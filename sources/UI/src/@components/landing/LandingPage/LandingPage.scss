@@ -707,8 +707,12 @@
     border-bottom: 1px solid var(--lp-border);
     transition: background 200ms ease;
 
-    &:last-child { border-bottom: none; }
-    &:hover:not(&--header) { background: rgba(255, 255, 255, 0.02); }
+    &:last-child {
+      border-bottom: none;
+    }
+    &:hover:not(&--header) {
+      background: rgba(255, 255, 255, 0.02);
+    }
 
     &--header {
       background: var(--lp-card-solid);

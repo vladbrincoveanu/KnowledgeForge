@@ -251,5 +251,3 @@ describe("CodeArchitectureViewer", () => {
     });
   }
 });
-
-

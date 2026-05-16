@@ -1,6 +1,6 @@
 import React, { memo } from "react";
 import { Handle, Position } from "reactflow";
-import { EnrichmentBadge } from "../../../../components/CodeArchitectureViewer/EnrichmentBadge";
+import { EnrichmentBadge } from "../../../components/CodeArchitectureViewer/EnrichmentBadge";
 
 interface ContainerMeta {
   container_type?: string;

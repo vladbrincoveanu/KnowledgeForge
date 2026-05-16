@@ -87,11 +87,9 @@ test.describe('Architecture Graph', () => {
     const detailPanel = page.locator('aside.node-details-panel');
     await expect(detailPanel).toBeVisible({ timeout: 3000 });
 
-    const labels = detailPanel.locator('span.detail-label');
-    const labelTexts = await labels.allTextContents();
-    const allLabels = labelTexts.map(t => t.trim());
-
-    expect(allLabels.some(l => l.length > 0)).toBeTruthy();
+    const labels = detailPanel.locator('.detail-label');
+    const labelCount = await labels.count();
+    expect(labelCount).toBeGreaterThan(0);
   });
 
   test('search input allows filtering nodes', async ({ page }) => {

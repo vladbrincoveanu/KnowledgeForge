@@ -163,5 +163,13 @@ For other stacks, replace build/test commands with appropriate ones:
 - Python: `python -m pytest`, `ruff check`
 - Go: `go build`, `go test`
 
+## Related Skills
+- **pr-review-expert** - For detailed PR analysis with blast radius and security scanning
+- **code-reviewer** - For code quality and SOLID violation detection
+- **playwright-pro** - For E2E browser test generation and fixing
+- **skill-security-auditor** - For security vulnerability scanning
+- **agent-designer** - For designing the multi-agent workflow itself
+- **orchestration** - For coordination patterns between agents
+
 ## Dependencies
 - [dispatching-parallel-agents] - for parallel execution pattern

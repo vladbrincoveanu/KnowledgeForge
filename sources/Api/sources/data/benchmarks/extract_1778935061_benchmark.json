@@ -1,0 +1,38 @@
+{
+  "task_id": "extract_1778935061",
+  "repository_url": "/app/sources/demo/omnipay-payment-processor",
+  "timestamp": "2026-05-16T12:37:41.187314",
+  "total_duration_ms": 73.44222068786621,
+  "phases": [
+    {
+      "name": "L2_Containers",
+      "duration_ms": 16.510963439941406,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "L1_Context",
+      "duration_ms": 54.89993095397949,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "Container_Relationships",
+      "duration_ms": 0.14543533325195312,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "L3_Components",
+      "duration_ms": 1.8773078918457031,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "LLM_Enrichment",
+      "duration_ms": 0.00858306884765625,
+      "success": true,
+      "error": null
+    }
+  ]
+}

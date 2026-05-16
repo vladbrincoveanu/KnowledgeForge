@@ -136,3 +136,25 @@ class ExtractionToolRegistry:
                 },
             },
         ]
+
+    def dispatch(self, tool_name: str,
+                tool_input: dict[str, Any]) -> dict[str, Any]:
+        try:
+            if tool_name == "grep":
+                return {"is_error": False,
+                        "content": str(self.grep(**tool_input))}
+            if tool_name == "read_file":
+                return {"is_error": False,
+                        "content": str(self.read_file(**tool_input))}
+            if tool_name == "list_dir":
+                return {"is_error": False,
+                        "content": str(self.list_dir(**tool_input))}
+            if tool_name == "emit_node":
+                return {"is_error": False,
+                        "content": str(self.emit_node(**tool_input))}
+            if tool_name == "emit_edge":
+                return {"is_error": False,
+                        "content": str(self.emit_edge(**tool_input))}
+            return {"is_error": True, "content": f"Unknown tool: {tool_name}"}
+        except Exception as e:
+            return {"is_error": True, "content": str(e)}

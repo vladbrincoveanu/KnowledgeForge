@@ -1,0 +1,38 @@
+{
+  "task_id": "extract_1778933988",
+  "repository_url": "/tmp/code_arch_f40e738e-0959-4d74-984d-98aa136c2d2e_lw476qbs/ImmoAgent",
+  "timestamp": "2026-05-16T12:19:48.241968",
+  "total_duration_ms": 2596.923589706421,
+  "phases": [
+    {
+      "name": "L2_Containers",
+      "duration_ms": 83.33468437194824,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "L1_Context",
+      "duration_ms": 347.365140914917,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "Container_Relationships",
+      "duration_ms": 0.1823902130126953,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "L3_Components",
+      "duration_ms": 2165.9798622131348,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "LLM_Enrichment",
+      "duration_ms": 0.061511993408203125,
+      "success": true,
+      "error": null
+    }
+  ]
+}

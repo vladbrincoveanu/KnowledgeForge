@@ -1,0 +1,38 @@
+{
+  "task_id": "extract_1778934497",
+  "repository_url": "/app/sources/demo/airbyte",
+  "timestamp": "2026-05-16T12:28:17.772187",
+  "total_duration_ms": 51083.58979225159,
+  "phases": [
+    {
+      "name": "L2_Containers",
+      "duration_ms": 19441.802978515625,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "L1_Context",
+      "duration_ms": 31344.55680847168,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "Container_Relationships",
+      "duration_ms": 0.4470348358154297,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "L3_Components",
+      "duration_ms": 296.7498302459717,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "LLM_Enrichment",
+      "duration_ms": 0.03314018249511719,
+      "success": true,
+      "error": null
+    }
+  ]
+}

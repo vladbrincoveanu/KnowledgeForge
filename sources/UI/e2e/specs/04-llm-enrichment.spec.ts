@@ -4,8 +4,8 @@ test.describe('LLM Enrichment Display', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/code-architecture');
     await page.waitForSelector('.react-flow', { timeout: 15000 });
-    const systemNode = page.locator('.node-name').filter({ hasText: 'OmniPay Payment Processor' });
-    await systemNode.click();
+    const airbyteNode = page.locator('.node-name').filter({ hasText: 'airbyte' });
+    await airbyteNode.first().click();
     await page.waitForTimeout(500);
   });
 

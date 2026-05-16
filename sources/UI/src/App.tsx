@@ -363,10 +363,7 @@ const MainContent: React.FC = () => {
               }
             />
 
-            <Route
-              path="/review"
-              element={<ReviewDashboard />}
-            />
+            <Route path="/review" element={<ReviewDashboard />} />
           </Routes>
         </main>
       </div>

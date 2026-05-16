@@ -339,7 +339,9 @@ export const codeArchitectureAPI = {
     });
 
     if (!response.ok || !response.body) {
-      throw new Error(`Architecture chat failed with status ${response.status}`);
+      throw new Error(
+        `Architecture chat failed with status ${response.status}`,
+      );
     }
 
     const reader = response.body.getReader();
@@ -374,7 +376,9 @@ export const codeArchitectureAPI = {
               completed = true;
               handlers.onComplete?.(source);
             } else if (chunk.type === "error") {
-              throw new Error(chunk.message || "Architecture chat stream failed");
+              throw new Error(
+                chunk.message || "Architecture chat stream failed",
+              );
             }
           }
 

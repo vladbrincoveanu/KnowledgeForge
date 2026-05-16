@@ -128,7 +128,7 @@ services:
     container_name: knowledgeforge-ui
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3010:3000"
     volumes:
       - ./sources/UI:/app
       - /app/node_modules # Anonymous volume to protect container node_modules
