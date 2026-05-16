@@ -1,0 +1,38 @@
+{
+  "task_id": "extract_1778937112",
+  "repository_url": "/app/sources/demo/omnipay-database",
+  "timestamp": "2026-05-16T13:11:52.138426",
+  "total_duration_ms": 67.41929054260254,
+  "phases": [
+    {
+      "name": "L2_Containers",
+      "duration_ms": 16.457080841064453,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "L1_Context",
+      "duration_ms": 48.16794395446777,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "Container_Relationships",
+      "duration_ms": 0.12826919555664062,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "L3_Components",
+      "duration_ms": 2.6197433471679688,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "LLM_Enrichment",
+      "duration_ms": 0.046253204345703125,
+      "success": true,
+      "error": null
+    }
+  ]
+}

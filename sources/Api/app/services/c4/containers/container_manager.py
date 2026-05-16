@@ -122,6 +122,7 @@ class ContainerManager:
         self._drop_redundant_root_containers()
 
         logger.info(f"Container detection complete. Found {len(self.containers)} containers.")
+        self.containers = self._enrich_containers_with_c4_metadata(self.containers)
         return self.containers
 
     def enrich_containers_with_llm(self) -> dict[str, Any]:
@@ -521,7 +522,7 @@ class ContainerManager:
                         "source": "internal-dependencies",
                     })
 
-        return result
+        return self._enrich_relationships_with_protocol(result)
 
     def _resolve_relationship(self, rel: dict, source_container: str) -> Optional[dict]:
         """Validate and resolve relationship endpoints. Returns None to discard."""

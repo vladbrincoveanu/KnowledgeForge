@@ -1,0 +1,38 @@
+{
+  "task_id": "extract_1778937247",
+  "repository_url": "/app/sources/demo/omnipay-event-projections",
+  "timestamp": "2026-05-16T13:14:07.746796",
+  "total_duration_ms": 79.97798919677734,
+  "phases": [
+    {
+      "name": "L2_Containers",
+      "duration_ms": 16.654253005981445,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "L1_Context",
+      "duration_ms": 62.970876693725586,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "Container_Relationships",
+      "duration_ms": 0.3020763397216797,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "L3_Components",
+      "duration_ms": 0.005245208740234375,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "LLM_Enrichment",
+      "duration_ms": 0.04553794860839844,
+      "success": true,
+      "error": null
+    }
+  ]
+}

@@ -10,6 +10,7 @@ Focus on architectural boundaries, not code details.
 
 import json
 import logging
+import os
 import time
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
@@ -17,6 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
+from app.infrastructure.llm.llm_manager import LLMManager
 from app.services.c4.containers import ContainerManager
 from app.services.c4.context import ContextManager
 from app.services.c4.components.component_extractor import ComponentExtractor
@@ -26,6 +28,7 @@ from app.infrastructure.graph.neo4j_client import Neo4jClient
 from app.domain.exceptions import GraphDatabaseError
 from app.services.code_extraction.llm_enrichment import enrich_with_llm_descriptions
 from app.services.code_extraction.component_extractor import link_components_to_containers
+from utils.config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -399,10 +402,23 @@ def main():
         target_repo = demo_path if demo_path.exists() else (monorepo_path if monorepo_path.exists() else repo_root)
 
     try:
-        provider = os.getenv("LLM_PROVIDER", "lmstudio")
-        base_url = os.getenv("LLM_BASE_URL", "http://localhost:1234/v1")
-        model = os.getenv("LLM_MODEL", "qwen/qwen2.5-vl-7b")
-        api_key = os.getenv("LLM_API_KEY", "")
+        config = get_config()
+        provider = os.getenv(
+            "LLM_PROVIDER",
+            getattr(config.llm, "provider", "lmstudio") if hasattr(config, "llm") else "lmstudio",
+        )
+        base_url = os.getenv(
+            "LLM_BASE_URL",
+            getattr(config.llm, "base_url", "http://localhost:1234/v1") if hasattr(config, "llm") else "http://localhost:1234/v1",
+        )
+        model = os.getenv(
+            "LLM_MODEL",
+            getattr(config.llm, "model_name", "qwen/qwen2.5-vl-7b") if hasattr(config, "llm") else "qwen/qwen2.5-vl-7b",
+        )
+        api_key = os.getenv(
+            "LLM_API_KEY",
+            getattr(config.llm, "api_key", "") if hasattr(config, "llm") else "",
+        )
         llm = LLMManager(provider=provider, base_url=base_url, default_model=model, api_key=api_key)
     except Exception:
         llm = None

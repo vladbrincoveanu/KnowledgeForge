@@ -1,0 +1,38 @@
+{
+  "task_id": "extract_1778937332",
+  "repository_url": "/app/sources/demo/omnipay-ledger",
+  "timestamp": "2026-05-16T13:15:32.899994",
+  "total_duration_ms": 126.06239318847656,
+  "phases": [
+    {
+      "name": "L2_Containers",
+      "duration_ms": 44.324398040771484,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "L1_Context",
+      "duration_ms": 76.97653770446777,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "Container_Relationships",
+      "duration_ms": 0.10228157043457031,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "L3_Components",
+      "duration_ms": 4.644870758056641,
+      "success": true,
+      "error": null
+    },
+    {
+      "name": "LLM_Enrichment",
+      "duration_ms": 0.01430511474609375,
+      "success": true,
+      "error": null
+    }
+  ]
+}
