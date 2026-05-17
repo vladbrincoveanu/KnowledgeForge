@@ -1,0 +1,10 @@
+[project]
+name = "worker"
+version = "1.0.0"
+dependencies = [
+  "kafka-python>=2.0",
+  "psycopg2-binary>=2.9",
+]
+
+[project.scripts]
+worker = "worker.__main__:main"

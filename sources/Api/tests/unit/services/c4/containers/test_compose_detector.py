@@ -132,6 +132,94 @@ class TestComposeDetectorDetect:
         assert isinstance(result, list)
 
 
+class TestComposeDetectorRecursion:
+    """Compose detector must find files in subdirectories. Monorepos commonly
+    place service-local compose files at services/<svc>/docker-compose.yml in
+    addition to (or instead of) a top-level orchestration compose."""
+
+    def test_finds_compose_in_subdirectory(self, temp_repo):
+        sub = temp_repo / "services" / "api"
+        sub.mkdir(parents=True)
+        (sub / "docker-compose.yml").write_text(yaml.dump({
+            "version": "3.8",
+            "services": {"api": {"image": "myapi:latest", "ports": ["3000:3000"]}},
+        }))
+        detector = ComposeDetector(temp_repo)
+        assert detector.can_detect() is True
+        result = detector.detect()
+        names = {c["name"] for c in result}
+        assert "api" in names
+
+    def test_finds_compose_in_root_and_subdirectory(self, temp_repo):
+        (temp_repo / "docker-compose.yml").write_text(yaml.dump({
+            "version": "3.8",
+            "services": {"postgres": {"image": "postgres:15"}},
+        }))
+        sub = temp_repo / "services" / "worker"
+        sub.mkdir(parents=True)
+        (sub / "docker-compose.yml").write_text(yaml.dump({
+            "version": "3.8",
+            "services": {"worker": {"image": "myworker:latest"}},
+        }))
+        result = ComposeDetector(temp_repo).detect()
+        names = {c["name"] for c in result}
+        assert names == {"postgres", "worker"}
+
+    def test_path_field_includes_subdirectory(self, temp_repo):
+        sub = temp_repo / "services" / "api"
+        sub.mkdir(parents=True)
+        (sub / "docker-compose.yml").write_text(yaml.dump({
+            "version": "3.8",
+            "services": {"api": {"image": "myapi:latest"}},
+        }))
+        result = ComposeDetector(temp_repo).detect()
+        api = next(c for c in result if c["name"] == "api")
+        # path should reflect the actual compose file location, not just the basename
+        assert "services/api" in api["path"]
+
+
+class TestComposeDetectorExclusions:
+    """Compose files inside vendored / test / build directories must be ignored —
+    they are typically example fixtures or third-party dependencies, not real
+    services of the system being analysed."""
+
+    @pytest.mark.parametrize("excluded_dir", [
+        "node_modules", "vendor", ".git", "dist", "build", "target",
+        "tests", "test", "__pycache__", ".venv", "venv",
+    ])
+    def test_compose_in_excluded_dirs_is_ignored(self, temp_repo, excluded_dir):
+        excluded = temp_repo / excluded_dir / "some-pkg"
+        excluded.mkdir(parents=True)
+        (excluded / "docker-compose.yml").write_text(yaml.dump({
+            "version": "3.8",
+            "services": {"vendored": {"image": "junk:latest"}},
+        }))
+        detector = ComposeDetector(temp_repo)
+        # No real compose at root, so can_detect should be False
+        assert detector.can_detect() is False, (
+            f"compose file inside {excluded_dir}/ must not satisfy can_detect"
+        )
+        assert detector.detect() == []
+
+    def test_real_service_alongside_excluded_compose(self, temp_repo):
+        # Real top-level compose
+        (temp_repo / "docker-compose.yml").write_text(yaml.dump({
+            "version": "3.8",
+            "services": {"api": {"image": "api:latest"}},
+        }))
+        # Junk inside node_modules — must be filtered out
+        nm = temp_repo / "node_modules" / "some-pkg"
+        nm.mkdir(parents=True)
+        (nm / "docker-compose.yml").write_text(yaml.dump({
+            "version": "3.8",
+            "services": {"vendored-junk": {"image": "junk:latest"}},
+        }))
+        result = ComposeDetector(temp_repo).detect()
+        names = {c["name"] for c in result}
+        assert names == {"api"}
+        assert "vendored-junk" not in names
+
+
 class TestComposeDetectorProtocolInference:
     """Test protocol inference from image and ports."""
 

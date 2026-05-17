@@ -5,7 +5,7 @@
     "type": "system",
     "name": "airbyte",
     "purpose": "We believe that only an open-source solution to data movement can cover the long tail of data sources while empowering data engineers to customize existing connectors.",
-    "description": "We believe that only an open-source solution to data movement can cover the long tail of data sources while empowering data engineers to customize existing connectors.",
+    "description": "Thinking Process:\n\n1.  Analyze the Request:\n    *   Input Data: System name (airbyte), Purpose (open-source data movement, covers long tail of sources, empowers customization), Domain (API Gateway - *Note: This seems contradictory to the purpose description which is about data movement/connectors, but I must use the provided info*), Owner (airbytehq/ai-language-models), Tier (Tier 1 - Production Critical), Status (ACTIVE), Languages/Frameworks (Python, Java, JavaScript).\n    *   Constraint: Concise.",
     "external_dependencies": [
       {
         "name": "AWS S3",
@@ -206,27 +206,12 @@
             {
               "type": "documentation_reference",
               "source": "README.md",
-              "snippet": "https://img.shields.io/github/stars/airbytehq/airbyte?style=social&label=Star&maxAge=2592000"
-            },
-            {
-              "type": "documentation_reference",
-              "source": "README.md",
               "snippet": "https://github.com/airbytehq/airbyte/releases"
             },
             {
               "type": "documentation_reference",
               "source": "README.md",
-              "snippet": "https://img.shields.io/github/v/release/airbytehq/airbyte?color=white"
-            },
-            {
-              "type": "documentation_reference",
-              "source": "README.md",
               "snippet": "https://github.com/airbytehq/airbyte/actions/workflows/gradle.yml"
-            },
-            {
-              "type": "documentation_reference",
-              "source": "README.md",
-              "snippet": "https://img.shields.io/github/actions/workflow/status/airbytehq/airbyte/gradle.yml?branch=master"
             },
             {
               "type": "documentation_reference",
@@ -262,11 +247,6 @@
               "type": "documentation_reference",
               "source": "README.md",
               "snippet": "https://github.com/airbytehq/airbyte/graphs/contributors"
-            },
-            {
-              "type": "documentation_reference",
-              "source": "docs/readme.md",
-              "snippet": "https://img.shields.io/github/stars/airbytehq/airbyte?style=social&label=Star&maxAge=2592000"
             },
             {
               "type": "documentation_reference",
@@ -2795,27 +2775,12 @@
           {
             "type": "documentation_reference",
             "source": "README.md",
-            "snippet": "https://img.shields.io/github/stars/airbytehq/airbyte?style=social&label=Star&maxAge=2592000"
-          },
-          {
-            "type": "documentation_reference",
-            "source": "README.md",
             "snippet": "https://github.com/airbytehq/airbyte/releases"
           },
           {
             "type": "documentation_reference",
             "source": "README.md",
-            "snippet": "https://img.shields.io/github/v/release/airbytehq/airbyte?color=white"
-          },
-          {
-            "type": "documentation_reference",
-            "source": "README.md",
             "snippet": "https://github.com/airbytehq/airbyte/actions/workflows/gradle.yml"
-          },
-          {
-            "type": "documentation_reference",
-            "source": "README.md",
-            "snippet": "https://img.shields.io/github/actions/workflow/status/airbytehq/airbyte/gradle.yml?branch=master"
           },
           {
             "type": "documentation_reference",
@@ -2851,11 +2816,6 @@
             "type": "documentation_reference",
             "source": "README.md",
             "snippet": "https://github.com/airbytehq/airbyte/graphs/contributors"
-          },
-          {
-            "type": "documentation_reference",
-            "source": "docs/readme.md",
-            "snippet": "https://img.shields.io/github/stars/airbytehq/airbyte?style=social&label=Star&maxAge=2592000"
           },
           {
             "type": "documentation_reference",
@@ -5485,8 +5445,8 @@
           }
         ],
         "suggested_prompts": [
-          "Is AWS (cloud) a business actor or technical detail given confidence 50% (threshold 70%)?",
-          "What role does AWS play given it was found in: Pattern match: aws?"
+          "prompt1",
+          "prompt2"
         ],
         "detected_from_all": [
           "airbyte-integrations/connectors-performance/destination-harness/Dockerfile",
@@ -5603,92 +5563,6 @@
             "source": "airbyte-integrations/bases/base-java/Dockerfile",
             "snippet": "Pattern match: datadog"
           }
-        ],
-        "detected_from_all": [
-          "airbyte-integrations/bases/base-java/Dockerfile"
-        ]
-      },
-      {
-        "name": "Dtdg",
-        "type": "external_service",
-        "detected_from": "airbyte-integrations/bases/base-java/Dockerfile",
-        "context": "https://dtdg.co/latest-java-tracer",
-        "evidence_type": "deployment_reference",
-        "url": "https://dtdg.co/latest-java-tracer",
-        "context_name": "Dtdg",
-        "integration_surface": null,
-        "provider": "Dtdg",
-        "company": null,
-        "category": "external_service",
-        "dependency_type": "UNKNOWN",
-        "classification_confidence": 0.5,
-        "classification_reasoning": "Could not determine classification for 'Dtdg' with type 'external_service'",
-        "decision_mode": "deterministic",
-        "decision": {
-          "value": "Dtdg",
-          "confidence": 0.5,
-          "detection_source": "rule_based_classifier",
-          "decision_mode": "deterministic",
-          "review_status": "needs_review",
-          "evidence": [
-            {
-              "type": "deployment_reference",
-              "source": "airbyte-integrations/bases/base-java/Dockerfile",
-              "snippet": "https://dtdg.co/latest-java-tracer"
-            }
-          ],
-          "metadata": {
-            "provider": "Dtdg",
-            "company": null,
-            "category": "external_service",
-            "boundary": "UNKNOWN",
-            "catalog_match": null
-          }
-        },
-        "confidence": 0.5,
-        "detection_source": "rule_based_classifier",
-        "review_status": "needs_review",
-        "requires_human_review": true,
-        "review_threshold": 0.7,
-        "evidence": [
-          {
-            "type": "deployment_reference",
-            "source": "airbyte-integrations/bases/base-java/Dockerfile",
-            "snippet": "https://dtdg.co/latest-java-tracer"
-          }
-        ],
-        "review_item": {
-          "field": "external_dependencies",
-          "candidate_value": "Dtdg",
-          "confidence": 0.5,
-          "reason": "Could not determine classification for 'Dtdg' with type 'external_service'",
-          "repo_path": "/app/sources/demo/airbyte",
-          "evidence": [
-            {
-              "type": "deployment_reference",
-              "source": "airbyte-integrations/bases/base-java/Dockerfile",
-              "snippet": "https://dtdg.co/latest-java-tracer"
-            }
-          ],
-          "recommended_action": "human_review"
-        },
-        "review_options": [
-          {
-            "id": "context-business-system",
-            "label": "Keep At Context Level",
-            "value": "BUSINESS_SYSTEM",
-            "description": "Treat Dtdg as an external business company or SaaS that belongs in the system context."
-          },
-          {
-            "id": "container-technical-infra",
-            "label": "Move To Container Level",
-            "value": "TECHNICAL_INFRA",
-            "description": "Treat Dtdg as technical infrastructure or an implementation detail that should not stay in the context diagram."
-          }
-        ],
-        "suggested_prompts": [
-          "Is Dtdg (external_service) a business actor or technical detail given confidence 50% (threshold 70%)?",
-          "What role does Dtdg play given it was found in: https://dtdg.co/latest-java-tracer?"
         ],
         "detected_from_all": [
           "airbyte-integrations/bases/base-java/Dockerfile"
@@ -6577,325 +6451,6 @@
         ]
       },
       {
-        "name": "Website Files",
-        "type": "external_service",
-        "detected_from": "README.md",
-        "context": "https://assets.website-files.com/605e01bc25f7e19a82e74788/624d9c4a375a55100be6b257_Airbyte_logo_color_dark.svg",
-        "evidence_type": "documentation_reference",
-        "url": "https://assets.website-files.com/605e01bc25f7e19a82e74788/624d9c4a375a55100be6b257_Airbyte_logo_color_dark.svg",
-        "context_name": "Website Files",
-        "integration_surface": null,
-        "provider": "Website Files",
-        "company": null,
-        "category": "external_service",
-        "dependency_type": "UNKNOWN",
-        "classification_confidence": 0.5,
-        "classification_reasoning": "Could not determine classification for 'Website Files' with type 'external_service'",
-        "decision_mode": "deterministic",
-        "decision": {
-          "value": "Website Files",
-          "confidence": 0.5,
-          "detection_source": "rule_based_classifier",
-          "decision_mode": "deterministic",
-          "review_status": "needs_review",
-          "evidence": [
-            {
-              "type": "documentation_reference",
-              "source": "README.md",
-              "snippet": "https://assets.website-files.com/605e01bc25f7e19a82e74788/624d9c4a375a55100be6b257_Airbyte_logo_color_dark.svg"
-            }
-          ],
-          "metadata": {
-            "provider": "Website Files",
-            "company": null,
-            "category": "external_service",
-            "boundary": "UNKNOWN",
-            "catalog_match": null
-          }
-        },
-        "confidence": 0.5,
-        "detection_source": "rule_based_classifier",
-        "review_status": "needs_review",
-        "requires_human_review": true,
-        "review_threshold": 0.7,
-        "evidence": [
-          {
-            "type": "documentation_reference",
-            "source": "README.md",
-            "snippet": "https://assets.website-files.com/605e01bc25f7e19a82e74788/624d9c4a375a55100be6b257_Airbyte_logo_color_dark.svg"
-          }
-        ],
-        "review_item": {
-          "field": "external_dependencies",
-          "candidate_value": "Website Files",
-          "confidence": 0.5,
-          "reason": "Could not determine classification for 'Website Files' with type 'external_service'",
-          "repo_path": "/app/sources/demo/airbyte",
-          "evidence": [
-            {
-              "type": "documentation_reference",
-              "source": "README.md",
-              "snippet": "https://assets.website-files.com/605e01bc25f7e19a82e74788/624d9c4a375a55100be6b257_Airbyte_logo_color_dark.svg"
-            }
-          ],
-          "recommended_action": "human_review"
-        },
-        "review_options": [
-          {
-            "id": "context-business-system",
-            "label": "Keep At Context Level",
-            "value": "BUSINESS_SYSTEM",
-            "description": "Treat Website Files as an external business company or SaaS that belongs in the system context."
-          },
-          {
-            "id": "container-technical-infra",
-            "label": "Move To Container Level",
-            "value": "TECHNICAL_INFRA",
-            "description": "Treat Website Files as technical infrastructure or an implementation detail that should not stay in the context diagram."
-          }
-        ],
-        "suggested_prompts": [
-          "Is Website Files (external_service) a business actor or technical detail given confidence 50% (threshold 70%)?",
-          "What role does Website Files play given it was found in: https://assets.website-files.com/605e01bc25f7e19a82e74788/624d9c4a375a55100be6b2?"
-        ],
-        "detected_from_all": [
-          "README.md"
-        ]
-      },
-      {
-        "name": "Shields",
-        "type": "external_service",
-        "detected_from": "README.md",
-        "context": "https://img.shields.io/badge/slack-join-white.svg?logo=slack",
-        "evidence_type": "documentation_reference",
-        "url": "https://img.shields.io/badge/slack-join-white.svg?logo=slack",
-        "context_name": "Shields",
-        "integration_surface": null,
-        "provider": "Shields",
-        "company": null,
-        "category": "external_service",
-        "dependency_type": "UNKNOWN",
-        "classification_confidence": 0.5,
-        "classification_reasoning": "Could not determine classification for 'Shields' with type 'external_service'",
-        "decision_mode": "deterministic",
-        "decision": {
-          "value": "Shields",
-          "confidence": 0.5,
-          "detection_source": "rule_based_classifier",
-          "decision_mode": "deterministic",
-          "review_status": "needs_review",
-          "evidence": [
-            {
-              "type": "documentation_reference",
-              "source": "README.md",
-              "snippet": "https://img.shields.io/badge/slack-join-white.svg?logo=slack"
-            },
-            {
-              "type": "documentation_reference",
-              "source": "README.md",
-              "snippet": "https://img.shields.io/youtube/channel/views/UCQ_JWEFzs1_INqdhIO3kmrw?style=social"
-            },
-            {
-              "type": "documentation_reference",
-              "source": "README.md",
-              "snippet": "https://img.shields.io/static/v1?label=license&message=MIT&color=white"
-            },
-            {
-              "type": "documentation_reference",
-              "source": "README.md",
-              "snippet": "https://img.shields.io/static/v1?label=license&message=ELv2&color=white"
-            },
-            {
-              "type": "documentation_reference",
-              "source": "docs/readme.md",
-              "snippet": "https://img.shields.io/static/v1?label=license&message=MIT&color=brightgreen"
-            },
-            {
-              "type": "documentation_reference",
-              "source": "docs/readme.md",
-              "snippet": "https://img.shields.io/static/v1?label=license&message=ELv2&color=brightgreen"
-            }
-          ],
-          "metadata": {
-            "provider": "Shields",
-            "company": null,
-            "category": "external_service",
-            "boundary": "UNKNOWN",
-            "catalog_match": null
-          }
-        },
-        "confidence": 0.5,
-        "detection_source": "rule_based_classifier",
-        "review_status": "needs_review",
-        "requires_human_review": true,
-        "review_threshold": 0.7,
-        "evidence": [
-          {
-            "type": "documentation_reference",
-            "source": "README.md",
-            "snippet": "https://img.shields.io/badge/slack-join-white.svg?logo=slack"
-          },
-          {
-            "type": "documentation_reference",
-            "source": "README.md",
-            "snippet": "https://img.shields.io/youtube/channel/views/UCQ_JWEFzs1_INqdhIO3kmrw?style=social"
-          },
-          {
-            "type": "documentation_reference",
-            "source": "README.md",
-            "snippet": "https://img.shields.io/static/v1?label=license&message=MIT&color=white"
-          },
-          {
-            "type": "documentation_reference",
-            "source": "README.md",
-            "snippet": "https://img.shields.io/static/v1?label=license&message=ELv2&color=white"
-          },
-          {
-            "type": "documentation_reference",
-            "source": "docs/readme.md",
-            "snippet": "https://img.shields.io/static/v1?label=license&message=MIT&color=brightgreen"
-          },
-          {
-            "type": "documentation_reference",
-            "source": "docs/readme.md",
-            "snippet": "https://img.shields.io/static/v1?label=license&message=ELv2&color=brightgreen"
-          }
-        ],
-        "review_item": {
-          "field": "external_dependencies",
-          "candidate_value": "Shields",
-          "confidence": 0.5,
-          "reason": "Could not determine classification for 'Shields' with type 'external_service'",
-          "repo_path": "/app/sources/demo/airbyte",
-          "evidence": [
-            {
-              "type": "documentation_reference",
-              "source": "docs/readme.md",
-              "snippet": "https://img.shields.io/static/v1?label=license&message=ELv2&color=brightgreen"
-            }
-          ],
-          "recommended_action": "human_review"
-        },
-        "review_options": [
-          {
-            "id": "context-business-system",
-            "label": "Keep At Context Level",
-            "value": "BUSINESS_SYSTEM",
-            "description": "Treat Shields as an external business company or SaaS that belongs in the system context."
-          },
-          {
-            "id": "container-technical-infra",
-            "label": "Move To Container Level",
-            "value": "TECHNICAL_INFRA",
-            "description": "Treat Shields as technical infrastructure or an implementation detail that should not stay in the context diagram."
-          }
-        ],
-        "suggested_prompts": [
-          "Is Shields (external_service) a business actor or technical detail given confidence 50% (threshold 70%)?",
-          "What role does Shields play given it was found in: https://img.shields.io/badge/slack-join-white.svg?logo=slack?"
-        ],
-        "detected_from_all": [
-          "README.md",
-          "docs/readme.md"
-        ]
-      },
-      {
-        "name": "Youtube",
-        "type": "external_service",
-        "detected_from": "README.md",
-        "context": "https://www.youtube.com/c/AirbyteHQ/?sub_confirmation=1",
-        "evidence_type": "documentation_reference",
-        "url": "https://www.youtube.com/c/AirbyteHQ/?sub_confirmation=1",
-        "context_name": "Youtube",
-        "integration_surface": null,
-        "provider": "Youtube",
-        "company": null,
-        "category": "external_service",
-        "dependency_type": "UNKNOWN",
-        "classification_confidence": 0.5,
-        "classification_reasoning": "Could not determine classification for 'Youtube' with type 'external_service'",
-        "decision_mode": "deterministic",
-        "decision": {
-          "value": "Youtube",
-          "confidence": 0.5,
-          "detection_source": "rule_based_classifier",
-          "decision_mode": "deterministic",
-          "review_status": "needs_review",
-          "evidence": [
-            {
-              "type": "documentation_reference",
-              "source": "README.md",
-              "snippet": "https://www.youtube.com/c/AirbyteHQ/?sub_confirmation=1"
-            },
-            {
-              "type": "documentation_reference",
-              "source": "README.md",
-              "snippet": "https://www.youtube.com/c/AirbyteHQ"
-            }
-          ],
-          "metadata": {
-            "provider": "Youtube",
-            "company": null,
-            "category": "external_service",
-            "boundary": "UNKNOWN",
-            "catalog_match": null
-          }
-        },
-        "confidence": 0.5,
-        "detection_source": "rule_based_classifier",
-        "review_status": "needs_review",
-        "requires_human_review": true,
-        "review_threshold": 0.7,
-        "evidence": [
-          {
-            "type": "documentation_reference",
-            "source": "README.md",
-            "snippet": "https://www.youtube.com/c/AirbyteHQ/?sub_confirmation=1"
-          },
-          {
-            "type": "documentation_reference",
-            "source": "README.md",
-            "snippet": "https://www.youtube.com/c/AirbyteHQ"
-          }
-        ],
-        "review_item": {
-          "field": "external_dependencies",
-          "candidate_value": "Youtube",
-          "confidence": 0.5,
-          "reason": "Could not determine classification for 'Youtube' with type 'external_service'",
-          "repo_path": "/app/sources/demo/airbyte",
-          "evidence": [
-            {
-              "type": "documentation_reference",
-              "source": "README.md",
-              "snippet": "https://www.youtube.com/c/AirbyteHQ"
-            }
-          ],
-          "recommended_action": "human_review"
-        },
-        "review_options": [
-          {
-            "id": "context-business-system",
-            "label": "Keep At Context Level",
-            "value": "BUSINESS_SYSTEM",
-            "description": "Treat Youtube as an external business company or SaaS that belongs in the system context."
-          },
-          {
-            "id": "container-technical-infra",
-            "label": "Move To Container Level",
-            "value": "TECHNICAL_INFRA",
-            "description": "Treat Youtube as technical infrastructure or an implementation detail that should not stay in the context diagram."
-          }
-        ],
-        "suggested_prompts": [
-          "Is Youtube (external_service) a business actor or technical detail given confidence 50% (threshold 70%)?",
-          "What role does Youtube play given it was found in: https://www.youtube.com/c/AirbyteHQ/?sub_confirmation=1?"
-        ],
-        "detected_from_all": [
-          "README.md"
-        ]
-      },
-      {
         "name": "Contrib",
         "type": "external_service",
         "detected_from": "README.md",
@@ -7070,8 +6625,8 @@
           }
         ],
         "suggested_prompts": [
-          "Is Oracle (external_service) a business actor or technical detail given confidence 50% (threshold 70%)?",
-          "What role does Oracle play given it was found in: https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/chapter_1540391670?"
+          "prompt1",
+          "prompt2"
         ],
         "detected_from_all": [
           "airbyte-integrations/bases/connector-acceptance-test/unit_tests/data/docs/with_not_required_steps.md"
@@ -7156,8 +6711,8 @@
           }
         ],
         "suggested_prompts": [
-          "Is Netsuite (external_service) a business actor or technical detail given confidence 50% (threshold 70%)?",
-          "What role does Netsuite play given it was found in: https://system.netsuite.com/pages/customerlogin.jsp?country=US?"
+          "prompt1",
+          "prompt2"
         ],
         "detected_from_all": [
           "airbyte-integrations/bases/connector-acceptance-test/unit_tests/data/docs/with_not_required_steps.md"
@@ -7182,21 +6737,6 @@
       },
       {
         "field": "external_dependencies",
-        "candidate_value": "Dtdg",
-        "confidence": 0.5,
-        "reason": "Could not determine classification for 'Dtdg' with type 'external_service'",
-        "repo_path": "/app/sources/demo/airbyte",
-        "evidence": [
-          {
-            "type": "deployment_reference",
-            "source": "airbyte-integrations/bases/base-java/Dockerfile",
-            "snippet": "https://dtdg.co/latest-java-tracer"
-          }
-        ],
-        "recommended_action": "human_review"
-      },
-      {
-        "field": "external_dependencies",
         "candidate_value": "Airbyte",
         "confidence": 0.5,
         "reason": "Could not determine classification for 'Airbyte' with type 'external_service'",
@@ -7206,51 +6746,6 @@
             "type": "documentation_reference",
             "source": "airbyte-integrations/bases/connector-acceptance-test/unit_tests/data/docs/correct.md",
             "snippet": "https://docs.airbyte.com/understanding-airbyte/connections/incremental-append-deduped"
-          }
-        ],
-        "recommended_action": "human_review"
-      },
-      {
-        "field": "external_dependencies",
-        "candidate_value": "Website Files",
-        "confidence": 0.5,
-        "reason": "Could not determine classification for 'Website Files' with type 'external_service'",
-        "repo_path": "/app/sources/demo/airbyte",
-        "evidence": [
-          {
-            "type": "documentation_reference",
-            "source": "README.md",
-            "snippet": "https://assets.website-files.com/605e01bc25f7e19a82e74788/624d9c4a375a55100be6b257_Airbyte_logo_color_dark.svg"
-          }
-        ],
-        "recommended_action": "human_review"
-      },
-      {
-        "field": "external_dependencies",
-        "candidate_value": "Shields",
-        "confidence": 0.5,
-        "reason": "Could not determine classification for 'Shields' with type 'external_service'",
-        "repo_path": "/app/sources/demo/airbyte",
-        "evidence": [
-          {
-            "type": "documentation_reference",
-            "source": "docs/readme.md",
-            "snippet": "https://img.shields.io/static/v1?label=license&message=ELv2&color=brightgreen"
-          }
-        ],
-        "recommended_action": "human_review"
-      },
-      {
-        "field": "external_dependencies",
-        "candidate_value": "Youtube",
-        "confidence": 0.5,
-        "reason": "Could not determine classification for 'Youtube' with type 'external_service'",
-        "repo_path": "/app/sources/demo/airbyte",
-        "evidence": [
-          {
-            "type": "documentation_reference",
-            "source": "README.md",
-            "snippet": "https://www.youtube.com/c/AirbyteHQ"
           }
         ],
         "recommended_action": "human_review"
@@ -7514,8 +7009,8 @@
           }
         ],
         "suggested_prompts": [
-          "Is AWS (cloud) a business actor or technical detail given confidence 50% (threshold 70%)?",
-          "What role does AWS play given it was found in: Pattern match: aws?"
+          "prompt1",
+          "prompt2"
         ],
         "detected_from_all": [
           "airbyte-integrations/connectors-performance/destination-harness/Dockerfile",
@@ -7694,92 +7189,6 @@
             "source": "airbyte-integrations/bases/base-java/Dockerfile",
             "snippet": "Pattern match: datadog"
           }
-        ],
-        "detected_from_all": [
-          "airbyte-integrations/bases/base-java/Dockerfile"
-        ]
-      },
-      {
-        "name": "Dtdg",
-        "type": "external_service",
-        "detected_from": "airbyte-integrations/bases/base-java/Dockerfile",
-        "context": "https://dtdg.co/latest-java-tracer",
-        "evidence_type": "deployment_reference",
-        "url": "https://dtdg.co/latest-java-tracer",
-        "context_name": "Dtdg",
-        "integration_surface": null,
-        "provider": "Dtdg",
-        "company": null,
-        "category": "external_service",
-        "dependency_type": "UNKNOWN",
-        "classification_confidence": 0.5,
-        "classification_reasoning": "Could not determine classification for 'Dtdg' with type 'external_service'",
-        "decision_mode": "deterministic",
-        "decision": {
-          "value": "Dtdg",
-          "confidence": 0.5,
-          "detection_source": "rule_based_classifier",
-          "decision_mode": "deterministic",
-          "review_status": "needs_review",
-          "evidence": [
-            {
-              "type": "deployment_reference",
-              "source": "airbyte-integrations/bases/base-java/Dockerfile",
-              "snippet": "https://dtdg.co/latest-java-tracer"
-            }
-          ],
-          "metadata": {
-            "provider": "Dtdg",
-            "company": null,
-            "category": "external_service",
-            "boundary": "UNKNOWN",
-            "catalog_match": null
-          }
-        },
-        "confidence": 0.5,
-        "detection_source": "rule_based_classifier",
-        "review_status": "needs_review",
-        "requires_human_review": true,
-        "review_threshold": 0.7,
-        "evidence": [
-          {
-            "type": "deployment_reference",
-            "source": "airbyte-integrations/bases/base-java/Dockerfile",
-            "snippet": "https://dtdg.co/latest-java-tracer"
-          }
-        ],
-        "review_item": {
-          "field": "external_dependencies",
-          "candidate_value": "Dtdg",
-          "confidence": 0.5,
-          "reason": "Could not determine classification for 'Dtdg' with type 'external_service'",
-          "repo_path": "/app/sources/demo/airbyte",
-          "evidence": [
-            {
-              "type": "deployment_reference",
-              "source": "airbyte-integrations/bases/base-java/Dockerfile",
-              "snippet": "https://dtdg.co/latest-java-tracer"
-            }
-          ],
-          "recommended_action": "human_review"
-        },
-        "review_options": [
-          {
-            "id": "context-business-system",
-            "label": "Keep At Context Level",
-            "value": "BUSINESS_SYSTEM",
-            "description": "Treat Dtdg as an external business company or SaaS that belongs in the system context."
-          },
-          {
-            "id": "container-technical-infra",
-            "label": "Move To Container Level",
-            "value": "TECHNICAL_INFRA",
-            "description": "Treat Dtdg as technical infrastructure or an implementation detail that should not stay in the context diagram."
-          }
-        ],
-        "suggested_prompts": [
-          "Is Dtdg (external_service) a business actor or technical detail given confidence 50% (threshold 70%)?",
-          "What role does Dtdg play given it was found in: https://dtdg.co/latest-java-tracer?"
         ],
         "detected_from_all": [
           "airbyte-integrations/bases/base-java/Dockerfile"
@@ -8023,14 +7432,6 @@
         "detected_from": "docs/readme.md",
         "detection_method": "documentation_heading",
         "evidence": "## For Airbyte contributors"
-      },
-      {
-        "name": "Step 2.5: Setup User",
-        "type": "person",
-        "description": "1.",
-        "detected_from": "airbyte-integrations/bases/connector-acceptance-test/unit_tests/data/docs/with_not_required_steps.md",
-        "detection_method": "documentation_heading",
-        "evidence": "#### Step 2.5: Setup User"
       }
     ],
     "languages": [
@@ -8051,13 +7452,7 @@
         "file_count": 1
       }
     ],
-    "frameworks": [
-      {
-        "language": "Python",
-        "framework": "Django",
-        "detected_from": "pyproject.toml"
-      }
-    ],
+    "frameworks": [],
     "repository_url": "",
     "git": {},
     "context_sources": {
@@ -8080,9 +7475,6 @@
         "airbyte-integrations/connectors/destination-sftp-json/Dockerfile",
         "airbyte-integrations/connectors/source-google-directory/Dockerfile",
         "airbyte-integrations/connectors/source-amazon-sqs/Dockerfile"
-      ],
-      "framework_files": [
-        "pyproject.toml"
       ]
     },
     "regulatory_frameworks": [],
@@ -8101,20 +7493,18 @@
     },
     "owner_contributors": [],
     "owner_contributor_stats": [],
-    "contributor_count": 1,
-    "status": "MAINTENANCE",
+    "contributor_count": null,
+    "status": "ACTIVE",
     "status_evidence": {
-      "commits_30d": 1,
-      "commits_90d": 2,
-      "commits_180d": 2,
-      "last_commit_date": "2026-04-25T20:29:59+02:00",
-      "days_since_last_commit": 4,
-      "git_repos_scanned": 1
+      "recent_files_90d": 4132,
+      "newest_file_date": "2026-05-01",
+      "days_since_newest_file": 1,
+      "source": "file_mtime"
     },
     "tier": "Tier 1 - Production Critical",
     "data_class": "PII",
-    "active_experts": 0,
-    "compliance": "AT_RISK",
+    "active_experts": null,
+    "compliance": "COMPLIANT",
     "compliance_confidence": 1.0,
     "compliance_factors": [
       "Score: 4/7 checks passed",
@@ -8126,10 +7516,10 @@
       "\u274c Repository structure",
       "\u2705 Dependency management"
     ],
-    "last_commit_date": "2026-04-25T20:29:59+02:00",
-    "commit_count_30d": 1,
-    "commit_count_90d": 2,
-    "commit_count_180d": 2,
+    "last_commit_date": null,
+    "commit_count_30d": null,
+    "commit_count_90d": null,
+    "commit_count_180d": null,
     "dora_metrics": {
       "deployment_frequency_per_day": 0.0,
       "lead_time_days": null,
@@ -8142,47 +7532,19 @@
     "owner_team": "airbytehq/ai-language-models",
     "business_domain": "API Gateway",
     "criticality": "Tier 1 - Production Critical",
-    "llm_description": "We believe that only an open-source solution to data movement can cover the long tail of data sources while empowering data engineers to customize existing connectors."
+    "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Input: Node metadata (JSON-like structure).\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Specific Metadata to Use: `name` (\"air."
   },
   "containers": [
     {
       "c4_level": 2,
       "type": "container",
-      "name": "openapi2jsonschema",
-      "container_type": "Python Service",
-      "technology": "Unknown",
-      "protocol": "HTTP",
-      "path": "tools/openapi2jsonschema",
-      "runtime_environment": null,
-      "deployment": null,
-      "description": "Util for generating catalog schema from OpenAPI definition file. Forked from [openapi2jsonschema](https://github.com/instrumenta/openapi2jsonschema) util with fixes for generating standlone schemas e.g. ones that don't contain reference to ",
-      "repository_url": "",
-      "runtime_info": "Python 3.9-slim",
-      "dependencies_internal": [
-        "docker"
-      ],
-      "health_endpoint": "",
-      "endpoint": "",
-      "dockerfile": "tools/openapi2jsonschema/Dockerfile",
-      "terraform": false,
-      "helm": false,
-      "kubernetes": false,
-      "owner": null,
-      "team": null,
-      "owner_team": null,
-      "relationships": [],
-      "llm_description": "openapi2jsonschema is a deployable service (Python Service, Unknown)."
-    },
-    {
-      "c4_level": 2,
-      "type": "container",
       "name": "source-stock-ticker-api-tutorial",
       "container_type": "Python Service",
-      "technology": "Unknown",
+      "technology": "Python",
       "protocol": "HTTP",
       "path": "airbyte-integrations/connectors/source-stock-ticker-api-tutorial",
-      "runtime_environment": "Container",
-      "deployment": "Docker",
+      "runtime_environment": null,
+      "deployment": null,
       "description": "This is the repository for the Freshcaller source connector, written in Python. For information about how to use this connector within Airbyte, see [the documentation](https://docs.airbyte.io/integrations/sources/freshcaller).",
       "repository_url": "",
       "runtime_info": "Python 3.9-slim",
@@ -8197,6 +7559,10 @@
       "team": null,
       "owner_team": null,
       "relationships": [],
+      "llm_enriched": true,
+      "llm_confidence": 0.9,
+      "llm_verdict": "keep",
+      "llm_notes": "Python Airbyte connector with ENTRYPOINT pointing to source.py integration code.",
       "components": [
         {
           "id": "source-stock-ticker-api-tutorial::community_detection_read",
@@ -8204,66 +7570,19 @@
           "type": "component"
         }
       ],
-      "llm_description": "source-stock-ticker-api-tutorial is a deployable service (Python Service, Unknown, Docker)."
-    },
-    {
-      "c4_level": 2,
-      "type": "container",
-      "name": "integration_tests",
-      "container_type": "Service",
-      "technology": "Unknown",
-      "protocol": "HTTP",
-      "path": "airbyte-integrations/connectors/source-azure-blob-storage/integration_tests",
-      "runtime_environment": null,
-      "deployment": null,
-      "description": "",
-      "repository_url": "",
-      "runtime_info": "Unknown",
-      "dependencies_internal": [],
-      "health_endpoint": "",
-      "endpoint": "",
-      "dockerfile": null,
-      "terraform": false,
-      "helm": false,
-      "kubernetes": false,
-      "owner": null,
-      "team": null,
-      "owner_team": null,
-      "relationships": [
-        {
-          "from": "integration_tests",
-          "to": "storage.googleapis.com",
-          "type": "uses",
-          "protocol": "HTTPS",
-          "port": null,
-          "source": "config",
-          "description": "integration_tests uses storage.googleapis.com via url",
-          "_unresolved": true,
-          "metadata": {
-            "database": "covid19-open-data/v2/latest/epidemiology.csv"
-          }
-        }
-      ],
-      "components": [
-        {
-          "id": "integration_tests::community_detection_fixtureinfrastructure",
-          "name": "FixtureInfrastructure",
-          "type": "component"
-        }
-      ],
-      "llm_description": "integration_tests is a deployable service (Service, Unknown)."
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what this node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: A JSON object containing fields like `name`, `type`, `container_type`, `technology`, `."
     },
     {
       "c4_level": 2,
       "type": "container",
       "name": "docker",
-      "container_type": "Containerized Service",
-      "technology": "Unknown",
+      "container_type": "Database",
+      "technology": "ClickHouse",
       "protocol": "HTTP",
       "path": "airbyte-integrations/connectors/source-clickhouse/src/test-integration/resources/docker",
       "runtime_environment": null,
       "deployment": null,
-      "description": "",
+      "description": "ClickHouse database server for analytics and data warehousing workloads.",
       "repository_url": "",
       "runtime_info": "Unknown",
       "dependencies_internal": [],
@@ -8277,155 +7596,11 @@
       "team": null,
       "owner_team": null,
       "relationships": [],
-      "llm_description": "docker is a deployable service (Containerized Service, Unknown)."
-    },
-    {
-      "c4_level": 2,
-      "type": "container",
-      "name": "credentials",
-      "container_type": "Python Service",
-      "technology": "Unknown",
-      "protocol": "HTTP",
-      "path": "airbyte-integrations/connectors/source-google-search-console/credentials",
-      "runtime_environment": null,
-      "deployment": null,
-      "description": "1. Follow instructions [here](https://www.balbooa.com/gridbox-documentation/how-to-get-google-client-id-and-client-secret), to get `CLIENT_ID, CLIENT_SECRET and REDIRECTED_URI` 2. Source `Google Search Console` provides scripts to easy get ",
-      "repository_url": "",
-      "runtime_info": "Python 3.9-slim",
-      "dependencies_internal": [],
-      "health_endpoint": "",
-      "endpoint": "",
-      "dockerfile": "airbyte-integrations/connectors/source-google-search-console/credentials/Dockerfile",
-      "terraform": false,
-      "helm": false,
-      "kubernetes": false,
-      "owner": null,
-      "team": null,
-      "owner_team": null,
-      "relationships": [],
-      "llm_description": "credentials is a deployable service (Python Service, Unknown)."
-    },
-    {
-      "c4_level": 2,
-      "type": "container",
-      "name": "destination-harness",
-      "container_type": "Java Service",
-      "technology": "Java",
-      "protocol": "HTTP",
-      "path": "airbyte-integrations/connectors-performance/destination-harness",
-      "runtime_environment": null,
-      "deployment": null,
-      "description": "Performance harness for destination connectors.",
-      "repository_url": "",
-      "runtime_info": "Java dev",
-      "dependencies_internal": [],
-      "health_endpoint": "",
-      "endpoint": "",
-      "dockerfile": "airbyte-integrations/connectors-performance/destination-harness/Dockerfile",
-      "terraform": false,
-      "helm": false,
-      "kubernetes": false,
-      "owner": null,
-      "team": null,
-      "owner_team": null,
-      "relationships": [],
-      "components": [
-        {
-          "id": "destination-harness::community_detection_performance",
-          "name": "Performance",
-          "type": "component"
-        }
-      ],
-      "llm_description": "destination-harness is a deployable service (Java Service, Java)."
-    },
-    {
-      "c4_level": 2,
-      "type": "container",
-      "name": "connector-acceptance-test",
-      "container_type": "Python Service",
-      "technology": "Python",
-      "protocol": "HTTP",
-      "path": "airbyte-integrations/bases/connector-acceptance-test",
-      "runtime_environment": null,
-      "deployment": null,
-      "description": "This package gathers multiple test suites to assess the sanity of any Airbyte connector. It is shipped as a [pytest](https://docs.pytest.org/en/7.1.x/) plugin and relies on pytest to discover, configure and execute tests. Test-specific docu",
-      "repository_url": "",
-      "runtime_info": "Python 3.10.12",
-      "dependencies_internal": [],
-      "health_endpoint": "",
-      "endpoint": "",
-      "dockerfile": "airbyte-integrations/bases/connector-acceptance-test/Dockerfile",
-      "terraform": false,
-      "helm": false,
-      "kubernetes": false,
-      "owner": null,
-      "team": null,
-      "owner_team": null,
-      "relationships": [],
-      "components": [
-        {
-          "id": "connector-acceptance-test::community_detection_spec",
-          "name": "Spec",
-          "type": "component"
-        },
-        {
-          "id": "connector-acceptance-test::community_detection_connector_acceptance_testinfrastructure",
-          "name": "Connector_acceptance_testInfrastructure",
-          "type": "component"
-        },
-        {
-          "id": "connector-acceptance-test::community_detection_configurationinfrastructure",
-          "name": "ConfigurationInfrastructure",
-          "type": "component"
-        },
-        {
-          "id": "connector-acceptance-test::community_detection_pytestinfrastructure",
-          "name": "PytestInfrastructure",
-          "type": "component"
-        },
-        {
-          "id": "connector-acceptance-test::community_detection_getinfrastructure",
-          "name": "GetInfrastructure",
-          "type": "component"
-        },
-        {
-          "id": "connector-acceptance-test::community_detection_diff",
-          "name": "Diff",
-          "type": "component"
-        },
-        {
-          "id": "connector-acceptance-test::community_detection_hash",
-          "name": "Hash",
-          "type": "component"
-        }
-      ],
-      "llm_description": "connector-acceptance-test is a deployable service (Python Service, Python)."
-    },
-    {
-      "c4_level": 2,
-      "type": "container",
-      "name": "base-java",
-      "container_type": "Java Service",
-      "technology": "Java",
-      "protocol": "HTTP",
-      "path": "airbyte-integrations/bases/base-java",
-      "runtime_environment": null,
-      "deployment": null,
-      "description": "",
-      "repository_url": "",
-      "runtime_info": "Unknown",
-      "dependencies_internal": [],
-      "health_endpoint": "",
-      "endpoint": "",
-      "dockerfile": "airbyte-integrations/bases/base-java/Dockerfile",
-      "terraform": false,
-      "helm": false,
-      "kubernetes": false,
-      "owner": null,
-      "team": null,
-      "owner_team": null,
-      "relationships": [],
-      "llm_description": "base-java is a deployable service (Java Service, Java)."
+      "llm_enriched": true,
+      "llm_confidence": 0.95,
+      "llm_verdict": "keep",
+      "llm_notes": "Official clickhouse-server image with ports 8123/8443/9000/9440 exposed.",
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what this node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: A JSON object containing fields like `name`, `type`, `container_type`, `technology`, `."
     },
     {
       "c4_level": 2,
@@ -8437,7 +7612,7 @@
       "path": "airbyte-integrations/bases/base-normalization",
       "runtime_environment": null,
       "deployment": null,
-      "description": "",
+      "description": "Data normalization service using DBT for transformation pipelines.",
       "repository_url": "",
       "runtime_info": "Unknown",
       "dependencies_internal": [
@@ -8453,6 +7628,10 @@
       "team": null,
       "owner_team": null,
       "relationships": [],
+      "llm_enriched": true,
+      "llm_confidence": 0.9,
+      "llm_verdict": "keep",
+      "llm_notes": "Airbyte normalization base with DBT templates and entrypoint.sh for orchestration.",
       "components": [
         {
           "id": "base-normalization::community_detection_transform_configinfrastructure",
@@ -8490,59 +7669,7 @@
           "type": "component"
         }
       ],
-      "llm_description": "base-normalization is a deployable service (Python Service, Python)."
-    },
-    {
-      "c4_level": 2,
-      "type": "container",
-      "name": "base",
-      "container_type": "Java Service",
-      "technology": "Java",
-      "protocol": "HTTP",
-      "path": "airbyte-integrations/bases/base",
-      "runtime_environment": null,
-      "deployment": null,
-      "description": "",
-      "repository_url": "",
-      "runtime_info": "Unknown",
-      "dependencies_internal": [],
-      "health_endpoint": "",
-      "endpoint": "",
-      "dockerfile": "airbyte-integrations/bases/base/Dockerfile",
-      "terraform": false,
-      "helm": false,
-      "kubernetes": false,
-      "owner": null,
-      "team": null,
-      "owner_team": null,
-      "relationships": [],
-      "llm_description": "base is a deployable service (Java Service, Java)."
-    },
-    {
-      "c4_level": 2,
-      "type": "container",
-      "name": "generator",
-      "container_type": "Frontend (Node.js)",
-      "technology": "Node.js",
-      "protocol": "HTTP",
-      "path": "airbyte-integrations/connector-templates/generator",
-      "runtime_environment": null,
-      "deployment": null,
-      "description": "This module generates code to bootstrap your connector development.",
-      "repository_url": "",
-      "runtime_info": "Node.js 16-alpine",
-      "dependencies_internal": [],
-      "health_endpoint": "",
-      "endpoint": "",
-      "dockerfile": "airbyte-integrations/connector-templates/generator/Dockerfile",
-      "terraform": false,
-      "helm": false,
-      "kubernetes": false,
-      "owner": null,
-      "team": null,
-      "owner_team": null,
-      "relationships": [],
-      "llm_description": "generator is a deployable service (Frontend (Node.js), Node.js)."
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Base only on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: A JSON object containing fields like `name`, `type`,."
     },
     {
       "c4_level": 2,
@@ -8557,9 +7684,7 @@
       "description": "We use [Docusaurus](https://docusaurus.io) to build Airbyte's [documentation site](https://docs.airbyte.io) from documentation source files in Markdown, and lint the source files. We host the resulting docs site on Vercel. It deploys automa",
       "repository_url": "",
       "runtime_info": "Unknown",
-      "dependencies_internal": [
-        "generator"
-      ],
+      "dependencies_internal": [],
       "health_endpoint": "",
       "endpoint": "",
       "dockerfile": null,
@@ -8570,6 +7695,10 @@
       "team": null,
       "owner_team": null,
       "relationships": [],
+      "llm_enriched": true,
+      "llm_confidence": 0.85,
+      "llm_verdict": "keep",
+      "llm_notes": "React-based documentation generator with start/build scripts for local development.",
       "components": [
         {
           "id": "docusaurus::community_detection_get",
@@ -8587,7 +7716,7 @@
           "type": "component"
         }
       ],
-      "llm_description": "docusaurus is a deployable service (React Frontend, Node.js)."
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what this node is used for.\n    *   Constraint 1: Based only on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: A JSON object containing fields like `name`, `type`,."
     }
   ],
   "components": [
@@ -8605,161 +7734,7 @@
       "tags": [],
       "metadata": {},
       "container_id": "source-stock-ticker-api-tutorial",
-      "llm_description": "Read is a component within the system."
-    },
-    {
-      "c4_level": 3,
-      "type": "component",
-      "name": "FixtureInfrastructure",
-      "component_type": "component",
-      "container": "integration_tests",
-      "file": "airbyte-integrations/connectors/source-azure-blob-storage/integration_tests/conftest.py",
-      "documentation": null,
-      "technology": "Python",
-      "confidence": 0.5,
-      "extraction_method": "community_detection",
-      "tags": [],
-      "metadata": {
-        "layer": "infrastructure"
-      },
-      "container_id": "integration_tests",
-      "llm_description": "FixtureInfrastructure is a component within the system."
-    },
-    {
-      "c4_level": 3,
-      "type": "component",
-      "name": "Performance",
-      "component_type": "component",
-      "container": "destination-harness",
-      "file": "airbyte-integrations/connectors-performance/destination-harness/Main.java",
-      "documentation": null,
-      "technology": "Java",
-      "confidence": 0.5,
-      "extraction_method": "community_detection",
-      "tags": [],
-      "metadata": {},
-      "container_id": "destination-harness",
-      "llm_description": "Performance is a component within the system."
-    },
-    {
-      "c4_level": 3,
-      "type": "component",
-      "name": "Spec",
-      "component_type": "component",
-      "container": "connector-acceptance-test",
-      "file": "airbyte-integrations/bases/connector-acceptance-test/conftest.py",
-      "documentation": null,
-      "technology": "Python",
-      "confidence": 0.5,
-      "extraction_method": "community_detection",
-      "tags": [],
-      "metadata": {},
-      "container_id": "connector-acceptance-test",
-      "llm_description": "Spec is a component within the system."
-    },
-    {
-      "c4_level": 3,
-      "type": "component",
-      "name": "Connector_acceptance_testInfrastructure",
-      "component_type": "component",
-      "container": "connector-acceptance-test",
-      "file": "airbyte-integrations/bases/connector-acceptance-test/conftest.py",
-      "documentation": null,
-      "technology": "Python",
-      "confidence": 0.5,
-      "extraction_method": "community_detection",
-      "tags": [],
-      "metadata": {
-        "layer": "infrastructure"
-      },
-      "container_id": "connector-acceptance-test",
-      "llm_description": "Connector_acceptance_testInfrastructure is a component within the system."
-    },
-    {
-      "c4_level": 3,
-      "type": "component",
-      "name": "ConfigurationInfrastructure",
-      "component_type": "component",
-      "container": "connector-acceptance-test",
-      "file": "airbyte-integrations/bases/connector-acceptance-test/config.py",
-      "documentation": null,
-      "technology": "Python",
-      "confidence": 0.5,
-      "extraction_method": "community_detection",
-      "tags": [],
-      "metadata": {
-        "layer": "infrastructure"
-      },
-      "container_id": "connector-acceptance-test",
-      "llm_description": "ConfigurationInfrastructure is a component within the system."
-    },
-    {
-      "c4_level": 3,
-      "type": "component",
-      "name": "PytestInfrastructure",
-      "component_type": "component",
-      "container": "connector-acceptance-test",
-      "file": "airbyte-integrations/bases/connector-acceptance-test/config.py",
-      "documentation": null,
-      "technology": "Python",
-      "confidence": 0.5,
-      "extraction_method": "community_detection",
-      "tags": [],
-      "metadata": {
-        "layer": "infrastructure"
-      },
-      "container_id": "connector-acceptance-test",
-      "llm_description": "PytestInfrastructure is a component within the system."
-    },
-    {
-      "c4_level": 3,
-      "type": "component",
-      "name": "GetInfrastructure",
-      "component_type": "component",
-      "container": "connector-acceptance-test",
-      "file": "airbyte-integrations/bases/connector-acceptance-test/json_schema_helper.py",
-      "documentation": null,
-      "technology": "Python",
-      "confidence": 0.5,
-      "extraction_method": "community_detection",
-      "tags": [],
-      "metadata": {
-        "layer": "infrastructure"
-      },
-      "container_id": "connector-acceptance-test",
-      "llm_description": "GetInfrastructure is a component within the system."
-    },
-    {
-      "c4_level": 3,
-      "type": "component",
-      "name": "Diff",
-      "component_type": "component",
-      "container": "connector-acceptance-test",
-      "file": "airbyte-integrations/bases/connector-acceptance-test/backward_compatibility.py",
-      "documentation": null,
-      "technology": "Python",
-      "confidence": 0.5,
-      "extraction_method": "community_detection",
-      "tags": [],
-      "metadata": {},
-      "container_id": "connector-acceptance-test",
-      "llm_description": "Diff is a component within the system."
-    },
-    {
-      "c4_level": 3,
-      "type": "component",
-      "name": "Hash",
-      "component_type": "component",
-      "container": "connector-acceptance-test",
-      "file": "airbyte-integrations/bases/connector-acceptance-test/compare.py",
-      "documentation": null,
-      "technology": "Python",
-      "confidence": 0.5,
-      "extraction_method": "community_detection",
-      "tags": [],
-      "metadata": {},
-      "container_id": "connector-acceptance-test",
-      "llm_description": "Hash is a component within the system."
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: A JSON object containing fields like `name`, `type`, `container_type`, `technology`, `."
     },
     {
       "c4_level": 3,
@@ -8777,7 +7752,7 @@
         "layer": "infrastructure"
       },
       "container_id": "base-normalization",
-      "llm_description": "Transform_configInfrastructure is a component within the system."
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Transform_configInfrastructure\", \"type\": \"component\", \"container_type\": null."
     },
     {
       "c4_level": 3,
@@ -8793,7 +7768,7 @@
       "tags": [],
       "metadata": {},
       "container_id": "base-normalization",
-      "llm_description": "Macro is a component within the system."
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Macro\", \"type\":."
     },
     {
       "c4_level": 3,
@@ -8811,7 +7786,7 @@
         "layer": "infrastructure"
       },
       "container_id": "base-normalization",
-      "llm_description": "ReadInfrastructure is a component within the system."
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: A JSON object with fields like `name`, `type`, `container_type`, `technology`, `."
     },
     {
       "c4_level": 3,
@@ -8827,7 +7802,7 @@
       "tags": [],
       "metadata": {},
       "container_id": "base-normalization",
-      "llm_description": "Name is a component within the system."
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: A JSON object with keys like `name`, `type`, `container_type`, `technology`, `."
     },
     {
       "c4_level": 3,
@@ -8843,7 +7818,7 @@
       "tags": [],
       "metadata": {},
       "container_id": "base-normalization",
-      "llm_description": "Datetime is a component within the system."
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Datetime\", \"type\":."
     },
     {
       "c4_level": 3,
@@ -8859,7 +7834,7 @@
       "tags": [],
       "metadata": {},
       "container_id": "base-normalization",
-      "llm_description": "Transform is a component within the system."
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Base description *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: A JSON object containing fields like `name`, `type`, `container_type`, `technology`,."
     },
     {
       "c4_level": 3,
@@ -8875,7 +7850,7 @@
       "tags": [],
       "metadata": {},
       "container_id": "base-normalization",
-      "llm_description": "Integration_tests is a component within the system."
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: JSON object with keys like `name`, `type`, `container_type`, `technology`, `deployment."
     },
     {
       "c4_level": 3,
@@ -8891,7 +7866,7 @@
       "tags": [],
       "metadata": {},
       "container_id": "docusaurus",
-      "llm_description": "Get is a component within the system."
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Get\", \"type\":."
     },
     {
       "c4_level": 3,
@@ -8907,7 +7882,7 @@
       "tags": [],
       "metadata": {},
       "container_id": "docusaurus",
-      "llm_description": "Inject is a component within the system."
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint: Based *only* on the provided metadata. Avoid speculation.\n    *   Input Metadata: A JSON object with fields like `name`, `type`, `container_type`, `technology`, `."
     },
     {
       "c4_level": 3,
@@ -8923,7 +7898,7 @@
       "tags": [],
       "metadata": {},
       "container_id": "docusaurus",
-      "llm_description": "Show is a component within the system."
+      "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1-2 concise sentences describing what the node is used for.\n    *   Constraint 1: Based *only* on the provided metadata.\n    *   Constraint 2: Avoid speculation.\n    *   Input Metadata: `{\"name\": \"Show\", \"type\":."
     }
   ],
   "relationships": {
@@ -8933,84 +7908,59 @@
         "destination": "airbyte",
         "description": "Uses the command-line interface",
         "relationship_type": "uses",
-        "llm_description": "CLI User uses airbyte."
+        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data: Edge metadata (`{\"source\": \"CLI User\", \"."
       },
       {
         "source": "For Airbyte Cloud users",
         "destination": "airbyte",
         "description": "Browse the [connector catalog](/integrations/) to find the connector you want",
         "relationship_type": "uses",
-        "llm_description": "For Airbyte Cloud users uses airbyte."
+        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   `source`: \"."
       },
       {
         "source": "For Airbyte Open Source users",
         "destination": "airbyte",
         "description": "Browse the [connector catalog](/integrations/) to find the connector you want",
         "relationship_type": "uses",
-        "llm_description": "For Airbyte Open Source users uses airbyte."
+        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata):\n        *   `source`: \"."
       },
       {
         "source": "For Airbyte contributors",
         "destination": "airbyte",
         "description": "To contribute to Airbyte code, connectors, and documentation, refer to our [Contributing Guide](/contributingtoairbyte/)",
         "relationship_type": "uses",
-        "llm_description": "For Airbyte contributors uses airbyte."
-      },
-      {
-        "source": "Step 2.5: Setup User",
-        "destination": "airbyte",
-        "description": "1",
-        "relationship_type": "uses",
-        "llm_description": "Step 2.5: Setup User uses airbyte."
+        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata): `{\"source\": \"For Airbyte."
       },
       {
         "source": "airbyte",
         "destination": "Github",
         "description": "Uses Github for developer platform workflows",
         "relationship_type": "uses",
-        "llm_description": "airbyte uses Github."
+        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data: Edge metadata (`{\"source\": \"airbyte\", \"."
       },
       {
         "source": "airbyte",
         "destination": "Slack",
         "description": "Integrates with Slack",
         "relationship_type": "uses",
-        "llm_description": "airbyte uses Slack."
+        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data: Edge metadata (`{\"source\": \"airbyte\", \"."
       }
     ],
     "containers": [
       {
-        "source": "openapi2jsonschema",
-        "destination": "docker",
+        "from": "base-normalization",
+        "to": "docker",
         "type": "uses",
         "protocol": "HTTP",
-        "detection_source": "internal-dependencies",
-        "description": "openapi2jsonschema uses docker over HTTP.",
-        "llm_description": "openapi2jsonschema uses docker over HTTP."
-      },
-      {
-        "source": "base-normalization",
-        "destination": "docker",
-        "type": "uses",
-        "protocol": "HTTP",
-        "detection_source": "internal-dependencies",
-        "description": "base-normalization uses docker over HTTP.",
-        "llm_description": "base-normalization uses docker over HTTP."
-      },
-      {
-        "source": "docusaurus",
-        "destination": "generator",
-        "type": "uses",
-        "protocol": "HTTP",
-        "detection_source": "internal-dependencies",
-        "description": "docusaurus uses generator over HTTP.",
-        "llm_description": "docusaurus uses generator over HTTP."
+        "source": "internal-dependencies",
+        "description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata): `{\"source\": \"base-normalization.",
+        "llm_description": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Role: Software architecture assistant.\n    *   Task: Write 1 concise sentence describing the interaction between two nodes.\n    *   Input Data (Edge metadata): `{\"source\": \"base-normalization."
       }
     ]
   },
   "metadata": {
-    "total_containers": 12,
-    "total_components": 20,
+    "total_containers": 4,
+    "total_components": 11,
     "extraction_approach": "c4_model",
     "runtime": {
       "platform": "Unknown",

@@ -13,26 +13,55 @@ from .relationship_extractor import EnvVarRelationshipExtractor
 logger = logging.getLogger(__name__)
 
 
+# Mirrors kubernetes_detector._EXCLUDED_DIRS — a compose file inside any of
+# these is almost certainly an example/test fixture/vendored dependency, not
+# a real service of the system being analysed.
+_EXCLUDED_DIRS = {
+    "__pycache__", ".git", ".github", ".gitlab", "node_modules",
+    "venv", ".venv", "env", ".env", "dist", "build", "target", "out",
+    ".idea", ".vscode", "logs", "temp", "tmp", ".pytest_cache",
+    "test", "tests", "__tests__", "docs", "documentation",
+    ".next", ".nuxt", ".cache", "coverage", ".coverage",
+    "vendor", "third_party",
+}
+
+
 class ComposeDetector(BaseContainerDetector):
-    """Detect containers from docker-compose files."""
-    
+    """Detect containers from docker-compose files.
+
+    Searches recursively from the repo root. Monorepos commonly place
+    service-local compose files at `services/<svc>/docker-compose.yml`
+    in addition to (or instead of) a top-level orchestration compose;
+    we want both. Excludes vendored / test / build directories so that
+    example or fixture compose files don't pollute the candidate set.
+    """
+
     def __init__(self, repo_path: Path):
         """Initialize compose detector."""
         super().__init__(repo_path)
-    
+
+    def _is_excluded(self, path: Path) -> bool:
+        """True when any path component is in the exclusion list."""
+        return any(part in _EXCLUDED_DIRS for part in path.parts)
+
+    def _find_compose_files(self) -> list[Path]:
+        """Recursively find docker-compose files outside excluded directories."""
+        files: list[Path] = []
+        for pattern in ("docker-compose*.yaml", "docker-compose*.yml"):
+            for path in self.repo_path.rglob(pattern):
+                if self._is_excluded(path.relative_to(self.repo_path)):
+                    continue
+                files.append(path)
+        return files
+
     def can_detect(self) -> bool:
-        """Check if docker-compose files exist."""
-        compose_patterns = ["docker-compose*.yaml", "docker-compose*.yml"]
-        for pattern in compose_patterns:
-            if list(self.repo_path.glob(pattern)):
-                return True
-        return False
-    
+        """Check if docker-compose files exist anywhere in the repo."""
+        return bool(self._find_compose_files())
+
     def detect(self) -> list[dict[str, Any]]:
         """Detect containers from docker-compose files."""
         containers = []
-        compose_files = list(self.repo_path.glob("docker-compose*.yaml")) + \
-                       list(self.repo_path.glob("docker-compose*.yml"))
+        compose_files = self._find_compose_files()
 
         for compose_file in compose_files:
             try:

@@ -1,0 +1,7 @@
+image:
+  repository: api
+  tag: latest
+service:
+  port: 3000
+postgresUrl: "postgres://postgres:5432/app"
+redisUrl: "redis://redis:6379"

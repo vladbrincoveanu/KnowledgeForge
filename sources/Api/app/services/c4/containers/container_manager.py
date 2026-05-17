@@ -8,17 +8,27 @@ from typing import Any, Optional, Tuple
 import yaml
 
 from . import utils
-from .llm_enrichment import enrich_containers
+from .llm_enrichment import (
+    enrich_containers,
+    run_sanity_pass,
+    SANITY_FALSE_POSITIVE_THRESHOLD,
+)
 
 from .structure_detector import StructureDetector
 from .compose_detector import ComposeDetector
 from .helm_detector import HelmDetector
 from .terraform_detector import TerraformDetector
 from .kubernetes_detector import KubernetesDetector
-from .python_library_detector import PythonLibraryDetector
 from .relationship_extractor import ConfigRelationshipExtractor
 
 logger = logging.getLogger(__name__)
+
+# Minimum LLM confidence required before a discard/merge verdict is
+# enforced (i.e. the container is removed). Below this threshold the
+# verdict marker is preserved for the human review queue but the
+# container survives, on the principle that one-way deletes need
+# strong evidence.
+_VERDICT_ENFORCE_CONFIDENCE = 0.5
 
 
 def _deduplicate_relationships(rels: list[dict]) -> list[dict]:
@@ -102,12 +112,11 @@ class ContainerManager:
             for container in kubernetes_containers:
                 self._merge_kubernetes_container(container)
 
-        # Run Python library detection (finds packages without __main__.py)
-        python_library_detector = PythonLibraryDetector(self.repo_path, self.llm_manager)
-        if python_library_detector.can_detect():
-            library_containers = python_library_detector.detect()
-            for container in library_containers:
-                self._register_or_merge_container(container, source="python_library")
+        # Python *libraries* (folders with __init__.py + pyproject.toml but
+        # no __main__.py) are deliberately NOT registered here — they belong
+        # at C4 Level 3 (components), not Level 2. Real Python applications
+        # surface via structure_detector (Dockerfile / __main__.py) and the
+        # compose/helm/k8s detectors.
 
         # Map internal dependencies
         self._map_internal_dependencies()
@@ -138,9 +147,178 @@ class ContainerManager:
 
         # Build current relationships so the LLM can see existing signals
         current_rels = self.build_container_relationships()
-        stats = enrich_containers(self.containers, current_rels, self.llm_manager)
+        stats = enrich_containers(
+            self.containers, current_rels, self.llm_manager,
+            repo_path=self.repo_path,
+        )
+
+        # Enforce LLM verdicts: remove discarded containers and fold merges
+        # into their targets. Without this step the markers are inert and
+        # noise-tier candidates ship to the frontend.
+        verdict_stats = self._apply_verdicts()
+        stats["verdicts_enforced"] = verdict_stats
+
+        # Sanity pass: one global LLM review over the surviving set, to catch
+        # false positives the per-candidate pass missed and surface containers
+        # that look like they should be there but aren't.
+        sanity = run_sanity_pass(self.containers, self.llm_manager)
+        sanity_removed = self._apply_sanity_false_positives(sanity.get("false_positives") or [])
+        stats["sanity_pass"] = {
+            "false_positives_removed": sanity_removed,
+            "missing_flagged": len(sanity.get("missing") or []),
+            "missing": sanity.get("missing") or [],
+            "skipped": sanity.get("skipped", True),
+            "error": sanity.get("error"),
+        }
+
         logger.info("LLM enrichment stats: %s", stats)
         return stats
+
+    def _apply_sanity_false_positives(self, false_positives: list[dict]) -> int:
+        """Remove containers the sanity pass flagged with sufficient confidence.
+
+        Inbound edges to removed containers are dropped (same shape as the
+        per-candidate discard path). Containers below the confidence
+        threshold get a soft marker so the review queue can pick them up.
+        """
+        to_remove: set[str] = set()
+        for fp in false_positives:
+            name = fp.get("name")
+            if not name or name not in self.containers:
+                continue
+            confidence = float(fp.get("confidence") or 0.0)
+            reason = fp.get("reason", "")
+            if confidence >= SANITY_FALSE_POSITIVE_THRESHOLD:
+                to_remove.add(name)
+            else:
+                self.containers[name]["sanity_flag"] = {
+                    "verdict": "false_positive",
+                    "confidence": confidence,
+                    "reason": reason,
+                }
+
+        if not to_remove:
+            return 0
+
+        for name, container in self.containers.items():
+            if name in to_remove:
+                continue
+            rels = container.get("relationships") or []
+            if rels:
+                container["relationships"] = [
+                    r for r in rels if r.get("to") not in to_remove
+                ]
+            deps = container.get("dependencies_internal") or []
+            if deps:
+                container["dependencies_internal"] = [
+                    d for d in deps if d not in to_remove
+                ]
+
+        for name in to_remove:
+            self.containers.pop(name, None)
+
+        logger.info("Sanity pass removed %d false positives", len(to_remove))
+        return len(to_remove)
+
+    def _apply_verdicts(self) -> dict[str, int]:
+        """Enforce LLM discard/merge verdicts on self.containers in place.
+
+        For each container with llm_verdict == "discard" (above the
+        confidence threshold), remove it from the container set and drop
+        any relationships pointing at it. For each container with
+        llm_verdict == "merge", fold its relationships and dependencies
+        into the resolved merge target, redirect inbound edges, and
+        remove the source. Merge chains (A→B→C) collapse to the final
+        target; cycles fall back to discard.
+        """
+        discarded: set[str] = set()
+        merge_map: dict[str, str] = {}
+
+        for name, container in self.containers.items():
+            verdict = container.get("llm_verdict")
+            confidence = float(container.get("llm_confidence") or 0.0)
+            if confidence < _VERDICT_ENFORCE_CONFIDENCE:
+                continue
+
+            if verdict == "discard":
+                discarded.add(name)
+            elif verdict == "merge":
+                target_raw = container.get("llm_merge_into") or ""
+                target = self._resolve_container_by_token(target_raw)
+                if target and target != name:
+                    merge_map[name] = target
+                else:
+                    logger.debug(
+                        "Unresolvable merge target %r for %r; leaving as-is",
+                        target_raw, name,
+                    )
+
+        # Collapse merge chains (A→B, B→C ⇒ A→C). Cycles fall back to discard.
+        resolved: dict[str, str] = {}
+        for source in merge_map:
+            seen = {source}
+            current = merge_map[source]
+            while current in merge_map and current not in seen:
+                seen.add(current)
+                current = merge_map[current]
+            if current in seen:
+                discarded.add(source)
+            else:
+                resolved[source] = current
+        merge_map = resolved
+
+        # If a merge target ended up discarded, the source becomes discard too.
+        for source, target in list(merge_map.items()):
+            if target in discarded:
+                discarded.add(source)
+                merge_map.pop(source)
+
+        # Apply merges: append source's relationships and deps onto target
+        for source_name, target_name in merge_map.items():
+            source = self.containers.get(source_name)
+            target = self.containers.get(target_name)
+            if not source or not target:
+                continue
+            for rel in source.get("relationships") or []:
+                target.setdefault("relationships", []).append(rel)
+            for dep in source.get("dependencies_internal") or []:
+                if dep not in target.get("dependencies_internal", []):
+                    target.setdefault("dependencies_internal", []).append(dep)
+
+        # Redirect or drop inbound edges from surviving containers
+        removed = discarded | set(merge_map.keys())
+        for name, container in self.containers.items():
+            if name in removed:
+                continue
+
+            rels = container.get("relationships") or []
+            if rels:
+                new_rels: list[dict] = []
+                for rel in rels:
+                    to = rel.get("to")
+                    if to in discarded:
+                        continue
+                    if to in merge_map:
+                        rel = {**rel, "to": merge_map[to]}
+                    new_rels.append(rel)
+                container["relationships"] = new_rels
+
+            deps = container.get("dependencies_internal") or []
+            if deps:
+                new_deps = [
+                    merge_map.get(d, d) for d in deps if d not in discarded
+                ]
+                container["dependencies_internal"] = sorted(set(new_deps))
+
+        for name in removed:
+            self.containers.pop(name, None)
+
+        if removed:
+            logger.info(
+                "Verdicts enforced: %d discarded, %d merged",
+                len(discarded), len(merge_map),
+            )
+        return {"discarded": len(discarded), "merged": len(merge_map)}
     
     def _register_or_merge_container(self, container: dict[str, Any], source: str) -> None:
         """Register a new container or merge if an identity match exists."""

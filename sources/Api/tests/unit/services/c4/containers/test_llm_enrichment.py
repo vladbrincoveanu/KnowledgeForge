@@ -1,6 +1,8 @@
 """Unit tests for containers/llm_enrichment.py."""
 
 import json
+import tempfile
+from pathlib import Path
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -10,11 +12,15 @@ from app.services.c4.containers.llm_enrichment import (
     parse_llm_enrichment_response,
     apply_enrichments,
     enrich_containers,
+    _collect_candidate_file_evidence,
     _infer_signal_type,
     _should_update_field,
     _GENERIC_CONTAINER_TYPES,
     _GENERIC_TECHNOLOGIES,
     _SYSTEM_PROMPT,
+    build_sanity_prompt,
+    parse_sanity_response,
+    run_sanity_pass,
 )
 
 
@@ -257,6 +263,32 @@ class TestParseLlmEnrichmentResponse:
         result = parse_llm_enrichment_response(raw)
         assert result is not None
 
+    def test_strips_reasoning_think_block(self, valid_llm_result):
+        """qwen3/deepseek-r1-style <think>...</think> reasoning must be
+        stripped before JSON extraction. Otherwise braces inside the
+        reasoning prose can confuse the brace-balance scanner."""
+        raw = (
+            "<think>The user wants me to classify these containers. "
+            "Looking at signal {x: 1} I think keep is right.</think>\n"
+            + json.dumps(valid_llm_result)
+        )
+        result = parse_llm_enrichment_response(raw)
+        assert result is not None
+        assert len(result["containers"]) == 2
+
+    def test_strips_unclosed_think_when_token_budget_exhausted(self, valid_llm_result):
+        """When max_tokens cuts the response mid-reasoning, the closing
+        </think> may be missing — the parser should still find any JSON
+        emitted before the budget ran out, or fail cleanly without
+        crashing on the malformed prefix."""
+        raw = (
+            "<think>The user wants me to review the containers. "
+            "Looking carefully at the evidence, I see "
+        )
+        result = parse_llm_enrichment_response(raw)
+        # No JSON to recover — parser should return None, not crash
+        assert result is None
+
 
 # ---------------------------------------------------------------------------
 # apply_enrichments
@@ -468,8 +500,14 @@ class TestEnrichContainers:
         enrich_containers(simple_containers, simple_relationships, mock_llm)
         assert mock_llm.timeout == 30  # restored even after exception
 
-    def test_batch_size_capped(self, simple_relationships):
-        # Create 30 containers — only MAX_CONTAINERS_PER_BATCH (25) should be sent
+    def test_chunks_cover_all_containers(self, simple_relationships):
+        """All candidates must reach the LLM across multiple chunks; nothing
+        gets silently dropped past MAX_CONTAINERS_PER_BATCH."""
+        from app.services.c4.containers.llm_enrichment import (
+            MAX_CONTAINERS_PER_BATCH,
+        )
+
+        n = MAX_CONTAINERS_PER_BATCH * 2 + 3  # forces at least 3 chunks
         containers = {
             f"svc-{i}": {
                 "name": f"svc-{i}",
@@ -482,10 +520,10 @@ class TestEnrichContainers:
                 "dependencies_internal": [],
                 "relationships": [],
             }
-            for i in range(30)
+            for i in range(n)
         }
 
-        sent_prompts = []
+        sent_prompts: list[str] = []
 
         def capture_prompt(prompt, **kwargs):
             sent_prompts.append(prompt)
@@ -497,12 +535,15 @@ class TestEnrichContainers:
 
         enrich_containers(containers, [], mock_llm)
 
-        # The prompt should contain at most 25 container names, not all 30
-        prompt = sent_prompts[0]
-        # Count unique "svc-N" occurrences in the evidence section
-        # (only 25 out of 30 should be in the bundle)
-        contained = sum(1 for i in range(30) if f'"svc-{i}"' in prompt)
-        assert contained <= 25
+        # Every container must appear in some prompt — none silently dropped
+        joined = "\n".join(sent_prompts)
+        for i in range(n):
+            assert f'"svc-{i}"' in joined, f"svc-{i} not sent to any chunk"
+
+        # No single prompt may exceed the per-batch cap
+        for prompt in sent_prompts:
+            present = sum(1 for i in range(n) if f'"svc-{i}"' in prompt)
+            assert present <= MAX_CONTAINERS_PER_BATCH
 
     def test_inferred_relationships_counted_in_stats(
         self, simple_containers, simple_relationships, valid_llm_result
@@ -530,3 +571,263 @@ class TestShouldUpdateField:
     def test_specific_value_should_not_update(self):
         assert _should_update_field("PostgreSQL Database", _GENERIC_CONTAINER_TYPES) is False
         assert _should_update_field("Python/FastAPI", _GENERIC_TECHNOLOGIES) is False
+
+
+# ---------------------------------------------------------------------------
+# _collect_candidate_file_evidence
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def sample_repo():
+    """A temp repo with a candidate folder containing diagnostic files."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        repo = Path(tmpdir)
+        svc = repo / "services" / "api"
+        svc.mkdir(parents=True)
+        (svc / "Dockerfile").write_text(
+            "FROM node:18\nWORKDIR /app\nCOPY . .\nCMD [\"node\", \"server.js\"]\n"
+        )
+        (svc / "package.json").write_text(json.dumps({
+            "name": "api-svc",
+            "version": "1.0.0",
+            "main": "server.js",
+            "scripts": {"start": "node server.js", "test": "jest"},
+            "dependencies": {"express": "^4.18.0", "pg": "^8.0.0"},
+        }))
+        (svc / "README.md").write_text("# API service\n\nHTTP API serving products.\n")
+        yield repo
+
+
+class TestCollectCandidateFileEvidence:
+    def test_returns_empty_for_no_repo_path(self):
+        assert _collect_candidate_file_evidence(None, "services/api") == {}
+
+    def test_returns_empty_for_repo_root(self, sample_repo):
+        assert _collect_candidate_file_evidence(sample_repo, ".") == {}
+        assert _collect_candidate_file_evidence(sample_repo, "") == {}
+
+    def test_returns_empty_for_missing_folder(self, sample_repo):
+        assert _collect_candidate_file_evidence(sample_repo, "does/not/exist") == {}
+
+    def test_collects_dockerfile(self, sample_repo):
+        ev = _collect_candidate_file_evidence(sample_repo, "services/api")
+        assert "dockerfile" in ev
+        assert "FROM node:18" in ev["dockerfile"]
+        assert "CMD" in ev["dockerfile"]
+
+    def test_collects_package_json(self, sample_repo):
+        ev = _collect_candidate_file_evidence(sample_repo, "services/api")
+        pkg = ev.get("package_json")
+        assert pkg is not None
+        assert pkg["name"] == "api-svc"
+        assert "start" in pkg["scripts"]
+        assert "express" in pkg["dependencies"]
+
+    def test_collects_readme(self, sample_repo):
+        ev = _collect_candidate_file_evidence(sample_repo, "services/api")
+        assert "API service" in ev["readme"]
+
+    def test_collects_top_level_files(self, sample_repo):
+        ev = _collect_candidate_file_evidence(sample_repo, "services/api")
+        assert "Dockerfile" in ev["files"]
+        assert "package.json" in ev["files"]
+
+    def test_collects_pyproject_toml(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = Path(tmpdir)
+            svc = repo / "services" / "py"
+            svc.mkdir(parents=True)
+            (svc / "pyproject.toml").write_text(
+                "[project]\n"
+                "name = \"py-svc\"\n"
+                "dependencies = [\"fastapi>=0.100\", \"uvicorn[standard]\"]\n"
+                "\n"
+                "[project.scripts]\n"
+                "serve = \"py_svc:main\"\n"
+            )
+            ev = _collect_candidate_file_evidence(repo, "services/py")
+            py = ev.get("pyproject_toml")
+            assert py is not None
+            assert py["name"] == "py-svc"
+            assert "serve" in py["scripts"]
+            # Version specifiers stripped
+            assert "fastapi" in py["dependencies"]
+            assert "uvicorn" in py["dependencies"]
+
+    def test_collects_chart_yaml_distinguishes_library(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = Path(tmpdir)
+            chart = repo / "charts" / "shared"
+            chart.mkdir(parents=True)
+            (chart / "Chart.yaml").write_text(
+                "apiVersion: v2\n"
+                "name: shared-helpers\n"
+                "type: library\n"
+                "version: 0.1.0\n"
+            )
+            ev = _collect_candidate_file_evidence(repo, "charts/shared")
+            assert ev["chart_yaml"]["type"] == "library"
+            assert ev["chart_yaml"]["name"] == "shared-helpers"
+
+
+class TestEvidenceBundleIncludesFileEvidence:
+    def test_bundle_includes_file_evidence_when_repo_path_set(self, sample_repo):
+        containers = {
+            "api-svc": {
+                "name": "api-svc",
+                "container_type": "Service",
+                "technology": "Unknown",
+                "protocol": "HTTP",
+                "path": "services/api",
+            },
+        }
+        bundle = build_evidence_bundle(containers, [], repo_path=sample_repo)
+        signal = bundle["container_signals"][0]
+        assert "file_evidence" in signal
+        assert "dockerfile" in signal["file_evidence"]
+
+    def test_bundle_omits_file_evidence_without_repo_path(self, sample_repo):
+        containers = {
+            "api-svc": {
+                "name": "api-svc",
+                "container_type": "Service",
+                "technology": "Unknown",
+                "protocol": "HTTP",
+                "path": "services/api",
+            },
+        }
+        bundle = build_evidence_bundle(containers, [])
+        signal = bundle["container_signals"][0]
+        assert "file_evidence" not in signal
+
+
+# ---------------------------------------------------------------------------
+# Sanity pass
+# ---------------------------------------------------------------------------
+
+class TestBuildSanityPrompt:
+    def test_includes_container_count_and_summaries(self):
+        containers = {
+            "api": {
+                "name": "api", "container_type": "Microservice",
+                "technology": "Python", "protocol": "HTTP",
+                "path": "services/api", "description": "REST API.",
+            },
+            "junk": {
+                "name": "junk", "container_type": "Service",
+                "technology": "Unknown", "protocol": None,
+                "path": "tools/codegen", "description": "Code generator.",
+            },
+        }
+        prompt = build_sanity_prompt(containers, system_type="ecommerce")
+        assert "false_positives" in prompt
+        assert "missing" in prompt
+        assert '"api"' in prompt
+        assert '"junk"' in prompt
+        assert "ecommerce" in prompt
+
+    def test_truncation_flag_set_when_over_limit(self):
+        from app.services.c4.containers.llm_enrichment import SANITY_MAX_CONTAINERS
+        containers = {
+            f"svc-{i}": {
+                "name": f"svc-{i}", "container_type": "Service",
+                "technology": "Python", "path": f"services/svc-{i}",
+                "description": "",
+            }
+            for i in range(SANITY_MAX_CONTAINERS + 5)
+        }
+        prompt = build_sanity_prompt(containers)
+        assert '"truncated": true' in prompt
+
+
+class TestParseSanityResponse:
+    def test_valid_response(self):
+        raw = json.dumps({
+            "false_positives": [
+                {"name": "junk", "reason": "code generator", "confidence": 0.9},
+            ],
+            "missing": [
+                {"name": "redis", "reason": "REDIS_URL referenced",
+                 "evidence": "services/api/.env", "confidence": 0.85},
+            ],
+        })
+        result = parse_sanity_response(raw)
+        assert result is not None
+        assert len(result["false_positives"]) == 1
+        assert len(result["missing"]) == 1
+
+    def test_returns_none_for_empty(self):
+        assert parse_sanity_response("") is None
+        assert parse_sanity_response(None) is None
+
+    def test_returns_none_for_garbage(self):
+        assert parse_sanity_response("not json") is None
+
+    def test_handles_missing_keys(self):
+        raw = json.dumps({"false_positives": []})
+        result = parse_sanity_response(raw)
+        assert result is not None
+        assert result["false_positives"] == []
+        assert result["missing"] == []
+
+    def test_strips_markdown_fences(self):
+        raw = "```json\n" + json.dumps({"false_positives": [], "missing": []}) + "\n```"
+        result = parse_sanity_response(raw)
+        assert result is not None
+
+
+class TestRunSanityPass:
+    def test_skipped_without_llm_manager(self):
+        result = run_sanity_pass({"a": {"name": "a"}}, None)
+        assert result["skipped"] is True
+
+    def test_skipped_with_empty_containers(self):
+        result = run_sanity_pass({}, MagicMock())
+        assert result["skipped"] is True
+
+    def test_returns_parsed_result(self):
+        mock_llm = MagicMock()
+        mock_llm.generate_text.return_value = json.dumps({
+            "false_positives": [{"name": "junk", "reason": "tool", "confidence": 0.9}],
+            "missing": [],
+        })
+        mock_llm.timeout = 30
+        result = run_sanity_pass(
+            {"a": {"name": "a", "container_type": "Service"}},
+            mock_llm,
+        )
+        assert result["skipped"] is False
+        assert len(result["false_positives"]) == 1
+
+    def test_handles_empty_response(self):
+        mock_llm = MagicMock()
+        mock_llm.generate_text.return_value = ""
+        mock_llm.timeout = 30
+        result = run_sanity_pass(
+            {"a": {"name": "a", "container_type": "Service"}},
+            mock_llm,
+        )
+        assert result["error"] == "empty_response"
+
+    def test_handles_exception(self):
+        mock_llm = MagicMock()
+        mock_llm.generate_text.side_effect = OSError("connection refused")
+        mock_llm.timeout = 30
+        result = run_sanity_pass(
+            {"a": {"name": "a", "container_type": "Service"}},
+            mock_llm,
+        )
+        assert result["error"] is not None
+        assert result["skipped"] is False
+
+    def test_timeout_restored(self):
+        mock_llm = MagicMock()
+        mock_llm.generate_text.return_value = json.dumps({
+            "false_positives": [], "missing": [],
+        })
+        mock_llm.timeout = 30
+        run_sanity_pass(
+            {"a": {"name": "a", "container_type": "Service"}},
+            mock_llm,
+        )
+        assert mock_llm.timeout == 30

@@ -21,8 +21,16 @@ Integration:
 import json
 import logging
 import re
+from pathlib import Path
 from typing import Any, Optional
 from uuid import uuid4
+
+import yaml
+
+try:
+    import tomllib  # Python 3.11+
+except ImportError:  # pragma: no cover
+    tomllib = None  # type: ignore[assignment]
 
 from app.domain.review_queue import enqueue_review_item_if_low_confidence
 
@@ -34,14 +42,33 @@ logger = logging.getLogger(__name__)
 
 MAX_CONTAINERS_PER_BATCH = 12   # cap prompt size for small-context models
 MAX_SIGNALS_PER_CONTAINER = 2   # drop extra signals from noisy containers
-LLM_MAX_TOKENS = 1024
+# Reasoning models (qwen3, deepseek-r1, etc.) burn output budget on
+# <think>...</think> tokens before emitting JSON. 4096 leaves room for
+# both reasoning AND the answer; non-reasoning models simply use less.
+LLM_MAX_TOKENS = 4096
 LLM_TEMPERATURE = 0.2           # low variance: we want factual classification
+# A 9B-class reasoning model on a typical local GPU takes 3-8 minutes for a
+# full 4K-token chunk: prompt processing + thinking + JSON. 600s gives
+# headroom; smaller/non-reasoning models simply finish faster.
+LLM_REQUEST_TIMEOUT_SEC = 600
+
+# Sanity pass: minimum confidence required to act on a flagged false positive
+SANITY_FALSE_POSITIVE_THRESHOLD = 0.7
+# Bound the sanity prompt to a sensible upper limit; very large repos truncate.
+SANITY_MAX_CONTAINERS = 80
 
 # Field values the rule-based pipeline emits when it has no real signal —
-# the LLM is allowed to overwrite these.
+# the LLM is allowed to overwrite these. Includes everything emitted by
+# utils.infer_container_type so the LLM can correct misclassifications
+# when file_evidence supports a more specific label (e.g. "Backend API",
+# "Background Worker", "Code Generator", "Static Site Generator").
 _GENERIC_CONTAINER_TYPES = frozenset({
     "Service", "Unknown", "Helm Deployed Service",
     "Containerized Service", "JavaScript Application",
+    "Node.js Application", "Node.js Service",
+    "Python Application", "Python Service",
+    "Java Application", "Go Application", "Rust Application",
+    "Frontend Application",
 })
 _GENERIC_TECHNOLOGIES = frozenset({"Unknown", "", None})
 _GENERIC_DESCRIPTIONS = frozenset({
@@ -74,6 +101,27 @@ AMBIGUOUS CASES
   • Sidecar containers (envoy, istio-proxy): discard — infrastructure, not application
   • Multi-stage Dockerfile build stage: discard — not a runtime unit
   • "wait-for" helper images: discard — only ensures startup order
+
+EVIDENCE
+Each container_signal may include "file_evidence" with high-signal artifacts
+read from the candidate folder:
+  • dockerfile:     Dockerfile content (truncated). CMD/ENTRYPOINT presence is
+                    strong evidence of a runtime unit.
+  • package_json:   {name, version, main, type, scripts, dependencies}.
+                    A "start" script + http framework dep ⇒ likely a service.
+                    No "start" script ⇒ likely a library/tool.
+  • pyproject_toml: {name, scripts, dependencies}. [project.scripts] entries
+                    ⇒ runnable CLI/service. No scripts + no __main__.py in files
+                    ⇒ likely a library, discard at L2.
+  • chart_yaml:     {name, type, version, dependencies}. type=="library"
+                    ⇒ Helm subchart, NOT a runtime container, discard.
+  • readme:         First ~30 lines. Use to infer purpose; phrases like
+                    "shared utilities", "test fixtures", "code generator",
+                    "build tool" almost always mean discard at L2.
+  • files:          Top-level entries in the candidate folder.
+
+Use file_evidence aggressively. A folder with no Dockerfile, no start script,
+no main entry point, and a README labelling it a library/tool is a discard.
 
 YOUR TASK
 Given a JSON evidence bundle produced by a static-analysis pipeline, return a
@@ -264,15 +312,172 @@ def _signal_confidence(signal_type: str) -> float:
     }.get(signal_type, 0.70)
 
 
+# ---------------------------------------------------------------------------
+# File evidence collection — diagnostic file contents per candidate folder
+# ---------------------------------------------------------------------------
+
+# Sizes calibrated so a chunk of MAX_CONTAINERS_PER_BATCH candidates with full
+# file evidence fits comfortably under typical model context windows.
+_DOCKERFILE_MAX_CHARS = 1500
+_README_MAX_LINES = 30
+_README_MAX_CHARS = 1500
+_FILES_LIST_MAX = 25
+_PKG_DEPS_MAX = 20
+_PKG_SCRIPTS_MAX = 10
+_CHART_DEPS_MAX = 10
+
+
+def _read_text_safely(path: Path, max_chars: int) -> Optional[str]:
+    try:
+        return path.read_text(encoding="utf-8", errors="ignore")[:max_chars]
+    except OSError:
+        return None
+
+
+def _collect_package_json(folder: Path) -> Optional[dict[str, Any]]:
+    pkg = folder / "package.json"
+    if not pkg.is_file():
+        return None
+    try:
+        data = json.loads(pkg.read_text(encoding="utf-8", errors="ignore"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    return {
+        "name": data.get("name"),
+        "version": data.get("version"),
+        "main": data.get("main"),
+        "type": data.get("type"),
+        "scripts": list((data.get("scripts") or {}).keys())[:_PKG_SCRIPTS_MAX],
+        "dependencies": list((data.get("dependencies") or {}).keys())[:_PKG_DEPS_MAX],
+    }
+
+
+def _collect_pyproject_toml(folder: Path) -> Optional[dict[str, Any]]:
+    if tomllib is None:
+        return None
+    pyproject = folder / "pyproject.toml"
+    if not pyproject.is_file():
+        return None
+    try:
+        with open(pyproject, "rb") as f:
+            data = tomllib.load(f)
+    except (OSError, ValueError):
+        return None
+    project = data.get("project") if isinstance(data, dict) else None
+    if not isinstance(project, dict):
+        return None
+    deps = project.get("dependencies") or []
+    # Strip version/extras specifiers: "fastapi>=0.100" → "fastapi"
+    dep_names: list[str] = []
+    for dep in deps[:_PKG_DEPS_MAX]:
+        if isinstance(dep, str):
+            dep_names.append(re.split(r"[\s\[<>=!~;]", dep, 1)[0])
+    return {
+        "name": project.get("name"),
+        "scripts": list((project.get("scripts") or {}).keys())[:_PKG_SCRIPTS_MAX],
+        "dependencies": dep_names,
+    }
+
+
+def _collect_chart_yaml(folder: Path) -> Optional[dict[str, Any]]:
+    chart = folder / "Chart.yaml"
+    if not chart.is_file():
+        return None
+    try:
+        data = yaml.safe_load(chart.read_text(encoding="utf-8", errors="ignore"))
+    except (OSError, yaml.YAMLError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    deps_raw = data.get("dependencies") or []
+    deps = [
+        d.get("name") for d in deps_raw
+        if isinstance(d, dict) and d.get("name")
+    ][:_CHART_DEPS_MAX]
+    return {
+        "name": data.get("name"),
+        "type": data.get("type"),  # "application" or "library"
+        "version": data.get("version"),
+        "dependencies": deps,
+    }
+
+
+def _collect_readme(folder: Path) -> Optional[str]:
+    for candidate in ("README.md", "Readme.md", "readme.md", "README", "README.rst"):
+        readme = folder / candidate
+        if not readme.is_file():
+            continue
+        try:
+            lines = readme.read_text(encoding="utf-8", errors="ignore").splitlines()
+        except OSError:
+            return None
+        return "\n".join(lines[:_README_MAX_LINES])[:_README_MAX_CHARS]
+    return None
+
+
+def _collect_candidate_file_evidence(
+    repo_path: Optional[Path],
+    container_path: Optional[str],
+) -> dict[str, Any]:
+    """Read small, high-signal files from a candidate folder.
+
+    Best-effort: any read error returns whatever was gathered so far.
+    Skipped for repo-root paths because their contents are too broad to
+    be diagnostic of a single container — the file_evidence is meant to
+    distinguish candidate folders, not summarise the whole repo.
+    """
+    if not repo_path or not container_path or container_path in {".", ""}:
+        return {}
+
+    folder = Path(repo_path) / container_path
+    if not folder.is_dir():
+        return {}
+
+    evidence: dict[str, Any] = {}
+
+    try:
+        names = sorted(p.name for p in folder.iterdir())[:_FILES_LIST_MAX]
+        evidence["files"] = names
+    except OSError:
+        return evidence
+
+    dockerfile_text = _read_text_safely(folder / "Dockerfile", _DOCKERFILE_MAX_CHARS)
+    if dockerfile_text is not None:
+        evidence["dockerfile"] = dockerfile_text
+
+    pkg_json = _collect_package_json(folder)
+    if pkg_json:
+        evidence["package_json"] = pkg_json
+
+    pyproject = _collect_pyproject_toml(folder)
+    if pyproject:
+        evidence["pyproject_toml"] = pyproject
+
+    chart = _collect_chart_yaml(folder)
+    if chart:
+        evidence["chart_yaml"] = chart
+
+    readme = _collect_readme(folder)
+    if readme:
+        evidence["readme"] = readme
+
+    return evidence
+
+
 def build_evidence_bundle(
     containers: dict[str, dict[str, Any]],
     relationships: list[dict[str, Any]],
+    repo_path: Optional[Path] = None,
 ) -> dict[str, Any]:
     """Compress rule-based detection output into a structured evidence bundle.
 
     Args:
         containers:    name → container dict (output of ContainerManager.detect_all_containers)
         relationships: list of relationship dicts (output of build_container_relationships)
+        repo_path:     repo root, when provided each candidate gets a "file_evidence"
+                       entry with diagnostic contents read from its folder
 
     Returns:
         Evidence bundle dict suitable for prompt serialisation.
@@ -316,7 +521,7 @@ def build_evidence_bundle(
         }]
         signals.extend(extra_signals[:MAX_SIGNALS_PER_CONTAINER - 1])
 
-        container_signals.append({
+        signal_entry: dict[str, Any] = {
             "name": name,
             "existing": {
                 "type": container.get("container_type"),
@@ -325,7 +530,16 @@ def build_evidence_bundle(
                 "description": container.get("description") or "",
             },
             "signals": signals,
-        })
+        }
+
+        if repo_path is not None:
+            file_evidence = _collect_candidate_file_evidence(
+                repo_path, container.get("path"),
+            )
+            if file_evidence:
+                signal_entry["file_evidence"] = file_evidence
+
+        container_signals.append(signal_entry)
 
     def _rel_direction(rel_type: str) -> str:
         return "inbound" if rel_type == "subscribes-to" else "outbound"
@@ -398,15 +612,35 @@ def build_enrichment_prompt(bundle: dict[str, Any]) -> str:
 # JSON extraction / response parser
 # ---------------------------------------------------------------------------
 
+_THINK_BLOCK_RE = re.compile(r"<think\b[^>]*>.*?</think\s*>", re.IGNORECASE | re.DOTALL)
+_OPEN_THINK_TRAILING_RE = re.compile(r"<think\b[^>]*>.*\Z", re.IGNORECASE | re.DOTALL)
+
+
+def _strip_reasoning_tags(text: str) -> str:
+    """Remove <think>...</think> blocks emitted by reasoning models (qwen3,
+    deepseek-r1, etc.). Also drops an unclosed trailing <think>... segment,
+    which can occur when token budget is exhausted before the closing tag.
+    """
+    text = _THINK_BLOCK_RE.sub("", text)
+    text = _OPEN_THINK_TRAILING_RE.sub("", text)
+    return text
+
+
 def _strip_markdown_fences(text: str) -> str:
-    """Remove ``` or ```json fences from LLM output."""
+    """Remove ``` or ```json fences from LLM output, and any reasoning tags."""
+    text = _strip_reasoning_tags(text)
     text = re.sub(r"^```(?:json)?\s*", "", text.strip(), flags=re.IGNORECASE)
     text = re.sub(r"\s*```\s*$", "", text)
     return text.strip()
 
 
 def _extract_json_object(text: str) -> Optional[str]:
-    """Find the first top-level JSON object in text."""
+    """Find the first top-level JSON object in text.
+
+    Reasoning-model output (e.g. <think>...</think>) is stripped first so
+    JSON-like braces inside chain-of-thought don't get returned by mistake.
+    """
+    text = _strip_reasoning_tags(text)
     depth = 0
     start = None
     for i, ch in enumerate(text):
@@ -597,6 +831,7 @@ def enrich_containers(
     containers: dict[str, dict[str, Any]],
     relationships: list[dict[str, Any]],
     llm_manager: Any,
+    repo_path: Optional[Path] = None,
 ) -> dict[str, Any]:
     """Run LLM enrichment over detected containers and relationships.
 
@@ -607,6 +842,9 @@ def enrich_containers(
         containers:   name → container dict (mutated in-place on success)
         relationships: list of relationship dicts from build_container_relationships()
         llm_manager:  LLMManager instance (or None to skip)
+        repo_path:    when provided, each candidate's evidence bundle includes
+                      file_evidence (Dockerfile, package.json, README, etc.)
+                      read from its folder
 
     Returns:
         Stats dict: {"enriched": int, "discarded": int, "inferred_relationships": int,
@@ -621,8 +859,9 @@ def enrich_containers(
         return {"enriched": 0, "discarded": 0, "inferred_relationships": 0,
                 "skipped": True, "error": None}
 
-    # Batch: cap at MAX_CONTAINERS_PER_BATCH to stay within token budget
-    # Prioritise containers with generic types (most in need of enrichment)
+    # Prioritise containers with generic types (most in need of enrichment).
+    # Order matters across chunks: noisier candidates get classified first so
+    # if a downstream batch fails the most-uncertain ones still got a verdict.
     def _enrichment_priority(item: tuple[str, dict]) -> int:
         name, c = item
         score = 0
@@ -635,54 +874,74 @@ def enrich_containers(
         return -score  # higher score → lower sort key → first in list
 
     ordered = sorted(containers.items(), key=_enrichment_priority)
-    batch = dict(ordered[:MAX_CONTAINERS_PER_BATCH])
-
-    # Trim relationships to only those in the batch
-    batch_rels = [r for r in relationships
-                  if r.get("from") in batch or r.get("to") in batch]
-
-    # Build evidence bundle and prompt
-    bundle = build_evidence_bundle(batch, batch_rels)
-    prompt = build_enrichment_prompt(bundle)
+    chunks: list[dict[str, dict[str, Any]]] = [
+        dict(ordered[i:i + MAX_CONTAINERS_PER_BATCH])
+        for i in range(0, len(ordered), MAX_CONTAINERS_PER_BATCH)
+    ]
 
     logger.info(
-        "LLM enrichment: sending %d containers (%d relationships) for review",
-        len(batch), len(batch_rels),
+        "LLM enrichment: %d containers split into %d chunk(s) of up to %d",
+        len(containers), len(chunks), MAX_CONTAINERS_PER_BATCH,
     )
 
-    # Temporarily extend timeout for larger generation budget
+    aggregated: dict[str, Any] = {"containers": [], "inferred_relationships": []}
+    chunk_errors: list[str] = []
+
     original_timeout = getattr(llm_manager, "timeout", 30)
     try:
-        llm_manager.timeout = max(original_timeout, 120)
-        raw_response = llm_manager.generate_text(
-            prompt,
-            max_tokens=LLM_MAX_TOKENS,
-            temperature=LLM_TEMPERATURE,
-            use_cache=True,
-        )
-    except Exception as exc:
-        logger.warning("LLM enrichment call failed: %s", exc)
-        return {"enriched": 0, "discarded": 0, "inferred_relationships": 0,
-                "skipped": False, "error": str(exc)}
+        llm_manager.timeout = max(original_timeout, LLM_REQUEST_TIMEOUT_SEC)
+        for idx, batch in enumerate(chunks, start=1):
+            batch_rels = [r for r in relationships
+                          if r.get("from") in batch or r.get("to") in batch]
+            bundle = build_evidence_bundle(batch, batch_rels, repo_path=repo_path)
+            prompt = build_enrichment_prompt(bundle)
+
+            logger.info(
+                "LLM enrichment chunk %d/%d: %d containers (%d relationships)",
+                idx, len(chunks), len(batch), len(batch_rels),
+            )
+
+            try:
+                raw_response = llm_manager.generate_text(
+                    prompt,
+                    max_tokens=LLM_MAX_TOKENS,
+                    temperature=LLM_TEMPERATURE,
+                    use_cache=True,
+                )
+            except Exception as exc:
+                logger.warning("LLM enrichment chunk %d failed: %s", idx, exc)
+                chunk_errors.append(f"chunk{idx}:{exc}")
+                continue
+
+            if not raw_response:
+                logger.warning("LLM enrichment chunk %d: empty response", idx)
+                chunk_errors.append(f"chunk{idx}:empty_response")
+                continue
+
+            parsed = parse_llm_enrichment_response(raw_response)
+            if not parsed:
+                logger.warning(
+                    "LLM enrichment chunk %d: parse failed (first 300 chars): %s",
+                    idx, raw_response[:300],
+                )
+                chunk_errors.append(f"chunk{idx}:parse_failed")
+                continue
+
+            aggregated["containers"].extend(parsed.get("containers", []) or [])
+            aggregated["inferred_relationships"].extend(
+                parsed.get("inferred_relationships", []) or []
+            )
     finally:
         llm_manager.timeout = original_timeout
 
-    if not raw_response:
-        logger.warning("LLM enrichment: empty response from model")
+    if not aggregated["containers"] and not aggregated["inferred_relationships"]:
+        # All chunks failed — surface the first error code for caller visibility
+        first_error = chunk_errors[0].split(":", 1)[1] if chunk_errors else "no_results"
         return {"enriched": 0, "discarded": 0, "inferred_relationships": 0,
-                "skipped": False, "error": "empty_response"}
+                "skipped": False, "error": first_error}
 
-    llm_result = parse_llm_enrichment_response(raw_response)
-    if not llm_result:
-        logger.warning(
-            "LLM enrichment: could not parse response (first 300 chars): %s",
-            raw_response[:300],
-        )
-        return {"enriched": 0, "discarded": 0, "inferred_relationships": 0,
-                "skipped": False, "error": "parse_failed"}
-
-    # Apply enrichments to the full containers dict (batch keys are a subset)
-    apply_enrichments(containers, relationships, llm_result)
+    # Apply aggregated enrichments to the full containers dict
+    apply_enrichments(containers, relationships, aggregated)
 
     run_id = str(uuid4())
     for container in containers.values():
@@ -722,5 +981,161 @@ def enrich_containers(
         "discarded": discarded,
         "inferred_relationships": inferred,
         "skipped": False,
-        "error": None,
+        "error": "; ".join(chunk_errors) if chunk_errors else None,
     }
+
+
+# ===========================================================================
+# Sanity pass — global completeness/correctness review over the surviving set
+# ===========================================================================
+
+_SANITY_SYSTEM_PROMPT = """\
+You are reviewing the FINAL container list extracted from a code repository
+at the C4 Model (Simon Brown) Level 2 (containers) abstraction.
+
+C4 CONTAINER DEFINITION
+A container is "an application or data store that needs to be running for
+the system to work." Examples: web APIs, SPAs, mobile apps, databases,
+message buses, file stores, background workers, caches.
+
+NOT containers (do not keep them): build tools, code generators, shared
+libraries, test fixtures, init/migration scripts, documentation sites
+unless they are deployed and served.
+
+YOUR TASK
+Review the list of {n} containers below. Flag two things:
+  1. false_positives — items that survived classification but DO NOT meet
+     the C4 container definition. The per-candidate pass missed something.
+  2. missing — containers that the system clearly needs (referenced in
+     env vars, code imports, IaC, deployment configs) but which are NOT
+     in the list.
+
+Return ONLY a JSON object, no markdown, no commentary:
+{{
+  "false_positives": [
+    {{"name": "<container name from input>",
+      "reason": "<≤25 words>",
+      "confidence": 0.0-1.0}}
+  ],
+  "missing": [
+    {{"name": "<inferred name>",
+      "reason": "<≤25 words>",
+      "evidence": "<short pointer (file/path/import)>",
+      "confidence": 0.0-1.0}}
+  ]
+}}
+
+Be conservative. Only flag items you are confident about (>=0.7).
+If everything looks correct, return both lists empty.\
+"""
+
+
+def _summarise_for_sanity(container: dict[str, Any]) -> dict[str, Any]:
+    """Compact per-container view for the sanity pass — no file evidence."""
+    return {
+        "name": container.get("name"),
+        "type": container.get("container_type"),
+        "technology": container.get("technology"),
+        "protocol": container.get("protocol"),
+        "path": container.get("path"),
+        "description": (container.get("description") or "")[:200],
+    }
+
+
+def build_sanity_prompt(
+    containers: dict[str, dict[str, Any]],
+    system_type: Optional[str] = None,
+) -> str:
+    """Build the sanity-pass prompt over the surviving container set."""
+    summaries = [
+        _summarise_for_sanity(c) for c in list(containers.values())[:SANITY_MAX_CONTAINERS]
+    ]
+    body = {
+        "system_type": system_type or "unknown",
+        "container_count": len(containers),
+        "truncated": len(containers) > SANITY_MAX_CONTAINERS,
+        "containers": summaries,
+    }
+    parts = [
+        "=== SYSTEM CONTEXT ===",
+        _SANITY_SYSTEM_PROMPT.format(n=len(containers)),
+        "\n=== INPUT ===",
+        json.dumps(body, indent=2),
+        "\nReturn the JSON object now.",
+    ]
+    return "\n".join(parts)
+
+
+def parse_sanity_response(response_text: Optional[str]) -> Optional[dict[str, Any]]:
+    """Parse the sanity-pass response. Returns None on failure."""
+    if not response_text:
+        return None
+    try:
+        cleaned = _strip_markdown_fences(response_text)
+        raw_json = _extract_json_object(cleaned) or cleaned
+        data = json.loads(raw_json)
+    except json.JSONDecodeError:
+        raw_json = _extract_json_object(response_text)
+        if not raw_json:
+            return None
+        try:
+            data = json.loads(raw_json)
+        except json.JSONDecodeError:
+            return None
+
+    if not isinstance(data, dict):
+        return None
+
+    fps = data.get("false_positives")
+    missing = data.get("missing")
+    if not isinstance(fps, list):
+        fps = []
+    if not isinstance(missing, list):
+        missing = []
+    return {"false_positives": fps, "missing": missing}
+
+
+def run_sanity_pass(
+    containers: dict[str, dict[str, Any]],
+    llm_manager: Any,
+    system_type: Optional[str] = None,
+) -> dict[str, Any]:
+    """Run a single global review LLM call and return the parsed result.
+
+    Returns:
+        {"false_positives": [...], "missing": [...], "skipped": bool, "error": str|None}
+    """
+    if llm_manager is None or not containers:
+        return {"false_positives": [], "missing": [], "skipped": True, "error": None}
+
+    prompt = build_sanity_prompt(containers, system_type=system_type)
+    logger.info("LLM sanity pass: reviewing %d containers", len(containers))
+
+    original_timeout = getattr(llm_manager, "timeout", 30)
+    try:
+        llm_manager.timeout = max(original_timeout, LLM_REQUEST_TIMEOUT_SEC)
+        try:
+            raw = llm_manager.generate_text(
+                prompt,
+                max_tokens=LLM_MAX_TOKENS,
+                temperature=LLM_TEMPERATURE,
+                use_cache=True,
+            )
+        except Exception as exc:
+            logger.warning("LLM sanity pass call failed: %s", exc)
+            return {"false_positives": [], "missing": [], "skipped": False, "error": str(exc)}
+    finally:
+        llm_manager.timeout = original_timeout
+
+    if not raw:
+        return {"false_positives": [], "missing": [], "skipped": False, "error": "empty_response"}
+
+    parsed = parse_sanity_response(raw)
+    if parsed is None:
+        logger.warning(
+            "LLM sanity pass: could not parse response (first 300 chars): %s",
+            raw[:300],
+        )
+        return {"false_positives": [], "missing": [], "skipped": False, "error": "parse_failed"}
+
+    return {**parsed, "skipped": False, "error": None}

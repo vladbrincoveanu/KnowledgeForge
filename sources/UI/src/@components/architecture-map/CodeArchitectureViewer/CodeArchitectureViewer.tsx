@@ -2148,39 +2148,8 @@ const CodeArchitectureViewerInner: React.FC = () => {
       filteredEntities,
     );
 
-// Build context external entities from system_context for linking container edges to context-level externals
-    const contextExternalEntities = (
-      architecture.system_context?.external_dependencies || []
-    ).map((dep: any, idx: number) => ({
-      id: `context_external_${idx}`,
-      name: dep.context_name || dep.name,
-      entity_type: "external_system",
-    }));
-
-    const visibleContainers = (architecture?.containers || []).filter(
-      (c: any) => !c.is_infrastructure_only,
-    );
-    const hiddenContainerNames = new Set(
-      (architecture?.containers || [])
-        .filter((c: any) => c.is_infrastructure_only)
-        .map((c: any) => String(c.name)),
-    );
-    const visibleContainerRelationships = (
-      architecture?.relationships?.containers || []
-    ).filter((rel: any) => {
-      const src = String(rel?.from ?? rel?.source ?? "");
-      const dst = String(rel?.to ?? rel?.destination ?? "");
-      return !hiddenContainerNames.has(src) && !hiddenContainerNames.has(dst);
-    });
-    const { nodes: ghostNodes, edges: dependencyEdges } =
-      selectedLevel === "container_level" &&
-      (visibleContainers.length > 0 || visibleContainerRelationships.length > 0)
-        ? generateC4Edges(
-            visibleContainers,
-            visibleContainerRelationships,
-            contextExternalEntities,
-          )
-        : { nodes: [], edges: [] };
+    const ghostNodes: Node[] = [];
+    const dependencyEdges: Edge[] = [];
 
     const mergedEdges = [...rfEdges, ...dependencyEdges];
     const mergedNodes = [...rfNodes, ...ghostNodes];

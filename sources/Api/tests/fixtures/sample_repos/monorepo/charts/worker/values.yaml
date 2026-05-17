@@ -1,0 +1,5 @@
+image:
+  repository: worker
+  tag: latest
+kafkaBootstrap: "kafka:9092"
+postgresUrl: "postgres://postgres:5432/app"

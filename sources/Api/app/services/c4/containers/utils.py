@@ -23,62 +23,75 @@ _CODEOWNERS_HANDLE_PATTERN = re.compile(r"@([a-zA-Z0-9_.-]+(?:/[a-zA-Z0-9_.-]+)?
 
 
 def infer_container_type(project_dir: Path) -> str:
-    """Infer what type of container this is."""
-    # Check for indicators
-    if (project_dir / "Dockerfile").exists():
-        # Read Dockerfile to guess type
+    """Infer container type from project files.
+
+    Priority order matters here. Dependency manifests (package.json,
+    pyproject.toml) declare *what the project actually is* and are the
+    most reliable signal — a Dockerfile mentioning `node` only tells you
+    the runtime, not whether the project is a backend API or a SPA.
+
+    All values returned here belong to the LLM-overridable generic set in
+    llm_enrichment._GENERIC_CONTAINER_TYPES so the enrichment pass can
+    correct mistakes when it sees stronger evidence (file_evidence,
+    dependencies, README purpose statement).
+    """
+    # 1. package.json dependencies — most reliable signal for Node projects
+    pkg = project_dir / "package.json"
+    if pkg.exists():
         try:
-            with open(project_dir / "Dockerfile") as f:
-                content = f.read().lower()
-                
-                if 'node' in content or 'npm' in content:
-                    return "Frontend (Node.js)"
-                elif 'python' in content:
-                    if 'fastapi' in content or 'flask' in content:
-                        return "Backend API"
-                    else:
-                        return "Python Service"
-                elif 'java' in content:
-                    return "Java Service"
-                elif 'go' in content:
-                    return "Go Service"
-                
-                return "Containerized Service"
-        except Exception:
-            pass
-    
-    # Check for frontend indicators
-    if (project_dir / "package.json").exists():
-        try:
-            with open(project_dir / "package.json") as f:
+            with open(pkg) as f:
                 data = json.load(f)
-                deps = str(data.get('dependencies', {}))
-                
-                if 'react' in deps:
-                    return "React Frontend"
-                elif 'vue' in deps:
-                    return "Vue Frontend"
-                elif 'angular' in deps:
-                    return "Angular Frontend"
-                elif 'express' in deps:
-                    return "Node.js Backend"
-                
-                return "JavaScript Application"
+            deps_dict = data.get('dependencies') or {}
+            dev_deps_dict = data.get('devDependencies') or {}
+            all_deps = {**deps_dict, **dev_deps_dict}
+            deps_keys = {str(k).lower() for k in all_deps}
+
+            # Frontend frameworks — strong signal it's a UI
+            if any(k in deps_keys for k in ('react', 'react-dom', 'next',
+                                            'vue', '@vue/cli', 'nuxt',
+                                            '@angular/core', 'svelte', 'solid-js')):
+                return "Frontend Application"
+            # Backend HTTP frameworks
+            if any(k in deps_keys for k in ('express', 'fastify', 'koa',
+                                            '@nestjs/core', 'hapi', 'restify')):
+                return "Node.js Service"
+            # Has a `start` script + node runtime ⇒ probably a service
+            if 'start' in (data.get('scripts') or {}):
+                return "Node.js Service"
+            return "Node.js Application"
         except Exception:
             pass
-    
-    # Check for backend indicators
-    if (project_dir / "pyproject.toml").exists():
-        return "Python Service"
-    
-    # Check for database
-    if 'db' in project_dir.name.lower() or 'database' in project_dir.name.lower():
-        return "Database"
-    
-    # Check for worker/job
-    if any(keyword in project_dir.name.lower() for keyword in ['worker', 'job', 'queue', 'task']):
-        return "Background Worker"
-    
+
+    # 2. Python project files
+    pyproject = project_dir / "pyproject.toml"
+    if pyproject.exists() or (project_dir / "requirements.txt").exists():
+        try:
+            text = ""
+            if pyproject.exists():
+                text = pyproject.read_text(encoding='utf-8', errors='ignore').lower()
+            req = project_dir / "requirements.txt"
+            if req.exists():
+                text += "\n" + req.read_text(encoding='utf-8', errors='ignore').lower()
+            if 'fastapi' in text or 'flask' in text or 'django' in text or 'starlette' in text:
+                return "Python Service"
+            return "Python Application"
+        except Exception:
+            return "Python Application"
+
+    # 3. JVM / Go / Rust — manifests only tell us the language, defer details to LLM
+    if (project_dir / "pom.xml").exists() or (project_dir / "build.gradle").exists() \
+            or (project_dir / "build.gradle.kts").exists():
+        return "Java Application"
+    if (project_dir / "go.mod").exists():
+        return "Go Application"
+    if (project_dir / "Cargo.toml").exists():
+        return "Rust Application"
+
+    # 4. Dockerfile is the LAST resort: tells us *something* runs in a container,
+    # but the runtime keyword (node/python/java) is not the same as the role.
+    if (project_dir / "Dockerfile").exists():
+        return "Containerized Service"
+
     return "Service"
 
 

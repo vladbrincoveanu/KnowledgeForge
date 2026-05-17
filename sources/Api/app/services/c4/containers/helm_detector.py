@@ -39,7 +39,15 @@ class HelmDetector(BaseContainerDetector):
             try:
                 with open(chart_file) as f:
                     data = yaml.safe_load(f)
-                
+
+                # Helm "library" charts cannot be deployed standalone — they
+                # only provide reusable templates to other charts. They are
+                # not C4 containers; skip them upstream so they don't even
+                # reach the LLM verdict pass.
+                if isinstance(data, dict) and str(data.get("type") or "").lower() == "library":
+                    logger.debug("Skipping Helm library chart at %s", chart_file)
+                    continue
+
                 chart_dir = chart_file.parent
                 service_dir = chart_dir
                 if chart_dir.name in {'chart', 'charts'} and chart_dir.parent != self.repo_path:

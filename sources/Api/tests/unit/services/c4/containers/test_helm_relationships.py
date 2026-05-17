@@ -25,6 +25,64 @@ def make_chart(repo: Path, name: str, extra: dict = None, chart_subdir: str = "c
     return chart_dir
 
 
+class TestLibraryChartSkipped:
+    """Helm `type: library` charts are not deployable runtimes — they must
+    not be registered as C4 containers."""
+
+    def test_library_chart_omitted_from_detection(self, temp_repo):
+        chart_dir = temp_repo / "shared-helpers"
+        chart_dir.mkdir()
+        (chart_dir / "Chart.yaml").write_text(yaml.dump({
+            "apiVersion": "v2",
+            "name": "shared-helpers",
+            "type": "library",
+            "version": "0.1.0",
+        }))
+        result = HelmDetector(temp_repo).detect()
+        names = {c["name"] for c in result}
+        assert "shared-helpers" not in names
+
+    def test_application_chart_still_detected(self, temp_repo):
+        chart_dir = temp_repo / "my-app"
+        chart_dir.mkdir()
+        (chart_dir / "Chart.yaml").write_text(yaml.dump({
+            "apiVersion": "v2",
+            "name": "my-app",
+            "type": "application",  # explicitly an app
+            "version": "1.0.0",
+        }))
+        result = HelmDetector(temp_repo).detect()
+        names = {c["name"] for c in result}
+        assert "my-app" in names
+
+    def test_chart_without_type_field_still_detected(self, temp_repo):
+        """Most charts omit the `type` field — they default to application."""
+        chart_dir = temp_repo / "legacy-svc"
+        chart_dir.mkdir()
+        (chart_dir / "Chart.yaml").write_text(yaml.dump({
+            "apiVersion": "v2",
+            "name": "legacy-svc",
+            "version": "1.0.0",
+        }))
+        result = HelmDetector(temp_repo).detect()
+        names = {c["name"] for c in result}
+        assert "legacy-svc" in names
+
+    def test_mixed_charts_only_library_skipped(self, temp_repo):
+        for name, type_ in [("svc", "application"), ("lib", "library")]:
+            d = temp_repo / name
+            d.mkdir()
+            (d / "Chart.yaml").write_text(yaml.dump({
+                "apiVersion": "v2",
+                "name": name,
+                "type": type_,
+                "version": "1.0.0",
+            }))
+        result = HelmDetector(temp_repo).detect()
+        names = {c["name"] for c in result}
+        assert names == {"svc"}
+
+
 class TestChartDependencies:
     def test_subchart_deps_emit_relationships(self, temp_repo):
         make_chart(temp_repo, "my-app", extra={
