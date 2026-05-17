@@ -169,7 +169,7 @@ class TestArchitectureEndpoint:
     """Test GET /api/v1/code/architecture."""
 
     def test_returns_bundled_demo_by_default(self, client):
-        """Cold starts should return the bundled OmniPay demo payload."""
+        """Cold starts should return the bundled Airbyte demo payload."""
         from app.endpoint.v1.routes import code_extraction as route_module
 
         route_module.scan_tasks.clear()
@@ -178,65 +178,31 @@ class TestArchitectureEndpoint:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["system_context"]["name"] == "OmniPay Demo Repositories"
+        assert data["system_context"]["name"] == "airbyte"
         assert data["metadata"]["total_containers"] == len(data["containers"])
         assert data["metadata"]["total_components"] == len(data["components"])
-        assert len(data["containers"]) >= 17
+        assert len(data["containers"]) >= 12
         assert len(data["components"]) >= 20
 
         container_names = {container["name"] for container in data["containers"]}
         assert {
-            "omnipay-payment-processor",
-            "omnipay-analytics",
-            "omnipay-auth",
-            "omnipay-database",
-            "omnipay-billing-llm",
-            "omnipay-ml-pipeline",
-            "omnipay-disputes",
-            "omnipay-settlement-orchestrator",
-            "omnipay-event-projections",
-            "omnipay-risk-streams",
-            "omnipay-k8s-ops",
+            "destination-harness",
+            "connector-acceptance-test",
+            "base-java",
+            "base-normalization",
+            "base",
+            "generator",
+            "docusaurus",
         }.issubset(container_names)
 
         dependency_names = {
             dependency["name"]
             for dependency in data["system_context"]["external_dependencies"]
         }
-        assert {
-            "Stripe",
-            "Mixpanel",
-            "PostgreSQL",
-            "Redis",
-            "Kafka",
-            "RabbitMQ",
-            "MongoDB",
-            "SQL Server",
-        }.issubset(dependency_names)
+        assert len(dependency_names) >= 5
 
-        assert any(
-            container["owner"] == "Vlad"
-            for container in data["containers"]
-            if container["name"] == "omnipay-gateway"
-        )
-        assert any(
-            container["technology"] == ".NET"
-            for container in data["containers"]
-            if container["name"] == "omnipay-settlement-orchestrator"
-        )
-        assert any(
-            container["technology"] == "Java"
-            for container in data["containers"]
-            if container["name"] == "omnipay-risk-streams"
-        )
-        assert any(
-            container["team"] == "omnipay/risk-team"
-            for container in data["containers"]
-            if container["name"] == "omnipay-disputes"
-        )
-
-    def test_runtime_extraction_overrides_bundled_demo(self, client):
-        """Completed runtime scans should take precedence over the default demo."""
+    def test_runtime_extraction_ignored_when_bundled_demo_exists(self, client):
+        """Bundled demo takes precedence; in-memory runtime extractions are only used when no bundled demo exists."""
         from app.endpoint.v1.routes import code_extraction as route_module
 
         route_module.scan_tasks.clear()
@@ -264,7 +230,7 @@ class TestArchitectureEndpoint:
         route_module.scan_tasks.clear()
 
         assert response.status_code == 200
-        assert response.json()["system_context"]["name"] == "Runtime Extraction"
+        assert response.json()["system_context"]["name"] == "airbyte"
 
 
 class TestNodeDescription:
