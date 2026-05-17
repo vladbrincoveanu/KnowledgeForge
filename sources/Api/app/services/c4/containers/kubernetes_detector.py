@@ -75,8 +75,6 @@ class KubernetesDetector(BaseContainerDetector):
             return True
 
         for yaml_file in list(self.repo_path.rglob("*.yaml")) + list(self.repo_path.rglob("*.yml")):
-            if self._is_excluded(yaml_file):
-                continue
             if self._quick_check_k8s_workload(yaml_file):
                 return True
 
@@ -313,8 +311,12 @@ class KubernetesDetector(BaseContainerDetector):
     # ------------------------------------------------------------------
 
     def _is_excluded(self, path: Path) -> bool:
-        """True when any path component is in the exclusion list."""
-        return any(part in _EXCLUDED_DIRS for part in path.parts)
+        """True when any path component under repo_root is in the exclusion list."""
+        try:
+            rel_parts = path.relative_to(self.repo_path).parts
+        except ValueError:
+            return True
+        return any(part in _EXCLUDED_DIRS for part in rel_parts)
 
     def _is_in_helm_dir(self, path: Path) -> bool:
         """True when any ancestor directory contains a Chart.yaml."""
