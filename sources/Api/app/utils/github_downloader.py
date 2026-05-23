@@ -11,14 +11,67 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
+_GIT_URL_PATTERN = re.compile(
+    r'^https?://[a-zA-Z0-9._-]+(?:/[a-zA-Z0-9._~:@%-]+){2,}(?:\.git)?/?$'
+)
+
+
 class GitHubDownloader:
-    """Download GitHub repositories for analysis."""
+    """Download Git repositories (GitHub, GitLab, Bitbucket, self-hosted) for analysis."""
 
     @staticmethod
     def is_github_url(url: str) -> bool:
-        """Validate if URL is a GitHub repository URL."""
-        github_pattern = r'^https://github\.com/[\w\-\.]+/[\w\-\.]+(\.git)?/?$'
-        return bool(re.match(github_pattern, url.strip()))
+        """Return True for any HTTPS Git repository URL."""
+        return bool(_GIT_URL_PATTERN.match(url.strip()))
+
+    @staticmethod
+    def _repo_name_from_url(url: str) -> str:
+        """Extract the repository name (last path component) from a Git URL."""
+        path = url.rstrip("/").split("?")[0].split("#")[0]
+        name = path.rsplit("/", 1)[-1].removesuffix(".git")
+        return name or "repo"
+
+    @staticmethod
+    def _inject_token(url: str, token: Optional[str] = None) -> str:
+        """Inject an auth token into the clone URL.
+
+        Credential format varies by host:
+        - GitHub:    https://TOKEN@github.com/...         (token alone as username)
+        - GitLab:    https://oauth2:TOKEN@gitlab.host/... (PAT requires oauth2 prefix)
+        - Bitbucket: https://USER:APP_PASSWORD@...        (pass token as-is; user supplies user:pass)
+        - Other:     https://oauth2:TOKEN@host/...        (safe default for self-hosted git)
+
+        Precedence: explicit token > host-specific env var (GITHUB_TOKEN /
+        GITLAB_TOKEN / BITBUCKET_TOKEN) > GIT_TOKEN generic fallback.
+        """
+        parsed = re.match(r'^(https?://)(.+)', url)
+        if not parsed:
+            return url
+        scheme, rest = parsed.group(1), parsed.group(2)
+        host = rest.split("/")[0].lower()
+
+        if not token:
+            if "github.com" in host:
+                token = os.getenv("GITHUB_TOKEN")
+            elif "gitlab" in host:
+                token = os.getenv("GITLAB_TOKEN")
+            elif "bitbucket.org" in host:
+                token = os.getenv("BITBUCKET_TOKEN")
+            token = token or os.getenv("GIT_TOKEN")
+
+        if not token:
+            return url
+
+        # Choose the right credential format for the host.
+        # If the token already contains a colon it's already user:secret — pass through.
+        if ":" in token:
+            credentials = token
+        elif "github.com" in host:
+            credentials = token          # GitHub accepts bare token as username
+        else:
+            credentials = f"oauth2:{token}"  # GitLab / self-hosted require oauth2 prefix
+
+        return f"{scheme}{credentials}@{rest}"
 
     @staticmethod
     def download_repository(
@@ -26,94 +79,44 @@ class GitHubDownloader:
         output_dir: Path,
         use_git: bool = True,
         full_history: bool = False,
+        token: Optional[str] = None,
     ) -> Path:
-        """Download a GitHub repository.
-        
+        """Clone a Git repository.
+
         Args:
-            github_url: GitHub repository URL
+            github_url: HTTPS URL of the repository (GitHub, GitLab, Bitbucket, etc.)
             output_dir: Directory to save the repository
-            use_git: Use git clone (True) or download archive (False)
-            full_history: Clone with full history (True) or shallow (False)
-            
+            use_git: Use git clone (always True; archive path kept for compat)
+            full_history: Clone with full history or shallow
+            token: Optional personal access token for private repositories.
+                   Falls back to host-specific env vars (GITHUB_TOKEN, GITLAB_TOKEN,
+                   BITBUCKET_TOKEN) then GIT_TOKEN.
+
         Returns:
-            Path to the downloaded repository
+            Path to the cloned repository
         """
         logger.info(f"Downloading repository from {github_url}")
-        
-        # Extract owner and repo name
-        match = re.search(r'github\.com/([\w\-\.]+)/([\w\-\.]+)', github_url)
-        if not match:
-            raise ValueError(f"Invalid GitHub URL: {github_url}")
-        
-        owner, repo = match.groups()
-        repo = repo.rstrip('/').removesuffix('.git')
-        
+
+        repo = GitHubDownloader._repo_name_from_url(github_url)
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
-        
         repo_path = output_dir / repo
-        
-        if use_git:
-            # Use git clone
-            try:
-                github_token = os.getenv('GITHUB_TOKEN')
-                
-                if github_token:
-                    # Use authenticated URL
-                    clone_url = f"https://{github_token}@github.com/{owner}/{repo}.git"
-                else:
-                    clone_url = f"https://github.com/{owner}/{repo}.git"
-                
-                git_cmd = ['git', 'clone']
-                
-                if not full_history:
-                    git_cmd.extend(['--depth', '1'])
-                
-                git_cmd.extend([clone_url, str(repo_path)])
-                
-                logger.info(f"Running: git clone {'--depth 1 ' if not full_history else ''}{github_url}")
-                subprocess.run(git_cmd, check=True, capture_output=True, text=True, timeout=300)
-                
-                logger.info(f"Repository cloned successfully to {repo_path}")
-                return repo_path
-                
-            except subprocess.CalledProcessError as e:
-                logger.error(f"Git clone failed: {e.stderr}")
-                raise RuntimeError(f"Failed to clone repository: {e.stderr}")
-        
-        else:
-            # Use archive download (simpler, no git required)
-            import requests
-            
-            archive_url = f"https://github.com/{owner}/{repo}/archive/refs/heads/main.zip"
-            
-            logger.info(f"Downloading archive from {archive_url}")
-            
-            try:
-                response = requests.get(archive_url, timeout=120)
-                response.raise_for_status()
-                
-                zip_path = output_dir / f"{repo}.zip"
-                with open(zip_path, 'wb') as f:
-                    f.write(response.content)
-                
-                # Extract ZIP
-                import zipfile
-                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                    zip_ref.extractall(output_dir)
-                
-                # Find extracted directory (usually repo-main)
-                extracted_dirs = [d for d in output_dir.iterdir() if d.is_dir() and d.name.startswith(repo)]
-                if extracted_dirs:
-                    extracted_dir = extracted_dirs[0]
-                    if extracted_dir != repo_path:
-                        extracted_dir.rename(repo_path)
-                
-                zip_path.unlink()  # Clean up ZIP
-                
-                logger.info(f"Repository downloaded successfully to {repo_path}")
-                return repo_path
-                
-            except Exception as e:
-                logger.error(f"Archive download failed: {e}")
-                raise RuntimeError(f"Failed to download repository: {str(e)}")
+
+        clone_url = GitHubDownloader._inject_token(github_url, token=token)
+        if not clone_url.endswith(".git"):
+            clone_url = clone_url.rstrip("/") + ".git"
+
+        git_cmd = ["git", "clone"]
+        if not full_history:
+            git_cmd.extend(["--depth", "1"])
+        git_cmd.extend([clone_url, str(repo_path)])
+
+        logger.info(f"Running: git clone {'--depth 1 ' if not full_history else ''}{github_url}")
+        try:
+            subprocess.run(git_cmd, check=True, capture_output=True, text=True, timeout=300)
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Git clone failed: {e.stderr}")
+            raise RuntimeError(f"Failed to clone repository: {e.stderr}")
+
+        logger.info(f"Repository cloned successfully to {repo_path}")
+        return repo_path

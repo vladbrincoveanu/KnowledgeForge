@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
 
-# Regex for safe git owner/repo names (letters, digits, hyphens, underscores, dots)
-_SAFE_GH_COMPONENT = re.compile(r'^[a-zA-Z0-9._-]{1,100}$')
+# Regex for safe git path components (letters, digits, hyphens, underscores, dots)
+_SAFE_GH_COMPONENT = re.compile(r'^[a-zA-Z0-9._-]{1,200}$')
 # Regex for safe branch/tag names (no spaces, no shell metacharacters)
 _SAFE_BRANCH = re.compile(r'^[a-zA-Z0-9._\-/]{1,200}$')
 # Maximum allowed uncompressed ZIP size (500 MB)
@@ -19,13 +19,12 @@ MAX_ZIP_UNCOMPRESSED_BYTES = 500 * 1024 * 1024
 
 
 def validate_github_url(url: str) -> tuple[str, str, Optional[str]]:
-    """Validate a GitHub repository URL and return (owner, repo, branch).
+    """Validate a Git repository URL (GitHub, GitLab, Bitbucket, self-hosted).
 
     Enforces:
     - HTTPS scheme only
-    - Exact github.com hostname (no typosquatting)
-    - Safe owner and repo name characters
-    - Safe branch name characters (if present)
+    - At least two path components (owner/repo)
+    - Safe path component characters
 
     Returns:
         (owner, repo, branch_or_None)
@@ -34,40 +33,36 @@ def validate_github_url(url: str) -> tuple[str, str, Optional[str]]:
         ValueError: If any part of the URL is invalid.
     """
     if not url or not isinstance(url, str):
-        raise ValueError("GitHub URL must be a non-empty string")
+        raise ValueError("Repository URL must be a non-empty string")
 
     url = url.strip()
     parsed = urlparse(url)
 
     if parsed.scheme not in ("http", "https"):
-        raise ValueError(f"GitHub URL must use http(s) scheme, got: {parsed.scheme!r}")
+        raise ValueError(f"Repository URL must use http(s) scheme, got: {parsed.scheme!r}")
 
     netloc = parsed.netloc.lower().split(":")[0]  # strip port
-    if netloc != "github.com":
-        raise ValueError(
-            f"URL must point to github.com (got {netloc!r}). "
-            "Use the full repository URL, e.g. https://github.com/owner/repo"
-        )
+    if not netloc or "." not in netloc:
+        raise ValueError(f"Invalid repository host: {netloc!r}")
 
     path_parts = [p for p in parsed.path.split("/") if p]
     if len(path_parts) < 2:
         raise ValueError(
-            f"Invalid GitHub URL: {url!r}. "
-            "Expected format: https://github.com/owner/repo"
+            f"Invalid repository URL: {url!r}. "
+            "Expected format: https://host/owner/repo"
         )
 
     owner = path_parts[0]
-    repo = path_parts[1].removesuffix(".git")
+    # For self-hosted GitLab with subgroups (host/group/subgroup/repo), use last segment
+    repo = path_parts[-1].removesuffix(".git")
 
-    if not _SAFE_GH_COMPONENT.match(owner):
-        raise ValueError(f"Invalid GitHub owner name: {owner!r}")
     if not _SAFE_GH_COMPONENT.match(repo):
-        raise ValueError(f"Invalid GitHub repo name: {repo!r}")
+        raise ValueError(f"Invalid repository name: {repo!r}")
 
     # Detect branch from /tree/<branch> or fragment (#branch)
     branch: Optional[str] = None
-    if len(path_parts) > 3 and path_parts[2] in ("tree", "blob"):
-        branch = "/".join(path_parts[3:])
+    if len(path_parts) > 3 and path_parts[-3] in ("tree", "blob"):
+        branch = "/".join(path_parts[-2:])
     elif parsed.fragment:
         branch = parsed.fragment
 

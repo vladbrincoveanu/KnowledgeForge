@@ -137,11 +137,11 @@ class ScanRequest(BaseModel):
 
 
 class GitHubScanRequest(BaseModel):
-    """Request model for GitHub-based C4 scan."""
+    """Request model for Git repository C4 scan (GitHub, GitLab, Bitbucket, self-hosted)."""
 
     github_url: str = Field(
         ...,
-        description="HTTPS URL of the GitHub repository to scan.",
+        description="HTTPS URL of the repository to scan.",
         examples=["https://github.com/microservices-demo/microservices-demo"],
     )
     use_git: bool = Field(
@@ -158,6 +158,14 @@ class GitHubScanRequest(BaseModel):
         default=True,
         description=(
             "Append results to existing C4 data (True) or clear all stored data first (False)."
+        ),
+    )
+    token: Optional[str] = Field(
+        default=None,
+        description=(
+            "Personal access token for private repositories. "
+            "Supports GitHub PAT, GitLab PAT, and Bitbucket app-password (user:password). "
+            "Falls back to GITHUB_TOKEN / GITLAB_TOKEN / BITBUCKET_TOKEN / GIT_TOKEN env vars."
         ),
     )
 
@@ -604,6 +612,7 @@ async def extract_from_github(
             request.github_url,
             output_dir=temp_dir,
             use_git=request.use_git,
+            token=request.token or None,
         )
 
         scan_tasks[task_id].update({
@@ -886,30 +895,37 @@ async def run_c4_extraction(
     append_mode: bool = True,
 ):
     """Run C4 Model architecture extraction in background."""
+    import asyncio
     task = scan_tasks.get(task_id)
     if not task:
         logger.error(f"Task {task_id} not found in scan_tasks")
         return
-    
+
     try:
         task['status'] = 'scanning'
         task['progress'] = 0.1
-        task['message'] = 'Initializing C4 extractor'
-        
+        task['message'] = 'Cloning repository'
+
         # Initialize LLM (optional)
         llm = get_llm_manager()
-        
+
         # Initialize C4 extractor
         extractor = C4ArchitectureExtractor(repo_path=repo_path, llm_manager=llm)
-        
-        task['progress'] = 0.3
-        task['message'] = 'Extracting C4 architecture'
+
+        task['progress'] = 0.2
+        task['message'] = 'Analysing architecture'
         logger.info(f"{task['message']} (progress: {int(task['progress'] * 100)}%)")
-        
-        # Extract C4 architecture
-        c4_architecture = extractor.extract(max_components_per_domain=max_components)
-        
-        task['progress'] = 0.7
+
+        # Run the synchronous extraction in a thread so the event loop stays
+        # free to serve poll requests while the extraction is running.
+        c4_architecture = await asyncio.to_thread(
+            extractor.extract,
+            max_components_per_domain=max_components,
+            task_id=task_id,
+            repo_url=task.get('github_url', ''),
+        )
+
+        task['progress'] = 0.9
         task['message'] = f'Extracted {len(c4_architecture["containers"])} containers, {len(c4_architecture["components"])} components'
         task['containers_count'] = len(c4_architecture['containers'])
         task['components_count'] = len(c4_architecture['components'])
@@ -1058,15 +1074,14 @@ async def get_code_architecture():
     """
     Get the active C4 architecture payload.
 
-    Bundled demo (Airbyte) is the default. Runtime extractions are only used
-    when explicitly requested via a scan task.
+    Priority: in-memory runtime extraction → latest JSON on disk → bundled demo.
     """
     try:
-        c4_data = _load_default_c4_from_json()
-        if not c4_data:
-            c4_data = _load_latest_runtime_c4()
+        c4_data = _load_latest_runtime_c4()
         if not c4_data:
             c4_data = _load_latest_c4_from_json()
+        if not c4_data:
+            c4_data = _load_default_c4_from_json()
 
         if not c4_data:
             # Return empty structure if no data

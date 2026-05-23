@@ -97,6 +97,11 @@ services:
       - LMSTUDIO_BASE_URL=http://host.docker.internal:1234/v1
       - LMSTUDIO_MODEL_NAME=qwen/qwen2.5-vl-7b
       - LMSTUDIO_MODEL=qwen/qwen2.5-vl-7b
+      # AI Factory / Qwen (active LLM for component naming and enrichment)
+      - LLM_PROVIDER=aifactory
+      - LLM_BASE_URL=https://aifactory-dev.ai-factory.datalab.tuwien.ac.at/hpc/qwen-qwen3-coder-next/v1
+      - LLM_MODEL=Qwen/Qwen3-Coder-Next
+      - LLM_API_KEY=${LLM_API_KEY}
       # Config system (KF_ prefix) settings
       - KF_LMSTUDIO__BASE_URL=http://host.docker.internal:1234/v1
       - KF_LMSTUDIO__MODEL_NAME=qwen/qwen2.5-vl-7b
