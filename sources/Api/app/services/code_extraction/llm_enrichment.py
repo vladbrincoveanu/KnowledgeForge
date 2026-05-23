@@ -150,6 +150,6 @@ def enrich_with_llm_descriptions(
         relationship['llm_description'] = generate_edge_description(relationship, llm_manager)
 
     for relationship in container_relationships:
-        if not relationship.get('description'):
-            relationship['description'] = generate_edge_description(relationship, llm_manager)
-        relationship['llm_description'] = generate_edge_description(relationship, llm_manager)
+        enriched = generate_edge_description(relationship, llm_manager)
+        relationship['description'] = enriched
+        relationship['llm_description'] = enriched

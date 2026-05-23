@@ -28,6 +28,7 @@ from app.infrastructure.graph.neo4j_client import Neo4jClient
 from app.domain.exceptions import GraphDatabaseError
 from app.services.code_extraction.llm_enrichment import enrich_with_llm_descriptions
 from app.services.code_extraction.component_extractor import link_components_to_containers
+from app.services.code_extraction.shell_extractor import extract_shell_components
 from utils.config import get_config
 
 logger = logging.getLogger(__name__)
@@ -239,6 +240,273 @@ class C4ArchitectureExtractor:
         "Helm Deployed Service",
     })
 
+    def _resolve_polylith_bricks(self, container_abs_path: str) -> list[Path] | None:
+        """Return resolved brick paths if the container is a Polylith project.
+
+        Reads [tool.polylith.bricks] from pyproject.toml and resolves each
+        relative path relative to the container directory.  Returns None when
+        the container is not a Polylith project.
+        """
+        try:
+            import tomllib
+        except ImportError:
+            import tomli as tomllib  # type: ignore[no-redef]
+
+        pyproject = Path(container_abs_path) / "pyproject.toml"
+        if not pyproject.exists():
+            return None
+        try:
+            with open(pyproject, "rb") as f:
+                data = tomllib.load(f)
+        except Exception:
+            return None
+
+        bricks: dict = data.get("tool", {}).get("polylith", {}).get("bricks", {})
+        if not bricks:
+            return None
+
+        resolved: list[Path] = []
+        for brick_rel_path in bricks:
+            brick_abs = (Path(container_abs_path) / brick_rel_path).resolve()
+            if brick_abs.is_dir():
+                resolved.append(brick_abs)
+        return resolved or None
+
+    @staticmethod
+    def _dedup_components_by_name(
+        components: list[ComponentObject],
+    ) -> list[ComponentObject]:
+        """When two components share a name, keep the one with higher confidence."""
+        seen: dict[str, ComponentObject] = {}
+        for comp in components:
+            key = comp.name.lower()
+            if key not in seen or comp.confidence > seen[key].confidence:
+                seen[key] = comp
+        return list(seen.values())
+
+    @staticmethod
+    def _merge_over_fragmented_components(
+        components: list[ComponentObject],
+    ) -> list[ComponentObject]:
+        """Merge community-detected components that share the same source directory.
+
+        Louvain can split a flat package into many tiny clusters, each named after
+        a single class.  Per C4 book rules, a component is a *grouping* of code —
+        not a class.  When multiple community-detection components all live in the
+        same directory, collapse them into one component named after that directory.
+
+        Framework- and LLM-detected components are never touched.
+        """
+        from collections import Counter, defaultdict
+        from app.services.c4.components.models import ExtractionMethod
+
+        # Split by detection method
+        keep = [c for c in components
+                if c.extraction_method != ExtractionMethod.COMMUNITY_DETECTION]
+        community = [c for c in components
+                     if c.extraction_method == ExtractionMethod.COMMUNITY_DETECTION]
+
+        if len(community) <= 1:
+            return components
+
+        def _dominant_dir(comp: ComponentObject) -> str:
+            # Use only the immediate parent directory basename.  For Polylith
+            # repos each brick lives at a different absolute path, so we strip
+            # everything above the last two segments to get a stable key.
+            dirs = [
+                os.path.basename(os.path.dirname(e.file_path))
+                for e in comp.code_elements
+                if e.file_path
+            ]
+            if not dirs:
+                return ""
+            return Counter(dirs).most_common(1)[0][0]
+
+        dir_groups: dict[str, list[ComponentObject]] = defaultdict(list)
+        for comp in community:
+            dir_groups[_dominant_dir(comp)].append(comp)
+
+        for dir_name, group in dir_groups.items():
+            if len(group) == 1:
+                keep.append(group[0])
+                continue
+            # Multiple components share the same directory — merge into one
+            all_elements = [e for c in group for e in c.code_elements]
+            best_conf = max(c.confidence for c in group)
+            label = (
+                dir_name.replace("-", " ").replace("_", " ").title()
+                if dir_name
+                else group[0].name
+            )
+            merged = ComponentObject(
+                component_id=f"community_{label.lower().replace(' ', '_')}",
+                name=label,
+                technology=group[0].technology,
+                component_type=group[0].component_type,
+                extraction_method=ExtractionMethod.COMMUNITY_DETECTION,
+                confidence=best_conf,
+                code_elements=all_elements,
+            )
+            keep.append(merged)
+
+        return keep
+
+    @staticmethod
+    def _merge_same_source_file_components(
+        components: list[ComponentObject],
+    ) -> list[ComponentObject]:
+        """Merge non-framework components that share the same source file basename.
+
+        C4 book: a component is a *grouping* of related code, not a single class.
+        Louvain and other detectors can produce one component per class (e.g. Job,
+        KserveService, Harbor all from models.py).  When two or more such components
+        share the same dominant source filename, collapsing them into one component
+        named after that file restores correct C4 granularity.
+
+        Framework-detected components are intentional architectural groupings and
+        are never touched — mixing them distorts both their names and file pointers.
+        """
+        from collections import Counter, defaultdict
+        from pathlib import Path as _Path
+        from app.services.c4.components.models import ExtractionMethod
+
+        # Framework components are correct by construction — keep them untouched.
+        framework = [c for c in components
+                     if c.extraction_method == ExtractionMethod.FRAMEWORK_DETECTION]
+        non_framework = [c for c in components
+                         if c.extraction_method != ExtractionMethod.FRAMEWORK_DETECTION]
+
+        def _dominant_file(comp: ComponentObject) -> str:
+            # Basename only — stable across different Polylith brick absolute paths.
+            files = [os.path.basename(e.file_path) for e in comp.code_elements if e.file_path]
+            if not files:
+                return ""
+            return Counter(files).most_common(1)[0][0]
+
+        # Files already claimed by a framework component — community components
+        # from the same file are redundant noise and should be suppressed.
+        framework_files: set[str] = {
+            f for c in framework if (f := _dominant_file(c))
+        }
+
+        file_groups: dict[str, list[ComponentObject]] = defaultdict(list)
+        no_file: list[ComponentObject] = []
+
+        for comp in non_framework:
+            key = _dominant_file(comp)
+            if key in framework_files:
+                # Already covered by a framework-detected component — drop.
+                continue
+            if key:
+                file_groups[key].append(comp)
+            else:
+                no_file.append(comp)
+
+        merged_non_framework: list[ComponentObject] = list(no_file)
+        for file_path, group in file_groups.items():
+            if len(group) == 1:
+                merged_non_framework.append(group[0])
+                continue
+
+            # Multiple components share the same file → merge into one named after it.
+            stem = _Path(file_path).stem
+            label = stem.replace("-", " ").replace("_", " ").title()
+            # Order elements so those from the dominant file come first — this
+            # ensures _component_object_to_dict picks the right display file.
+            dominant_elements = [e for c in group for e in c.code_elements
+                                  if os.path.basename(e.file_path) == file_path]
+            other_elements = [e for c in group for e in c.code_elements
+                               if os.path.basename(e.file_path) != file_path]
+            all_elements = dominant_elements + other_elements
+            best = max(group, key=lambda c: c.confidence)
+            ns = best.component_id.split("::")[0] if "::" in best.component_id else best.component_id
+            merged = ComponentObject(
+                component_id=f"{ns}::{stem}",
+                name=label,
+                technology=best.technology,
+                component_type=best.component_type,
+                extraction_method=best.extraction_method,
+                confidence=best.confidence,
+                code_elements=all_elements,
+            )
+            merged_non_framework.append(merged)
+
+        return framework + merged_non_framework
+
+    def _llm_rename_components(
+        self,
+        components: list[ComponentObject],
+    ) -> list[ComponentObject]:
+        """Ask the LLM to produce business-intent names for non-framework components.
+
+        Framework-detected components already carry meaningful architectural names
+        (e.g. "Sign-in API", "Token Validator") and are skipped.  For community- or
+        hybrid-detected components the static analysis can only produce file-stem
+        names ("Models", "Utils").  The LLM reads the actual class names, imports,
+        and architectural layer to produce a real name like "ML Workload Models" or
+        "Kubernetes Job Orchestrator".
+        """
+        from app.services.c4.components.models import ExtractionMethod
+
+        if self.llm_manager is None:
+            return components
+
+        renamed: list[ComponentObject] = []
+        for comp in components:
+            if comp.extraction_method == ExtractionMethod.FRAMEWORK_DETECTION:
+                renamed.append(comp)
+                continue
+
+            elements_summary = []
+            for el in comp.code_elements[:8]:
+                parts = [f"{el.qualified_name} ({el.kind.value}"]
+                if el.layer and el.layer.value != "unknown":
+                    parts[0] += f", {el.layer.value} layer"
+                parts[0] += ")"
+                if el.base_classes:
+                    parts.append(f"inherits {el.base_classes[:3]}")
+                notable_imports = [
+                    imp for imp in el.imports[:6]
+                    if not imp.startswith(("typing", "dataclasses", "abc", "__future__"))
+                ]
+                if notable_imports:
+                    parts.append(f"imports {notable_imports}")
+                if el.method_calls:
+                    parts.append(f"calls {el.method_calls[:4]}")
+                elements_summary.append(", ".join(parts))
+
+            prompt = (
+                "You are a software architect applying the C4 model.\n"
+                "Given the code elements below that belong to a single C4 Component, "
+                "produce a concise name (2-5 words) that describes what this component DOES "
+                "from a business or architectural perspective.\n"
+                "Rules:\n"
+                "- Prefer business intent over technical mechanism when clear\n"
+                "- Use title case\n"
+                "- Do NOT include the word 'Component'\n"
+                "- Output ONLY the name, nothing else\n\n"
+                "Code elements:\n"
+                + "\n".join(f"  - {s}" for s in elements_summary)
+            )
+
+            try:
+                raw = self.llm_manager.generate_text(
+                    prompt, max_tokens=20, temperature=0.2, use_cache=True
+                )
+                if raw:
+                    candidate = raw.strip().strip('"').strip("'").strip()
+                    if 1 < len(candidate) < 60 and "\n" not in candidate:
+                        comp = comp.model_copy(update={
+                            "name": candidate,
+                            "extraction_method": ExtractionMethod.LLM_REFINED,
+                        })
+            except Exception as exc:
+                logger.debug("LLM rename skipped for '%s': %s", comp.name, exc)
+
+            renamed.append(comp)
+
+        return renamed
+
     def _extract_level3_components(self) -> None:
         """Extract Level 3: Components using ComponentExtractor (tree-sitter + graph + grouping)."""
         for container_name, container in self.containers.items():
@@ -250,15 +518,51 @@ class C4ArchitectureExtractor:
             container_rel_path = container.get("path", "")
             container_abs_path = str(self.repo_path / container_rel_path) if container_rel_path else str(self.repo_path)
 
-            try:
-                component_objects = self.component_extractor.extract(container_abs_path)
-            except Exception as exc:
-                logger.warning("ComponentExtractor failed for container '%s': %s", container_name, exc)
+            # Polylith: project directories have no source — resolve brick paths instead
+            brick_paths = self._resolve_polylith_bricks(container_abs_path)
+            if brick_paths:
                 component_objects = []
+                for brick_path in brick_paths:
+                    try:
+                        brick_components = self.component_extractor.extract(str(brick_path))
+                        component_objects.extend(brick_components)
+                    except Exception as exc:
+                        logger.debug("ComponentExtractor skipped brick '%s': %s", brick_path.name, exc)
 
-            # Fallback: if no components were extracted but the container has
-            # source files, create a single entry-point component so the
-            # container isn't invisible at Level 3.
+                # Deduplicate across bricks: same name → keep highest confidence
+                component_objects = self._dedup_components_by_name(component_objects)
+                logger.info(
+                    "Polylith container '%s': %d bricks → %d components",
+                    container_name, len(brick_paths), len(component_objects),
+                )
+            else:
+                try:
+                    component_objects = self.component_extractor.extract(container_abs_path)
+                except Exception as exc:
+                    logger.warning("ComponentExtractor failed for container '%s': %s", container_name, exc)
+                    component_objects = []
+
+            # Pass 1: collapse components that share the same source filename.
+            # Done first (before directory merge) so same-file classes from
+            # different Polylith bricks merge on the stable basename key.
+            component_objects = self._merge_same_source_file_components(component_objects)
+            # Pass 2: collapse any remaining community-detection components that
+            # share the same source directory (handles multi-file flat packages).
+            component_objects = self._merge_over_fragmented_components(component_objects)
+            # Pass 3: LLM naming — replace file-stem names with business-intent
+            # names when an LLM is available (skips framework-detected components).
+            component_objects = self._llm_rename_components(component_objects)
+
+            # Shell-script fallback: containers implemented in .sh files
+            # (Alpine gateways, init containers, CI runners) yield nothing
+            # from the tree-sitter pipeline.  Try shell extraction first so
+            # the LLM rename pass can produce real business-intent names.
+            if not component_objects:
+                component_objects = extract_shell_components(container_abs_path)
+                if component_objects:
+                    component_objects = self._llm_rename_components(component_objects)
+
+            # Generic fallback: single entry-point component from main.py / app.py etc.
             if not component_objects:
                 fallback = self._create_fallback_component(
                     container_name, container_rel_path, container_abs_path, container,
