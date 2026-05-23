@@ -278,6 +278,7 @@ def _django_element(file_path: str, name: str = "MyModel") -> CodeElement:
         kind=CodeElementKind.CLASS,
         file_path=file_path,
         language="Python",
+        imports=["django.db.models"],
     )
 
 
