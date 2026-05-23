@@ -548,8 +548,17 @@ Create ontology mappings in JSON format:
         max_tokens: int = 100,
         temperature: float = 0.7,
         use_cache: bool = True,
+        prefix: str = "",
     ) -> Optional[str]:
-        """Generate text using LM Studio with caching and fallback."""
+        """Generate text using LM Studio with caching and fallback.
+
+        Args:
+            prefix: Optional partial assistant message prepended before generation
+                    (assistant prefill). When set, the model continues from this
+                    string — useful to force JSON output and suppress reasoning preamble.
+                    The prefix is prepended to the returned string so callers get the
+                    full content.
+        """
         model = model or self.default_model
 
         # Check cache first
@@ -559,10 +568,15 @@ Create ontology mappings in JSON format:
                 logger.info("Using cached response for prompt")
                 return cached_response.response
 
+        # Build message list; add partial assistant message when prefix is set
+        messages: list[dict] = [{"role": "user", "content": prompt}]
+        if prefix:
+            messages.append({"role": "assistant", "content": prefix})
+
         # Try primary model first
         payload = {
             "model": model,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": messages,
             "max_tokens": max_tokens,
             "temperature": temperature,
             "stream": False,
@@ -571,10 +585,13 @@ Create ontology mappings in JSON format:
         response = self._make_request_with_retry(payload, model)
 
         if response:
-            confidence = self._calculate_confidence(response, model)
+            # When prefill is used, the model continues from the prefix —
+            # prepend it so callers receive the complete output.
+            full_response = prefix + response if prefix else response
+            confidence = self._calculate_confidence(full_response, model)
             if use_cache:
-                self._cache_response(prompt, model, response, confidence)
-            return response
+                self._cache_response(prompt, model, full_response, confidence)
+            return full_response
 
         # Try model fallback
         logger.info(f"Primary model {model} failed, trying fallback models")
@@ -583,10 +600,11 @@ Create ontology mappings in JSON format:
         )
 
         if response:
-            confidence = self._calculate_confidence(response, fallback_model)
+            full_response = prefix + response if prefix else response
+            confidence = self._calculate_confidence(full_response, fallback_model)
             if use_cache:
-                self._cache_response(prompt, fallback_model, response, confidence)
-            return response
+                self._cache_response(prompt, fallback_model, full_response, confidence)
+            return full_response
 
         return None
 
