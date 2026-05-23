@@ -21,6 +21,7 @@ Integration:
 import json
 import logging
 import re
+from pathlib import Path
 from typing import Any, Optional
 from uuid import uuid4
 
@@ -34,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 MAX_CONTAINERS_PER_BATCH = 12   # cap prompt size for small-context models
 MAX_SIGNALS_PER_CONTAINER = 2   # drop extra signals from noisy containers
-LLM_MAX_TOKENS = 1024
+LLM_MAX_TOKENS = 2048           # thinking models consume tokens on reasoning first
 LLM_TEMPERATURE = 0.2           # low variance: we want factual classification
 
 # Field values the rule-based pipeline emits when it has no real signal —
@@ -74,14 +75,30 @@ AMBIGUOUS CASES
   • Sidecar containers (envoy, istio-proxy): discard — infrastructure, not application
   • Multi-stage Dockerfile build stage: discard — not a runtime unit
   • "wait-for" helper images: discard — only ensures startup order
+  • Paths under development/ directories: pipeline definitions, dev scripts, local
+    tooling — discard unless there is a Dockerfile, docker-compose entry, or k8s
+    manifest that proves this path runs as a deployed service
 
 YOUR TASK
 Given a JSON evidence bundle produced by a static-analysis pipeline, return a
 JSON object (no markdown, no comments) that:
   1. Reviews each detected container: verdict = keep | discard | merge
   2. Improves container_type, technology, protocol when the evidence is clear
-  3. Infers additional relationships from env-var patterns, image names, ports
+  3. Infers relationships between containers — see strategy below
   4. Writes concise 1-2 sentence descriptions
+
+RELATIONSHIP INFERENCE STRATEGY (apply in order, stop when confident)
+  Priority 1 — explicit signals (confidence 0.85-0.95):
+    env_var_names containing another container's name (e.g. ROUTE_MANAGER_URL → calls route-manager)
+    depends_on lists in docker-compose
+    ports that expose well-known database/broker ports (5432, 6379, 9092, 5672)
+
+  Priority 2 — readme/description text (confidence 0.70-0.84):
+    README excerpt mentions another container name or role
+    Description says "calls", "connects to", "publishes to", "subscribes from"
+
+  If evidence is completely absent for a relationship, emit nothing — do not guess from names.\
+
 
 OUTPUT SCHEMA (strict JSON, every container must appear, null = keep existing):
 {
@@ -153,6 +170,68 @@ _FEW_SHOT_EXAMPLES: list[dict[str, Any]] = [
                 },
             ],
             "inferred_relationships": [],
+        },
+    },
+    {
+        "label": "Thin-signal services with source cross-reference",
+        "input": {
+            "repo_context": {
+                "total_containers": 2,
+                "detection_sources": ["structure"],
+                "is_infrastructure_only": False,
+            },
+            "container_signals": [
+                {
+                    "name": "order-service",
+                    "existing": {"type": "ServerSideWebApp", "tech": "Python", "protocol": "HTTP", "description": ""},
+                    "signals": [
+                        {"signal_type": "filesystem-structure", "source_file": "services/order-service", "attributes": {"technology": "Python + FastAPI", "path": "services/order-service"}, "confidence": 0.60},
+                        {"signal_type": "readme-excerpt", "source_file": "services/order-service/README", "attributes": {"description": "Manages order lifecycle. Sends confirmation emails via the notification-worker."}, "confidence": 0.70},
+                    ],
+                },
+                {
+                    "name": "notification-worker",
+                    "existing": {"type": "Unknown", "tech": "Node.js", "protocol": "", "description": ""},
+                    "signals": [
+                        {"signal_type": "filesystem-structure", "source_file": "services/notification-worker", "attributes": {"technology": "Node.js", "path": "services/notification-worker"}, "confidence": 0.60},
+                    ],
+                },
+            ],
+            "relationship_signals": [
+                {
+                    "from": "order-service", "to": "notification-worker",
+                    "type": "uses", "protocol": "", "direction": "outbound",
+                    "source": "source-xref:src/clients.py (3 occurrences)", "confidence": 0.65,
+                },
+            ],
+        },
+        "output": {
+            "containers": [
+                {
+                    "name": "order-service", "verdict": "keep",
+                    "container_type": "ServerSideWebApp", "technology": "Python + FastAPI",
+                    "protocol": "HTTP",
+                    "description": "Manages the full order lifecycle and delegates email confirmations to notification-worker.",
+                    "confidence": 0.80,
+                    "notes": "README and source cross-reference confirm dependency on notification-worker.",
+                },
+                {
+                    "name": "notification-worker", "verdict": "keep",
+                    "container_type": "ServerSideConsoleApp", "technology": "Node.js",
+                    "protocol": None,
+                    "description": "Background worker that sends transactional emails on behalf of order-service.",
+                    "confidence": 0.72,
+                    "notes": "Referenced 3 times in order-service source; README confirms email role.",
+                },
+            ],
+            "inferred_relationships": [
+                {
+                    "from": "order-service", "to": "notification-worker",
+                    "type": "uses", "protocol": "HTTP", "port": "",
+                    "description": "delegates email delivery to",
+                    "confidence": 0.72,
+                },
+            ],
         },
     },
     {
@@ -230,11 +309,129 @@ def _infer_signal_type(container: dict[str, Any]) -> str:
     return "filesystem-structure"
 
 
+def _read_readme_excerpt(container_dir: Path, max_chars: int = 280) -> Optional[str]:
+    """Return a short description excerpt from README, skipping title lines."""
+    for name in ("README.md", "README.rst", "README.txt", "README"):
+        readme = container_dir / name
+        if not readme.is_file():
+            continue
+        try:
+            text = readme.read_text(encoding="utf-8", errors="ignore")
+            lines = [l.strip() for l in text.splitlines()
+                     if l.strip() and not l.startswith("#") and not l.startswith("=")]
+            excerpt = " ".join(lines[:6])
+            return excerpt[:max_chars] if excerpt else None
+        except OSError:
+            pass
+    return None
+
+
+_SOURCE_EXTENSIONS = {
+    ".py", ".go", ".ts", ".js", ".java", ".cs", ".rb", ".rs",
+    ".sh", ".yaml", ".yml", ".env", ".toml", ".cfg", ".ini", ".json",
+}
+_SKIP_DIRS = {".git", "vendor", "node_modules", ".venv", "__pycache__", "dist", "build"}
+
+
+def _scan_cross_service_refs(
+    container_dir: Path,
+    other_names: list[str],
+    max_files: int = 30,
+    max_bytes: int = 50_000,
+) -> list[dict[str, Any]]:
+    """Scan source files in *container_dir* for call-site references to other containers.
+
+    A reference counts only when the container name appears in a meaningful call context:
+      - URL/hostname:  ://name, http(s)://name, name:PORT, name/v1, name.svc
+      - Env variable:  UPPER_CASE variant of the name (e.g. COMPUTE_API_URL)
+      - Import/client: 'import name', 'from name', name appearing in a quoted string
+                       alongside 'url', 'host', 'endpoint', 'client', 'base'
+
+    Generic string occurrences (e.g. label values, comments) only count toward
+    confidence when at least one of the above strong signals is also present.
+    """
+    if not container_dir.is_dir() or not other_names:
+        return []
+
+    # Build lookup: normalised variant → original name
+    name_variants: dict[str, str] = {}
+    for n in other_names:
+        name_variants[n] = n
+        alt = n.replace("-", "_") if "-" in n else n.replace("_", "-")
+        if alt != n:
+            name_variants[alt] = n
+
+    results: dict[str, dict[str, Any]] = {}
+    files_scanned = 0
+
+    for path in container_dir.rglob("*"):
+        if files_scanned >= max_files:
+            break
+        if any(part in _SKIP_DIRS for part in path.parts):
+            continue
+        if not path.is_file() or path.suffix not in _SOURCE_EXTENSIONS:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="ignore")[:max_bytes]
+        except OSError:
+            continue
+        files_scanned += 1
+
+        for variant, original in name_variants.items():
+            if variant not in text:
+                continue
+
+            # Strong signal 1: URL / hostname context
+            url_pat = re.compile(
+                r'(?:://|https?://)[^\s]*' + re.escape(variant) +
+                r'|' + re.escape(variant) + r'(?::\d{2,5}|/v\d|\.svc|\.cluster)',
+                re.IGNORECASE,
+            )
+            url_hits = len(url_pat.findall(text))
+
+            # Strong signal 2: env-var naming (COMPUTE_API_URL, ROUTE_MANAGER_HOST …)
+            env_base = variant.upper().replace("-", "_")
+            env_pat = re.compile(r'\b' + re.escape(env_base) + r'[_A-Z]*\b')
+            env_hits = len(env_pat.findall(text))
+
+            # Strong signal 3: import / client context in quoted strings
+            client_pat = re.compile(
+                r'(?:import|from|client|url|host|endpoint|base)[^\n]{0,60}' +
+                re.escape(variant),
+                re.IGNORECASE,
+            )
+            client_hits = len(client_pat.findall(text))
+
+            strong = url_hits + env_hits + client_hits
+            # Require at least one strong signal — bare string occurrences alone
+            # (e.g. K8s label values, comments) are too noisy to trust
+            if strong == 0:
+                continue
+
+            generic_count = text.count(variant)
+            weighted = url_hits * 3 + env_hits * 2 + client_hits * 2 + min(generic_count, 10)
+            confidence = min(0.80, 0.45 + weighted * 0.04)
+
+            existing = results.get(original)
+            if existing is None or confidence > existing["confidence"]:
+                results[original] = {
+                    "referenced_name": original,
+                    "file": str(path.relative_to(container_dir)),
+                    "occurrences": generic_count,
+                    "url_hits": url_hits,
+                    "env_hits": env_hits,
+                    "client_hits": client_hits,
+                    "confidence": confidence,
+                }
+
+    return list(results.values())
+
+
 def _container_attributes(container: dict[str, Any]) -> dict[str, Any]:
     """Extract the most diagnostic attributes from a container dict."""
     attrs: dict[str, Any] = {}
 
-    for field in ("container_type", "technology", "protocol",
+    for field in ("container_type", "technology", "protocol", "image",
                   "runtime_info", "runtime_environment", "deployment", "path"):
         val = container.get(field)
         if val and val not in ("Unknown", "N/A", ""):
@@ -247,6 +444,14 @@ def _container_attributes(container: dict[str, Any]) -> dict[str, Any]:
     health = container.get("health_endpoint") or ""
     if health:
         attrs["health_endpoint"] = health
+
+    ports = container.get("ports") or []
+    if ports:
+        attrs["ports"] = ports[:5]
+
+    env_var_names = container.get("env_var_names") or []
+    if env_var_names:
+        attrs["env_var_names"] = env_var_names[:12]
 
     return attrs
 
@@ -267,12 +472,15 @@ def _signal_confidence(signal_type: str) -> float:
 def build_evidence_bundle(
     containers: dict[str, dict[str, Any]],
     relationships: list[dict[str, Any]],
+    repo_path: Optional[Path] = None,
 ) -> dict[str, Any]:
     """Compress rule-based detection output into a structured evidence bundle.
 
     Args:
         containers:    name → container dict (output of ContainerManager.detect_all_containers)
         relationships: list of relationship dicts (output of build_container_relationships)
+        repo_path:     optional repo root Path; when provided, README excerpts are read
+                       from each container's directory to supplement thin signals.
 
     Returns:
         Evidence bundle dict suitable for prompt serialisation.
@@ -316,6 +524,34 @@ def build_evidence_bundle(
         }]
         signals.extend(extra_signals[:MAX_SIGNALS_PER_CONTAINER - 1])
 
+        # Flag containers inside development/ — likely dev tooling, not deployable
+        container_path_str = container.get("path") or ""
+        if any(part.lower() in {"development", "dev"} for part in Path(container_path_str).parts):
+            signals.append({
+                "signal_type": "dev-directory",
+                "source_file": container_path_str,
+                "attributes": {
+                    "note": "Path is under a development/ directory. "
+                            "Discard unless explicit deployment evidence exists."
+                },
+                "confidence": 0.85,
+            })
+
+        # README excerpt — adds purpose/context when structural signals are thin
+        container_path_str = container.get("path") or ""
+        container_dir: Optional[Path] = None
+        if repo_path and container_path_str and container_path_str not in {".", ""}:
+            container_dir = repo_path / container_path_str
+            if container_dir.is_dir():
+                excerpt = _read_readme_excerpt(container_dir)
+                if excerpt:
+                    signals.append({
+                        "signal_type": "readme-excerpt",
+                        "source_file": f"{container_path_str}/README",
+                        "attributes": {"description": excerpt},
+                        "confidence": 0.70,
+                    })
+
         container_signals.append({
             "name": name,
             "existing": {
@@ -343,6 +579,38 @@ def build_evidence_bundle(
         for r in relationships
         if r.get("from") and r.get("to")
     ]
+
+    # Cross-reference scan: find containers whose names appear in other containers'
+    # source files.  This gives the LLM real code evidence — not naming guesswork.
+    if repo_path:
+        all_names = list(containers.keys())
+        for name, container in containers.items():
+            c_path_str = container.get("path") or ""
+            if not c_path_str or c_path_str in {".", ""}:
+                continue
+            c_dir = repo_path / c_path_str
+            other_names = [n for n in all_names if n != name]
+            hits = _scan_cross_service_refs(c_dir, other_names)
+            for hit in hits:
+                detail = (
+                    f"url:{hit.get('url_hits',0)} "
+                    f"env:{hit.get('env_hits',0)} "
+                    f"client:{hit.get('client_hits',0)} "
+                    f"generic:{hit['occurrences']}"
+                )
+                relationship_signals.append({
+                    "from": name,
+                    "to": hit["referenced_name"],
+                    "type": "uses",
+                    "protocol": "",
+                    "direction": "outbound",
+                    "source": f"source-xref:{hit['file']} ({detail})",
+                    "confidence": hit["confidence"],
+                })
+                logger.debug(
+                    "Cross-ref: %s references %s in %s (%d times)",
+                    name, hit["referenced_name"], hit["file"], hit["occurrences"],
+                )
 
     _app_sources = {"compose", "structure"}
     _infra_sources = {"helm", "terraform", "kustomize", "manifest", "gitops", "infrastructure-only"}
@@ -386,8 +654,13 @@ def build_enrichment_prompt(bundle: dict[str, Any]) -> str:
 
     # Actual evidence
     sections.append("\n=== YOUR TASK ===")
-    sections.append("Process the following evidence bundle and return ONLY a JSON object.")
-    sections.append("Do NOT include markdown code fences, comments, or explanation.")
+    sections.append(
+        "Process the following evidence bundle.\n"
+        "/no_think\n"
+        "CRITICAL: Your entire response must be a single JSON object — nothing else.\n"
+        "Start your response with { and end with }.\n"
+        "Do NOT include markdown fences, reasoning text, or any explanation."
+    )
     sections.append("\nEvidence bundle:")
     sections.append(json.dumps(bundle, indent=2))
 
@@ -398,6 +671,11 @@ def build_enrichment_prompt(bundle: dict[str, Any]) -> str:
 # JSON extraction / response parser
 # ---------------------------------------------------------------------------
 
+def _strip_thinking_tags(text: str) -> str:
+    """Remove <think>...</think> blocks emitted by reasoning models (e.g. Qwen3)."""
+    return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+
+
 def _strip_markdown_fences(text: str) -> str:
     """Remove ``` or ```json fences from LLM output."""
     text = re.sub(r"^```(?:json)?\s*", "", text.strip(), flags=re.IGNORECASE)
@@ -405,8 +683,15 @@ def _strip_markdown_fences(text: str) -> str:
     return text.strip()
 
 
-def _extract_json_object(text: str) -> Optional[str]:
-    """Find the first top-level JSON object in text."""
+def _extract_json_object(text: str, last: bool = False) -> Optional[str]:
+    """Find a top-level JSON object in text.
+
+    Args:
+        text: Input string.
+        last: If True, return the *last* top-level JSON object instead of the first.
+              Useful when models emit reasoning text before the actual JSON output.
+    """
+    candidates: list[str] = []
     depth = 0
     start = None
     for i, ch in enumerate(text):
@@ -417,8 +702,24 @@ def _extract_json_object(text: str) -> Optional[str]:
         elif ch == "}":
             depth -= 1
             if depth == 0 and start is not None:
-                return text[start: i + 1]
-    return None
+                candidates.append(text[start: i + 1])
+                start = None
+    if not candidates:
+        return None
+    return candidates[-1] if last else candidates[0]
+
+
+def _try_parse_json(text: str) -> Optional[dict[str, Any]]:
+    """Attempt to parse text as a JSON object with 'containers' key."""
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    if "containers" not in data or not isinstance(data.get("containers"), list):
+        return None
+    return data
 
 
 def parse_llm_enrichment_response(
@@ -426,37 +727,50 @@ def parse_llm_enrichment_response(
 ) -> Optional[dict[str, Any]]:
     """Extract and validate the JSON envelope from the LLM response.
 
+    Tries multiple extraction strategies to handle models that emit reasoning
+    text before or around the JSON output.
+
     Returns None if parsing fails or the result doesn't match the expected
     schema (must have a 'containers' list).
     """
     if not response_text:
         return None
 
-    try:
-        cleaned = _strip_markdown_fences(response_text)
-        raw_json = _extract_json_object(cleaned) or cleaned
-        data = json.loads(raw_json)
-    except json.JSONDecodeError:
-        # Try to recover by finding the first valid JSON substring
-        raw_json = _extract_json_object(response_text)
-        if not raw_json:
-            logger.debug("LLM enrichment: no JSON object found in response")
-            return None
-        try:
-            data = json.loads(raw_json)
-        except json.JSONDecodeError as exc:
-            logger.debug("LLM enrichment: JSON parse failed: %s", exc)
-            return None
+    # Strip reasoning blocks first so they don't interfere with JSON extraction
+    cleaned = _strip_thinking_tags(response_text)
+    cleaned = _strip_markdown_fences(cleaned)
 
-    if not isinstance(data, dict):
-        logger.debug("LLM enrichment: response is not a JSON object")
-        return None
+    # Strategy 1: the whole cleaned text is valid JSON
+    result = _try_parse_json(cleaned)
+    if result:
+        return result
 
-    if "containers" not in data or not isinstance(data.get("containers"), list):
-        logger.debug("LLM enrichment: response missing 'containers' list")
-        return None
+    # Strategy 2: last top-level JSON object (after reasoning preamble)
+    last_json = _extract_json_object(cleaned, last=True)
+    if last_json:
+        result = _try_parse_json(last_json)
+        if result:
+            return result
 
-    return data
+    # Strategy 3: first top-level JSON object
+    first_json = _extract_json_object(cleaned, last=False)
+    if first_json and first_json != last_json:
+        result = _try_parse_json(first_json)
+        if result:
+            return result
+
+    # Strategy 4: raw response as fallback (model may not have stripped fences)
+    last_raw = _extract_json_object(response_text, last=True)
+    if last_raw:
+        result = _try_parse_json(last_raw)
+        if result:
+            return result
+
+    logger.debug(
+        "LLM enrichment: could not parse valid response (first 300 chars): %s",
+        response_text[:300],
+    )
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -543,10 +857,13 @@ def apply_enrichments(
         if llm_protocol and container.get("protocol") in (None, "", "N/A"):
             container["protocol"] = llm_protocol
 
-        # description: update if missing or generic boilerplate
+        # description: update if missing, generic boilerplate, or LLM is confident
+        # enough to override non-architectural content scraped from README/docs.
         llm_desc = verdict_item.get("description")
-        if llm_desc and _should_update_field(
-            container.get("description") or "", _GENERIC_DESCRIPTIONS
+        existing_desc = container.get("description") or ""
+        if llm_desc and (
+            _should_update_field(existing_desc, _GENERIC_DESCRIPTIONS)
+            or confidence >= 0.75
         ):
             container["description"] = llm_desc
             descriptions_improved += 1
@@ -597,6 +914,7 @@ def enrich_containers(
     containers: dict[str, dict[str, Any]],
     relationships: list[dict[str, Any]],
     llm_manager: Any,
+    repo_path: Optional[Path] = None,
 ) -> dict[str, Any]:
     """Run LLM enrichment over detected containers and relationships.
 
@@ -604,9 +922,10 @@ def enrich_containers(
     garbage the containers dict is returned unmodified.
 
     Args:
-        containers:   name → container dict (mutated in-place on success)
+        containers:    name → container dict (mutated in-place on success)
         relationships: list of relationship dicts from build_container_relationships()
-        llm_manager:  LLMManager instance (or None to skip)
+        llm_manager:   LLMManager instance (or None to skip)
+        repo_path:     optional repo root Path; enables README-based evidence signals
 
     Returns:
         Stats dict: {"enriched": int, "discarded": int, "inferred_relationships": int,
@@ -642,7 +961,7 @@ def enrich_containers(
                   if r.get("from") in batch or r.get("to") in batch]
 
     # Build evidence bundle and prompt
-    bundle = build_evidence_bundle(batch, batch_rels)
+    bundle = build_evidence_bundle(batch, batch_rels, repo_path=repo_path)
     prompt = build_enrichment_prompt(bundle)
 
     logger.info(
@@ -688,22 +1007,25 @@ def enrich_containers(
     for container in containers.values():
         llm_confidence = container.get("llm_confidence", 1.0)
         if llm_confidence < 0.70:
-            enqueue_review_item_if_low_confidence(
-                extraction_run_id=run_id,
-                field="container_verdict",
-                candidate_values=[container.get("container_type", "Unknown")],
-                llm_suggestion=container.get("llm_notes"),
-                confidence=llm_confidence,
-                evidence=[
-                    {
-                        "container_name": container.get("name", ""),
-                        "container_type": container.get("container_type"),
-                        "technology": container.get("technology"),
-                        "verdict": container.get("llm_verdict"),
-                        "notes": container.get("llm_notes"),
-                    }
-                ],
-            )
+            try:
+                enqueue_review_item_if_low_confidence(
+                    extraction_run_id=run_id,
+                    field="container_verdict",
+                    candidate_values=[container.get("container_type", "Unknown")],
+                    llm_suggestion=container.get("llm_notes"),
+                    confidence=llm_confidence,
+                    evidence=[
+                        {
+                            "container_name": container.get("name", ""),
+                            "container_type": container.get("container_type"),
+                            "technology": container.get("technology"),
+                            "verdict": container.get("llm_verdict"),
+                            "notes": container.get("llm_notes"),
+                        }
+                    ],
+                )
+            except Exception as exc:
+                logger.debug("Review queue insert skipped (table may not exist): %s", exc)
 
     enriched = sum(1 for c in containers.values() if c.get("llm_enriched"))
     discarded = sum(1 for c in containers.values() if c.get("llm_verdict") == "discard")

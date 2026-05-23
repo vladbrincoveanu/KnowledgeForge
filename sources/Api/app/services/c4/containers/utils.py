@@ -102,8 +102,77 @@ def detect_technology_stack(project_dir: Path) -> str:
         return "Terraform"
     elif (project_dir / "chart" / "Chart.yaml").exists() or (project_dir / "Chart.yaml").exists():
         return "Helm"
-    
+
+    # Fallback 1: infer from Dockerfile base image
+    dockerfile = project_dir / "Dockerfile"
+    if dockerfile.exists():
+        tech = _detect_tech_from_dockerfile(dockerfile)
+        if tech:
+            return tech
+
+    # Fallback 2: dominant source file extension
+    tech = _detect_tech_from_source_files(project_dir)
+    if tech:
+        return tech
+
     return "Unknown"
+
+
+_DOCKERFILE_IMAGE_MAP = (
+    ("python", "Python"),
+    ("node", "Node.js"),
+    ("golang", "Go"),
+    ("openjdk", "Java"),
+    ("eclipse-temurin", "Java"),
+    ("amazoncorretto", "Java"),
+    ("rust", "Rust"),
+    ("dotnet", ".NET"),
+    ("mcr.microsoft.com/dotnet", ".NET"),
+)
+
+
+def _detect_tech_from_dockerfile(dockerfile: Path) -> str:
+    """Parse the first FROM instruction and map the base image to a tech stack."""
+    try:
+        for line in dockerfile.read_text(encoding="utf-8", errors="ignore").splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            if stripped.upper().startswith("FROM "):
+                image = stripped.split()[1].lower()
+                for prefix, tech in _DOCKERFILE_IMAGE_MAP:
+                    if image.startswith(prefix) or f"/{prefix}" in image:
+                        return tech
+                break
+    except Exception:
+        pass
+    return ""
+
+
+def _detect_tech_from_source_files(project_dir: Path) -> str:
+    """Count source files by extension and return the dominant tech, or empty string."""
+    _EXT_TECH = {
+        ".py": "Python",
+        ".go": "Go",
+        ".java": "Java",
+        ".ts": "TypeScript",
+        ".js": "JavaScript",
+        ".rs": "Rust",
+        ".cs": "C#",
+        ".rb": "Ruby",
+        ".sh": "Shell",
+    }
+    counts: dict[str, int] = {}
+    try:
+        for f in project_dir.iterdir():
+            if f.is_file() and f.suffix in _EXT_TECH:
+                tech = _EXT_TECH[f.suffix]
+                counts[tech] = counts.get(tech, 0) + 1
+    except Exception:
+        pass
+    if not counts:
+        return ""
+    return max(counts, key=lambda t: counts[t])
 
 
 def detect_service_owner(repo_path: Path, project_dir: Path) -> tuple[Optional[str], Optional[str]]:

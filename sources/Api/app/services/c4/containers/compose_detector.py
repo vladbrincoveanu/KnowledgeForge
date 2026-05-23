@@ -47,6 +47,27 @@ class ComposeDetector(BaseContainerDetector):
                     image = service_config.get('image', '')
                     runtime = utils.extract_runtime_from_image(image)
 
+                    # Collect env var names (keys only — values may contain secrets)
+                    raw_env = service_config.get('environment') or {}
+                    if isinstance(raw_env, list):
+                        env_var_names = [
+                            item.split('=', 1)[0].strip()
+                            for item in raw_env
+                            if isinstance(item, str) and '=' in item
+                        ]
+                    else:
+                        env_var_names = list(raw_env.keys())
+
+                    # Exposed ports (published side only)
+                    raw_ports = service_config.get('ports') or []
+                    port_list: list[str] = []
+                    for p in raw_ports:
+                        if isinstance(p, dict):
+                            port_list.append(str(p.get('published') or p.get('target') or ''))
+                        elif isinstance(p, str):
+                            port_list.append(p.split(':')[-1].split('/')[0])
+                    ports = [p for p in port_list if p]
+
                     container = {
                         "c4_level": 2,
                         "type": "container",
@@ -55,6 +76,9 @@ class ComposeDetector(BaseContainerDetector):
                         "technology": image.split(':')[0] if image else "Unknown",
                         "protocol": self._infer_service_protocol(image, service_config),
                         "path": str(compose_file.relative_to(self.repo_path)),
+                        "image": image,
+                        "ports": ports,
+                        "env_var_names": env_var_names[:15],
 
                         # IT Landscape fields
                         "repository_url": utils.get_repository_url(self.repo_path, compose_file.parent),

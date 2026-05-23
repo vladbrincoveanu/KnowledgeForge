@@ -141,7 +141,7 @@ class ContainerManager:
 
         # Build current relationships so the LLM can see existing signals
         current_rels = self.build_container_relationships()
-        stats = enrich_containers(self.containers, current_rels, self.llm_manager)
+        stats = enrich_containers(self.containers, current_rels, self.llm_manager, repo_path=self.repo_path)
         logger.info("LLM enrichment stats: %s", stats)
         return stats
     
