@@ -99,6 +99,14 @@ class ContextManager:
 
         # External dependencies
         external_deps = self.dependency_detector.detect_external_dependencies()
+        # Without LLM, drop documentation-only evidence — URLs in READMEs and
+        # docs are indistinguishable from tutorial links and don't prove a
+        # runtime integration (C4 Context shows only what the system calls).
+        if self.llm_manager is None:
+            external_deps = [
+                d for d in external_deps
+                if d.get("evidence_type") != "documentation_reference"
+            ]
         external_deps = self._enrich_deps_with_element_type(external_deps)
         external_dep_reviews = self.dependency_detector.get_last_review_items()
         deployment_deps = self.dependency_detector.detect_deployment_dependencies()
@@ -123,14 +131,17 @@ class ContextManager:
 
         owner_confidence = owner_provenance.get("confidence", 0.0)
         if owner_confidence < 0.70:
-            enqueue_review_item_if_low_confidence(
-                extraction_run_id=extraction_run_id,
-                field="owner",
-                candidate_values=[owner_team] if owner_team else [],
-                llm_suggestion=None,
-                confidence=owner_confidence,
-                evidence=[owner_provenance],
-            )
+            try:
+                enqueue_review_item_if_low_confidence(
+                    extraction_run_id=extraction_run_id,
+                    field="owner",
+                    candidate_values=[owner_team] if owner_team else [],
+                    llm_suggestion=None,
+                    confidence=owner_confidence,
+                    evidence=[owner_provenance],
+                )
+            except Exception as exc:
+                logger.debug("Review queue insert skipped (table may not exist): %s", exc)
         criticality = self.metadata_detector.determine_criticality(languages)
         data_class = self.metadata_detector.infer_data_classification()
 
@@ -282,6 +293,19 @@ class ContextManager:
                 "relationship_type": "uses",
             })
 
+        # Names that are dev/docs tooling, not runtime software systems.
+        # Per C4 book: L1 shows only systems the software *integrates with at runtime*.
+        # Build tools, CI platforms, documentation sites, and GitOps descriptors belong
+        # on deployment diagrams or are out of scope entirely.
+        _dev_only_names = frozenset({
+            "gitbook", "readthedocs", "confluence", "notion", "mkdocs",
+            "gitops", "argocd", "argo", "flux", "kustomize",
+            "github actions", "gitlab ci", "jenkins", "circleci", "travis",
+            "docker hub", "ghcr", "quay",
+            "localtest", "localhost", "example", "test",
+            "ac",  # too short / ambiguous
+        })
+
         # System -> External dependency relationships
         for dep in system_context.get('external_dependencies', []):
             if dep.get("review_status") == "needs_review":
@@ -294,6 +318,8 @@ class ContextManager:
                 or dep.get('service')
                 or 'External Service'
             )
+            if dep_name.lower() in _dev_only_names:
+                continue
             relationships.append({
                 "source": system_name,
                 "destination": dep_name,

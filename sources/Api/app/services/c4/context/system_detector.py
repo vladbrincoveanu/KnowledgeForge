@@ -30,6 +30,17 @@ logger = logging.getLogger(__name__)
 
 STEP_HEADING_PATTERN = re.compile(r'^(?:Step|Chapter|Section|Part)\s+\d+', re.IGNORECASE)
 
+# Headings that are clearly not human actors — error messages, code snippets,
+# config keys, future-work notes, or troubleshooting entries.
+_NON_ACTOR_HEADING_RE = re.compile(
+    r'connection\s+refused|timed?\s+out|error|failed|exception|traceback'
+    r'|^\s*note\s*:|^\s*future\s*:|^\s*todo\s*:|^\s*fixme'
+    r'|=\s*true|=\s*false|=\s*none|={2,}'   # config values / code
+    r'|namespace\s*=|parameter\s+is\s+ignored'
+    r'|^\s*#',                                # Python comment lines used as headings
+    re.IGNORECASE,
+)
+
 
 class SystemDetector:
     """Detects system-level information for C4 Context."""
@@ -486,7 +497,16 @@ Your answer:"""
                 with open(doc, 'r', encoding='utf-8', errors='ignore') as f:
                     lines = f.readlines()
 
+                in_code_block = False
                 for idx, line in enumerate(lines):
+                    # Track fenced code blocks — skip content inside them
+                    stripped = line.strip()
+                    if stripped.startswith('```') or stripped.startswith('~~~'):
+                        in_code_block = not in_code_block
+                        continue
+                    if in_code_block:
+                        continue
+
                     line_lower = line.lower()
                     supporting_line = ""
                     for candidate in lines[idx + 1: idx + 4]:
@@ -496,13 +516,17 @@ Your answer:"""
                             break
 
                     # Prefer headings for roles/personas
-                    if line.strip().startswith('#'):
-                        raw_heading = line.strip()
+                    if stripped.startswith('#'):
+                        raw_heading = stripped
                         heading_text = raw_heading.lstrip('#').strip()
+                        # Skip step/chapter headings and non-actor headings
                         if STEP_HEADING_PATTERN.match(heading_text):
                             continue
+                        if _NON_ACTOR_HEADING_RE.search(heading_text):
+                            continue
                         for key, (label, desc) in role_keywords.items():
-                            if key in line_lower:
+                            # Word-boundary match — prevents "user" matching "multiuser"
+                            if re.search(r'\b' + re.escape(key) + r'\b', line_lower):
                                 remember_actor(
                                     normalize_heading_actor_name(heading_text, label),
                                     clean_actor_description(supporting_line, desc),
@@ -510,22 +534,22 @@ Your answer:"""
                                     detection_method="documentation_heading",
                                     evidence=raw_heading,
                                 )
-                    # Catch inline mentions of CLI or SDK usage
-                    if 'cli' in line_lower:
+                    # Catch inline mentions of CLI or SDK usage (not in code blocks)
+                    if re.search(r'\bcli\b', line_lower):
                         remember_actor(
                             'CLI User',
                             'Uses the command-line interface',
                             detected_from=rel_path,
                             detection_method="documentation_mention",
-                            evidence=line.strip(),
+                            evidence=stripped,
                         )
-                    if 'sdk' in line_lower or 'api client' in line_lower:
+                    if re.search(r'\bsdk\b', line_lower) or 'api client' in line_lower:
                         remember_actor(
                             'API Client',
                             'Consumes the system API',
                             detected_from=rel_path,
                             detection_method="documentation_mention",
-                            evidence=line.strip(),
+                            evidence=stripped,
                         )
                     # CMS-specific inline patterns
                     if any(p in line_lower for p in ('content editor', 'content manager', 'cms user')):

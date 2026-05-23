@@ -88,19 +88,63 @@ NUGET_DEPENDENCY_MAP: dict[str, tuple[str, str]] = {
 }
 
 NON_SERVICE_HOSTS = {
+    # Badge / media / marketing
     "shields.io",
     "website-files.com",
     "docusaurus.com",
     "youtube.com",
     "youtu.be",
-    "github.com",
-    "github.io",
-    "readme.io",
     "marketing.com",
     "dtdg.co",
+    # CDN / static assets
     "cdn.jsdelivr.net",
     "cdn.tailnet",
     "netlify.app",
+    "raw.githubusercontent.com",
+    "githubusercontent.com",
+    # Source hosting (not runtime dependencies)
+    "github.com",
+    "github.io",
+    "gitlab.com",
+    "bitbucket.org",
+    # Documentation platforms
+    "readme.io",
+    "readthedocs.io",
+    "readthedocs.org",
+    "gitbook.io",
+    "gitbook.com",
+    "docs.rs",
+    "pkg.go.dev",
+    "javadoc.io",
+    # Container / package registries (deployment artefacts, not runtime deps)
+    "ghcr.io",
+    "docker.io",
+    "docker.com",
+    "hub.docker.com",
+    "quay.io",
+    "mcr.microsoft.com",
+    "registry.k8s.io",
+    "k8s.gcr.io",
+    "gcr.io",
+    "ecr.aws",
+    # Kubernetes / cloud tool sites (concepts, not services)
+    "kubernetes.io",
+    "k8s.io",
+    "helm.sh",
+    "kustomize.io",
+    "gitops.tech",
+    "argoproj.github.io",
+    "fluxcd.io",
+    # Local / test / dev hosts
+    "localhost",
+    "localtest.me",
+    "127.0.0.1",
+    "0.0.0.0",
+    # Install scripts / tooling sites
+    "astral.sh",
+    "install.sh",
+    "get.helm.sh",
+    "get.docker.com",
 }
 
 GENERIC_URL_PATTERN = r"[A-Za-z][A-Za-z0-9+.-]*://[^\s\"')\];,}<>]+"
@@ -1215,6 +1259,8 @@ class DependencyDetector:
         if repo_domain and (host == repo_domain or host.endswith(f".{repo_domain}")):
             return None
         parts = host.split(".")
-        if len(parts) >= 2:
-            return parts[-2].replace("-", " ").replace("_", " ").title()
-        return host.replace("-", " ").replace("_", " ").title()
+        # Skip single-char and two-letter parts (TLD fragments like .ac.at, .co.uk)
+        # to find the meaningful registered domain label.
+        meaningful = [p for p in parts if len(p) > 2]
+        label = meaningful[-1] if meaningful else (parts[-2] if len(parts) >= 2 else host)
+        return label.replace("-", " ").replace("_", " ").title()
