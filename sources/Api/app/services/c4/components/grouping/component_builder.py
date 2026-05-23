@@ -21,6 +21,7 @@ _SPRING_ANNOTATIONS = frozenset({
     "Component", "SpringBootApplication",
 })
 _DJANGO_FILE_PATTERNS = frozenset({"models.py", "views.py", "serializers.py"})
+_DJANGO_IMPORT_RE = re.compile(r'^django\b|^rest_framework\b')
 _FASTAPI_IMPORTS = frozenset({"fastapi", "APIRouter"})
 
 _ASPNET_ANNOTATIONS = frozenset({
@@ -120,7 +121,8 @@ class ComponentBuilder:
 
         if dominant_lang == "python":
             for element in group:
-                if os.path.basename(element.file_path) in _DJANGO_FILE_PATTERNS:
+                if (os.path.basename(element.file_path) in _DJANGO_FILE_PATTERNS
+                        and any(_DJANGO_IMPORT_RE.match(imp) for imp in element.imports)):
                     return "Django"
             for element in group:
                 if any(imp in _FASTAPI_IMPORTS for imp in element.imports):

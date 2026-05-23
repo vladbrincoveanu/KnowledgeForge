@@ -66,6 +66,7 @@ def _has_spring(element: CodeElement) -> bool:
 # ---------------------------------------------------------------------------
 
 _DJANGO_FILE_PATTERN = re.compile(r'(models|views|serializers)\.py$')
+_DJANGO_IMPORT_PATTERN = re.compile(r'^django\b|^rest_framework\b')
 _FASTAPI_IMPORT_PATTERN = re.compile(r'APIRouter|fastapi')
 _FASTAPI_ROUTER_ANNOTATION = re.compile(r'^router\.')
 
@@ -77,7 +78,9 @@ def _django_app_dir(file_path: str) -> str:
 
 
 def _is_django_element(element: CodeElement) -> bool:
-    return bool(_DJANGO_FILE_PATTERN.search(element.file_path))
+    if not _DJANGO_FILE_PATTERN.search(element.file_path):
+        return False
+    return any(_DJANGO_IMPORT_PATTERN.match(imp) for imp in element.imports)
 
 
 def _is_fastapi_element(element: CodeElement) -> bool:
