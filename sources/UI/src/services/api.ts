@@ -209,10 +209,17 @@ export const codeArchitectureAPI = {
     githubUrl: string,
     useGit = true,
     appendMode = true,
+    token?: string,
   ): Promise<ExtractResponse> => {
+    const body: Record<string, unknown> = {
+      github_url: githubUrl,
+      use_git: useGit,
+      append_mode: appendMode,
+    };
+    if (token) body.token = token;
     const response: AxiosResponse<ExtractResponse> = await api.post(
       "/api/v1/code/extract-from-github",
-      { github_url: githubUrl, use_git: useGit, append_mode: appendMode },
+      body,
     );
     return response.data;
   },

@@ -1919,6 +1919,14 @@ const CodeArchitectureViewerInner: React.FC = () => {
         containerGroups.get(containerName)!.push(comp);
       });
 
+      // Add containers that have no components so they still appear on the graph
+      const allContainerNames = (architecture?.containers ?? [])
+        .filter((c: any) => !c.is_infrastructure_only)
+        .map((c: any) => c.name as string);
+      allContainerNames.forEach((name: string) => {
+        if (!containerGroups.has(name)) containerGroups.set(name, []);
+      });
+
       // Create container frames for each group
       let currentX = 100;
       containerGroups.forEach((components, containerName) => {

@@ -15,7 +15,8 @@ expect.extend(matchers);
 // Test URLs
 const REPO_FACEBOOK = "https://github.com/facebook/react";
 const REPO_MICROSOFT = "https://github.com/microsoft/typescript";
-const GITHUB_INPUT_PLACEHOLDER = /github\.com\/owner\/repository/i;
+const REPO_GITLAB = "https://gitlab.tuwien.ac.at/ai-factory/monorepo";
+const INPUT_PLACEHOLDER = /github\.com\/owner\/repo/i;
 
 // Mock the API service
 vi.mock("@/services/api", () => ({
@@ -62,11 +63,9 @@ describe("FileUploader Component", () => {
       />,
     );
 
+    expect(screen.getByPlaceholderText(INPUT_PLACEHOLDER)).toBeInTheDocument();
     expect(
-      screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Add one or more GitHub repository URLs above/i),
+      screen.getByText(/Add one or more repository URLs above/i),
     ).toBeInTheDocument();
   });
 
@@ -82,7 +81,9 @@ describe("FileUploader Component", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /add/i }));
 
-    expect(screen.getByText(/please enter a github url/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/please enter a repository url/i),
+    ).toBeInTheDocument();
   });
 
   it("shows error for invalid GitHub URL", () => {
@@ -95,14 +96,33 @@ describe("FileUploader Component", () => {
       />,
     );
 
-    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+    fireEvent.change(screen.getByPlaceholderText(INPUT_PLACEHOLDER), {
       target: { value: "not-a-valid-url" },
     });
     fireEvent.click(screen.getByRole("button", { name: /add/i }));
 
     expect(
-      screen.getByText(/enter a valid github repository url/i),
+      screen.getByText(/enter a valid repository url/i),
     ).toBeInTheDocument();
+  });
+
+  it("adds a valid GitLab URL to the repo list", () => {
+    render(
+      <FileUploader
+        onFilesUploaded={mockOnFilesUploaded}
+        isProcessing={false}
+        onExtractionStarted={mockOnExtractionStarted}
+        showNotification={mockShowNotification}
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText(INPUT_PLACEHOLDER), {
+      target: { value: REPO_GITLAB },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /add/i }));
+
+    expect(screen.getByText(/ai-factory\/monorepo/i)).toBeInTheDocument();
+    expect(screen.getByText(/ready to extract/i)).toBeInTheDocument();
   });
 
   it("adds a valid GitHub URL to the repo list", () => {
@@ -115,7 +135,7 @@ describe("FileUploader Component", () => {
       />,
     );
 
-    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+    fireEvent.change(screen.getByPlaceholderText(INPUT_PLACEHOLDER), {
       target: { value: REPO_FACEBOOK },
     });
     fireEvent.click(screen.getByRole("button", { name: /add/i }));
@@ -134,7 +154,7 @@ describe("FileUploader Component", () => {
       />,
     );
 
-    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+    fireEvent.change(screen.getByPlaceholderText(INPUT_PLACEHOLDER), {
       target: { value: "https://github.com/facebook/react.git" },
     });
     fireEvent.click(screen.getByRole("button", { name: /add/i }));
@@ -153,12 +173,12 @@ describe("FileUploader Component", () => {
       />,
     );
 
-    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+    fireEvent.change(screen.getByPlaceholderText(INPUT_PLACEHOLDER), {
       target: { value: REPO_FACEBOOK },
     });
     fireEvent.click(screen.getByRole("button", { name: /add/i }));
 
-    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+    fireEvent.change(screen.getByPlaceholderText(INPUT_PLACEHOLDER), {
       target: { value: REPO_FACEBOOK },
     });
     fireEvent.click(screen.getByRole("button", { name: /add/i }));
@@ -178,7 +198,7 @@ describe("FileUploader Component", () => {
       />,
     );
 
-    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+    fireEvent.change(screen.getByPlaceholderText(INPUT_PLACEHOLDER), {
       target: { value: REPO_FACEBOOK },
     });
     fireEvent.click(screen.getByRole("button", { name: /add/i }));
@@ -201,12 +221,12 @@ describe("FileUploader Component", () => {
       />,
     );
 
-    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+    fireEvent.change(screen.getByPlaceholderText(INPUT_PLACEHOLDER), {
       target: { value: REPO_FACEBOOK },
     });
     fireEvent.click(screen.getByRole("button", { name: /add/i }));
 
-    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+    fireEvent.change(screen.getByPlaceholderText(INPUT_PLACEHOLDER), {
       target: { value: REPO_MICROSOFT },
     });
     fireEvent.click(screen.getByRole("button", { name: /add/i }));
@@ -232,7 +252,7 @@ describe("FileUploader Component", () => {
       />,
     );
 
-    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+    fireEvent.change(screen.getByPlaceholderText(INPUT_PLACEHOLDER), {
       target: { value: REPO_FACEBOOK },
     });
     fireEvent.click(screen.getByRole("button", { name: /add/i }));
@@ -242,7 +262,8 @@ describe("FileUploader Component", () => {
     expect(codeArchitectureAPI.extractFromGitHub).toHaveBeenCalledWith(
       REPO_FACEBOOK,
       true,
-      true,
+      false, // appendMode defaults to false (replace)
+      undefined,
     );
   });
 
@@ -256,7 +277,7 @@ describe("FileUploader Component", () => {
       />,
     );
 
-    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+    fireEvent.change(screen.getByPlaceholderText(INPUT_PLACEHOLDER), {
       target: { value: REPO_FACEBOOK },
     });
     fireEvent.click(screen.getByRole("button", { name: /add/i }));
@@ -274,10 +295,10 @@ describe("FileUploader Component", () => {
       />,
     );
 
-    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+    fireEvent.change(screen.getByPlaceholderText(INPUT_PLACEHOLDER), {
       target: { value: REPO_FACEBOOK },
     });
-    fireEvent.keyDown(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+    fireEvent.keyDown(screen.getByPlaceholderText(INPUT_PLACEHOLDER), {
       key: "Enter",
     });
 
@@ -294,7 +315,7 @@ describe("FileUploader Component", () => {
       />,
     );
 
-    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+    fireEvent.change(screen.getByPlaceholderText(INPUT_PLACEHOLDER), {
       target: { value: REPO_FACEBOOK },
     });
     fireEvent.click(screen.getByRole("button", { name: /add/i }));
@@ -312,12 +333,12 @@ describe("FileUploader Component", () => {
       />,
     );
 
-    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+    fireEvent.change(screen.getByPlaceholderText(INPUT_PLACEHOLDER), {
       target: { value: REPO_FACEBOOK },
     });
     fireEvent.click(screen.getByRole("button", { name: /add/i }));
 
-    fireEvent.change(screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER), {
+    fireEvent.change(screen.getByPlaceholderText(INPUT_PLACEHOLDER), {
       target: { value: REPO_MICROSOFT },
     });
     fireEvent.click(screen.getByRole("button", { name: /add/i }));
@@ -337,7 +358,7 @@ describe("FileUploader Component", () => {
       />,
     );
 
-    const input = screen.getByPlaceholderText(GITHUB_INPUT_PLACEHOLDER);
+    const input = screen.getByPlaceholderText(INPUT_PLACEHOLDER);
     fireEvent.change(input, {
       target: { value: REPO_FACEBOOK },
     });
