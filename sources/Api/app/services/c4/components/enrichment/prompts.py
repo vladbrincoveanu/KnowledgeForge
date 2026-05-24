@@ -243,6 +243,30 @@ Technology: "{technology}"
 
 ---
 
+GRANULARITY RULES (follow strictly):
+  - A component is a GROUPING of related files, NOT a single file, class, or function.
+  - Cluster by the language's natural unit BEFORE labelling:
+      Python      → files in the same package directory (directory containing __init__.py)
+      Go          → files sharing the same `package` declaration
+      Java/Kotlin → same package namespace
+      TypeScript/JS → barrel-exported folder (index.ts / index.js)
+      Shell       → files in the same directory
+  - A single helper function or utility class is NOT a component on its own;
+    cluster it with its closest related files into one component.
+  - Do NOT produce more than ~10 components per container. If the result exceeds
+    that, merge the smallest/least-significant groups first.
+
+NAMING RULES (follow strictly):
+  - Name each component from its PRIMARY RESPONSIBILITY as evidenced by the code
+    content: read the module docstring, class names, key function signatures, and
+    imports — do NOT derive names from file paths or filenames alone.
+  - Do NOT use the container name "{container_name}" as the component name or any
+    part of it. The component name must describe a specific role WITHIN the container.
+  - Use domain vocabulary (e.g. "Kubernetes Provisioning Router", "Token Validator",
+    "Harbor Registry Client") not generic suffixes ("Utils", "Models", "Core").
+
+---
+
 COMPONENT TYPES (pick the single best fit):
   controller  — handles HTTP requests, routes, or user input entry points
   service     — encapsulates business logic and orchestrates operations
@@ -384,4 +408,56 @@ Respond ONLY with raw JSON (no markdown, no code fences).
 SOURCE_COMPONENT_IDENTIFICATION_PROMPT: tuple[str, str] = (
     _SOURCE_COMPONENT_IDENTIFICATION_SYSTEM,
     _SOURCE_COMPONENT_IDENTIFICATION_USER,
+)
+
+
+# ---------------------------------------------------------------------------
+# 5. Component Relationship Inference
+# ---------------------------------------------------------------------------
+
+_COMPONENT_RELATIONSHIP_SYSTEM = """\
+You are a senior software architect analyzing a C4 model component diagram.
+
+Given a list of C4 components (each with a name, container, and type), identify the
+most architecturally significant dependencies between them.
+
+DEPENDENCY PATTERNS:
+  - Controllers/routers call Services
+  - Services call Repositories (data access)
+  - Services call Gateways/Adapters (external integrations)
+  - Handlers invoke Services
+  - Middleware is consumed by Controllers (cross-cutting concerns)
+  - Validators/Auth components are consumed by Controllers and Gateways
+  - Schedulers/Workers invoke Services
+  - Components sharing the same domain noun (e.g. "Order") are likely coupled
+
+CONSTRAINTS:
+  - Only emit a relationship when confidence >= 0.65
+  - Do NOT invent relationships — only infer from names, types, and architectural patterns
+  - Do NOT emit self-relationships
+  - Prefer fewer high-confidence relationships over many speculative ones
+  - Components from DIFFERENT containers can have relationships too
+
+Respond ONLY with a JSON array. No markdown, no code fences.\
+"""
+
+_COMPONENT_RELATIONSHIP_USER = """\
+Given these C4 components, identify the dependencies between them.
+
+Components:
+{components_json}
+
+Return a JSON array where each object has exactly these fields:
+  from        — source component name (string, must match a name in the list)
+  to          — target component name (string, must match a name in the list)
+  label       — relationship verb: "calls", "uses", "reads from", "publishes to", "consumes", etc.
+  confidence  — float between 0.0 and 1.0
+  reasoning   — one sentence explaining why (string)
+
+Respond with the JSON array only. No markdown, no code fences.\
+"""
+
+COMPONENT_RELATIONSHIP_PROMPT: tuple[str, str] = (
+    _COMPONENT_RELATIONSHIP_SYSTEM,
+    _COMPONENT_RELATIONSHIP_USER,
 )

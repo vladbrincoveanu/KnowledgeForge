@@ -26,7 +26,11 @@ class GraphWriter:
             c4_data.get("containers") or [],
             (c4_data.get("relationships") or {}).get("containers") or [],
         )
-        self._write_component_level(task_id, c4_data.get("components") or [])
+        self._write_component_level(
+            task_id,
+            c4_data.get("components") or [],
+            (c4_data.get("relationships") or {}).get("components") or [],
+        )
 
     def _write_context_level(
         self,
@@ -148,15 +152,41 @@ class GraphWriter:
             )
 
     def _write_component_level(
-        self, task_id: str, components: list[dict[str, Any]]
+        self,
+        task_id: str,
+        components: list[dict[str, Any]],
+        relationships: list[dict[str, Any]] | None = None,
     ) -> None:
+        comp_id_by_name: dict[str, str] = {}
         for comp in components or []:
             comp_type = comp.get("type", "component")
             if comp_type == "component_group":
                 for sub in comp.get("components") or []:
                     self._write_component(task_id, sub, comp.get("container") or "")
+                    comp_id_by_name[sub.get("name", "")] = f"component:{sub.get('name', 'unknown')}"
             else:
                 self._write_component(task_id, comp, comp.get("container") or "")
+                comp_id_by_name[comp.get("name", "")] = f"component:{comp.get('name', 'unknown')}"
+
+        for rel in relationships or []:
+            src_name = rel.get("from")
+            tgt_name = rel.get("to")
+            if not src_name or not tgt_name:
+                continue
+            src_id = comp_id_by_name.get(src_name)
+            tgt_id = comp_id_by_name.get(tgt_name)
+            if not src_id or not tgt_id:
+                logger.warning(
+                    "Skipping component relationship %s->%s: node not found", src_name, tgt_name
+                )
+                continue
+            self._upsert_relationship(
+                "USES",
+                f"{src_id}->{tgt_id}",
+                src_id,
+                tgt_id,
+                {"label": rel.get("label", "uses")},
+            )
 
     def _write_component(
         self, task_id: str, comp: dict[str, Any], container_name: str

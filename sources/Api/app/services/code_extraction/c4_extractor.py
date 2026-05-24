@@ -96,6 +96,7 @@ class C4ArchitectureExtractor:
         self.components = {}       # Level 3
         self.context_relationships = []
         self.container_relationships = []
+        self.component_relationships: list[dict] = []  # Level 3 edges
         self.cluster_metadata = {}
 
         # Extractors
@@ -158,6 +159,15 @@ class C4ArchitectureExtractor:
         link_components_to_containers(self.components, self.containers)
         logger.info("✓ Component-container links created")
 
+        # Phase E: LLM semantic relationship inference (fills gaps structural analysis misses)
+        t0 = time.time()
+        llm_rels = self._llm_infer_component_relationships()
+        self.component_relationships.extend(llm_rels)
+        phase_e_ms = (time.time() - t0) * 1000
+        logger.info(f"✓ Phase E (LLM semantic relationships): {len(llm_rels)} new [{phase_e_ms:.0f}ms]")
+        if tracker:
+            tracker.results.add_phase("L3_Component_Relationships_LLM", phase_e_ms)
+
         # Group by domain if too many
         if group_components_by_domain and len(self.components) > max_components_per_domain:
             logger.info(f"✓ Grouping {len(self.components)} components by domain...")
@@ -188,6 +198,7 @@ class C4ArchitectureExtractor:
             "relationships": {
                 "context": self.context_relationships,
                 "containers": self.container_relationships,
+                "components": self.component_relationships,
             },
             "metadata": {
                 "total_containers": len(self.containers),
@@ -436,6 +447,7 @@ class C4ArchitectureExtractor:
     def _llm_rename_components(
         self,
         components: list[ComponentObject],
+        container_name: str = "",
     ) -> list[ComponentObject]:
         """Ask the LLM to produce business-intent names for non-framework components.
 
@@ -445,21 +457,32 @@ class C4ArchitectureExtractor:
         names ("Models", "Utils").  The LLM reads the actual class names, imports,
         and architectural layer to produce a real name like "ML Workload Models" or
         "Kubernetes Job Orchestrator".
+
+        After renaming, all ComponentRelationship references (source_component /
+        target_component) are remapped to the new names so that structural edges
+        lifted by _lift_structural_relationships remain valid.
         """
-        from app.services.c4.components.models import ExtractionMethod
+        from app.services.c4.components.models import ComponentRelationship, ExtractionMethod
 
         if self.llm_manager is None:
             return components
 
+        name_map: dict[str, str] = {}  # old_name → new_name
         renamed: list[ComponentObject] = []
         for comp in components:
+            old_name = comp.name
             if comp.extraction_method == ExtractionMethod.FRAMEWORK_DETECTION:
                 renamed.append(comp)
+                name_map[old_name] = old_name
                 continue
 
             elements_summary = []
             for el in comp.code_elements[:8]:
-                parts = [f"{el.qualified_name} ({el.kind.value}"]
+                # Use only the leaf symbol — the full qualified_name contains
+                # directory segments (e.g. ai_factory.token.core.fn) that cause
+                # the LLM to echo the package name instead of describing purpose.
+                symbol = el.qualified_name.rsplit(".", 1)[-1]
+                parts = [f"{symbol} ({el.kind.value}"]
                 if el.layer and el.layer.value != "unknown":
                     parts[0] += f", {el.layer.value} layer"
                 parts[0] += ")"
@@ -475,15 +498,23 @@ class C4ArchitectureExtractor:
                     parts.append(f"calls {el.method_calls[:4]}")
                 elements_summary.append(", ".join(parts))
 
+            container_rule = (
+                f"- Do NOT use '{container_name}' as the name or any part of it — "
+                f"the component must describe a specific role WITHIN the '{container_name}' container\n"
+                if container_name else ""
+            )
             prompt = (
                 "You are a software architect applying the C4 model.\n"
                 "Given the code elements below that belong to a single C4 Component, "
                 "produce a concise name (2-5 words) that describes what this component DOES "
                 "from a business or architectural perspective.\n"
                 "Rules:\n"
+                "- Name from the PRIMARY RESPONSIBILITY shown by class names, function "
+                "signatures, and imports — not from the filename\n"
                 "- Prefer business intent over technical mechanism when clear\n"
                 "- Use title case\n"
                 "- Do NOT include the word 'Component'\n"
+                + container_rule +
                 "- Output ONLY the name, nothing else\n\n"
                 "Code elements:\n"
                 + "\n".join(f"  - {s}" for s in elements_summary)
@@ -491,7 +522,7 @@ class C4ArchitectureExtractor:
 
             try:
                 raw = self.llm_manager.generate_text(
-                    prompt, max_tokens=20, temperature=0.2, use_cache=True
+                    prompt, max_tokens=20, temperature=0.2, use_cache=False
                 )
                 if raw:
                     candidate = raw.strip().strip('"').strip("'").strip()
@@ -503,7 +534,22 @@ class C4ArchitectureExtractor:
             except Exception as exc:
                 logger.debug("LLM rename skipped for '%s': %s", comp.name, exc)
 
+            name_map[old_name] = comp.name
             renamed.append(comp)
+
+        # Remap relationship references so structural edges lifted before renaming
+        # still resolve to the updated component names.
+        if any(old != new for old, new in name_map.items()):
+            for comp in renamed:
+                if comp.relationships:
+                    comp.relationships = [
+                        ComponentRelationship(
+                            source_component=name_map.get(rel.source_component, rel.source_component),
+                            target_component=name_map.get(rel.target_component, rel.target_component),
+                            label=rel.label,
+                        )
+                        for rel in comp.relationships
+                    ]
 
         return renamed
 
@@ -518,19 +564,31 @@ class C4ArchitectureExtractor:
             container_rel_path = container.get("path", "")
             container_abs_path = str(self.repo_path / container_rel_path) if container_rel_path else str(self.repo_path)
 
-            # Polylith: project directories have no source — resolve brick paths instead
+            # Polylith: project directories have no source — resolve brick paths instead.
+            # extract_multi combines all bricks before building the dependency graph so
+            # cross-brick imports appear as structural edges and yield relationships.
             brick_paths = self._resolve_polylith_bricks(container_abs_path)
             if brick_paths:
-                component_objects = []
-                for brick_path in brick_paths:
-                    try:
-                        brick_components = self.component_extractor.extract(str(brick_path))
-                        component_objects.extend(brick_components)
-                    except Exception as exc:
-                        logger.debug("ComponentExtractor skipped brick '%s': %s", brick_path.name, exc)
+                try:
+                    component_objects = self.component_extractor.extract_multi(
+                        [str(p) for p in brick_paths],
+                        container_info={"name": container_name},
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "extract_multi failed for Polylith container '%s': %s — falling back to per-brick",
+                        container_name, exc,
+                    )
+                    component_objects = []
+                    for brick_path in brick_paths:
+                        try:
+                            component_objects.extend(
+                                self.component_extractor.extract(str(brick_path))
+                            )
+                        except Exception as brick_exc:
+                            logger.debug("ComponentExtractor skipped brick '%s': %s", brick_path.name, brick_exc)
+                    component_objects = self._dedup_components_by_name(component_objects)
 
-                # Deduplicate across bricks: same name → keep highest confidence
-                component_objects = self._dedup_components_by_name(component_objects)
                 logger.info(
                     "Polylith container '%s': %d bricks → %d components",
                     container_name, len(brick_paths), len(component_objects),
@@ -551,7 +609,16 @@ class C4ArchitectureExtractor:
             component_objects = self._merge_over_fragmented_components(component_objects)
             # Pass 3: LLM naming — replace file-stem names with business-intent
             # names when an LLM is available (skips framework-detected components).
-            component_objects = self._llm_rename_components(component_objects)
+            component_objects = self._llm_rename_components(component_objects, container_name)
+            # Pass 4: Lift structural relationships onto the FINAL component list.
+            # Must happen after all merges and renames so component names are stable.
+            # _last_structural_edges is set by extract() / extract_multi() above.
+            from app.services.c4.components.component_extractor import _lift_structural_relationships
+            structural_rels = _lift_structural_relationships(component_objects, self.component_extractor._last_structural_edges)
+            logger.info(
+                "Container '%s': %d structural component relationships lifted",
+                container_name, structural_rels,
+            )
 
             # Shell-script fallback: containers implemented in .sh files
             # (Alpine gateways, init containers, CI runners) yield nothing
@@ -560,7 +627,7 @@ class C4ArchitectureExtractor:
             if not component_objects:
                 component_objects = extract_shell_components(container_abs_path)
                 if component_objects:
-                    component_objects = self._llm_rename_components(component_objects)
+                    component_objects = self._llm_rename_components(component_objects, container_name)
 
             # Generic fallback: single entry-point component from main.py / app.py etc.
             if not component_objects:
@@ -575,6 +642,13 @@ class C4ArchitectureExtractor:
                 # Namespace component IDs by container to avoid cross-container collisions
                 unique_id = f"{container_name}::{obj.component_id}"
                 self.components[unique_id] = comp_dict
+                for rel in obj.relationships:
+                    self.component_relationships.append({
+                        "from": rel.source_component,
+                        "to": rel.target_component,
+                        "label": rel.label,
+                        "container": container_name,
+                    })
 
     def _create_fallback_component(
         self, container_name: str, container_rel_path: str,
@@ -621,11 +695,16 @@ class C4ArchitectureExtractor:
     def _component_object_to_dict(self, obj: ComponentObject, container_name: str, container_rel_path: str) -> dict:
         """Convert a ComponentObject to the dict format used in the C4 output."""
         file_path = obj.code_elements[0].file_path if obj.code_elements else None
-        if file_path and container_rel_path:
+        if file_path:
             try:
-                file_path = str(Path(container_rel_path) / Path(file_path).name)
-            except Exception:
-                pass
+                # Preserve the full path relative to the repo root so sub-directory
+                # structure is not lost (the old approach of container_rel_path /
+                # basename silently dropped intermediate directories).
+                file_path = str(Path(file_path).relative_to(self.repo_path))
+            except ValueError:
+                # File is outside repo_path (e.g. a temp copy) — best-effort hint.
+                if container_rel_path:
+                    file_path = str(Path(container_rel_path) / Path(file_path).name)
 
         technology = obj.technology or (obj.code_elements[0].language if obj.code_elements else None)
 
@@ -643,6 +722,95 @@ class C4ArchitectureExtractor:
             "tags": obj.tags,
             "metadata": obj.metadata,
         }
+
+    def _llm_infer_component_relationships(self) -> list[dict]:
+        """Phase E: LLM semantic relationship inference across all components.
+
+        Runs after all components are named and collected.  Asks the LLM to
+        identify dependencies that structural analysis cannot see: shell-to-service
+        calls, HTTP cross-container wiring, cross-language boundaries, and any
+        Polylith cross-brick imports that extract_multi may have missed.
+
+        Returns only relationships not already present in self.component_relationships.
+        """
+        if self.llm_manager is None or len(self.components) < 2:
+            return []
+
+        from app.services.c4.components.enrichment.prompts import COMPONENT_RELATIONSHIP_PROMPT
+
+        manifest = []
+        for comp in self.components.values():
+            entry: dict = {
+                "name": comp["name"],
+                "container": comp.get("container", ""),
+                "component_type": comp.get("component_type", ""),
+            }
+            if comp.get("documentation"):
+                entry["description"] = comp["documentation"]
+            manifest.append(entry)
+
+        system_msg, user_template = COMPONENT_RELATIONSHIP_PROMPT
+        user_msg = user_template.format(components_json=json.dumps(manifest, indent=2))
+        # generate_text takes a single prompt string — embed system + user together
+        combined_prompt = f"{system_msg}\n\n{user_msg}"
+
+        try:
+            raw = self.llm_manager.generate_text(
+                combined_prompt,
+                max_tokens=2000,
+                temperature=0.1,
+                use_cache=False,
+                prefix="[",
+            )
+            if not raw:
+                return []
+            # Attempt full parse first; if truncated, recover complete objects only.
+            try:
+                parsed = json.loads(raw)
+            except json.JSONDecodeError:
+                # Trim to the last complete JSON object in the array
+                last_close = raw.rfind("},")
+                if last_close == -1:
+                    last_close = raw.rfind("}")
+                if last_close == -1:
+                    return []
+                raw = raw[: last_close + 1] + "]"
+                try:
+                    parsed = json.loads(raw)
+                except json.JSONDecodeError as exc2:
+                    logger.warning("LLM component relationship inference: JSON unrecoverable: %s", exc2)
+                    return []
+            if not isinstance(parsed, list):
+                return []
+        except Exception as exc:
+            logger.warning("LLM component relationship inference failed: %s", exc)
+            return []
+
+        existing_pairs = {(r["from"], r["to"]) for r in self.component_relationships}
+        component_names = {comp["name"] for comp in self.components.values()}
+        new_rels = []
+        for rel in parsed:
+            src = rel.get("from") or rel.get("source")
+            tgt = rel.get("to") or rel.get("target")
+            if (
+                src
+                and tgt
+                and src != tgt
+                and src in component_names
+                and tgt in component_names
+                and (src, tgt) not in existing_pairs
+                and float(rel.get("confidence", 0)) >= 0.65
+            ):
+                new_rels.append({
+                    "from": src,
+                    "to": tgt,
+                    "label": rel.get("label", "uses"),
+                    "source": "llm_semantic",
+                })
+                existing_pairs.add((src, tgt))
+
+        logger.info("Phase E (LLM semantic): %d new component relationships inferred", len(new_rels))
+        return new_rels
 
     def _group_by_domain(self):
         """Group components by domain if too many."""
