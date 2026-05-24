@@ -32,7 +32,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.9rem 1.35rem;
+  padding: 0.6rem 1.35rem;
   border-bottom: 1px solid rgba(20, 33, 61, 0.08);
   background: rgba(248, 250, 252, 0.9);
   backdrop-filter: blur(18px);
@@ -55,22 +55,8 @@
 .nav-brand {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-
-  svg {
-    color: #2563eb;
-  }
 }
 
-.nav-brand h2 {
-  margin: 0;
-  color: #14213d;
-  font-family:
-    "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
-  font-size: 1.55rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
 
 .nav-subtitle {
   margin: 0;

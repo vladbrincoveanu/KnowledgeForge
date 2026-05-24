@@ -11,9 +11,9 @@ import {
   Activity,
   Upload,
   Settings as SettingsIcon,
-  Brain,
   Code,
 } from "lucide-react";
+import KFLogo from "./@components/KFLogo";
 import "./App.scss";
 import CodeArchitectureViewer from "./@components/architecture-map/CodeArchitectureViewer/CodeArchitectureViewer";
 import Notification from "./@components/notification/Notification";
@@ -101,12 +101,8 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab }) => {
     <nav className={`main-navigation ${activeTab === "home" ? "is-home" : ""}`}>
       <div className="nav-header">
         <div className="nav-brand">
-          <Brain size={22} />
-          <h2>KnowledgeForge</h2>
+          <KFLogo height={44} />
         </div>
-        <p className="nav-subtitle">
-          Translate technical posture into board-ready risk language
-        </p>
       </div>
       <ul className="nav-list">
         {navItems.map((item) => (
@@ -278,9 +274,7 @@ const MainContent: React.FC = () => {
               element={
                 <div className="upload-section">
                   <div className="section-header">
-                    <h1>
-                      <Upload size={32} /> Build the Risk Evidence Baseline
-                    </h1>
+                    <h1>Build the Risk Evidence Baseline</h1>
                     <p>
                       Bring in repository and operational exports to generate
                       the system map, supporting evidence, and board-facing

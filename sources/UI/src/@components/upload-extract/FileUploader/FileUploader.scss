@@ -58,8 +58,8 @@
 
   &:focus {
     outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.12);
+    border-color: #00b8b8;
+    box-shadow: 0 0 0 3px rgba(0, 184, 184, 0.12);
   }
 
   &--error {
@@ -126,7 +126,7 @@
   align-items: center;
   gap: 0.375rem;
   padding: 0.75rem 1.25rem;
-  background: #007bff;
+  background: #00b8b8;
   color: #fff;
   border: none;
   border-radius: 6px;
@@ -140,9 +140,9 @@
     box-shadow 0.2s;
 
   &:hover {
-    background: #0069d9;
+    background: #007a7a;
     transform: translateY(-1px);
-    box-shadow: 0 4px 10px rgba(0, 123, 255, 0.25);
+    box-shadow: 0 4px 10px rgba(0, 184, 184, 0.25);
   }
 
   &:active {
@@ -176,7 +176,7 @@
   }
 
   &--scanning {
-    border-color: #007bff;
+    border-color: #00b8b8;
     background: rgba(0, 123, 255, 0.03);
   }
 
@@ -236,7 +236,7 @@
 
 .repo-item__progress-fill {
   height: 100%;
-  background: #007bff;
+  background: #00b8b8;
   border-radius: 2px;
   transition: width 0.4s ease;
 
@@ -320,8 +320,8 @@
     background 0.15s;
 
   &:hover:not(:disabled) {
-    color: #007bff;
-    background: rgba(0, 123, 255, 0.1);
+    color: #00b8b8;
+    background: rgba(0, 184, 184, 0.1);
   }
 
   &:disabled {
@@ -381,7 +381,7 @@
 
   input[type="checkbox"] {
     cursor: pointer;
-    accent-color: #007bff;
+    accent-color: #00b8b8;
   }
 }
 

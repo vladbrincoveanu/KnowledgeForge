@@ -1,6 +1,10 @@
 import React from "react";
 
 interface MetricsBarProps {
+  // View mode
+  viewMode: "diagram" | "data";
+  setViewMode: (mode: "diagram" | "data") => void;
+
   // Search
   searchTerm: string;
   setSearchTerm: (val: string) => void;
@@ -51,6 +55,8 @@ const AVAILABLE_LEVELS = [
 ];
 
 export default function MetricsBar({
+  viewMode,
+  setViewMode,
   searchTerm,
   setSearchTerm,
   selectedLevel,
@@ -84,7 +90,22 @@ export default function MetricsBar({
   return (
     <div className="metrics-bar">
       <div className="metrics-row metrics-row-single">
-        <div className="metrics-section search-section">
+        <div className="view-mode-toggle">
+          <button
+            className={`view-mode-btn cursor-pointer ${viewMode === "diagram" ? "active" : ""}`}
+            onClick={() => setViewMode("diagram")}
+          >
+            Diagram
+          </button>
+          <button
+            className={`view-mode-btn cursor-pointer ${viewMode === "data" ? "active" : ""}`}
+            onClick={() => setViewMode("data")}
+          >
+            Data
+          </button>
+        </div>
+
+        <div className="search-section">
           <input
             type="text"
             placeholder="Find a node, service, or file..."
@@ -94,56 +115,58 @@ export default function MetricsBar({
           />
         </div>
 
-        <div className="metrics-cluster levels-section">
-          <span className="section-label">Level</span>
-          <div className="level-pills">
-            {AVAILABLE_LEVELS.map((level) => (
+        <div className="metrics-filters-group">
+          <div className="metrics-cluster levels-section">
+            <span className="section-label">Level</span>
+            <div className="level-pills">
+              {AVAILABLE_LEVELS.map((level) => (
+                <button
+                  key={level.key}
+                  className={`level-pill cursor-pointer ${selectedLevel === level.key ? "active" : ""}`}
+                  onClick={() => toggleLevel(level.key)}
+                >
+                  {level.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="metrics-cluster dependency-section">
+            <span className="section-label">View</span>
+            <div className="view-toggle">
               <button
-                key={level.key}
-                className={`level-pill cursor-pointer ${selectedLevel === level.key ? "active" : ""}`}
-                onClick={() => toggleLevel(level.key)}
+                className={`view-btn cursor-pointer ${dependencyViewFilter === "all" ? "active" : ""}`}
+                onClick={() => setDependencyViewFilter("all")}
               >
-                {level.label}
+                All
               </button>
-            ))}
+              <button
+                className={`view-btn cursor-pointer ${dependencyViewFilter === "business" ? "active" : ""}`}
+                onClick={() => setDependencyViewFilter("business")}
+              >
+                Business
+              </button>
+              <button
+                className={`view-btn cursor-pointer ${dependencyViewFilter === "technical" ? "active" : ""}`}
+                onClick={() => setDependencyViewFilter("technical")}
+              >
+                Technical
+              </button>
+            </div>
           </div>
-        </div>
 
-        <div className="metrics-cluster dependency-section">
-          <span className="section-label">View</span>
-          <div className="view-toggle">
-            <button
-              className={`view-btn cursor-pointer ${dependencyViewFilter === "all" ? "active" : ""}`}
-              onClick={() => setDependencyViewFilter("all")}
-            >
-              All
-            </button>
-            <button
-              className={`view-btn cursor-pointer ${dependencyViewFilter === "business" ? "active" : ""}`}
-              onClick={() => setDependencyViewFilter("business")}
-            >
-              Business
-            </button>
-            <button
-              className={`view-btn cursor-pointer ${dependencyViewFilter === "technical" ? "active" : ""}`}
-              onClick={() => setDependencyViewFilter("technical")}
-            >
-              Technical
-            </button>
+          <div className="metrics-cluster external-section">
+            <span className="section-label">Scope</span>
+            <label className="toggle-label cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showExternal}
+                onChange={(e) => setShowExternal(e.target.checked)}
+              />
+              <span className="toggle-switch"></span>
+              <span>External</span>
+            </label>
           </div>
-        </div>
-
-        <div className="metrics-cluster external-section">
-          <span className="section-label">Scope</span>
-          <label className="toggle-label cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showExternal}
-              onChange={(e) => setShowExternal(e.target.checked)}
-            />
-            <span className="toggle-switch"></span>
-            <span>External</span>
-          </label>
         </div>
       </div>
     </div>

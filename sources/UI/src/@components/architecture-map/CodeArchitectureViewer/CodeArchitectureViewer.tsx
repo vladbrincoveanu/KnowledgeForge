@@ -30,6 +30,7 @@ import GraphView from "./components/GraphView";
 import NodeDetailsPanel from "./components/NodeDetailsPanel";
 import EdgeDetailsPanel from "./components/EdgeDetailsPanel";
 import MetricsBar from "./components/MetricsBar";
+import DataView from "./components/DataView";
 import { buildRenderedEdges } from "./edgeRendering";
 
 interface CodeEntity {
@@ -955,6 +956,8 @@ const CodeArchitectureViewerInner: React.FC = () => {
     isNodeLoading,
     isEdgeLoading,
   } = selState;
+  const [viewMode, setViewMode] = useState<"diagram" | "data">("diagram");
+
   const [chatMessages, setChatMessages] = useState<ArchitectureChatMessage[]>(
     [],
   );
@@ -984,6 +987,15 @@ const CodeArchitectureViewerInner: React.FC = () => {
   const { enrichedNodes: wsEnrichedNodes } = useEnrichmentWS(activeTaskId);
 
   const pollIntervalRef = useRef<number | null>(null);
+  const markdownCacheRef = useRef<Record<string, string>>({});
+  const prevArchForCacheRef = useRef(architecture);
+
+  useEffect(() => {
+    if (architecture !== prevArchForCacheRef.current) {
+      markdownCacheRef.current = {};
+      prevArchForCacheRef.current = architecture;
+    }
+  }, [architecture]);
 
   // ── Shim setters (keep child prop interfaces unchanged) ───────────────────
   const setArchitecture = (v: C4Architecture | null) =>
@@ -2700,6 +2712,8 @@ const CodeArchitectureViewerInner: React.FC = () => {
         />
 
         <MetricsBar
+          viewMode={viewMode}
+          setViewMode={setViewMode}
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
           selectedLevel={selectedLevel}
@@ -2733,19 +2747,39 @@ const CodeArchitectureViewerInner: React.FC = () => {
       </div>
 
       <div className="viewer-layout">
-        <GraphView
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onNodeClick={onNodeClick}
-          onEdgeClick={onEdgeClick}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          selectedLevel={selectedLevel}
-        />
+        {viewMode === "data" ? (
+          <DataView
+            levelData={
+              (architecture?.[selectedLevel as keyof typeof architecture] as {
+                entities: any[];
+                relationships: any[];
+              }) ?? null
+            }
+            levelLabel={
+              selectedLevel === "context_level"
+                ? "Context"
+                : selectedLevel === "container_level"
+                  ? "Container"
+                  : "Component"
+            }
+            architecture={architecture as Record<string, unknown> | null}
+            markdownCache={markdownCacheRef}
+          />
+        ) : (
+          <GraphView
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onNodeClick={onNodeClick}
+            onEdgeClick={onEdgeClick}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            selectedLevel={selectedLevel}
+          />
+        )}
 
-        <div className="chat-panel-container">
+        {viewMode === "diagram" && <div className="chat-panel-container">
           {selectedEdge && !selectedNode ? (
             <EdgeDetailsPanel
               selectedEdge={selectedEdge}
@@ -2768,7 +2802,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
               onApplyReviewDecision={handleApplyReviewDecision}
             />
           )}
-        </div>
+        </div>}
       </div>
     </div>
   );
