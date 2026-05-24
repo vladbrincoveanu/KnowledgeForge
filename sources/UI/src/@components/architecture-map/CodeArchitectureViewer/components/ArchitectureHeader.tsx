@@ -14,11 +14,7 @@ export default function ArchitectureHeader({
   return (
     <div className="viewer-header">
       <div className="header-content">
-        <h2>Architecture Context (Multi-Repository)</h2>
-        <p>
-          Cumulative view of all added repositories - add multiple projects to
-          see complete landscape
-        </p>
+        <h2>Architecture Context</h2>
       </div>
       <div className="header-stats">
         <div className="header-stat">

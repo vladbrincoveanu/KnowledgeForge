@@ -162,8 +162,15 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data }) => {
         }}
       >
         <Handle
+          id="left"
           type="target"
           position={Position.Left}
+          className="custom-handle"
+        />
+        <Handle
+          id="top"
+          type="target"
+          position={Position.Top}
           className="custom-handle"
         />
 
@@ -187,8 +194,15 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data }) => {
         </div>
 
         <Handle
+          id="right"
           type="source"
           position={Position.Right}
+          className="custom-handle"
+        />
+        <Handle
+          id="bottom"
+          type="source"
+          position={Position.Bottom}
           className="custom-handle"
         />
       </div>
@@ -207,8 +221,15 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data }) => {
       }
     >
       <Handle
+        id="left"
         type="target"
-        position={isContainer ? Position.Left : Position.Top}
+        position={Position.Left}
+        className="custom-handle"
+      />
+      <Handle
+        id="top"
+        type="target"
+        position={Position.Top}
         className="custom-handle"
       />
 
@@ -241,8 +262,15 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data }) => {
       </div>
 
       <Handle
+        id="right"
         type="source"
-        position={isContainer ? Position.Right : Position.Bottom}
+        position={Position.Right}
+        className="custom-handle"
+      />
+      <Handle
+        id="bottom"
+        type="source"
+        position={Position.Bottom}
         className="custom-handle"
       />
     </div>

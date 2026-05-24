@@ -83,7 +83,7 @@ export default function MetricsBar({
 }: MetricsBarProps) {
   return (
     <div className="metrics-bar">
-      <div className="metrics-row metrics-row-primary">
+      <div className="metrics-row metrics-row-single">
         <div className="metrics-section search-section">
           <input
             type="text"
@@ -94,10 +94,6 @@ export default function MetricsBar({
           />
         </div>
 
-        <div className="metrics-actions"></div>
-      </div>
-
-      <div className="metrics-row metrics-row-secondary">
         <div className="metrics-cluster levels-section">
           <span className="section-label">Level</span>
           <div className="level-pills">

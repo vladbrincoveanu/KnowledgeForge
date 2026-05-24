@@ -69,7 +69,8 @@ const ContainerNode: React.FC<ContainerNodeProps> = ({ data }) => {
       className={`container-node container-node--${category}`}
       style={{ borderColor: config.border }}
     >
-      <Handle type="target" position={Position.Left} />
+      <Handle id="left" type="target" position={Position.Left} />
+      <Handle id="top" type="target" position={Position.Top} />
       <div
         className="container-badge"
         style={{ backgroundColor: config.color }}
@@ -82,7 +83,8 @@ const ContainerNode: React.FC<ContainerNodeProps> = ({ data }) => {
           <div className="container-tech">{data.technology}</div>
         )}
       </div>
-      <Handle type="source" position={Position.Right} />
+      <Handle id="right" type="source" position={Position.Right} />
+      <Handle id="bottom" type="source" position={Position.Bottom} />
     </div>
   );
 };

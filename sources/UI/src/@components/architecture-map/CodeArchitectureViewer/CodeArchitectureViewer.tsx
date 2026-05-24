@@ -306,9 +306,32 @@ const layoutContainerTiers = (
     };
   });
 
+  // For same-tier (lateral) edges, Bottom→Top handles produce a U-shaped bezier
+  // that extends outside the viewport.  Override to Left/Right based on which
+  // node is further left so the edge draws as a clean horizontal arrow.
+  const nodePos = new Map(
+    [...containerNodes, ...externalNodes, ...ghostNodes].map((n) => [
+      n.id,
+      n.position,
+    ]),
+  );
+  const fixedEdges = edges.map((edge) => {
+    const src = nodePos.get(edge.source);
+    const tgt = nodePos.get(edge.target);
+    if (!src || !tgt) return edge;
+    if (Math.abs(src.y - tgt.y) < NODE_HEIGHT / 2) {
+      return {
+        ...edge,
+        sourcePosition: src.x < tgt.x ? Position.Right : Position.Left,
+        targetPosition: src.x < tgt.x ? Position.Left : Position.Right,
+      };
+    }
+    return edge;
+  });
+
   return {
     nodes: [...containerNodes, ...externalNodes, ...ghostNodes],
-    edges,
+    edges: fixedEdges,
   };
 };
 
@@ -331,34 +354,24 @@ const getLayoutedElements = (
 
   // Layout child nodes within their parent containers
   if (containerNodes.length > 0) {
-    // Position containers with MUCH more spacing
-    const containerSpacing = 80;
-    let currentX = 200;
-
     const childNodeWidth = 240;
     const childNodeHeight = 120;
     const childSpacing = 50;
     const childStartX = 60;
     const childStartY = 100;
 
+    // Pass 1: size each frame and position its children (relative coords)
     containerNodes.forEach((container) => {
-      container.position = { x: currentX, y: 150 };
-
-      // Get children of this container
       const children = childNodes.filter((n) => n.parentNode === container.id);
-
-      // Layout children in a grid inside the container (more horizontal when possible)
       const minColumns = 2;
       const maxColumns = 4;
       const childrenPerRow = Math.min(
         maxColumns,
         Math.max(minColumns, Math.ceil(children.length / 2)),
       );
-
       children.forEach((child, idx) => {
         const row = Math.floor(idx / childrenPerRow);
         const col = idx % childrenPerRow;
-
         child.position = {
           x: childStartX + col * (childNodeWidth + childSpacing),
           y: childStartY + row * (childNodeHeight + childSpacing),
@@ -366,7 +379,6 @@ const getLayoutedElements = (
         child.sourcePosition = Position.Right;
         child.targetPosition = Position.Left;
       });
-
       if (children.length > 0) {
         const rows = Math.ceil(children.length / childrenPerRow);
         const contentWidth =
@@ -375,17 +387,62 @@ const getLayoutedElements = (
           (childrenPerRow - 1) * childSpacing;
         const contentHeight =
           childStartY + rows * childNodeHeight + (rows - 1) * childSpacing + 50;
-
         container.style = {
           ...container.style,
           width: Math.max(400, contentWidth),
           height: Math.max(280, contentHeight),
         };
       }
-
-      currentX +=
-        ((container.style?.width as number) || 850) + containerSpacing;
     });
+
+    // Pass 2: position the frames themselves.
+    // If there are edges between frames, use dagre TB so connected frames are
+    // arranged the same way as the container-level diagram.  Otherwise fall
+    // back to a simple horizontal row.
+    const frameEdges = edges.filter(
+      (e) =>
+        containerNodes.some((n) => n.id === e.source) &&
+        containerNodes.some((n) => n.id === e.target),
+    );
+
+    if (frameEdges.length > 0) {
+      const fg = new dagre.graphlib.Graph();
+      fg.setDefaultEdgeLabel(() => ({}));
+      fg.setGraph({
+        rankdir: "TB",
+        ranksep: 100,
+        nodesep: 80,
+        marginx: 80,
+        marginy: 80,
+      });
+      containerNodes.forEach((n) => {
+        fg.setNode(n.id, {
+          width: (n.style?.width as number) || 700,
+          height: (n.style?.height as number) || 500,
+        });
+      });
+      frameEdges.forEach((e) => fg.setEdge(e.source, e.target));
+      dagre.layout(fg);
+      containerNodes.forEach((n) => {
+        const pos = fg.node(n.id);
+        if (pos) {
+          const w = (n.style?.width as number) || 700;
+          const h = (n.style?.height as number) || 500;
+          n.position = { x: pos.x - w / 2, y: pos.y - h / 2 };
+          n.sourcePosition = Position.Bottom;
+          n.targetPosition = Position.Top;
+        }
+      });
+    } else {
+      // No inter-frame edges — simple horizontal row
+      const containerSpacing = 80;
+      let currentX = 200;
+      containerNodes.forEach((container) => {
+        container.position = { x: currentX, y: 150 };
+        currentX +=
+          ((container.style?.width as number) || 850) + containerSpacing;
+      });
+    }
 
     // Position standalone nodes (non-K8s containers, non-child entities)
     // below the cluster frame in a grid layout
@@ -539,6 +596,7 @@ const getLayoutedElements = (
 
     dagre.layout(dagreGraph);
 
+    const isHorizontal = direction === "LR";
     const layoutedNodes = nodes.map((node) => {
       const nodeWithPosition = dagreGraph.node(node.id);
       if (
@@ -552,15 +610,23 @@ const getLayoutedElements = (
             x: nodeWithPosition.x - 110,
             y: nodeWithPosition.y - 50,
           },
-          sourcePosition: Position.Right,
-          targetPosition: Position.Left,
+          sourcePosition: isHorizontal ? Position.Right : Position.Bottom,
+          targetPosition: isHorizontal ? Position.Left : Position.Top,
         };
       }
       // Fallback if dagre didn't position this node
       return node;
     });
 
-    return { nodes: layoutedNodes, edges };
+    const updatedEdges = isHorizontal
+      ? edges
+      : edges.map((edge) => ({
+          ...edge,
+          sourceHandle: "bottom",
+          targetHandle: "top",
+        }));
+
+    return { nodes: layoutedNodes, edges: updatedEdges };
   }
 
   // If no edges, use an improved grid layout with much better spacing
@@ -2176,7 +2242,36 @@ const CodeArchitectureViewerInner: React.FC = () => {
       const dst = String(rel?.to ?? rel?.destination ?? "");
       return !hiddenContainerNames.has(src) && !hiddenContainerNames.has(dst);
     });
-    const mergedEdges = rfEdges;
+    // In component level, inherit container-level relationships as edges between
+    // container frames so the layout reflects the same source→target structure.
+    let interFrameEdges: Edge[] = [];
+    if (selectedLevel === "component_level") {
+      const rfNodeIds = new Set(rfNodes.map((n) => n.id));
+      interFrameEdges = visibleContainerRelationships
+        .map((rel: any, idx: number) => {
+          const src = String(rel?.from ?? rel?.source ?? "");
+          const dst = String(rel?.to ?? rel?.destination ?? "");
+          const sourceId = `container_frame_${src}`;
+          const targetId = `container_frame_${dst}`;
+          if (!rfNodeIds.has(sourceId) || !rfNodeIds.has(targetId)) return null;
+          return {
+            id: `inter_frame_${idx}`,
+            source: sourceId,
+            target: targetId,
+            sourceHandle: "bottom",
+            targetHandle: "top",
+            type: "smoothstep",
+            style: { stroke: "#94a3b8", strokeWidth: 2 },
+            markerEnd: { type: MarkerType.ArrowClosed, color: "#94a3b8" },
+            data: {
+              protocol: rel.protocol,
+              description: rel.description || rel.llm_description,
+            },
+          } as Edge;
+        })
+        .filter(Boolean) as Edge[];
+    }
+    const mergedEdges = [...rfEdges, ...interFrameEdges];
     const mergedNodes = rfNodes;
 
     // Apply layout: star layout for L1 context, semantic 3-tier for L2 containers,
@@ -2187,7 +2282,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
       layoutedNodes = layoutContextLevel([...mergedNodes]);
       layoutedEdges = mergedEdges;
     } else if (selectedLevel === "container_level") {
-      const result = layoutContainerTiers(mergedNodes, mergedEdges);
+      const result = getLayoutedElements(mergedNodes, mergedEdges, "TB");
       layoutedNodes = result.nodes;
       layoutedEdges = result.edges;
     } else {
