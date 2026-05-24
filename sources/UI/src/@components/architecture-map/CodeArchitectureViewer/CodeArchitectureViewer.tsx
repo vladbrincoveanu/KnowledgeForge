@@ -361,39 +361,53 @@ const getLayoutedElements = (
     const childStartX = 60;
     const childStartY = 100;
 
-    // Pass 1: size each frame and position its children (relative coords)
+    // Pass 1: size each frame and position its children using edge-aware dagre
     containerNodes.forEach((container) => {
       const children = childNodes.filter((n) => n.parentNode === container.id);
-      const minColumns = 2;
-      const maxColumns = 4;
-      const childrenPerRow = Math.min(
-        maxColumns,
-        Math.max(minColumns, Math.ceil(children.length / 2)),
+      if (children.length === 0) return;
+
+      const childIds = new Set(children.map((c) => c.id));
+      const childEdges = edges.filter(
+        (e) => childIds.has(e.source) && childIds.has(e.target),
       );
+
+      // Run dagre on this container's children so dependency order drives layout
+      const cg = new dagre.graphlib.Graph();
+      cg.setDefaultEdgeLabel(() => ({}));
+      cg.setGraph({ rankdir: "LR", ranksep: 80, nodesep: 40 });
+      children.forEach((child) => {
+        cg.setNode(child.id, { width: childNodeWidth, height: childNodeHeight });
+      });
+      childEdges.forEach((e) => cg.setEdge(e.source, e.target));
+      dagre.layout(cg);
+
       children.forEach((child, idx) => {
-        const row = Math.floor(idx / childrenPerRow);
-        const col = idx % childrenPerRow;
-        child.position = {
-          x: childStartX + col * (childNodeWidth + childSpacing),
-          y: childStartY + row * (childNodeHeight + childSpacing),
-        };
+        const pos = cg.node(child.id);
+        if (pos) {
+          child.position = {
+            x: childStartX + pos.x - childNodeWidth / 2,
+            y: childStartY + pos.y - childNodeHeight / 2,
+          };
+        } else {
+          // fallback: simple grid
+          const col = idx % 2;
+          const row = Math.floor(idx / 2);
+          child.position = {
+            x: childStartX + col * (childNodeWidth + childSpacing),
+            y: childStartY + row * (childNodeHeight + childSpacing),
+          };
+        }
         child.sourcePosition = Position.Right;
         child.targetPosition = Position.Left;
       });
-      if (children.length > 0) {
-        const rows = Math.ceil(children.length / childrenPerRow);
-        const contentWidth =
-          childStartX * 2 +
-          childrenPerRow * childNodeWidth +
-          (childrenPerRow - 1) * childSpacing;
-        const contentHeight =
-          childStartY + rows * childNodeHeight + (rows - 1) * childSpacing + 50;
-        container.style = {
-          ...container.style,
-          width: Math.max(400, contentWidth),
-          height: Math.max(280, contentHeight),
-        };
-      }
+
+      const maxChildX = Math.max(...children.map((c) => c.position.x + childNodeWidth));
+      const maxChildY = Math.max(...children.map((c) => c.position.y + childNodeHeight));
+      container.style = {
+        ...container.style,
+        width: Math.max(400, maxChildX + childStartX),
+        height: Math.max(280, maxChildY + childStartY),
+      };
     });
 
     // Pass 2: position the frames themselves.
@@ -1419,8 +1433,31 @@ const CodeArchitectureViewerInner: React.FC = () => {
         }
       });
 
-      // Components don't need relationships - they're independent endpoints
-      // No inter-component relationships needed
+      // Build inter-component relationships with deduplication (bidirectional pairs → one edge)
+      if (data.relationships?.components?.length) {
+        const componentIdByName = new Map(
+          componentEntities.map((c) => [c.name, c.id]),
+        );
+        const seenPairs = new Set<string>();
+        data.relationships.components.forEach((rel: any, idx: number) => {
+          const srcName = rel.from ?? rel.source;
+          const tgtName = rel.to ?? rel.destination ?? rel.target;
+          const srcId = srcName ? componentIdByName.get(String(srcName)) : undefined;
+          const tgtId = tgtName ? componentIdByName.get(String(tgtName)) : undefined;
+          if (srcId && tgtId) {
+            const pairKey = [srcId, tgtId].sort().join("|||");
+            if (seenPairs.has(pairKey)) return;
+            seenPairs.add(pairKey);
+            componentRelationships.push({
+              id: `rel_comp_dep_${idx}`,
+              source_entity_id: srcId,
+              target_entity_id: tgtId,
+              relationship_type: rel.label || "uses",
+              attributes: { label: rel.label },
+            });
+          }
+        });
+      }
 
       data.component_level = {
         entities: componentEntities,
