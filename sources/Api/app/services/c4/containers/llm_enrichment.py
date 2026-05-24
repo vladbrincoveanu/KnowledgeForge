@@ -403,14 +403,21 @@ def _scan_cross_service_refs(
             client_hits = len(client_pat.findall(text))
 
             strong = url_hits + env_hits + client_hits
-            # Require at least one strong signal — bare string occurrences alone
-            # (e.g. K8s label values, comments) are too noisy to trust
-            if strong == 0:
+            generic_count = text.count(variant)
+
+            # Require either a strong signal OR enough comment/label occurrences to
+            # be worth passing to the LLM.  K8s label-based coordination (e.g.
+            # route-manager watching a label set by hpc-gateway) shows up only in
+            # comments but is still a real architectural coupling.
+            if strong == 0 and generic_count < 3:
                 continue
 
-            generic_count = text.count(variant)
-            weighted = url_hits * 3 + env_hits * 2 + client_hits * 2 + min(generic_count, 10)
-            confidence = min(0.80, 0.45 + weighted * 0.04)
+            if strong > 0:
+                weighted = url_hits * 3 + env_hits * 2 + client_hits * 2 + min(generic_count, 10)
+                confidence = min(0.80, 0.45 + weighted * 0.04)
+            else:
+                # Comment/label-only reference — low confidence, let the LLM decide
+                confidence = min(0.35, 0.20 + generic_count * 0.03)
 
             existing = results.get(original)
             if existing is None or confidence > existing["confidence"]:
@@ -422,6 +429,7 @@ def _scan_cross_service_refs(
                     "env_hits": env_hits,
                     "client_hits": client_hits,
                     "confidence": confidence,
+                    "weak_only": strong == 0,
                 }
 
     return list(results.values())
@@ -598,7 +606,7 @@ def build_evidence_bundle(
                     f"client:{hit.get('client_hits',0)} "
                     f"generic:{hit['occurrences']}"
                 )
-                relationship_signals.append({
+                sig: dict[str, Any] = {
                     "from": name,
                     "to": hit["referenced_name"],
                     "type": "uses",
@@ -606,7 +614,10 @@ def build_evidence_bundle(
                     "direction": "outbound",
                     "source": f"source-xref:{hit['file']} ({detail})",
                     "confidence": hit["confidence"],
-                })
+                }
+                if hit.get("weak_only"):
+                    sig["note"] = "comment/label-only reference — no direct API call detected; include only if the coupling is architecturally significant"
+                relationship_signals.append(sig)
                 logger.debug(
                     "Cross-ref: %s references %s in %s (%d times)",
                     name, hit["referenced_name"], hit["file"], hit["occurrences"],
