@@ -5,10 +5,10 @@
   background:
     radial-gradient(
       circle at top left,
-      rgba(37, 99, 235, 0.08),
+      rgba(37, 99, 235, 0.06),
       transparent 24%
     ),
-    linear-gradient(180deg, #f8f5ee 0%, #f3ede2 100%);
+    linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
   color: #14213d;
   overflow: hidden;
   font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
@@ -34,14 +34,14 @@
   gap: 1rem;
   padding: 0.9rem 1.35rem;
   border-bottom: 1px solid rgba(20, 33, 61, 0.08);
-  background: rgba(252, 249, 243, 0.8);
+  background: rgba(248, 250, 252, 0.9);
   backdrop-filter: blur(18px);
   box-shadow: 0 18px 44px rgba(15, 23, 42, 0.06);
   flex-shrink: 0;
 }
 
 .main-navigation.is-home {
-  background: rgba(255, 252, 247, 0.72);
+  background: rgba(248, 250, 252, 0.85);
 }
 
 .nav-header {
@@ -119,10 +119,10 @@
 }
 
 .nav-link.active {
-  border-color: rgba(249, 115, 22, 0.24);
-  background: rgba(249, 115, 22, 0.12);
-  color: #9a3412;
-  box-shadow: 0 12px 24px rgba(249, 115, 22, 0.12);
+  border-color: rgba(0, 184, 184, 0.3);
+  background: rgba(0, 184, 184, 0.1);
+  color: #007a7a;
+  box-shadow: 0 4px 12px rgba(0, 184, 184, 0.1);
 }
 
 .nav-link svg {
@@ -206,7 +206,7 @@
 .no-task-selected {
   border: 1px solid rgba(20, 33, 61, 0.08);
   border-radius: 24px;
-  background: rgba(255, 252, 247, 0.82);
+  background: rgba(255, 255, 255, 0.9);
   box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
   backdrop-filter: blur(12px);
 }

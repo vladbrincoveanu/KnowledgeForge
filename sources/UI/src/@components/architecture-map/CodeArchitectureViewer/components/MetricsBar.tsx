@@ -102,11 +102,6 @@ export default function MetricsBar({
                 key={level.key}
                 className={`level-pill cursor-pointer ${selectedLevel === level.key ? "active" : ""}`}
                 onClick={() => toggleLevel(level.key)}
-                style={
-                  {
-                    "--pill-color": level.color,
-                  } as React.CSSProperties
-                }
               >
                 {level.label}
               </button>

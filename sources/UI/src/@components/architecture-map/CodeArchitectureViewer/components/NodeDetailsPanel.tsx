@@ -311,7 +311,6 @@ export default function NodeDetailsPanel({
     return (
       <aside className="node-details-panel chat-style">
         <div className="chat-header">
-          <div className="chat-avatar">👤</div>
           <div className="chat-title">
             <h3>{selectedNode?.name || selectedNode?.label || "Actor"}</h3>
             <span className="chat-subtitle">Actor / Person</span>
@@ -428,7 +427,6 @@ export default function NodeDetailsPanel({
     return (
       <aside className="node-details-panel chat-style">
         <div className="chat-header">
-          <div className="chat-avatar">🔍</div>
           <div className="chat-title">
             <h3>Inspector</h3>
             <span className="chat-subtitle">Click a node to inspect</span>
@@ -499,17 +497,7 @@ export default function NodeDetailsPanel({
   return (
     <aside className="node-details-panel chat-style">
       <div className="chat-header">
-        <div className={`chat-avatar node-type-${nodeType}`}>
-          {nodeType === "system"
-            ? "🏗️"
-            : nodeType === "container"
-              ? "📦"
-              : nodeType === "component"
-                ? "⚙️"
-                : isExternalDependencyNode
-                  ? "🌐"
-                  : "📄"}
-        </div>
+        <div className="chat-avatar" />
         <div className="chat-title">
           <h3>
             {selectedNode?.name ||

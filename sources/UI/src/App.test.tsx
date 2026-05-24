@@ -59,15 +59,14 @@ describe("App routing", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders the new landing page on the root route", () => {
+  it("redirects the root route to code architecture", async () => {
     render(<App />);
 
-    expect(
-      screen.getByText("Bridging the gap between engineering and leadership."),
-    ).toBeInTheDocument();
-    expect(screen.getAllByText("Become a Design Partner")).toHaveLength(2);
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(wsServiceMock.connect).not.toHaveBeenCalled();
+    expect(screen.getByText("Mock architecture viewer")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+    expect(wsServiceMock.connect).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the upload workspace available on the dedicated route", async () => {

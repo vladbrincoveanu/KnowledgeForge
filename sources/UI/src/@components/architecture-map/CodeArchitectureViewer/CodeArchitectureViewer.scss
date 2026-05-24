@@ -1530,8 +1530,8 @@
 
       &:focus {
         outline: none;
-        border-color: #2563eb;
-        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+        border-color: #00b8b8;
+        box-shadow: 0 0 0 2px rgba(0, 184, 184, 0.12);
       }
     }
   }
@@ -1556,19 +1556,19 @@
       transition: all 0.2s;
 
       &:hover {
-        border-color: var(--pill-color, #2563eb);
-        color: var(--pill-color, #2563eb);
-        background: rgba(99, 102, 241, 0.05);
+        border-color: #00b8b8;
+        color: #00b8b8;
+        background: rgba(0, 184, 184, 0.06);
       }
 
       &:focus-visible {
-        outline: 2px solid var(--pill-color, #2563eb);
+        outline: 2px solid #00b8b8;
         outline-offset: 2px;
       }
 
       &.active {
-        background: var(--pill-color, #2563eb);
-        border-color: var(--pill-color, #2563eb);
+        background: #00b8b8;
+        border-color: #00b8b8;
         color: white;
       }
     }
@@ -1603,12 +1603,12 @@
       }
 
       &:focus-visible {
-        outline: 2px solid #2563eb;
+        outline: 2px solid #00b8b8;
         outline-offset: -2px;
       }
 
       &.active {
-        background: #2563eb;
+        background: #00b8b8;
         color: white;
       }
     }
@@ -1652,7 +1652,7 @@
       }
 
       input:checked + .toggle-switch {
-        background: #2563eb;
+        background: #00b8b8;
 
         &::after {
           left: 18px;
@@ -1885,33 +1885,6 @@
     background: #ffffff;
     border-bottom: 1px solid #e2e8f0;
     flex-shrink: 0;
-
-    .chat-avatar {
-      width: 40px;
-      height: 40px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #2563eb 0%, #8b5cf6 100%);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.25rem;
-
-      &.node-type-system {
-        background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
-      }
-      &.node-type-container {
-        background: linear-gradient(135deg, #06b6d4 0%, #0ea5e9 100%);
-      }
-      &.node-type-component {
-        background: linear-gradient(135deg, #10b981 0%, #14b8a6 100%);
-      }
-
-      &.node-type-edge {
-        background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%);
-        font-size: 1rem;
-        font-weight: 700;
-      }
-    }
 
     .chat-title {
       flex: 1;

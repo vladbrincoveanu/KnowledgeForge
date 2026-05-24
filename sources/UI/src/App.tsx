@@ -3,6 +3,7 @@ import {
   BrowserRouter as Router,
   Routes,
   Route,
+  Navigate,
   Link,
   useLocation,
 } from "react-router-dom";
@@ -12,7 +13,6 @@ import {
   Settings as SettingsIcon,
   Brain,
   Code,
-  Home,
 } from "lucide-react";
 import "./App.scss";
 import CodeArchitectureViewer from "./@components/architecture-map/CodeArchitectureViewer/CodeArchitectureViewer";
@@ -65,12 +65,6 @@ interface ExtractionTask {
 // Navigation component
 const Navigation: React.FC<NavigationProps> = ({ activeTab }) => {
   const navItems: NavItem[] = [
-    {
-      id: "home",
-      label: "Home",
-      icon: <Home size={20} />,
-      path: "/",
-    },
     {
       id: "workspace",
       label: "Workspace",
@@ -206,13 +200,12 @@ const MainContent: React.FC = () => {
   // Determine active tab based on location
   const getActiveTab = (): string => {
     const path = location.pathname;
-    if (path === "/") return "home";
     if (path.startsWith("/workspace")) return "workspace";
     if (path.startsWith("/code-architecture")) return "code-architecture";
     if (path.startsWith("/metrics")) return "metrics";
     if (path.startsWith("/settings")) return "settings";
     if (path.startsWith("/review")) return "review";
-    return "home";
+    return "code-architecture";
   };
 
   const activeTab = getActiveTab();
@@ -279,8 +272,7 @@ const MainContent: React.FC = () => {
           } ${isLandingRoute ? "landing-main-content" : ""}`}
         >
           <Routes>
-            {/* Default route is the landing page; the product workspace lives at /workspace. */}
-            <Route path="/" element={<LandingPage />} />
+            <Route path="/" element={<Navigate to="/code-architecture" replace />} />
             <Route
               path="/workspace"
               element={

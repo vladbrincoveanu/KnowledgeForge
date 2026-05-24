@@ -243,7 +243,6 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data }) => {
             textAlign: "center",
           }}
         >
-          {data.type === "person" && <span style={{ marginRight: 4 }}>👤</span>}
           {stereotype}
         </div>
       ) : (
