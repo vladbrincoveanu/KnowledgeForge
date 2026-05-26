@@ -43,7 +43,6 @@ const FolderDropZone: React.FC<FolderDropZoneProps> = ({
         return;
       }
 
-      // Detect direct ZIP drop
       if (
         fileList.length === 1 &&
         (fileList[0].name.endsWith(".zip") ||
@@ -55,7 +54,6 @@ const FolderDropZone: React.FC<FolderDropZoneProps> = ({
         return;
       }
 
-      // Filter excluded paths
       const kept = fileList.filter(
         (f) => !isExcluded(f.webkitRelativePath || f.name),
       );
@@ -65,11 +63,9 @@ const FolderDropZone: React.FC<FolderDropZoneProps> = ({
         return;
       }
 
-      // Determine folder name from first file's webkitRelativePath
       const firstPath = kept[0].webkitRelativePath || kept[0].name;
       const folderName = firstPath.split("/")[0] || "project";
 
-      // Read all files and build fflate input map
       const entries: Record<string, Uint8Array> = {};
       let loaded = 0;
 
@@ -103,7 +99,6 @@ const FolderDropZone: React.FC<FolderDropZoneProps> = ({
         onProgress("zipping", Math.round((loaded / kept.length) * 100));
       }
 
-      // Zip using fflate async callback API
       zip(entries, { level: 1 }, (err, data) => {
         if (err) {
           onError(`Zip failed: ${err.message}`);
@@ -139,12 +134,17 @@ const FolderDropZone: React.FC<FolderDropZoneProps> = ({
     [processFiles],
   );
 
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
   return (
     <div
       role="region"
       aria-label="Drop project folder here"
       className={`folder-drop-zone ${isDragging ? "folder-drop-zone--active" : ""}`}
-      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+      onDragOver={handleDragOver}
       onDragLeave={() => setIsDragging(false)}
       onDrop={handleDrop}
       onClick={() => inputRef.current?.click()}
