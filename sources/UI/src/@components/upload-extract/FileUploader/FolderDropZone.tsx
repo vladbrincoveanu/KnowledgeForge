@@ -148,6 +148,13 @@ const FolderDropZone: React.FC<FolderDropZoneProps> = ({
       onDragLeave={() => setIsDragging(false)}
       onDrop={handleDrop}
       onClick={() => inputRef.current?.click()}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          inputRef.current?.click();
+        }
+      }}
     >
       <input
         ref={inputRef}

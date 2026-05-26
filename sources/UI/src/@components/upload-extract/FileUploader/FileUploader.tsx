@@ -3,6 +3,7 @@ import { codeArchitectureAPI, wsService } from "@/services/api";
 import { UploadedFile } from "@/types";
 import {
   Github,
+  Folder,
   Plus,
   X,
   Play,
@@ -227,8 +228,8 @@ const FileUploader: React.FC<FileUploaderProps> = ({
         ...prev,
         {
           url: displayName,
-          status: "zipping" as RepoStatus,
-          message: "Zipping complete, uploading…",
+          status: "uploading" as RepoStatus,
+          message: "Uploading…",
           progress: 0,
           containersCount: 0,
           componentsCount: 0,
@@ -284,7 +285,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
           r.status === "zipping"
             ? {
                 ...r,
-                message: phase === "zipping" ? `Zipping… ${value}%` : `Uploading… ${value}%`,
+                message: `Zipping… ${value}%`,
                 progress: value / 100,
               }
             : r,
@@ -475,11 +476,15 @@ const FileUploader: React.FC<FileUploaderProps> = ({
                 className={`repo-item repo-item--${repo.status}`}
               >
                 <div className="repo-item__left">
-                  <Github size={16} className="repo-item__icon" />
+                  {repo.url.endsWith("/") ? (
+                    <Folder size={16} className="repo-item__icon" />
+                  ) : (
+                    <Github size={16} className="repo-item__icon" />
+                  )}
                   <div className="repo-item__info">
                     <span className="repo-item__url">{repo.url}</span>
                     <span className="repo-item__message">{repo.message}</span>
-                    {repo.status === "scanning" && (
+                    {(repo.status === "scanning" || repo.status === "zipping" || repo.status === "uploading") && (
                       <div className="repo-item__progress">
                         <div
                           className="repo-item__progress-fill"
