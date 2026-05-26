@@ -549,4 +549,19 @@
     color: #6c757d;
     margin: 0;
   }
+
+  &__zip-link {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: inherit;
+    color: #e8420f;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+
+    &:hover {
+      color: #c73508;
+    }
+  }
 }

@@ -34,6 +34,7 @@ const FolderDropZone: React.FC<FolderDropZoneProps> = ({
   onError,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
+  const zipInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
   const processFiles = useCallback(
@@ -165,9 +166,25 @@ const FolderDropZone: React.FC<FolderDropZoneProps> = ({
         style={{ display: "none" }}
         onChange={handleChange}
       />
+      <input
+        ref={zipInputRef}
+        type="file"
+        accept=".zip,application/zip"
+        style={{ display: "none" }}
+        onChange={handleChange}
+      />
       <Upload size={40} className="folder-drop-zone__icon" />
       <p className="folder-drop-zone__title">Drop your project folder here</p>
-      <p className="folder-drop-zone__hint">or click to select &nbsp;·&nbsp; also accepts .zip files</p>
+      <p className="folder-drop-zone__hint">
+        or click to select folder &nbsp;·&nbsp;{" "}
+        <button
+          className="folder-drop-zone__zip-link"
+          onClick={(e) => { e.stopPropagation(); zipInputRef.current?.click(); }}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); zipInputRef.current?.click(); } }}
+        >
+          browse for .zip
+        </button>
+      </p>
     </div>
   );
 };
