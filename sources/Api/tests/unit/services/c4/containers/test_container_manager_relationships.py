@@ -124,7 +124,7 @@ class TestBuildContainerRelationshipsPhase2:
         assert len(rels) == 1
         assert rels[0]["from"] == "api"
         assert rels[0]["to"] == "db"
-        assert rels[0]["source"] == "runtime"
+        assert rels[0]["source"] == "internal-dependencies"
 
     def test_legacy_fallback_skipped_when_detector_rels_exist(self, temp_repo):
         """Phase 2 must be skipped for containers that already have Phase 1 rels."""

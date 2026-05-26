@@ -366,4 +366,47 @@ describe("FileUploader Component", () => {
 
     expect(input).toHaveValue("");
   });
+
+  it("renders GitHub URL tab and Local Folder tab by default", () => {
+    render(
+      <FileUploader
+        onFilesUploaded={mockOnFilesUploaded}
+        isProcessing={false}
+        onExtractionStarted={mockOnExtractionStarted}
+        showNotification={mockShowNotification}
+      />,
+    );
+    expect(screen.getByRole("tab", { name: /github url/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /local folder/i })).toBeInTheDocument();
+  });
+
+  it("switches to Local Folder tab on click", () => {
+    render(
+      <FileUploader
+        onFilesUploaded={mockOnFilesUploaded}
+        isProcessing={false}
+        onExtractionStarted={mockOnExtractionStarted}
+        showNotification={mockShowNotification}
+      />,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: /local folder/i }));
+    expect(screen.getByRole("region", { name: /drop project folder/i })).toBeInTheDocument();
+  });
+
+  it("GitHub tab still shows URL input after tab switch and back", () => {
+    render(
+      <FileUploader
+        onFilesUploaded={mockOnFilesUploaded}
+        isProcessing={false}
+        onExtractionStarted={mockOnExtractionStarted}
+        showNotification={mockShowNotification}
+      />,
+    );
+    // Switch to local
+    fireEvent.click(screen.getByRole("tab", { name: /local folder/i }));
+    // Switch back to github
+    fireEvent.click(screen.getByRole("tab", { name: /github url/i }));
+    // GitHub URL input should be visible again
+    expect(screen.getByRole("textbox")).toBeInTheDocument();
+  });
 });

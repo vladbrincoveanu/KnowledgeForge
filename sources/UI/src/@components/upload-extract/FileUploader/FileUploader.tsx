@@ -3,6 +3,7 @@ import { codeArchitectureAPI, wsService } from "@/services/api";
 import { UploadedFile } from "@/types";
 import {
   Github,
+  Folder,
   Plus,
   X,
   Play,
@@ -19,6 +20,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import "./FileUploader.scss";
+import FolderDropZone from "./FolderDropZone";
 
 interface FileUploaderProps {
   onFilesUploaded: (files: UploadedFile[]) => void;
@@ -30,7 +32,7 @@ interface FileUploaderProps {
   ) => void;
 }
 
-type RepoStatus = "idle" | "pending" | "scanning" | "completed" | "failed";
+type RepoStatus = "idle" | "pending" | "scanning" | "completed" | "failed" | "zipping" | "uploading";
 
 interface RepoEntry {
   url: string;
@@ -68,6 +70,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   const [inputError, setInputError] = useState("");
   const [repos, setRepos] = useState<RepoEntry[]>([]);
   const [isExtracting, setIsExtracting] = useState(false);
+  const [activeTab, setActiveTab] = useState<"github" | "local">("github");
   const pollIntervalsRef = React.useRef<
     Record<string, ReturnType<typeof setInterval>>
   >({});
@@ -260,6 +263,116 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     }
   };
 
+  const uploadZip = useCallback(
+    (blob: Blob, folderName: string): Promise<{ task_id: string }> =>
+      new Promise((resolve, reject) => {
+        const form = new FormData();
+        form.append("file", blob, `${folderName}.zip`);
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/api/v1/code/upload-repo");
+        xhr.upload.onprogress = (ev) => {
+          if (ev.lengthComputable) {
+            const pct = Math.round((ev.loaded / ev.total) * 100);
+            setRepos((prev) =>
+              prev.map((r) =>
+                r.url === folderName + "/"
+                  ? { ...r, status: "uploading" as RepoStatus, message: `Uploading… ${pct}%`, progress: pct / 100 }
+                  : r,
+              ),
+            );
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status === 202) {
+            resolve(JSON.parse(xhr.responseText));
+          } else {
+            reject(new Error(xhr.responseText || "Upload failed"));
+          }
+        };
+        xhr.onerror = () => reject(new Error("Network error during upload"));
+        xhr.send(form);
+      }),
+    [],
+  );
+
+  const handleFolderZipReady = useCallback(
+    async (blob: Blob, name: string, sizeBytes: number) => {
+      const displayName = name + "/";
+      if (repos.some((r) => r.url === displayName)) {
+        showNotification("This folder has already been added.", "info");
+        return;
+      }
+      setRepos((prev) => [
+        ...prev,
+        {
+          url: displayName,
+          status: "uploading" as RepoStatus,
+          message: "Uploading…",
+          progress: 0,
+          containersCount: 0,
+          componentsCount: 0,
+        },
+      ]);
+      try {
+        const result = await uploadZip(blob, name);
+        const taskId = result.task_id;
+        setRepos((prev) =>
+          prev.map((r) =>
+            r.url === displayName
+              ? { ...r, taskId, status: "pending" as RepoStatus, message: "Queued", progress: 0 }
+              : r,
+          ),
+        );
+        onExtractionStarted(taskId, {
+          name: displayName,
+          headers: [],
+          data: [],
+          size: sizeBytes,
+          rowCount: 0,
+          type: "local",
+        });
+        pollStatus(taskId);
+        showNotification(`Extraction started for ${displayName}`, "success");
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Upload failed";
+        setRepos((prev) =>
+          prev.map((r) =>
+            r.url === displayName
+              ? { ...r, status: "failed" as RepoStatus, message: msg }
+              : r,
+          ),
+        );
+        showNotification(`Upload failed for ${displayName}: ${msg}`, "error");
+      }
+    },
+    [repos, showNotification, uploadZip, pollStatus, onExtractionStarted],
+  );
+
+  const handleFolderProgress = useCallback(
+    (phase: "zipping" | "uploading" | "warning", value: number) => {
+      if (phase === "warning") {
+        const mb = Math.round(value / 1024 / 1024);
+        showNotification(
+          `Large zip (${mb} MB) — upload may be slow.`,
+          "info",
+        );
+        return;
+      }
+      setRepos((prev) =>
+        prev.map((r) =>
+          r.status === "zipping"
+            ? {
+                ...r,
+                message: `Zipping… ${value}%`,
+                progress: value / 100,
+              }
+            : r,
+        ),
+      );
+    },
+    [showNotification],
+  );
+
   const extractAll = async () => {
     const idleRepos = repos.filter(
       (r) => r.status === "idle" || r.status === "failed",
@@ -303,6 +416,16 @@ const FileUploader: React.FC<FileUploaderProps> = ({
       color: "#dc3545",
       label: "Failed",
     },
+    zipping: {
+      icon: <Loader size={14} className="spin" />,
+      color: "#6610f2",
+      label: "Zipping",
+    },
+    uploading: {
+      icon: <Loader size={14} className="spin" />,
+      color: "#007bff",
+      label: "Uploading",
+    },
   };
 
   const idleCount = repos.filter(
@@ -311,6 +434,34 @@ const FileUploader: React.FC<FileUploaderProps> = ({
 
   return (
     <div className="repo-extractor">
+      {/* Tabs */}
+      <div className="repo-tabs" role="tablist">
+        <button
+          role="tab"
+          aria-selected={activeTab === "github"}
+          className={`repo-tab ${activeTab === "github" ? "repo-tab--active" : ""}`}
+          onClick={() => setActiveTab("github")}
+        >
+          GitHub URL
+        </button>
+        <button
+          role="tab"
+          aria-selected={activeTab === "local"}
+          className={`repo-tab ${activeTab === "local" ? "repo-tab--active" : ""}`}
+          onClick={() => setActiveTab("local")}
+        >
+          Local Folder
+        </button>
+      </div>
+
+      {activeTab === "local" ? (
+        <FolderDropZone
+          onZipReady={handleFolderZipReady}
+          onProgress={handleFolderProgress}
+          onError={(msg) => showNotification(msg, "error")}
+        />
+      ) : (
+      <>
       {/* URL Input */}
       <div className="url-input-section">
         <div className="url-input-row">
@@ -357,6 +508,8 @@ const FileUploader: React.FC<FileUploaderProps> = ({
         </div>
         {inputError && <p className="url-error">{inputError}</p>}
       </div>
+      </>
+      )}
 
       {/* Repo List */}
       {repos.length > 0 && (
@@ -369,7 +522,11 @@ const FileUploader: React.FC<FileUploaderProps> = ({
                 className={`repo-item repo-item--${repo.status}`}
               >
                 <div className="repo-item__left">
-                  <Github size={16} className="repo-item__icon" />
+                  {repo.url.endsWith("/") ? (
+                    <Folder size={16} className="repo-item__icon" />
+                  ) : (
+                    <Github size={16} className="repo-item__icon" />
+                  )}
                   <div className="repo-item__info">
                     <span className="repo-item__url">
                       {repo.url}
@@ -383,17 +540,19 @@ const FileUploader: React.FC<FileUploaderProps> = ({
                     </span>
                     <span className="repo-item__message">{repo.message}</span>
                     {(repo.status === "pending" ||
-                      repo.status === "scanning") && (
+                      repo.status === "scanning" ||
+                      repo.status === "zipping" ||
+                      repo.status === "uploading") && (
                       <div className="repo-item__progress">
-                        {repo.status === "scanning" ? (
+                        {repo.status === "pending" ? (
+                          <div className="repo-item__progress-fill repo-item__progress-fill--indeterminate" />
+                        ) : (
                           <div
                             className="repo-item__progress-fill"
                             style={{
                               width: `${Math.round(repo.progress * 100)}%`,
                             }}
                           />
-                        ) : (
-                          <div className="repo-item__progress-fill repo-item__progress-fill--indeterminate" />
                         )}
                       </div>
                     )}
