@@ -8,7 +8,8 @@ import shutil
 import tempfile
 import uuid
 import zipfile
-from datetime import datetime
+import asyncio
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterator, Optional
 
@@ -29,6 +30,37 @@ ARCHITECTURE_CHAT_MAX_TOKENS = int(os.getenv("ARCHITECTURE_CHAT_MAX_TOKENS", "10
 
 # In-memory storage for scan tasks (use Redis in production)
 scan_tasks: dict[str, dict[str, Any]] = {}
+
+# In-memory storage for upload sessions (keyed by session_id)
+# Structure per session:
+# {
+#     "session_id": str,
+#     "created_at": datetime,
+#     "expires_at": datetime,
+#     "filename": str,
+#     "total_chunks": int,
+#     "expected_size_bytes": int,
+#     "expected_sha256": str,
+#     "received_chunks": dict[int, int],  # chunk_number -> size_bytes
+#     "status": "uploading" | "completed" | "failed" | "expired",
+#     "chunk_dir": Path,
+# }
+upload_sessions: dict[str, dict] = {}
+
+# Per-session asyncio locks to serialize concurrent chunk uploads
+upload_session_locks: dict[str, asyncio.Lock] = {}
+
+
+def _cleanup_upload_session(session_id: str) -> None:
+    """Delete chunk directory and remove session from upload_sessions."""
+    session = upload_sessions.get(session_id)
+    if session and session.get("chunk_dir"):
+        try:
+            shutil.rmtree(session["chunk_dir"])
+        except (OSError, RuntimeError) as e:
+            logger.warning(f"Failed to cleanup chunk directory for session {session_id}: {e}")
+    upload_sessions.pop(session_id, None)
+    upload_session_locks.pop(session_id, None)
 
 
 def _save_c4_to_json(task_id: str, c4_architecture: dict) -> None:
@@ -217,6 +249,54 @@ class ScanStatusResponse(BaseModel):
     external_deps_count: int = Field(0, description="Number of external dependencies detected.")
     errors: list[str] = Field(default_factory=list, description="Non-fatal errors encountered.")
     extraction_mode: str = Field("c4_model", description="Extraction mode used (c4_model or legacy).")
+
+
+class UploadStartRequest(BaseModel):
+    filename: str = Field(..., min_length=1, max_length=255)
+    total_chunks: int = Field(..., ge=1, le=30)
+    expected_size_bytes: int = Field(..., ge=1, le=6 * 1024 * 1024 * 1024)
+    expected_sha256: str = Field(
+        ...,
+        pattern=r"^[a-f0-9]{64}$",
+        description="Lowercase hex SHA-256 of the complete ZIP file (64 characters)",
+    )
+
+
+class UploadStartResponse(BaseModel):
+    session_id: str
+    chunk_urls: list[str]
+    expires_at: datetime
+
+
+class ChunkUploadResponse(BaseModel):
+    received: bool
+    chunk_number: int
+    received_size_bytes: int
+
+
+class UploadCompleteResponse(BaseModel):
+    task_id: str
+    status: str
+    message: str
+
+
+class UploadCancelResponse(BaseModel):
+    cancelled: bool
+    session_id: str
+
+
+class UploadStatusResponse(BaseModel):
+    session_id: str
+    status: str
+    received_chunks: list[int]
+    missing_chunks: list[int]
+    total_chunks: int
+    expires_at: datetime
+
+
+class UploadErrorResponse(BaseModel):
+    error: str
+    session_id: str
 
 
 class NodeDescribeRequest(BaseModel):
