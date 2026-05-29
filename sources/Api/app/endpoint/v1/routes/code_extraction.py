@@ -309,10 +309,40 @@ async def upload_complete(
         repo_path,
     )
 
-    return UploadCompleteResponse(
-        task_id=task_id,
-        status="pending",
-        message="ZIP reassembled and scan queued",
+    return UploadCancelResponse(cancelled=True, session_id=session_id)
+
+
+@router.get(
+    "/upload/session/{session_id}/status",
+    response_model=UploadStatusResponse,
+    summary="Get upload session status",
+    responses={
+        200: {"description": "Session status"},
+        404: {"description": "Session not found"},
+        410: {"description": "Session expired"},
+    },
+)
+async def upload_status(session_id: str):
+    session = upload_sessions.get(session_id)
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if datetime.now() > session["expires_at"]:
+        _cleanup_upload_session(session_id)
+        raise HTTPException(status_code=410, detail="Session expired")
+
+    received = set(session["received_chunks"].keys())
+    expected = set(range(session["total_chunks"]))
+    missing = sorted(expected - received)
+
+    return UploadStatusResponse(
+        session_id=session_id,
+        status=session["status"],
+        received_chunks=sorted(received),
+        missing_chunks=missing,
+        total_chunks=session["total_chunks"],
+        expires_at=session["expires_at"],
     )
 
 
