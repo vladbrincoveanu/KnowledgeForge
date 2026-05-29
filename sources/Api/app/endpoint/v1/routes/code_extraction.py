@@ -63,6 +63,53 @@ def _cleanup_upload_session(session_id: str) -> None:
     upload_session_locks.pop(session_id, None)
 
 
+MAX_CHUNK_BYTES = 200 * 1024 * 1024  # 200 MB
+
+
+@router.post(
+    "/upload/start",
+    response_model=UploadStartResponse,
+    status_code=201,
+    summary="Initiate a chunked upload session",
+    description="Starts an upload session for a large ZIP file split into chunks.",
+    responses={
+        201: {"description": "Upload session created"},
+        400: {"description": "Invalid request (bad sha256 format, etc.)"},
+    },
+)
+async def upload_start(request: UploadStartRequest):
+    session_id = str(uuid.uuid4())
+    chunk_dir = Path(tempfile.mkdtemp(prefix=f"kf-chunks_{session_id}_"))
+    chunk_dir.chmod(0o700)
+    expires_at = datetime.now() + timedelta(hours=1)
+
+    session = {
+        "session_id": session_id,
+        "created_at": datetime.now(),
+        "expires_at": expires_at,
+        "filename": request.filename,
+        "total_chunks": request.total_chunks,
+        "expected_size_bytes": request.expected_size_bytes,
+        "expected_sha256": request.expected_sha256,
+        "received_chunks": {},
+        "status": "uploading",
+        "chunk_dir": chunk_dir,
+    }
+    upload_sessions[session_id] = session
+    upload_session_locks[session_id] = asyncio.Lock()
+
+    chunk_urls = [
+        f"/api/v1/code/upload/chunk/{session_id}/{i}"
+        for i in range(request.total_chunks)
+    ]
+
+    return UploadStartResponse(
+        session_id=session_id,
+        chunk_urls=chunk_urls,
+        expires_at=expires_at,
+    )
+
+
 def _save_c4_to_json(task_id: str, c4_architecture: dict) -> None:
     """Save C4 architecture to JSON file for easy debugging."""
     try:
