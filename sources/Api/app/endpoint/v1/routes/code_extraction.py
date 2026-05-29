@@ -1,5 +1,6 @@
 """Code extraction endpoints for repository scanning."""
 
+import hashlib
 import json
 import logging
 import os
@@ -186,6 +187,133 @@ async def upload_chunk(
             chunk_number=chunk_number,
             received_size_bytes=chunk_size,
         )
+
+
+@router.post(
+    "/upload/complete/{session_id}",
+    response_model=UploadCompleteResponse,
+    status_code=202,
+    summary="Finalize chunked upload and start extraction",
+    responses={
+        202: {"description": "Upload complete, extraction started"},
+        400: {"description": "Missing chunks, size mismatch, or SHA256 mismatch"},
+        404: {"description": "Session not found"},
+        410: {"description": "Session expired"},
+    },
+)
+async def upload_complete(
+    session_id: str,
+    background_tasks: BackgroundTasks,
+):
+    session = upload_sessions.get(session_id)
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if datetime.now() > session["expires_at"]:
+        _cleanup_upload_session(session_id)
+        raise HTTPException(status_code=410, detail="Session expired")
+
+    received = set(session["received_chunks"].keys())
+    expected = set(range(session["total_chunks"]))
+    missing = expected - received
+
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "missing chunks",
+                "missing_chunks": sorted(missing),
+                "received_chunks": sorted(received),
+                "total_chunks": session["total_chunks"],
+            },
+        )
+
+    total_received = sum(session["received_chunks"].values())
+    if total_received != session["expected_size_bytes"]:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "size mismatch",
+                "expected_size_bytes": session["expected_size_bytes"],
+                "received_size_bytes": total_received,
+            },
+        )
+
+    reassembled_path = Path(tempfile.gettempdir()) / f"kf-reassembled_{session_id}.zip"
+    try:
+        with open(reassembled_path, "wb") as out_f:
+            for i in range(session["total_chunks"]):
+                chunk_path = session["chunk_dir"] / f"chunk_{i:06d}"
+                with open(chunk_path, "rb") as in_f:
+                    out_f.write(in_f.read())
+
+        sha256_hash = hashlib.sha256()
+        with open(reassembled_path, "rb") as f:
+            for chunk in iter(lambda: f.read(8192 * 1024), b""):
+                sha256_hash.update(chunk)
+        computed_hash = sha256_hash.hexdigest()
+
+        if computed_hash != session["expected_sha256"]:
+            os.remove(reassembled_path)
+            session["status"] = "failed"
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "sha256 mismatch",
+                    "expected": session["expected_sha256"],
+                    "computed": computed_hash,
+                },
+            )
+    finally:
+        _cleanup_upload_session(session_id)
+
+    task_id = str(uuid.uuid4())
+    temp_dir = Path(tempfile.mkdtemp(prefix=f"repo_{task_id}_"))
+    extract_dir = temp_dir / "extracted"
+    extract_dir.mkdir()
+
+    try:
+        safe_extract_zip(reassembled_path, extract_dir)
+    except ValueError as exc:
+        try:
+            os.remove(reassembled_path)
+        except OSError:
+            pass
+        raise HTTPException(status_code=400, detail=str(exc))
+    finally:
+        try:
+            os.remove(reassembled_path)
+        except OSError:
+            pass
+
+    subdirs = list(extract_dir.iterdir())
+    repo_path = extract_dir
+    if len(subdirs) == 1 and subdirs[0].is_dir():
+        repo_path = subdirs[0]
+
+    scan_tasks[task_id] = {
+        "task_id": task_id,
+        "status": "pending",
+        "progress": 0.0,
+        "message": "Chunked upload complete, scan queued",
+        "created_at": datetime.now(),
+        "repo_path": str(repo_path),
+        "temp_dir": str(temp_dir),
+        "errors": [],
+    }
+
+    background_tasks.add_task(
+        run_c4_extraction,
+        task_id,
+        repo_path,
+    )
+
+    return UploadCompleteResponse(
+        task_id=task_id,
+        status="pending",
+        message="ZIP reassembled and scan queued",
+    )
 
 
 def _save_c4_to_json(task_id: str, c4_architecture: dict) -> None:
