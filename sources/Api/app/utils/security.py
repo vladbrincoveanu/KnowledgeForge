@@ -14,8 +14,8 @@ from urllib.parse import urlparse
 _SAFE_GH_COMPONENT = re.compile(r'^[a-zA-Z0-9._-]{1,200}$')
 # Regex for safe branch/tag names (no spaces, no shell metacharacters)
 _SAFE_BRANCH = re.compile(r'^[a-zA-Z0-9._\-/]{1,200}$')
-# Maximum allowed uncompressed ZIP size (500 MB)
-MAX_ZIP_UNCOMPRESSED_BYTES = 500 * 1024 * 1024
+# Maximum allowed uncompressed ZIP size (6 GB)
+MAX_ZIP_UNCOMPRESSED_BYTES = 6 * 1024 * 1024 * 1024
 
 
 def validate_github_url(url: str) -> tuple[str, str, Optional[str]]:
