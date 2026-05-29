@@ -71,6 +71,8 @@ Env var fallback order: explicit token → GITHUB_TOKEN / GITLAB_TOKEN / BITBUCK
 }
 ```
 
+All fields required except `expected_sha256`. If omitted, SHA256 validation is skipped (trust mode for internal/trusted networks).
+
 **Response:**
 ```json
 {
@@ -92,8 +94,11 @@ Env var fallback order: explicit token → GITHUB_TOKEN / GITLAB_TOKEN / BITBUCK
 - Chunk numbers: `0` to `total_chunks - 1`
 - Server writes chunk to `/tmp/kf-chunks/{session_id}/chunk_{chunk_number:06d}` after full receipt
 - Server validates chunk size ≤ 200MB before writing
+- **Out-of-order chunks allowed** — server tracks received chunks as an unordered set; order does not matter
+- **Duplicate chunk upload rejected** — if chunk already received, returns `409 Conflict` (client should not retry the same chunk; only retry missing ones)
+- **Expiry refreshed** — each successful chunk upload resets the session TTL to 1hr from now (prevents race condition where upload finishes just as session expires)
 
-**Response:**
+**Response (success):**
 ```json
 {
   "received": true,
@@ -102,18 +107,30 @@ Env var fallback order: explicit token → GITHUB_TOKEN / GITLAB_TOKEN / BITBUCK
 }
 ```
 
+**Response (duplicate chunk):**
+```json
+{
+  "error": "chunk already received",
+  "chunk_number": 5,
+  "status": 409
+}
+```
+
 ### 3.4 Complete Session (POST)
 
 **Request:** `POST /api/v1/code/upload/complete/{session_id}`
 
 Server:
-1. Verify all chunks received (compare `received_chunks` list vs expected `total_chunks`)
-2. Reassemble chunks into `/tmp/kf-reassembled/{session_id}.zip`
-3. Compute SHA256 of reassembled file
-4. Compare against `expected_sha256` from start
-5. If mismatch → delete reassembled file, mark session failed, return 400
-6. If valid → run `safe_extract_zip()` → `run_c4_extraction()` (same as direct upload)
-7. Delete chunks directory immediately after successful reassembly
+1. Verify all chunks received (compare received set size vs expected `total_chunks`)
+2. Verify session not expired (if expired → 410 Gone, client must restart)
+3. Reassemble chunks into `/tmp/kf-reassembled/{session_id}.zip` (requires up to 6GB free disk)
+4. Compute SHA256 of reassembled file
+5. Compare against `expected_sha256` from start
+6. If mismatch → delete reassembled file, mark session failed, return 400
+7. If valid → mark session `completed`, run `safe_extract_zip()` → `run_c4_extraction()` (same as direct upload)
+8. Delete chunks directory immediately after successful reassembly
+
+**Note on SHA256 pre-computation:** The client must compute the SHA256 hash of the complete ZIP before uploading chunks. For large files this takes measurable time (minutes on slow disks). The client should compute and send the hash in `/upload/start` to avoid wasting upload bandwidth on a corrupt file. If SHA256 is omitted in the start request, it defaults to `"unknown"` and validation is skipped (server trusts the client; suitable for trusted internal networks).
 
 **Response:**
 ```json
@@ -152,19 +169,24 @@ Server: delete chunks directory, mark session expired.
 }
 ```
 
+Note: `received_chunks` is a set representation (order is irrelevant, not a list).
+
 Status values: `uploading`, `completed`, `failed`, `expired`
 
 ---
 
 ## 4. Limits
 
-| Limit | Value |
-|-------|-------|
-| Max chunk size (compressed) | 200 MB |
-| Max total chunks per session | 30 |
-| Max total uncompressed size | 6 GB |
-| Session TTL | 1 hour from start |
-| Session storage | `/tmp/kf-chunks/{session_id}/` |
+| Limit | Value | Notes |
+|-------|-------|-------|
+| Max chunk size (compressed) | 200 MB | Per individual chunk |
+| Max total compressed bytes | 6 GB | Sum of all chunk sizes; enforced at `/complete` |
+| Max total uncompressed size | 6 GB | Enforced by `safe_extract_zip()` per-member and total |
+| Max total chunks per session | 30 | 30 × 200MB = 6GB max compressed |
+| Session TTL | 1 hour from last chunk | Reset on each chunk upload; does not apply once session is `completed` |
+| Session storage | `/tmp/kf-chunks/{session_id}/` | |
+
+**Disk space note:** Reassembly requires free disk space equal to the total compressed size (up to 6GB). Ensure the `/tmp` partition has sufficient capacity.
 
 ---
 
@@ -173,9 +195,12 @@ Status values: `uploading`, `completed`, `failed`, `expired`
 | Error | HTTP | Action |
 |-------|------|--------|
 | Chunk > 200MB | 413 | Reject chunk, client retries |
-| Missing chunks on complete | 400 | Return `missing_chunks` list, client retries those |
+| Duplicate chunk uploaded | 409 | Reject (chunk already received), client should only retry missing chunks |
+| Out-of-order chunk | 200 | Accepted (server tracks set, order irrelevant) |
+| Missing chunks on complete | 400 | Return `missing_chunks` list, client retries those specific chunks |
 | SHA256 mismatch | 400 | Delete reassembled file, client must restart upload |
-| Session expired | 410 | Client must restart upload |
+| Session expired (upload phase) | 410 | Client must restart upload |
+| Session expired (during extraction) | N/A | Extraction continues regardless — expiry only blocks new chunk uploads, not in-progress work |
 | Session not found | 404 | Client must restart upload |
 | Server restart | N/A | Sessions lost, client retries from chunk 0 |
 
@@ -183,10 +208,10 @@ Status values: `uploading`, `completed`, `failed`, `expired`
 
 ## 6. Cleanup
 
-- **On complete**: chunks deleted, reassembled ZIP kept until extraction starts, then deleted
+- **On complete**: chunks deleted, reassembled ZIP kept for duration of `safe_extract_zip()` validation only, then deleted. The extraction pipeline reads from the extracted directory (not the ZIP), so ZIP deletion does not affect extraction.
 - **On cancel**: chunks deleted, session marked expired
-- **On expire** (1hr TTL): background job deletes chunk directories + marks sessions expired
-- **Temp directories**: reuse existing `safe_extract_zip()` cleanup (extract dir deleted after extraction)
+- **On expire** (1hr TTL, "uploading" state only): background job deletes chunk directories + marks sessions expired. Sessions in `completed`, `failed` states are not affected.
+- **Temp directories**: reuse existing `safe_extract_zip()` cleanup (extract dir deleted after extraction completes)
 
 ---
 
