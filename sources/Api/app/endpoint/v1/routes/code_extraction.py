@@ -969,6 +969,12 @@ async def run_c4_extraction(
             task['message'] = f'Extraction failed: {str(e)}'
             task.setdefault('errors', []).append(str(e))
             logger.error(f"Task {task_id} failed: {task['message']}")
+            # Cleanup temp directory on failure
+            if 'temp_dir' in task:
+                try:
+                    shutil.rmtree(task['temp_dir'])
+                except (ConnectionError, RuntimeError) as cleanup_err:
+                    logger.warning(f"Failed to cleanup temp directory on failure: {cleanup_err}")
         else:
             logger.error(f"Task {task_id} disappeared during error handling")
 
