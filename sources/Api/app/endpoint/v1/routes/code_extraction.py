@@ -168,6 +168,13 @@ class GitHubScanRequest(BaseModel):
             "Falls back to GITHUB_TOKEN / GITLAB_TOKEN / BITBUCKET_TOKEN / GIT_TOKEN env vars."
         ),
     )
+    full_history: bool = Field(
+        default=False,
+        description=(
+            "Clone with full Git history. Set True for repos > 6GB or when historical "
+            "analysis is needed. When False (default), uses --depth 1 for speed."
+        ),
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -176,6 +183,7 @@ class GitHubScanRequest(BaseModel):
                     "github_url": "https://github.com/microservices-demo/microservices-demo",
                     "use_git": True,
                     "append_mode": False,
+                    "full_history": False,
                 }
             ]
         }
@@ -612,6 +620,7 @@ async def extract_from_github(
             request.github_url,
             output_dir=temp_dir,
             use_git=request.use_git,
+            full_history=request.full_history,
             token=request.token or None,
         )
 
