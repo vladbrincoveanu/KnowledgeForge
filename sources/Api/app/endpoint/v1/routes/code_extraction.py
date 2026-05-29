@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterator, Optional
 
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -66,6 +66,11 @@ def _cleanup_upload_session(session_id: str) -> None:
 MAX_CHUNK_BYTES = 200 * 1024 * 1024  # 200 MB
 
 
+async def _read_chunk_body(request: Request) -> bytes:
+    """Read entire request body as bytes for chunk uploads."""
+    return await request.body()
+
+
 @router.post(
     "/upload/start",
     response_model=UploadStartResponse,
@@ -108,6 +113,79 @@ async def upload_start(request: UploadStartRequest):
         chunk_urls=chunk_urls,
         expires_at=expires_at,
     )
+
+
+@router.put(
+    "/upload/chunk/{session_id}/{chunk_number}",
+    response_model=ChunkUploadResponse,
+    summary="Upload a single chunk",
+    responses={
+        200: {"description": "Chunk received"},
+        404: {"description": "Session not found"},
+        409: {"description": "Chunk already received or concurrent upload"},
+        410: {"description": "Session expired"},
+        413: {"description": "Chunk too large"},
+    },
+)
+async def upload_chunk(
+    session_id: str,
+    chunk_number: int,
+    request: Request,
+    background_tasks: BackgroundTasks,
+):
+    session = upload_sessions.get(session_id)
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if datetime.now() > session["expires_at"]:
+        _cleanup_upload_session(session_id)
+        raise HTTPException(status_code=410, detail="Session expired")
+
+    lock = upload_session_locks.get(session_id)
+    if lock is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    async with lock:
+        if datetime.now() > session["expires_at"]:
+            _cleanup_upload_session(session_id)
+            raise HTTPException(status_code=410, detail="Session expired")
+
+        if chunk_number in session["received_chunks"]:
+            return ChunkUploadResponse(
+                received=False,
+                chunk_number=chunk_number,
+                received_size_bytes=session["received_chunks"][chunk_number],
+            )
+
+        if chunk_number < 0 or chunk_number >= session["total_chunks"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid chunk number {chunk_number}; expected 0 to {session['total_chunks'] - 1}",
+            )
+
+        chunk_bytes = await _read_chunk_body(request)
+        chunk_size = len(chunk_bytes)
+
+        if chunk_size > MAX_CHUNK_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Chunk size {chunk_size} exceeds limit {MAX_CHUNK_BYTES}",
+            )
+
+        chunk_path = session["chunk_dir"] / f"chunk_{chunk_number:06d}"
+        with open(chunk_path, "wb") as f:
+            f.write(chunk_bytes)
+        os.chmod(chunk_path, 0o600)
+
+        session["received_chunks"][chunk_number] = chunk_size
+        session["expires_at"] = datetime.now() + timedelta(hours=1)
+
+        return ChunkUploadResponse(
+            received=True,
+            chunk_number=chunk_number,
+            received_size_bytes=chunk_size,
+        )
 
 
 def _save_c4_to_json(task_id: str, c4_architecture: dict) -> None:
