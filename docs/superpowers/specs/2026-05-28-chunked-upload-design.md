@@ -67,11 +67,11 @@ Env var fallback order: explicit token → GITHUB_TOKEN / GITLAB_TOKEN / BITBUCK
   "filename": "repo.zip",
   "total_chunks": 25,
   "expected_size_bytes": 5368709120,
-  "expected_sha256": "abc123..."
+  "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 }
 ```
 
-All fields required except `expected_sha256`. If omitted, SHA256 validation is skipped (trust mode for internal/trusted networks).
+All fields required. `expected_sha256` must be a lowercase hex string, exactly 64 characters (SHA-256). If the client cannot compute SHA-256, use the Git URL path instead.
 
 **Response:**
 ```json
@@ -94,8 +94,10 @@ All fields required except `expected_sha256`. If omitted, SHA256 validation is s
 - Chunk numbers: `0` to `total_chunks - 1`
 - Server writes chunk to `/tmp/kf-chunks/{session_id}/chunk_{chunk_number:06d}` after full receipt
 - Server validates chunk size ≤ 200MB before writing
+- **Per-session locking** — concurrent uploads to the same `session_id` are rejected with 409; only one chunk upload at a time per session
 - **Out-of-order chunks allowed** — server tracks received chunks as an unordered set; order does not matter
 - **Duplicate chunk upload rejected** — if chunk already received, returns `409 Conflict` (client should not retry the same chunk; only retry missing ones)
+- **Lazy expiry check** — if `datetime.now() > session['expires_at']` on arrival, delete chunk directory, mark `expired`, return 410 Gone
 - **Expiry refreshed** — each successful chunk upload resets the session TTL to 1hr from now (prevents race condition where upload finishes just as session expires)
 
 **Response (success):**
@@ -121,16 +123,16 @@ All fields required except `expected_sha256`. If omitted, SHA256 validation is s
 **Request:** `POST /api/v1/code/upload/complete/{session_id}`
 
 Server:
-1. Verify all chunks received (compare received set size vs expected `total_chunks`)
-2. Verify session not expired (if expired → 410 Gone, client must restart)
-3. Reassemble chunks into `/tmp/kf-reassembled/{session_id}.zip` (requires up to 6GB free disk)
-4. Compute SHA256 of reassembled file
-5. Compare against `expected_sha256` from start
-6. If mismatch → delete reassembled file, mark session failed, return 400
+1. Lazy expiry check: if `datetime.now() > session['expires_at']` → delete chunk directory, mark `expired`, return 410 Gone
+2. Verify all chunks received (compare received set size vs expected `total_chunks`)
+3. Verify `sum(received_chunk_sizes) == expected_size_bytes` (from start request); if mismatch → 400 with detail
+4. Reassemble chunks into `/tmp/kf-reassembled/{session_id}.zip` (requires up to 6GB free disk)
+5. Compute SHA256 of reassembled file (lowercase hex, 64 chars)
+6. Compare against `expected_sha256` from start; if mismatch → delete reassembled file, mark `failed`, return 400
 7. If valid → mark session `completed`, run `safe_extract_zip()` → `run_c4_extraction()` (same as direct upload)
 8. Delete chunks directory immediately after successful reassembly
 
-**Note on SHA256 pre-computation:** The client must compute the SHA256 hash of the complete ZIP before uploading chunks. For large files this takes measurable time (minutes on slow disks). The client should compute and send the hash in `/upload/start` to avoid wasting upload bandwidth on a corrupt file. If SHA256 is omitted in the start request, it defaults to `"unknown"` and validation is skipped (server trusts the client; suitable for trusted internal networks).
+**Note on SHA256 pre-computation:** The client must compute the SHA-256 hash of the complete ZIP before uploading chunks. For large files this takes time on slow disks — do this before starting the upload to avoid wasting bandwidth on a file that will fail validation.
 
 **Response:**
 ```json
@@ -145,7 +147,7 @@ Server:
 
 **Request:** `DELETE /api/v1/code/upload/session/{session_id}`
 
-Server: delete chunks directory, mark session expired.
+Server: delete chunks directory, mark session `expired`. Returns 404 if session already gone.
 
 **Response:**
 ```json
@@ -171,6 +173,8 @@ Server: delete chunks directory, mark session expired.
 
 Note: `received_chunks` is a set representation (order is irrelevant, not a list).
 
+If session has expired, returns 410 Gone with `{"error": "session expired", "session_id": "uuid"}`.
+
 Status values: `uploading`, `completed`, `failed`, `expired`
 
 ---
@@ -188,6 +192,8 @@ Status values: `uploading`, `completed`, `failed`, `expired`
 
 **Disk space note:** Reassembly requires free disk space equal to the total compressed size (up to 6GB). Ensure the `/tmp` partition has sufficient capacity.
 
+**Code change required:** `MAX_ZIP_UNCOMPRESSED_BYTES` in `app/utils/security.py` must be updated from `500 * 1024 * 1024` (500 MB) to `6 * 1024 * 1024 * 1024` (6 GB) before this feature ships.
+
 ---
 
 ## 5. Error Handling
@@ -195,22 +201,24 @@ Status values: `uploading`, `completed`, `failed`, `expired`
 | Error | HTTP | Action |
 |-------|------|--------|
 | Chunk > 200MB | 413 | Reject chunk, client retries |
+| Concurrent chunk upload to same session | 409 | Reject; only one upload at a time per session |
 | Duplicate chunk uploaded | 409 | Reject (chunk already received), client should only retry missing chunks |
 | Out-of-order chunk | 200 | Accepted (server tracks set, order irrelevant) |
+| Lazy expiry detected (any request) | 410 | Delete chunk directory, mark expired, client must restart upload |
 | Missing chunks on complete | 400 | Return `missing_chunks` list, client retries those specific chunks |
-| SHA256 mismatch | 400 | Delete reassembled file, client must restart upload |
-| Session expired (upload phase) | 410 | Client must restart upload |
-| Session expired (during extraction) | N/A | Extraction continues regardless — expiry only blocks new chunk uploads, not in-progress work |
+| Total bytes mismatch on complete | 400 | Return expected vs received; client must restart upload |
+| SHA256 mismatch | 400 | Delete reassembled file, mark `failed`, client must restart upload |
 | Session not found | 404 | Client must restart upload |
-| Server restart | N/A | Sessions lost, client retries from chunk 0 |
+| Server restart | N/A | Sessions lost; client retries from chunk 0 (chunks on disk survive, session metadata lost) |
 
 ---
 
 ## 6. Cleanup
 
 - **On complete**: chunks deleted, reassembled ZIP kept for duration of `safe_extract_zip()` validation only, then deleted. The extraction pipeline reads from the extracted directory (not the ZIP), so ZIP deletion does not affect extraction.
-- **On cancel**: chunks deleted, session marked expired
-- **On expire** (1hr TTL, "uploading" state only): background job deletes chunk directories + marks sessions expired. Sessions in `completed`, `failed` states are not affected.
+- **On cancel**: chunks deleted, session marked `expired`
+- **On lazy expiry detection** (any request where `datetime.now() > expires_at`): chunk directory deleted, session marked `expired`, return 410 Gone. No background job required.
+- **On extraction failure** (`run_c4_extraction` exception): `temp_dir` deleted in the `except` block (existing direct upload has this bug — must fix). For chunked uploads, the reassembled ZIP is also deleted.
 - **Temp directories**: reuse existing `safe_extract_zip()` cleanup (extract dir deleted after extraction completes)
 
 ---
@@ -227,15 +235,19 @@ Status values: `uploading`, `completed`, `failed`, `expired`
 ## 8. Security
 
 - Session IDs are UUID v4 (unguessable)
+- Per-session `asyncio.Lock()` prevents concurrent chunk uploads to the same session
 - Chunks written to disk with permissions 0o600 (owner only)
-- `safe_extract_zip()` enforces: path traversal prevention, symlink rejection, uncompressed size limit (6GB)
-- SHA256 verification prevents corrupted/malicious uploads from consuming extraction resources
+- `safe_extract_zip()` enforces: path traversal prevention, symlink rejection, uncompressed size limit (6GB — `MAX_ZIP_UNCOMPRESSED_BYTES` constant updated from 500MB)
+- SHA256 verification (required) prevents corrupted/malicious uploads from consuming extraction resources
+- Lazy expiry: expired sessions are rejected immediately and chunk directories are deleted synchronously (no background job needed)
+- Failed extraction cleans up temp directories in `except` block (bug fix required for existing direct upload path)
 
 ---
 
 ## 9. Out of Scope
 
-- Resumable uploads across server restarts (sessions are in-memory)
+- Resumable uploads across server restarts (sessions are in-memory; chunk files survive on disk but session metadata is lost — client retries from first missing chunk)
 - Browser-based chunking UI (client responsibility)
 - Direct streaming upload (multipart/x-mixed-replace)
 - Repos > 6GB uncompressed (must use Git URL path)
+- Persistent session storage (Redis, DB) for cross-restart session recovery
