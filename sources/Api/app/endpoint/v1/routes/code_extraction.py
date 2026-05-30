@@ -52,6 +52,54 @@ upload_sessions: dict[str, dict] = {}
 upload_session_locks: dict[str, asyncio.Lock] = {}
 
 
+class UploadStartRequest(BaseModel):
+    filename: str = Field(..., min_length=1, max_length=255)
+    total_chunks: int = Field(..., ge=1, le=30)
+    expected_size_bytes: int = Field(..., ge=1, le=6 * 1024 * 1024 * 1024)
+    expected_sha256: str = Field(
+        ...,
+        pattern=r"^[a-f0-9]{64}$",
+        description="Lowercase hex SHA-256 of the complete ZIP file (64 characters)",
+    )
+
+
+class UploadStartResponse(BaseModel):
+    session_id: str
+    chunk_urls: list[str]
+    expires_at: datetime
+
+
+class ChunkUploadResponse(BaseModel):
+    received: bool
+    chunk_number: int
+    received_size_bytes: int
+
+
+class UploadCompleteResponse(BaseModel):
+    task_id: str
+    status: str
+    message: str
+
+
+class UploadCancelResponse(BaseModel):
+    cancelled: bool
+    session_id: str
+
+
+class UploadStatusResponse(BaseModel):
+    session_id: str
+    status: str
+    received_chunks: list[int]
+    missing_chunks: list[int]
+    total_chunks: int
+    expires_at: datetime
+
+
+class UploadErrorResponse(BaseModel):
+    error: str
+    session_id: str
+
+
 def _cleanup_upload_session(session_id: str) -> None:
     """Delete chunk directory and remove session from upload_sessions."""
     session = upload_sessions.get(session_id)
@@ -309,7 +357,11 @@ async def upload_complete(
         repo_path,
     )
 
-    return UploadCancelResponse(cancelled=True, session_id=session_id)
+    return UploadCompleteResponse(
+        task_id=task_id,
+        status="pending",
+        message="Chunked upload complete, scan queued",
+    )
 
 
 @router.get(
@@ -532,54 +584,6 @@ class ScanStatusResponse(BaseModel):
     external_deps_count: int = Field(0, description="Number of external dependencies detected.")
     errors: list[str] = Field(default_factory=list, description="Non-fatal errors encountered.")
     extraction_mode: str = Field("c4_model", description="Extraction mode used (c4_model or legacy).")
-
-
-class UploadStartRequest(BaseModel):
-    filename: str = Field(..., min_length=1, max_length=255)
-    total_chunks: int = Field(..., ge=1, le=30)
-    expected_size_bytes: int = Field(..., ge=1, le=6 * 1024 * 1024 * 1024)
-    expected_sha256: str = Field(
-        ...,
-        pattern=r"^[a-f0-9]{64}$",
-        description="Lowercase hex SHA-256 of the complete ZIP file (64 characters)",
-    )
-
-
-class UploadStartResponse(BaseModel):
-    session_id: str
-    chunk_urls: list[str]
-    expires_at: datetime
-
-
-class ChunkUploadResponse(BaseModel):
-    received: bool
-    chunk_number: int
-    received_size_bytes: int
-
-
-class UploadCompleteResponse(BaseModel):
-    task_id: str
-    status: str
-    message: str
-
-
-class UploadCancelResponse(BaseModel):
-    cancelled: bool
-    session_id: str
-
-
-class UploadStatusResponse(BaseModel):
-    session_id: str
-    status: str
-    received_chunks: list[int]
-    missing_chunks: list[int]
-    total_chunks: int
-    expires_at: datetime
-
-
-class UploadErrorResponse(BaseModel):
-    error: str
-    session_id: str
 
 
 class NodeDescribeRequest(BaseModel):
