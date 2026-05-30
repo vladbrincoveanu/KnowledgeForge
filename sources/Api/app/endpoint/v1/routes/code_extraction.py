@@ -1319,31 +1319,24 @@ async def run_c4_extraction(
         task['completed_at'] = datetime.now()
         
         logger.info(f"C4 extraction completed for task {task_id}")
-        
-        # Cleanup temp directory if exists
-        if 'temp_dir' in task:
-            try:
-                shutil.rmtree(task['temp_dir'])
-            except (ConnectionError, RuntimeError) as e:
-                logger.warning(f"Failed to cleanup temp directory: {e}")
-    
-    except (ConnectionError, RuntimeError) as e:
+
+    except Exception as e:
         logger.error(f"C4 extraction failed for task {task_id}: {e}", exc_info=True)
-        
         task = scan_tasks.get(task_id)
         if task:
             task['status'] = 'failed'
             task['message'] = f'Extraction failed: {str(e)}'
             task.setdefault('errors', []).append(str(e))
             logger.error(f"Task {task_id} failed: {task['message']}")
-            # Cleanup temp directory on failure
-            if 'temp_dir' in task:
-                try:
-                    shutil.rmtree(task['temp_dir'])
-                except (ConnectionError, RuntimeError) as cleanup_err:
-                    logger.warning(f"Failed to cleanup temp directory on failure: {cleanup_err}")
         else:
             logger.error(f"Task {task_id} disappeared during error handling")
+
+    finally:
+        if 'temp_dir' in task:
+            try:
+                shutil.rmtree(task['temp_dir'])
+            except (ConnectionError, RuntimeError, OSError) as cleanup_err:
+                logger.warning(f"Failed to cleanup temp directory: {cleanup_err}")
 
 
 @router.get(
