@@ -394,3 +394,167 @@ class TestArchitectureChat:
         ]
         assert lines[-1] == {"type": "done", "source": "llm"}
         assert mock_llm.stream_text.call_args.kwargs["max_tokens"] == 1024
+
+
+class TestGitHubScanRequestFullHistory:
+    """Tests for the full_history field added to GitHubScanRequest."""
+
+    def test_full_history_default_false(self):
+        from app.endpoint.v1.routes.code_extraction import GitHubScanRequest
+        request = GitHubScanRequest(github_url="https://github.com/owner/repo")
+        assert request.full_history is False
+
+    def test_full_history_explicit_true(self):
+        from app.endpoint.v1.routes.code_extraction import GitHubScanRequest
+        request = GitHubScanRequest(github_url="https://github.com/owner/repo", full_history=True)
+        assert request.full_history is True
+
+
+class TestUploadStart:
+    """Tests for POST /api/v1/code/upload/start."""
+
+    def test_upload_start_valid_request(self, client):
+        response = client.post(
+            "/api/v1/code/upload/start",
+            json={
+                "filename": "repo.zip",
+                "total_chunks": 3,
+                "expected_size_bytes": 629145600,
+                "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            },
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert "session_id" in data
+        assert len(data["chunk_urls"]) == 3
+
+    def test_upload_start_invalid_sha256_format(self, client):
+        response = client.post(
+            "/api/v1/code/upload/start",
+            json={
+                "filename": "repo.zip",
+                "total_chunks": 1,
+                "expected_size_bytes": 1024,
+                "expected_sha256": "not-a-valid-sha256",
+            },
+        )
+        assert response.status_code == 422
+
+    def test_upload_start_total_chunks_exceeds_limit(self, client):
+        response = client.post(
+            "/api/v1/code/upload/start",
+            json={
+                "filename": "repo.zip",
+                "total_chunks": 31,
+                "expected_size_bytes": 1024,
+                "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            },
+        )
+        assert response.status_code == 422
+
+
+class TestUploadChunk:
+    """Tests for PUT /api/v1/code/upload/chunk/{session_id}/{chunk_number}."""
+
+    def test_upload_chunk_session_not_found(self, client):
+        response = client.put(
+            "/api/v1/code/upload/chunk/invalid-session/0",
+            content=b"test chunk data",
+        )
+        assert response.status_code == 404
+
+    def test_upload_chunk_duplicate(self, client):
+        start_resp = client.post(
+            "/api/v1/code/upload/start",
+            json={
+                "filename": "repo.zip",
+                "total_chunks": 1,
+                "expected_size_bytes": 5,
+                "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            },
+        )
+        session_id = start_resp.json()["session_id"]
+
+        response1 = client.put(
+            f"/api/v1/code/upload/chunk/{session_id}/0",
+            content=b"hello",
+        )
+        assert response1.status_code == 200
+        assert response1.json()["received"] is True
+
+        response2 = client.put(
+            f"/api/v1/code/upload/chunk/{session_id}/0",
+            content=b"hello",
+        )
+        assert response2.status_code == 200
+        assert response2.json()["received"] is False
+
+
+class TestUploadComplete:
+    """Tests for POST /api/v1/code/upload/complete/{session_id}."""
+
+    def test_upload_complete_missing_chunks(self, client):
+        start_resp = client.post(
+            "/api/v1/code/upload/start",
+            json={
+                "filename": "repo.zip",
+                "total_chunks": 3,
+                "expected_size_bytes": 15,
+                "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            },
+        )
+        session_id = start_resp.json()["session_id"]
+
+        client.put(f"/api/v1/code/upload/chunk/{session_id}/0", content=b"01234")
+
+        response = client.post(f"/api/v1/code/upload/complete/{session_id}")
+        assert response.status_code == 400
+        assert "missing chunks" in str(response.json())
+
+
+class TestUploadCancel:
+    """Tests for DELETE /api/v1/code/upload/session/{session_id}."""
+
+    def test_upload_cancel_success(self, client):
+        start_resp = client.post(
+            "/api/v1/code/upload/start",
+            json={
+                "filename": "repo.zip",
+                "total_chunks": 1,
+                "expected_size_bytes": 5,
+                "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            },
+        )
+        session_id = start_resp.json()["session_id"]
+
+        response = client.delete(f"/api/v1/code/upload/session/{session_id}")
+        assert response.status_code == 200
+        assert response.json()["cancelled"] is True
+
+        status_resp = client.get(f"/api/v1/code/upload/session/{session_id}/status")
+        assert status_resp.status_code == 404
+
+
+class TestUploadStatus:
+    """Tests for GET /api/v1/code/upload/session/{session_id}/status."""
+
+    def test_upload_status_shows_missing_chunks(self, client):
+        start_resp = client.post(
+            "/api/v1/code/upload/start",
+            json={
+                "filename": "repo.zip",
+                "total_chunks": 3,
+                "expected_size_bytes": 15,
+                "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            },
+        )
+        session_id = start_resp.json()["session_id"]
+
+        client.put(f"/api/v1/code/upload/chunk/{session_id}/0", content=b"01234")
+        client.put(f"/api/v1/code/upload/chunk/{session_id}/2", content=b"90123")
+
+        status = client.get(f"/api/v1/code/upload/session/{session_id}/status")
+        assert status.status_code == 200
+        data = status.json()
+        assert set(data["received_chunks"]) == {0, 2}
+        assert data["missing_chunks"] == [1]
