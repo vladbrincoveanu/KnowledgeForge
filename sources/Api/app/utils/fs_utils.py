@@ -9,7 +9,7 @@ from typing import Iterator
 logger = logging.getLogger(__name__)
 
 # Config via environment variables (keeps dependency small)
-MAX_FILES_PER_GLOB = int(os.getenv("KF_MAX_FILES_PER_GLOB", os.getenv("MAX_FILES_PER_GLOB", "5000")))
+MAX_FILES_PER_GLOB = int(os.getenv("KF_MAX_FILES_PER_GLOB", os.getenv("MAX_FILES_PER_GLOB", "50000")))
 MAX_TRAVERSAL_DEPTH = int(os.getenv("KF_MAX_TRAVERSAL_DEPTH", os.getenv("MAX_TRAVERSAL_DEPTH", "10")))
 
 
