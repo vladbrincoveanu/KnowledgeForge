@@ -54,6 +54,7 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_API_KEY': JSON.stringify('test-api-key-12345'),
     },
     test: {
+      globals: true,
       include: ['src/**/*.{test,spec}.{ts,tsx}'],
       exclude: ['e2e/**', 'node_modules/**'],
     },
