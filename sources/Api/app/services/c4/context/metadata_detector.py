@@ -634,7 +634,7 @@ Team name:"""
                 _scan_file(cfg_path, max_bytes=20000)
 
         # Scan *.json config files one level deep (appsettings.*.json pattern)
-        for json_file in self.repo_path.glob('**/*.json'):
+        for json_file in limited_rglob(self.repo_path, '*.json', max_files=1000):
             if _should_skip(json_file) or json_file.stat().st_size > 50_000:
                 continue
             if any(k in json_file.name.lower() for k in ('appsettings', 'config', 'settings')):
