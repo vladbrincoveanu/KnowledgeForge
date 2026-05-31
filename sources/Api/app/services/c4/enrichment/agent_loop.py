@@ -23,8 +23,13 @@ class Budget:
 class LoopResult:
     stop_reason: StopReason
     tool_calls_used: int
-    tokens_used: int
+    tokens_in: int
+    tokens_out: int
     last_response: Any = None
+
+    @property
+    def tokens_used(self) -> int:
+        return self.tokens_in + self.tokens_out
 
 
 class RateLimitMidrunError(Exception):
@@ -44,7 +49,8 @@ class LLMAgentLoop:
             {"role": "user", "content": warm_payload}
         ]
         tool_calls_used = 0
-        tokens_used = 0
+        tokens_in = 0
+        tokens_out = 0
         turn = 0
 
         while True:
@@ -59,10 +65,11 @@ class LLMAgentLoop:
             except RateLimitMidrunError:
                 return LoopResult(stop_reason=StopReason.rate_limit_midrun,
                                   tool_calls_used=tool_calls_used,
-                                  tokens_used=tokens_used)
+                                  tokens_in=tokens_in,
+                                  tokens_out=tokens_out)
 
-            tokens_used += getattr(resp.usage, "input_tokens", 0) \
-                         + getattr(resp.usage, "output_tokens", 0)
+            tokens_in += getattr(resp.usage, "input_tokens", 0)
+            tokens_out += getattr(resp.usage, "output_tokens", 0)
 
             tool_uses = [b for b in (resp.content or [])
                          if getattr(b, "type", None) == "tool_use"]
@@ -74,7 +81,8 @@ class LLMAgentLoop:
             if resp.stop_reason != "tool_use" or not tool_uses:
                 return LoopResult(stop_reason=StopReason.natural_stop,
                                   tool_calls_used=tool_calls_used,
-                                  tokens_used=tokens_used,
+                                  tokens_in=tokens_in,
+                                  tokens_out=tokens_out,
                                   last_response=resp)
 
             tool_results = []
@@ -89,10 +97,11 @@ class LLMAgentLoop:
             messages.append({"role": "user", "content": tool_results})
 
             if (tool_calls_used >= budget.max_tool_calls
-                    or tokens_used >= budget.max_tokens):
+                    or (tokens_in + tokens_out) >= budget.max_tokens):
                 return LoopResult(stop_reason=StopReason.budget_exceeded,
                                   tool_calls_used=tool_calls_used,
-                                  tokens_used=tokens_used)
+                                  tokens_in=tokens_in,
+                                  tokens_out=tokens_out)
             turn += 1
 
     def _block_to_dict(self, b: Any) -> dict[str, Any]:

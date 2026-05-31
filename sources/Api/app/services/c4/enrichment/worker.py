@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 import uuid
 from pathlib import Path
 from typing import Any, Optional
@@ -134,6 +135,7 @@ class LLMEnrichmentWorker:
             timeout = config.ENRICHMENT_TIMEOUT_S()
             partial_reason: str | None = None
             partial = False
+            start = time.monotonic()
             async with _semaphore():
                 result: LoopResult = await asyncio.wait_for(
                     loop.run(warm_payload=self._render_warm(warm),
@@ -162,9 +164,16 @@ class LLMEnrichmentWorker:
         summary = {"partial": partial, "reason": partial_reason,
                    "nodes_added": nodes_added}
         merger.finalize(summary)
-        ws.emit("enrichment_complete",
-                {"partial": partial, "reason": partial_reason,
-                 "nodes_added": nodes_added})
+        ws.emit("enrichment_complete", {
+            "partial": partial,
+            "reason": partial_reason,
+            "nodes_added": nodes_added,
+            "tokens_in": result.tokens_in,
+            "tokens_out": result.tokens_out,
+            "tool_calls_used": result.tool_calls_used,
+            "model": client.model,
+            "duration_s": round(time.monotonic() - start, 2),
+        })
 
     def _render_warm(self, wc) -> str:
         lines = ["# File Tree", *wc.file_tree[:300],

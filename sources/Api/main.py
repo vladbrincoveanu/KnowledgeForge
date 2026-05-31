@@ -104,12 +104,14 @@ try:
         websocket,
         code_extraction,
         review,
+        llm_config,
     )
 
     app.include_router(health.router, prefix="/api/v1/health")
     app.include_router(code_extraction.router, prefix="/api/v1/code")
     app.include_router(review.router, prefix="/api/v1/review")
     app.include_router(websocket.router)  # WebSocket doesn't need prefix
+    app.include_router(llm_config.router, prefix="/api/v1/config/llm")
 
     logger.info("All route modules loaded successfully")
 

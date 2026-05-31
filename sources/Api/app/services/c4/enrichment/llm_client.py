@@ -35,21 +35,23 @@ def get_rate_counter() -> RateCounter:
 
 
 class EnrichmentLLMClient:
-    def __init__(self, client: Anthropic):
+    def __init__(self, client: Anthropic, model: str):
         self.client = client
+        self.model = model
 
     @classmethod
     def from_env(cls) -> Optional["EnrichmentLLMClient"]:
         api_key = os.getenv("MINIMAX_API_KEY")
         if not api_key:
             return None
-        return cls(Anthropic(base_url=MINIMAX_API_URL, api_key=api_key))
+        model = os.getenv("ENRICHMENT_MODEL", "anthropic/claude-sonnet-4-20250514")
+        return cls(Anthropic(base_url=MINIMAX_API_URL, api_key=api_key), model=model)
 
     async def messages_create(self, messages: list[dict], tools: list[dict],
                              system: str, **kwargs):
         return await asyncio.to_thread(
             self.client.messages.create,
-            model="anthropic/claude-sonnet-4-20250514",
+            model=self.model,
             messages=messages,
             tools=tools,
             system=system,
