@@ -152,3 +152,6 @@ sources/Api/sources/data/benchmarks/
 *.env
 !.env.example
 .vercel
+
+# Worktrees
+.worktrees/
