@@ -353,7 +353,7 @@ async def upload_complete(
     if len(subdirs) == 1 and subdirs[0].is_dir():
         repo_path = subdirs[0]
 
-    scan_tasks[task_id] = {
+scan_tasks[task_id] = {
         "task_id": task_id,
         "status": "pending",
         "progress": 0.0,
@@ -369,6 +369,9 @@ async def upload_complete(
         task_id,
         repo_path,
     )
+
+    # Session dir cleanup happens via run_c4_extraction's finally: block
+    # which deletes temp_dir (parent of session_dir). No additional cleanup needed.
 
     return UploadCompleteResponse(
         task_id=task_id,
@@ -1350,6 +1353,12 @@ async def run_c4_extraction(
                 shutil.rmtree(task['temp_dir'])
             except (ConnectionError, RuntimeError, OSError) as cleanup_err:
                 logger.warning(f"Failed to cleanup temp directory: {cleanup_err}")
+            # Also clean up the parent session_dir (chunks + archive.zip)
+            session_dir = Path(task['temp_dir']).parent
+            try:
+                shutil.rmtree(session_dir)
+            except (ConnectionError, RuntimeError, OSError):
+                pass
 
 
 @router.get(
