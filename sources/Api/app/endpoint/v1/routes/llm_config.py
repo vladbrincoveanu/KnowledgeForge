@@ -14,6 +14,7 @@ DEFAULT_MODEL = "anthropic/claude-sonnet-4-20250514"
 VALID_MODELS = {
     "anthropic/claude-sonnet-4-20250514",
     "anthropic/claude-haiku-4-5-20251001",
+    "MiniMax-M2.7",
 }
 
 
@@ -24,8 +25,8 @@ class LLMConfigPatch(BaseModel):
     @field_validator("model")
     @classmethod
     def model_format(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None and not v.startswith("anthropic/"):
-            raise ValueError("model must be 'anthropic/<version>'")
+        if v is not None and not v.startswith("anthropic/") and not v.startswith("MiniMax-"):
+            raise ValueError("model must be 'anthropic/<version>' or 'MiniMax-<version>'")
         return v
 
 

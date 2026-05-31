@@ -6,6 +6,7 @@ import "./SystemMetrics.scss";
 const VALID_MODELS = [
   "anthropic/claude-sonnet-4-20250514",
   "anthropic/claude-haiku-4-5-20251001",
+  "MiniMax-M2.7",
 ];
 
 function formatNum(n: number): string {
