@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
+import axios from "axios";
 import { llmConfigAPI, LLMConfigResponse } from "../../../services/api";
-import { useLLMStats, LLMRun } from "../../../hooks/useLLMStats";
+import { useLLMStats } from "../../../hooks/useLLMStats";
 import "./SystemMetrics.scss";
 
 const VALID_MODELS = [
@@ -26,6 +27,8 @@ const SystemMetrics: React.FC = () => {
   const [saveStatus, setSaveStatus] = useState<"idle" | "ok" | "err">("idle");
   const [errMsg, setErrMsg] = useState("");
   const [loading, setLoading] = useState(true);
+  const [testStatus, setTestStatus] = useState<"idle" | "testing" | "ok" | "err">("idle");
+  const [testMsg, setTestMsg] = useState("");
 
   useEffect(() => {
     llmConfigAPI.getConfig().then((c) => {
@@ -48,8 +51,27 @@ const SystemMetrics: React.FC = () => {
       setApiKeyInput("");
       setSaveStatus("ok");
     } catch (e: unknown) {
-      setErrMsg(e instanceof Error ? e.message : "Failed to save");
+      const msg = axios.isAxiosError(e)
+        ? (e.response?.data?.detail ?? e.message)
+        : (e instanceof Error ? e.message : "Failed to save");
+      setErrMsg(msg);
       setSaveStatus("err");
+    }
+  };
+
+  const handleTestConnection = async () => {
+    setTestStatus("testing");
+    setTestMsg("");
+    try {
+      const res = await llmConfigAPI.updateConfig({});
+      setTestStatus("ok");
+      setTestMsg(`Connected — model: ${res.model}, key: ${res.api_key_set ? "set" : "not set"}`);
+    } catch (e: unknown) {
+      const msg = axios.isAxiosError(e)
+        ? (e.response?.data?.detail ?? e.message)
+        : (e instanceof Error ? e.message : "Connection failed");
+      setTestStatus("err");
+      setTestMsg(msg);
     }
   };
 
@@ -107,8 +129,20 @@ const SystemMetrics: React.FC = () => {
           {saveStatus === "err" && <p className="sm-error">{errMsg}</p>}
           <div className="sm-actions">
             <button className="sm-btn-primary" onClick={handleSave}>Save</button>
+            <button
+              className="sm-btn-secondary"
+              onClick={handleTestConnection}
+              disabled={testStatus === "testing"}
+            >
+              {testStatus === "testing" ? "Testing..." : "Test Connection"}
+            </button>
             {saveStatus === "ok" && <span className="sm-toast">Saved</span>}
           </div>
+          {testMsg && (
+            <p className={`sm-test-msg sm-test-msg--${testStatus === "ok" ? "ok" : "err"}`}>
+              {testMsg}
+            </p>
+          )}
           {config && (
             <div className="sm-rate-chip">
               Rate limit: {config.rate_limit_used} / {config.rate_limit_max} req/hr
@@ -166,7 +200,7 @@ const SystemMetrics: React.FC = () => {
               {runs.map((r) => (
                 <tr key={`${r.task_id}-${r.timestamp}`}>
                   <td>{r.task_id.slice(0, 8)}</td>
-                  <td>{r.model.split("/")[1]}</td>
+                  <td>{r.model.includes("/") ? r.model.split("/")[1] : r.model}</td>
                   <td>{formatNum(r.tokens_in)}</td>
                   <td>{formatNum(r.tokens_out)}</td>
                   <td title="Total tokens ÷ run duration (includes tool execution time)">

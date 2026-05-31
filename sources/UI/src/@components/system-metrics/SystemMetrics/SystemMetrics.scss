@@ -115,6 +115,30 @@
   &:hover {
     background: #1648a8;
   }
+
+  &:disabled {
+    background: #a0a0a0;
+    cursor: not-allowed;
+  }
+}
+
+.sm-btn-secondary {
+  padding: 6px 16px;
+  background: #f0f0f0;
+  color: #333;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+
+  &:hover {
+    background: #e4e4e4;
+  }
+
+  &:disabled {
+    color: #a0a0a0;
+    cursor: not-allowed;
+  }
 }
 
 .sm-btn-ghost {
@@ -205,5 +229,24 @@
 
   tbody tr:hover td {
     background: #fafafa;
+  }
+}
+
+.sm-test-msg {
+  font-size: 0.82rem;
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 4px;
+
+  &--ok {
+    background: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #a5d6a7;
+  }
+
+  &--err {
+    background: #ffebee;
+    color: #c62828;
+    border: 1px solid #ef9a9a;
   }
 }
