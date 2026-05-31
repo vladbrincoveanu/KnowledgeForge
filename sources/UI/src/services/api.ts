@@ -412,4 +412,23 @@ export const codeArchitectureAPI = {
   },
 };
 
+export type LLMConfigResponse = {
+  model: string;
+  api_key_set: boolean;
+  api_key_source: string;
+  rate_limit_used: number;
+  rate_limit_max: number;
+};
+
+export const llmConfigAPI = {
+  getConfig: async (): Promise<LLMConfigResponse> => {
+    const response: AxiosResponse<LLMConfigResponse> = await api.get("/api/v1/config/llm/");
+    return response.data;
+  },
+  updateConfig: async (patch: Partial<{ api_key: string; model: string }>): Promise<LLMConfigResponse> => {
+    const response: AxiosResponse<LLMConfigResponse> = await api.put("/api/v1/config/llm/", patch);
+    return response.data;
+  },
+};
+
 export default api;

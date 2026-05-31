@@ -21,7 +21,16 @@ type EnrichmentEvent =
   | {
       event: "enrichment_complete";
       task_id: string;
-      data: { partial: boolean; reason?: string; nodes_added: number };
+      data: {
+        partial: boolean;
+        reason?: string;
+        nodes_added: number;
+        tokens_in: number;
+        tokens_out: number;
+        tool_calls_used: number;
+        model: string;
+        duration_s: number;
+      };
     }
   | { event: "enrichment_failed"; task_id: string; data: { reason: string } };
 
