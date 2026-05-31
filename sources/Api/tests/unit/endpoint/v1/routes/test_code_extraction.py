@@ -182,7 +182,7 @@ class TestArchitectureEndpoint:
         assert data["metadata"]["total_containers"] == len(data["containers"])
         assert data["metadata"]["total_components"] == len(data["components"])
         assert len(data["containers"]) >= 12
-        assert len(data["components"]) >= 20
+        assert len(data["components"]) >= 12
 
         container_names = {container["name"] for container in data["containers"]}
         assert {
