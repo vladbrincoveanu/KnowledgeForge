@@ -295,38 +295,28 @@ async def upload_complete(
         )
 
     reassembled_path = session["session_dir"] / "archive.zip"
-    try:
-        with open(reassembled_path, "wb") as out_f:
-            for i in range(session["total_chunks"]):
-                chunk_path = session["chunk_dir"] / f"chunk_{i:06d}"
-                with open(chunk_path, "rb") as in_f:
-                    out_f.write(in_f.read())
+    with open(reassembled_path, "wb") as out_f:
+        for i in range(session["total_chunks"]):
+            chunk_path = session["chunk_dir"] / f"chunk_{i:06d}"
+            with open(chunk_path, "rb") as in_f:
+                out_f.write(in_f.read())
 
-        sha256_hash = hashlib.sha256()
-        with open(reassembled_path, "rb") as f:
-            for chunk in iter(lambda: f.read(8192 * 1024), b""):
-                sha256_hash.update(chunk)
-        computed_hash = sha256_hash.hexdigest()
+    sha256_hash = hashlib.sha256()
+    with open(reassembled_path, "rb") as f:
+        for chunk in iter(lambda: f.read(8192 * 1024), b""):
+            sha256_hash.update(chunk)
+    computed_hash = sha256_hash.hexdigest()
 
-        if computed_hash != session["expected_sha256"]:
-            os.remove(reassembled_path)
-            session["status"] = "failed"
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "error": "sha256 mismatch",
-                    "expected": session["expected_sha256"],
-                    "computed": computed_hash,
-                },
-            )
-    finally:
-        _cleanup_upload_session(session_id)
-        if "session_dir" in session:
-            try:
-                import shutil as shutil2
-                shutil2.rmtree(session["session_dir"])
-            except (OSError, RuntimeError):
-                pass
+    if computed_hash != session["expected_sha256"]:
+        session["status"] = "failed"
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "sha256 mismatch",
+                "expected": session["expected_sha256"],
+                "computed": computed_hash,
+            },
+        )
 
     task_id = str(uuid.uuid4())
     temp_dir = session["session_dir"] / "extraction"
@@ -342,18 +332,13 @@ async def upload_complete(
         except OSError:
             pass
         raise HTTPException(status_code=400, detail=str(exc))
-    finally:
-        try:
-            os.remove(reassembled_path)
-        except OSError:
-            pass
 
     subdirs = list(extract_dir.iterdir())
     repo_path = extract_dir
     if len(subdirs) == 1 and subdirs[0].is_dir():
         repo_path = subdirs[0]
 
-scan_tasks[task_id] = {
+    scan_tasks[task_id] = {
         "task_id": task_id,
         "status": "pending",
         "progress": 0.0,
@@ -369,9 +354,6 @@ scan_tasks[task_id] = {
         task_id,
         repo_path,
     )
-
-    # Session dir cleanup happens via run_c4_extraction's finally: block
-    # which deletes temp_dir (parent of session_dir). No additional cleanup needed.
 
     return UploadCompleteResponse(
         task_id=task_id,

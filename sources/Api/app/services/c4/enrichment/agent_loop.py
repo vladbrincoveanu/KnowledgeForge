@@ -52,7 +52,7 @@ class LLMAgentLoop:
         messages: list[dict[str, Any]] = [
             {"role": "user", "content": warm_payload}
         ]
-tool_calls_used = 0
+        tool_calls_used = 0
         tokens_in = 0
         tokens_out = 0
         turn = 0
