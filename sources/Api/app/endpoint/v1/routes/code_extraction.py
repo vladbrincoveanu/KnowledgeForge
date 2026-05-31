@@ -133,8 +133,13 @@ async def _read_chunk_body(request: Request) -> bytes:
 )
 async def upload_start(request: UploadStartRequest):
     session_id = str(uuid.uuid4())
-    chunk_dir = Path(tempfile.mkdtemp(prefix=f"kf-chunks_{session_id}_"))
-    chunk_dir.chmod(0o700)
+    api_root = Path(__file__).resolve().parents[4]
+    sessions_dir = api_root / "sources" / "data" / "sessions"
+    sessions_dir.mkdir(parents=True, exist_ok=True)
+    session_dir = sessions_dir / session_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+    chunk_dir = session_dir / "chunks"
+    chunk_dir.mkdir(parents=True, exist_ok=True)
     expires_at = datetime.now() + timedelta(hours=1)
 
     session = {
@@ -148,6 +153,7 @@ async def upload_start(request: UploadStartRequest):
         "received_chunks": {},
         "status": "uploading",
         "chunk_dir": chunk_dir,
+        "session_dir": session_dir,
     }
     upload_sessions[session_id] = session
     upload_session_locks[session_id] = asyncio.Lock()
@@ -288,7 +294,7 @@ async def upload_complete(
             },
         )
 
-    reassembled_path = Path(tempfile.gettempdir()) / f"kf-reassembled_{session_id}.zip"
+    reassembled_path = session["session_dir"] / "archive.zip"
     try:
         with open(reassembled_path, "wb") as out_f:
             for i in range(session["total_chunks"]):
@@ -315,9 +321,16 @@ async def upload_complete(
             )
     finally:
         _cleanup_upload_session(session_id)
+        if "session_dir" in session:
+            try:
+                import shutil as shutil2
+                shutil2.rmtree(session["session_dir"])
+            except (OSError, RuntimeError):
+                pass
 
     task_id = str(uuid.uuid4())
-    temp_dir = Path(tempfile.mkdtemp(prefix=f"repo_{task_id}_"))
+    temp_dir = session["session_dir"] / "extraction"
+    temp_dir.mkdir(parents=True, exist_ok=True)
     extract_dir = temp_dir / "extracted"
     extract_dir.mkdir()
 
