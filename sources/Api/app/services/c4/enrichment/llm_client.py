@@ -1,11 +1,33 @@
 import os
 import time
 import asyncio
-from typing import Optional
+from typing import AsyncIterator, Optional
 
 from anthropic import Anthropic
 
 MINIMAX_API_URL = "https://api.minimax.io/anthropic"
+
+
+def _extract_delta_text(event) -> Optional[str]:
+    """Extract the text payload from a content_block_delta event.
+
+    Handles both dict-style events (older SDK, proxies, mocks) and typed
+    object events (modern anthropic SDK), so callers don't have to care
+    which shape the underlying transport returned.
+    """
+    if isinstance(event, dict):
+        if event.get("type") != "content_block_delta":
+            return None
+        delta = event.get("delta")
+    else:
+        if getattr(event, "type", None) != "content_block_delta":
+            return None
+        delta = getattr(event, "delta", None)
+    if delta is None:
+        return None
+    if isinstance(delta, dict):
+        return delta.get("text") or None
+    return getattr(delta, "text", None) or None
 
 
 class RateCounter:
@@ -58,3 +80,33 @@ class EnrichmentLLMClient:
             max_tokens=4096,
             **kwargs,
         )
+
+    async def messages_stream(
+        self,
+        messages: list[dict],
+        system: str = "",
+        max_tokens: int = 256,
+    ) -> AsyncIterator[dict]:
+        """Async-iterate over streamed text deltas from the configured provider.
+
+        Yields normalized {"type": "chunk", "delta": str} events.
+        Non-delta SDK events (message_start, content_block_stop, message_stop)
+        are skipped. Empty or None text deltas are also skipped.
+        """
+        params = {
+            "model": self.model,
+            "messages": messages,
+            "max_tokens": max_tokens,
+        }
+        if system:
+            params["system"] = system
+
+        def _open_stream():
+            return self.client.messages.stream(**params)
+
+        stream_cm = await asyncio.to_thread(_open_stream)
+        with stream_cm as stream:
+            for event in stream:
+                text = _extract_delta_text(event)
+                if text:
+                    yield {"type": "chunk", "delta": text}
