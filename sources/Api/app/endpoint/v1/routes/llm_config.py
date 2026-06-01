@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import time
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
@@ -134,6 +135,7 @@ async def test_prompt(req: TestPromptRequest, request: Request):
                                 "type": "meta",
                                 "model": client.model,
                                 "ttft_ms": ttft,
+                                "ts": datetime.now(timezone.utc).isoformat(),
                             })
                         last_chunk_ms = now_ms
                         chunks.append(ev["delta"])

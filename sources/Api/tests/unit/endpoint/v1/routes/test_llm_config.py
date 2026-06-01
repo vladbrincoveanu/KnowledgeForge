@@ -94,3 +94,44 @@ def test_test_prompt_returns_401_when_no_client(client):
             "/api/v1/config/llm/test-prompt", json={"prompt": "hi"}
         )
     assert response.status_code == 401
+
+
+def test_test_prompt_emits_empty_response_error(client):
+    """When the provider yields no chunks, route emits an empty_response error frame."""
+    with patch("app.endpoint.v1.routes.llm_config.EnrichmentLLMClient") as MockCls:
+        mock_instance = MagicMock()
+        mock_instance.model = "MiniMax-M2.7"
+
+        async def empty_stream(messages, system="", max_tokens=256):
+            if False:  # pragma: no cover — make this a generator
+                yield {}
+
+        mock_instance.messages_stream = empty_stream
+        MockCls.from_env.return_value = mock_instance
+
+        response = client.post(
+            "/api/v1/config/llm/test-prompt", json={"prompt": "hi"}
+        )
+    assert response.status_code == 200
+    assert '"code": "empty_response"' in response.text
+
+
+def test_test_prompt_handles_provider_error(client):
+    """When the provider raises, route emits a provider_unavailable error frame."""
+    with patch("app.endpoint.v1.routes.llm_config.EnrichmentLLMClient") as MockCls:
+        mock_instance = MagicMock()
+        mock_instance.model = "MiniMax-M2.7"
+
+        async def raising_stream(messages, system="", max_tokens=256):
+            raise RuntimeError("boom")
+            yield  # pragma: no cover — make this a generator
+
+        mock_instance.messages_stream = raising_stream
+        MockCls.from_env.return_value = mock_instance
+
+        response = client.post(
+            "/api/v1/config/llm/test-prompt", json={"prompt": "hi"}
+        )
+    assert response.status_code == 200
+    assert '"code": "provider_unavailable"' in response.text
+    assert "boom" in response.text

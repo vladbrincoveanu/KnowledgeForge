@@ -182,17 +182,16 @@ generation_ms = last_chunk_ts_ms - first_chunk_ts_ms
 tps = round(tokens_out / max(generation_ms / 1000, 0.05), 2)
 ```
 
-Token counts: estimated from accumulated delta text via `len/4` if provider does not return usage block in final event. Anthropic SDK's `message_stop` event does include `usage`; use real count when present, estimate otherwise.
+Token counts: estimated from accumulated delta text via `sum(len(delta) // 4 for delta in chunks)`. The Anthropic SDK's `message_stop` event includes a `usage` block, but the current `messages_stream()` implementation yields only chunk events (non-delta events are filtered). Threading usage through would require a contract change to `messages_stream`. For a test panel, the `len/4` estimate is sufficient; deviation documented as follow-up (§10).
 
 ### 5.5 Error Codes
 
 | Code | HTTP Status | Cause |
 |---|---|---|
-| `invalid_prompt` | 400 | prompt empty, >500 chars, or contains control chars |
-| `invalid_model` | 400 | model string fails `ModelName` regex |
+| `invalid_prompt` | 422 (Pydantic v2) | prompt empty, >500 chars, or contains control chars. Note: Pydantic v2 returns 422 for validation errors; spec originally said 400 but the actual impl + tests assert 422. Frontend pre-validates so the distinction is not user-visible. |
+| `invalid_model` | 422 (Pydantic v2) | model string fails `ModelName` regex |
 | `no_api_key` | 401 | `MINIMAX_API_KEY` env not set |
-| `provider_unauthorized` | 502 | Anthropic SDK raises 401/403 |
-| `provider_unavailable` | 502 | Anthropic SDK raises 5xx, network error |
+| `provider_unavailable` | 502 | Anthropic SDK raises any error (401/403/5xx, network, parse) |
 | `provider_timeout` | 504 | 15s server-side timeout exceeded |
 | `client_disconnected` | (closed) | FastAPI detects `request.is_disconnected()` mid-stream |
 
@@ -381,7 +380,7 @@ Used for client-side pre-validation before sending the Run request. Server is th
 
 - `test_test_prompt_returns_sse_stream` — mock `EnrichmentLLMClient.messages_stream` to yield 3 chunks; assert response is `text/event-stream` and contains 3 `chunk` frames + 1 `done` frame.
 - `test_test_prompt_validates_prompt_length` — empty → 400, 501 chars → 400.
-- `test_test_prompt_rejects_invalid_model` — `"gpt-3.5"` → 400.
+- `test_test_prompt_rejects_invalid_model` — `"gpt-3.5"` → 422 (Pydantic v2 default).
 - `test_test_prompt_returns_401_when_no_key` — unset `MINIMAX_API_KEY` → 401.
 - `test_test_prompt_does_not_consume_rate_counter` — assert `RateCounter._timestamps` unchanged after test.
 - `test_test_prompt_emits_meta_first_with_ttft` — assert first event has `type: "meta"`, `ttft_ms: int`.
