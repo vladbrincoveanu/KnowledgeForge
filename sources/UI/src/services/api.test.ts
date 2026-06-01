@@ -22,7 +22,7 @@ describe("llmConfigAPI.testPrompt", () => {
 
   it("yields parsed SSE events from chunked response", async () => {
     const frames = [
-      'data: {"type":"meta","model":"MiniMax-M2.7","ttft_ms":100}\n\n',
+      'data: {"type":"meta","model":"MiniMax-M2.7","ttft_ms":100,"ts":"2026-06-01T10:00:00Z"}\n\n',
       'data: {"type":"chunk","delta":"p"}\n\n',
       'data: {"type":"chunk","delta":"ong"}\n\n',
       'data: {"type":"done","total_ms":200,"tokens_in":3,"tokens_out":3,"tps":15}\n\n',
@@ -34,7 +34,7 @@ describe("llmConfigAPI.testPrompt", () => {
       out.push(ev);
     }
     expect(out).toEqual([
-      { type: "meta", model: "MiniMax-M2.7", ttft_ms: 100 },
+      { type: "meta", model: "MiniMax-M2.7", ttft_ms: 100, ts: "2026-06-01T10:00:00Z" },
       { type: "chunk", delta: "p" },
       { type: "chunk", delta: "ong" },
       { type: "done", total_ms: 200, tokens_in: 3, tokens_out: 3, tps: 15 },

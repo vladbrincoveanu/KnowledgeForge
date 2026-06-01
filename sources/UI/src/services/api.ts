@@ -421,7 +421,7 @@ export type LLMConfigResponse = {
 };
 
 export type TestEvent =
-  | { type: "meta"; model: string; ttft_ms: number }
+  | { type: "meta"; model: string; ttft_ms: number; ts: string }
   | { type: "chunk"; delta: string }
   | {
       type: "done";
