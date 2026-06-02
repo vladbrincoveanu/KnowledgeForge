@@ -20,10 +20,10 @@ test.describe("SystemMetrics test prompt panel", () => {
     await expect(card.getByText(/TPS/)).toBeVisible();
   });
 
-  test("empty prompt prevents request (red border)", async ({ page }) => {
+  test("empty prompt shows validation error message", async ({ page }) => {
     const ta = page.getByLabel(/test prompt|max 500/i);
     await ta.fill("");
     await page.getByRole("button", { name: /run test/i }).click();
-    await expect(ta).toHaveCSS("border-color", /.+/); // any non-default border indicates error state
+    await expect(page.getByText(/Prompt must be 1-500 characters/)).toBeVisible();
   });
 });
