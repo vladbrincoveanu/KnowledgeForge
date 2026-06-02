@@ -17,11 +17,6 @@ from app.services.c4.enrichment.llm_client import EnrichmentLLMClient, get_rate_
 router = APIRouter(tags=["llm_config"])
 
 DEFAULT_MODEL = "anthropic/claude-sonnet-4-20250514"
-VALID_MODELS = {
-    "anthropic/claude-sonnet-4-20250514",
-    "anthropic/claude-haiku-4-5-20251001",
-    "MiniMax-M2.7",
-}
 
 
 class LLMConfigPatch(BaseModel):
@@ -71,11 +66,6 @@ async def update_llm_config(patch: LLMConfigPatch):
     if patch.api_key is not None:
         os.environ["MINIMAX_API_KEY"] = patch.api_key
     if patch.model is not None:
-        if patch.model not in VALID_MODELS:
-            raise HTTPException(
-                status_code=400,
-                detail=f"model must be one of: {', '.join(sorted(VALID_MODELS))}",
-            )
         os.environ["ENRICHMENT_MODEL"] = patch.model
     model, api_key_set, api_key_source = _read_env_config()
     rate_used = _compute_rate_used()

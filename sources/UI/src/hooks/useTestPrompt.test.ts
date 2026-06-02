@@ -78,9 +78,7 @@ describe("useTestPrompt", () => {
   it("reset() clears result and error", async () => {
     const { llmConfigAPI } = await import("../services/api");
     vi.spyOn(llmConfigAPI, "testPrompt").mockReturnValue(
-      asyncIterFromArray([
-        { type: "error" as const, code: "x", message: "x" },
-      ]),
+      asyncIterFromArray([{ type: "error" as const, code: "x", message: "x" }]),
     );
 
     const { result } = renderHook(() => useTestPrompt());
@@ -91,5 +89,30 @@ describe("useTestPrompt", () => {
     expect(result.current.status).toBe("idle");
     expect(result.current.result).toBeNull();
     expect(result.current.error).toBeNull();
+  });
+
+  it("sets stream_truncated error when stream ends without done", async () => {
+    const events = [
+      {
+        type: "meta" as const,
+        model: "MiniMax-M2.7",
+        ttft_ms: 50,
+        ts: "2026-06-01T10:00:00Z",
+      },
+      { type: "chunk" as const, delta: "hel" },
+      // Stream ends here without a `done` event
+    ];
+    const { llmConfigAPI } = await import("../services/api");
+    vi.spyOn(llmConfigAPI, "testPrompt").mockReturnValue(
+      asyncIterFromArray(events),
+    );
+
+    const { result } = renderHook(() => useTestPrompt());
+    await act(async () => {
+      await result.current.run("hi");
+    });
+    expect(result.current.status).toBe("err");
+    expect(result.current.error?.code).toBe("stream_truncated");
+    expect(result.current.result).toBeNull();
   });
 });

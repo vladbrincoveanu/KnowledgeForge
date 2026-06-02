@@ -73,6 +73,7 @@ export function useTestPrompt(): UseTestPromptReturn {
     };
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 18_000);
+    let gotDone = false;
 
     try {
       for await (const ev of llmConfigAPI.testPrompt(
@@ -87,13 +88,22 @@ export function useTestPrompt(): UseTestPromptReturn {
           setStatus("err");
           return;
         }
+        if (ev.type === "done") {
+          gotDone = true;
+        }
         handleEvent(ev as TestEvent, acc);
       }
-      if (acc.tps !== undefined && acc.tps >= 0) {
+      if (gotDone) {
         setResult(acc as TestResult);
         setStatus("ok");
       } else if (!acc.response) {
         setError({ code: "empty_response", message: "No response received" });
+        setStatus("err");
+      } else {
+        setError({
+          code: "stream_truncated",
+          message: "Stream ended without completion",
+        });
         setStatus("err");
       }
     } catch (e) {

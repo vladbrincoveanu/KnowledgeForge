@@ -135,3 +135,31 @@ def test_test_prompt_handles_provider_error(client):
     assert response.status_code == 200
     assert '"code": "provider_unavailable"' in response.text
     assert "boom" in response.text
+
+
+def test_test_prompt_enforces_15s_timeout(client, mock_enrichment_client):
+    """When the provider takes >15s, route emits provider_timeout error frame."""
+    import asyncio
+
+    async def slow_stream(messages, system="", max_tokens=256):
+        await asyncio.sleep(20)
+        yield {"type": "chunk", "delta": "late"}  # pragma: no cover
+
+    mock_enrichment_client.messages_stream = slow_stream
+
+    response = client.post(
+        "/api/v1/config/llm/test-prompt", json={"prompt": "hi"}
+    )
+    assert response.status_code == 200
+    assert '"code": "provider_timeout"' in response.text
+
+
+def test_test_prompt_does_not_consume_rate_counter(client, mock_enrichment_client):
+    """Manual test prompt must NOT count toward enrichment rate limit (spec §9.1)."""
+    from app.services.c4.enrichment.llm_client import get_rate_counter
+
+    counter = get_rate_counter()
+    before = sum(1 for t in counter._timestamps)
+    client.post("/api/v1/config/llm/test-prompt", json={"prompt": "hi"})
+    after = sum(1 for t in counter._timestamps)
+    assert after == before, "test-prompt must not increment the rate counter"
