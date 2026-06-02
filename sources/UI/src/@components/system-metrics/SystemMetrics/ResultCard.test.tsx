@@ -1,12 +1,13 @@
 /* @vitest-environment jsdom */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import * as matchers from "@testing-library/jest-dom/matchers";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { ResultCard } from "./ResultCard";
 import type { TestResult } from "../../../hooks/useTestPrompt";
 
 expect.extend(matchers);
+afterEach(cleanup);
 
 const sample: TestResult = {
   model: "MiniMax-M2.7",

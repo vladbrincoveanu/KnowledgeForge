@@ -1,10 +1,11 @@
 /* @vitest-environment jsdom */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as matchers from "@testing-library/jest-dom/matchers";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 
 expect.extend(matchers);
+afterEach(cleanup);
 
 // Mock fflate
 vi.mock("fflate", () => ({
@@ -52,9 +53,7 @@ describe("FolderDropZone", () => {
     Object.defineProperty(input, "files", { value: [], configurable: true });
     fireEvent.change(input);
     // onError should be called
-    expect(onError).toHaveBeenCalledWith(
-      expect.stringMatching(/no files/i),
-    );
+    expect(onError).toHaveBeenCalledWith(expect.stringMatching(/no files/i));
   });
 
   it("excludes node_modules from zip entries", async () => {
@@ -129,7 +128,11 @@ describe("FolderDropZone", () => {
     const { zip } = await import("fflate");
     // Override zip to return 160MB
     (zip as ReturnType<typeof vi.fn>).mockImplementationOnce(
-      (_files: unknown, _opts: unknown, cb: (err: null, data: Uint8Array) => void) => {
+      (
+        _files: unknown,
+        _opts: unknown,
+        cb: (err: null, data: Uint8Array) => void,
+      ) => {
         cb(null, new Uint8Array(160 * 1024 * 1024));
       },
     );
