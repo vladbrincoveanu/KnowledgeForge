@@ -44,7 +44,7 @@ export function useTestPrompt(): UseTestPromptReturn {
     setStatus("running");
     setError(null);
 
-    if (!prompt || prompt.length < 1 || prompt.length > 500) {
+    if (!prompt || prompt.length > 500) {
       setError({
         code: "invalid_prompt",
         message: "Prompt must be 1-500 characters",
@@ -91,7 +91,7 @@ export function useTestPrompt(): UseTestPromptReturn {
         if (ev.type === "done") {
           gotDone = true;
         }
-        handleEvent(ev as TestEvent, acc);
+        handleEvent(ev, acc);
       }
       if (gotDone) {
         setResult(acc as TestResult);
@@ -138,9 +138,6 @@ function handleEvent(ev: TestEvent, acc: Partial<TestResult>): void {
       acc.tokensIn = ev.tokens_in;
       acc.tokensOut = ev.tokens_out;
       acc.tps = ev.tps;
-      return;
-    case "error":
-      // Handled directly in `run` so the original `code` is surfaced to the UI.
       return;
   }
 }

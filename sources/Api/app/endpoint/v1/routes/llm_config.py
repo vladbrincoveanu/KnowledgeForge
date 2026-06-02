@@ -79,7 +79,7 @@ async def update_llm_config(patch: LLMConfigPatch):
     )
 
 
-async def _sse_event(data: dict) -> str:
+def _sse_event(data: dict) -> str:
     return f"data: {json.dumps(data)}\n\n"
 
 
@@ -121,7 +121,7 @@ async def test_prompt(req: TestPromptRequest, request: Request):
                         if first_chunk_ms is None:
                             first_chunk_ms = now_ms
                             ttft = int(now_ms - start_ms)
-                            yield await _sse_event({
+                            yield _sse_event({
                                 "type": "meta",
                                 "model": client.model,
                                 "ttft_ms": ttft,
@@ -129,9 +129,9 @@ async def test_prompt(req: TestPromptRequest, request: Request):
                             })
                         last_chunk_ms = now_ms
                         chunks.append(ev["delta"])
-                        yield await _sse_event(ev)
+                        yield _sse_event(ev)
                 if not chunks:
-                    yield await _sse_event({
+                    yield _sse_event({
                         "type": "error",
                         "code": "empty_response",
                         "message": "No chunks received",
@@ -148,7 +148,7 @@ async def test_prompt(req: TestPromptRequest, request: Request):
                 else:
                     tps = 0.0
                 total_ms = int((last_chunk_ms or start_ms) - start_ms)
-                yield await _sse_event({
+                yield _sse_event({
                     "type": "done",
                     "total_ms": total_ms,
                     "tokens_in": len(req.prompt) // 4,
@@ -156,13 +156,13 @@ async def test_prompt(req: TestPromptRequest, request: Request):
                     "tps": tps,
                 })
         except asyncio.TimeoutError:
-            yield await _sse_event({
+            yield _sse_event({
                 "type": "error",
                 "code": "provider_timeout",
                 "message": "Provider timed out (>15s)",
             })
         except Exception as e:
-            yield await _sse_event({
+            yield _sse_event({
                 "type": "error",
                 "code": "provider_unavailable",
                 "message": str(e),
