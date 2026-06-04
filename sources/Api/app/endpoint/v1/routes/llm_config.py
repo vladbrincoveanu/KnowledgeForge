@@ -16,7 +16,7 @@ from app.services.c4.enrichment.llm_client import EnrichmentLLMClient, get_rate_
 
 router = APIRouter(tags=["llm_config"])
 
-DEFAULT_MODEL = "anthropic/claude-sonnet-4-20250514"
+DEFAULT_MODEL = "MiniMax-M3"
 
 
 class LLMConfigPatch(BaseModel):

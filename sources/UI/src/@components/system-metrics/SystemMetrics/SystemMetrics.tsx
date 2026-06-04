@@ -8,6 +8,7 @@ import { isValidModelName } from "../../../schemas/modelName";
 import "./SystemMetrics.scss";
 
 const KNOWN_MODELS = [
+  "MiniMax-M3",
   "MiniMax-M2.7",
   "anthropic/claude-sonnet-4-20250514",
   "anthropic/claude-haiku-4-5-20251001",
@@ -118,7 +119,7 @@ const SystemMetrics: React.FC = () => {
               list="known-models"
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
-              placeholder="MiniMax-M2.7 or anthropic/claude-sonnet-4-20250514"
+              placeholder="MiniMax-M3 or anthropic/claude-sonnet-4-20250514"
             />
             <datalist id="known-models">
               {KNOWN_MODELS.map((m) => (
