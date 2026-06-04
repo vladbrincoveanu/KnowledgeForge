@@ -138,15 +138,17 @@ async def test_prompt(req: TestPromptRequest, request: Request):
                     })
                     return
                 tokens_out = sum(len(d) // 4 for d in chunks)
-                if (
-                    first_chunk_ms is not None
-                    and last_chunk_ms is not None
-                    and last_chunk_ms > first_chunk_ms
-                ):
-                    gen_s = (last_chunk_ms - first_chunk_ms) / 1000
-                    tps = round(tokens_out / max(gen_s, 0.05), 2)
-                else:
+                if first_chunk_ms is None or last_chunk_ms is None:
                     tps = 0.0
+                else:
+                    gen_s = (last_chunk_ms - first_chunk_ms) / 1000
+                    if gen_s <= 0:
+                        # Single-chunk response: no inter-token time is
+                        # measurable, so use the full round-trip time as
+                        # the throughput denominator rather than reporting
+                        # 0 TPS for any short single-token reply.
+                        gen_s = (last_chunk_ms - start_ms) / 1000
+                    tps = round(tokens_out / max(gen_s, 0.05), 2)
                 total_ms = int((last_chunk_ms or start_ms) - start_ms)
                 yield _sse_event({
                     "type": "done",

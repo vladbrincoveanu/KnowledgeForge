@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { llmConfigAPI, LLMConfigResponse } from "../../../services/api";
 import { useLLMStats } from "../../../hooks/useLLMStats";
-import { useTestPrompt } from "../../../hooks/useTestPrompt";
+import { useTestPrompt, TestResult } from "../../../hooks/useTestPrompt";
 import { ResultCard } from "./ResultCard";
 import { isValidModelName } from "../../../schemas/modelName";
 import "./SystemMetrics.scss";
@@ -28,7 +28,7 @@ function fmtTs(ts: string): string {
 }
 
 const SystemMetrics: React.FC = () => {
-  const { runs, totals, clearStats } = useLLMStats();
+  const { runs, totals, avgTps, clearStats, addRun } = useLLMStats();
   const { status, result, error, run, reset } = useTestPrompt();
   const [config, setConfig] = useState<LLMConfigResponse | null>(null);
   const [selectedModel, setSelectedModel] = useState("");
@@ -36,6 +36,7 @@ const SystemMetrics: React.FC = () => {
   const [saveStatus, setSaveStatus] = useState<"idle" | "ok" | "err">("idle");
   const [errMsg, setErrMsg] = useState("");
   const [loading, setLoading] = useState(true);
+  const lastAddedRef = useRef<TestResult | null>(null);
 
   useEffect(() => {
     llmConfigAPI
@@ -47,6 +48,21 @@ const SystemMetrics: React.FC = () => {
       })
       .catch(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (status !== "ok" || !result) return;
+    if (lastAddedRef.current === result) return;
+    lastAddedRef.current = result;
+    addRun({
+      task_id: `test-${result.timestamp}`,
+      model: result.model || config?.model || "unknown",
+      tokens_in: result.tokensIn,
+      tokens_out: result.tokensOut,
+      tool_calls: 0,
+      duration_s: result.totalMs / 1000,
+      tps: result.tps,
+    });
+  }, [status, result, addRun, config?.model]);
 
   const handleSave = async () => {
     setSaveStatus("idle");
@@ -207,6 +223,10 @@ const SystemMetrics: React.FC = () => {
             <span className="sm-chip-label">Runs</span>
             <span className="sm-chip-value">{totals.runs_count}</span>
           </div>
+          <div className="sm-chip">
+            <span className="sm-chip-label">avg tok/s</span>
+            <span className="sm-chip-value">{avgTps.toFixed(2)}</span>
+          </div>
         </div>
       </section>
 
@@ -220,7 +240,7 @@ const SystemMetrics: React.FC = () => {
           )}
         </div>
         {runs.length === 0 ? (
-          <p className="sm-empty">No enrichment runs this session.</p>
+          <p className="sm-empty">No runs this session yet.</p>
         ) : (
           <table className="sm-table">
             <thead>

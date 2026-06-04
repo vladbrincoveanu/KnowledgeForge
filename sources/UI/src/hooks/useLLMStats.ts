@@ -33,6 +33,12 @@ function computeTotals(runs: LLMRun[]): LLMTotals {
   );
 }
 
+function computeAvgTps(runs: LLMRun[]): number {
+  if (!runs.length) return 0;
+  const sum = runs.reduce((acc, r) => acc + r.tps, 0);
+  return Math.round((sum / runs.length) * 100) / 100;
+}
+
 function loadFromStorage(): LLMRun[] {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
@@ -54,6 +60,21 @@ export function useLLMStats() {
     sessionStorage.removeItem(STORAGE_KEY);
     setRuns([]);
     setTotals({ tokens_in: 0, tokens_out: 0, tool_calls: 0, runs_count: 0 });
+  }, []);
+
+  const addRun = useCallback((run: Omit<LLMRun, "timestamp">) => {
+    const full: LLMRun = { ...run, timestamp: new Date().toISOString() };
+    setRuns((prev) => {
+      const next = [...prev, full];
+      saveToStorage(next);
+      return next;
+    });
+    setTotals((prev) => ({
+      tokens_in: prev.tokens_in + full.tokens_in,
+      tokens_out: prev.tokens_out + full.tokens_out,
+      tool_calls: prev.tool_calls + full.tool_calls,
+      runs_count: prev.runs_count + 1,
+    }));
   }, []);
 
   useEffect(() => {
@@ -105,5 +126,7 @@ export function useLLMStats() {
     };
   }, []);
 
-  return { runs, totals, clearStats };
+  const avgTps = computeAvgTps(runs);
+
+  return { runs, totals, avgTps, clearStats, addRun };
 }
