@@ -146,6 +146,7 @@ sources/data/c4_extractions/
 
 # Benchmark JSON files (generated test artifacts)
 sources/Api/sources/data/benchmarks/
+sources/Api/sources/data/sessions/
 
 # Secrets and sensitive configuration
 .env

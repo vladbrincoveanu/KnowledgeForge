@@ -19,6 +19,7 @@ from .terraform_detector import TerraformDetector
 from .kubernetes_detector import KubernetesDetector
 from .python_library_detector import PythonLibraryDetector
 from .relationship_extractor import ConfigRelationshipExtractor
+from .llm_discovery import discover_containers
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,17 @@ class ContainerManager:
             Dictionary of container_name -> container_data
         """
         logger.info("Starting container detection...")
-        
+
+        # Phase 0: LLM discovery from high-level signals (README, .env, scripts, compose)
+        # Seeds the registry before structural detectors run so that services referenced
+        # in scripts/docs but not present as directories are still candidates.
+        if self.llm_manager:
+            proposed = discover_containers(self.repo_path, self.llm_manager)
+            for container in proposed:
+                self._register_or_merge_container(container, source="llm_discovery")
+            if proposed:
+                logger.info("LLM discovery primed %d container proposals", len(proposed))
+
         # Run structure detection first (base containers)
         structure_detector = self.detectors[0]
         structure_containers = structure_detector.detect()
@@ -210,9 +221,18 @@ class ContainerManager:
                 existing[key] = k8s_container[key]
 
     def _merge_container_data(self, existing: dict[str, Any], incoming: dict[str, Any]) -> None:
-        """Merge incoming container data into existing without overwriting truthy values."""
+        """Merge incoming container data into existing.
+
+        Generic placeholder values ('Unknown', empty strings) are treated as
+        overwritable so that later detectors (e.g. PythonLibraryDetector) can
+        fill in fields that were set to 'Unknown' by an earlier pass.
+        """
+        _OVERWRITABLE = ("Unknown", "", "Service")
         for key, value in incoming.items():
-            if value and not existing.get(key):
+            if not value:
+                continue
+            existing_val = existing.get(key)
+            if not existing_val or existing_val in _OVERWRITABLE:
                 existing[key] = value
 
     def _apply_helm_overrides(self, existing: dict[str, Any], helm_container: dict[str, Any]) -> None:
@@ -359,12 +379,13 @@ class ContainerManager:
             except Exception as e:
                 logger.debug("ConfigRelationshipExtractor failed for %s: %s", container_name, e)
 
-        # Phase 2: fallback for unstructured YAML files
+        # Phase 2: fallback for unstructured files (YAML + shell scripts)
         unstructured_files: list[Path] = []
         unstructured_files.extend(self.repo_path.rglob("docker-compose*.yml"))
         unstructured_files.extend(self.repo_path.rglob("docker-compose*.yaml"))
         unstructured_files.extend(self.repo_path.rglob("*.yml"))
         unstructured_files.extend(self.repo_path.rglob("*.yaml"))
+        unstructured_files.extend(self.repo_path.rglob("*.sh"))
 
         for file_path in unstructured_files:
             if not file_path.is_file():

@@ -79,6 +79,18 @@ AMBIGUOUS CASES
     tooling — discard unless there is a Dockerfile, docker-compose entry, or k8s
     manifest that proves this path runs as a deployed service
 
+DISCARD CONSERVATISM RULE (applies to filesystem-structure and llm-proposed signals)
+  Do NOT discard a container merely because:
+    • technology = "Unknown" — infer the tech from the name, README excerpt, or file
+      extension evidence and set verdict=keep with your best estimate.
+    • No Dockerfile or deploy manifest was found — libraries, SDKs, and internal
+      tooling packages without Dockerfiles are still C4 containers if they are
+      independently versioned units that must exist for the system to work.
+  Only discard a filesystem-structure container when you are confident (≥ 0.85)
+  that the directory is a CI pipeline script folder, one-off migration script, or
+  a build-time-only artifact with no runtime presence whatsoever.
+  When in doubt between discard and keep, choose keep and note the ambiguity.
+
 YOUR TASK
 Given a JSON evidence bundle produced by a static-analysis pipeline, return a
 JSON object (no markdown, no comments) that:
@@ -97,7 +109,17 @@ RELATIONSHIP INFERENCE STRATEGY (apply in order, stop when confident)
     README excerpt mentions another container name or role
     Description says "calls", "connects to", "publishes to", "subscribes from"
 
-  If evidence is completely absent for a relationship, emit nothing — do not guess from names.\
+  If evidence is completely absent for a relationship, emit nothing — do not guess from names.
+
+CONTAINER DETECTION SOURCES
+Some containers have signal_type "llm-proposed": they were discovered in Phase 0 by
+reading executable signals — docker-compose files, .env.example connection strings,
+CI workflow files, and shell scripts with docker run/compose commands.
+  • Keep them if their type and role make sense for this system (e.g. postgres when
+    DATABASE_URL appears in .env.example, temporal when a workflow CI job references it).
+  • Discard them only when confident they are NOT real runtime components.
+  • Do NOT discard them merely because they have no filesystem-structure signal —
+    external services like databases rarely have source code in the repo.\
 
 
 OUTPUT SCHEMA (strict JSON, every container must appear, null = keep existing):
@@ -289,6 +311,9 @@ _FEW_SHOT_EXAMPLES: list[dict[str, Any]] = [
 
 def _infer_signal_type(container: dict[str, Any]) -> str:
     """Derive a signal_type label from a container dict's deployment metadata."""
+    if container.get("detection_source") == "llm-proposed":
+        return "llm-proposed"
+
     deployment = (container.get("deployment") or "").lower()
     path = (container.get("path") or "").lower()
     tech = (container.get("technology") or "").lower()
@@ -474,6 +499,7 @@ def _signal_confidence(signal_type: str) -> float:
         "kustomize-manifest": 0.80,
         "infrastructure-only": 0.65,
         "filesystem-structure": 0.60,
+        "llm-proposed": 0.55,
     }.get(signal_type, 0.70)
 
 
@@ -524,12 +550,18 @@ def build_evidence_bundle(
                 "confidence": 0.85,
             })
 
-        signals: list[dict[str, Any]] = [{
+        primary_signal: dict[str, Any] = {
             "signal_type": signal_type,
-            "source_file": container.get("path", ""),
+            "source_file": container.get("path", "") or container.get("llm_discovery_signal", ""),
             "attributes": attrs,
             "confidence": conf,
-        }]
+        }
+        # For llm-proposed containers, surface the original discovery signal
+        if signal_type == "llm-proposed":
+            primary_signal["attributes"]["discovery_signal"] = container.get("llm_discovery_signal", "")
+            primary_signal["attributes"]["discovery_confidence"] = container.get("llm_discovery_confidence", 0.5)
+
+        signals: list[dict[str, Any]] = [primary_signal]
         signals.extend(extra_signals[:MAX_SIGNALS_PER_CONTAINER - 1])
 
         # Flag containers inside development/ — likely dev tooling, not deployable

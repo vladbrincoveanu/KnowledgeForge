@@ -45,6 +45,15 @@ class PythonLibraryDetector(BaseContainerDetector):
         """Check if Python library detection is possible."""
         return True
 
+    # Framework manifests mirrored from StructureDetector for collection checks
+    _FRAMEWORK_MANIFESTS = {
+        'Dockerfile', 'docker-compose.yml', 'docker-compose.yaml',
+        'package.json', 'pyproject.toml', 'pom.xml', 'build.gradle',
+        'build.gradle.kts', 'go.mod', 'Cargo.toml', 'requirements.txt',
+        'Chart.yaml', 'kustomization.yaml',
+    }
+    _COLLECTION_THRESHOLD = 3
+
     def detect(self) -> list[dict[str, Any]]:
         """Detect Python libraries in the repository.
 
@@ -64,6 +73,9 @@ class PythonLibraryDetector(BaseContainerDetector):
             if str(rel_path) in seen_paths:
                 continue
 
+            if self._is_collection_member(dir_path):
+                continue
+
             if self._is_python_library(dir_path):
                 container = self._create_library_container(dir_path)
                 if container:
@@ -71,6 +83,29 @@ class PythonLibraryDetector(BaseContainerDetector):
                     seen_paths.add(str(rel_path))
 
         return libraries
+
+    def _is_collection_member(self, directory: Path) -> bool:
+        """Return True if directory is part of a collection tree (walk upward)."""
+        if directory.parent == self.repo_path:
+            return False
+        current = directory
+        while True:
+            parent = current.parent
+            if parent == self.repo_path:
+                break
+            sibling_count = 0
+            try:
+                for child in parent.iterdir():
+                    if not child.is_dir() or child == current:
+                        continue
+                    if any((child / m).exists() for m in self._FRAMEWORK_MANIFESTS):
+                        sibling_count += 1
+                        if sibling_count >= self._COLLECTION_THRESHOLD:
+                            return True
+            except OSError:
+                pass
+            current = parent
+        return False
 
     def _is_python_library(self, directory: Path) -> bool:
         """Check if directory is a Python library (not application).

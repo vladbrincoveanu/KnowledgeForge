@@ -1456,11 +1456,11 @@ async def get_code_architecture():
     Priority: in-memory runtime extraction → latest JSON on disk → bundled demo.
     """
     try:
-        c4_data = _load_default_c4_from_json()
-        if not c4_data:
-            c4_data = _load_latest_runtime_c4()
+        c4_data = _load_latest_runtime_c4()
         if not c4_data:
             c4_data = _load_latest_c4_from_json()
+        if not c4_data:
+            c4_data = _load_default_c4_from_json()
 
         if not c4_data:
             # Return empty structure if no data

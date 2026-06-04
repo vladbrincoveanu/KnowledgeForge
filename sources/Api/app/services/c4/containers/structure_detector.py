@@ -59,71 +59,258 @@ class StructureDetector(BaseContainerDetector):
             '__pycache__', '.git', '.github', '.gitlab', 'node_modules',
             'venv', 'env', '.env', 'dist', 'build', 'target', 'out',
             '.idea', '.vscode', 'logs', 'temp', 'tmp', '.pytest_cache',
-            'test', 'tests', '__tests__', 'docs', 'documentation',
+            'test', 'tests', '__tests__', 'integration_tests', 'docs', 'documentation',
             '.next', '.nuxt', '.cache', 'coverage', '.coverage',
+            # Gradle build infrastructure — never a deployable service
+            'buildSrc', 'gradle',
         }
+
+        # How many sibling directories with manifests makes a parent a "collection"
+        # (connector repos, plugin directories, etc.) whose children are not C4 containers.
+        self._collection_threshold = 3
     
     def can_detect(self) -> bool:
         """Check if structure detection is possible."""
-        # Structure detection always runs as fallback
         return True
-    
+
     def detect(self) -> list[dict[str, Any]]:
-        """Detect containers from project structure."""
-        containers = []
-        registered_paths = set()
-        resolved_paths = set()  # Track resolved (real) paths to deduplicate symlinks
+        """Detect containers using a depth-1-first / top-down strategy.
 
-        # Recursively search for framework manifests with pruning
-        for root, dirs, files in os.walk(self.repo_path, topdown=True):
-            dirs[:] = [d for d in dirs if d not in self.excluded_dirs]
+        Phase 1: classify each depth-1 directory as a deployable service or
+        significant module and register it as a C4 container.  This catches
+        top-level SDK/tool directories that have nested manifests rather than
+        a manifest at their own root (e.g. airbyte-cdk/, airbyte-ci/).
 
-            for file_name in files:
-                if file_name not in self.framework_manifests:
-                    continue
+        Phase 2: recurse into depth-1 grouping dirs (directories that act as
+        collection parents for many service sub-directories, like apps/ or
+        services/ in a monorepo) and surface their direct children as
+        containers using the existing collection-member filter.
 
-                manifest_file = Path(root) / file_name
+        Fallback: if no containers are found, treat the repo root as a single
+        service.
+        """
+        containers: list[dict[str, Any]] = []
+        registered_paths: set[str] = set()
+        grouping_dirs: list[Path] = []
 
-                # Get the directory containing this manifest
-                service_dir = manifest_file.parent
+        # Phase 1: classify depth-1 directories
+        try:
+            depth1_dirs = sorted(
+                d for d in self.repo_path.iterdir()
+                if d.is_dir()
+                and d.name not in self.excluded_dirs
+                and not d.name.startswith('.')
+            )
+        except OSError:
+            depth1_dirs = []
 
-                # Normalize Helm chart/kustomize layouts (chart folder -> parent service)
-                if manifest_file.name == 'Chart.yaml' and service_dir.name in {'chart', 'charts'}:
-                    service_dir = service_dir.parent
-                if manifest_file.name == 'kustomization.yaml' and service_dir.name in {'kustomize', 'kustomization'}:
-                    service_dir = service_dir.parent
+        for d1 in depth1_dirs:
+            is_deployable = self._is_deployable_service(d1)
+            has_deployable_children = self._has_deployable_children(d1)
+            is_significant = self._is_significant_module(d1)
+            is_grouping = self._is_grouping_dir(d1)
 
-                # Deduplicate symlinked directories by resolved path
+            # Register as a container only when the directory itself is deployable,
+            # OR it has nested manifests but NO deployable immediate children
+            # (multi-language SDK like airbyte-cdk whose python/ and java/ subdirs
+            # are library packages, not standalone services).
+            # Organizational folders like development/ or projects/ that contain
+            # actual services as direct children must NOT be registered here — they
+            # belong in Phase 2 recursion so the real services surface instead.
+            if is_deployable or (is_significant and not has_deployable_children):
+                container = self._create_container(d1)
+                if container:
+                    containers.append(container)
+                    registered_paths.add(str(d1.relative_to(self.repo_path)))
+
+            # Recurse in Phase 2 for classic grouping dirs OR folders whose
+            # immediate children are deployable services.
+            if is_grouping or has_deployable_children:
+                grouping_dirs.append(d1)
+
+        # Phase 2: recurse into grouping dirs that were not already registered
+        # as Phase 1 containers (a dir can be both significant and a grouping
+        # parent; if it is registered as a container we don't recurse inside it).
+        grouping_dirs = [
+            g for g in grouping_dirs
+            if str(g.relative_to(self.repo_path)) not in registered_paths
+        ]
+
+        resolved_paths: set[str] = set()
+        for grouping_dir in grouping_dirs:
+            for root, dirs, files in os.walk(grouping_dir, topdown=True):
+                root_path = Path(root)
+
+                dirs[:] = [
+                    d for d in dirs
+                    if d not in self.excluded_dirs and not d.startswith('.')
+                ]
+
                 try:
-                    resolved_service_dir = service_dir.resolve()
-                except (OSError, RuntimeError):
-                    resolved_service_dir = service_dir
-                resolved_rel = resolved_service_dir.relative_to(self.repo_path)
-                if str(resolved_rel) in resolved_paths:
-                    continue  # Skip — this is a symlink to an already-seen directory
-                resolved_paths.add(str(resolved_rel))
+                    root_rel = root_path.relative_to(self.repo_path)
+                except ValueError:
+                    root_rel = Path('.')
+                dirs[:] = [d for d in dirs if str(root_rel / d) not in registered_paths]
 
-                # Skip if already registered
-                rel_path = service_dir.relative_to(self.repo_path)
-                if str(rel_path) in registered_paths:
-                    continue
+                for file_name in files:
+                    if file_name not in self.framework_manifests:
+                        continue
 
-                # Check if this directory looks like a deployable service
-                if self._is_deployable_service(service_dir):
-                    container = self._create_container(service_dir)
-                    if container:  # Only add if not None
-                        containers.append(container)
-                        registered_paths.add(str(rel_path))
-        
-        # Fallback: If no containers found, check if root is a service
+                    manifest_file = root_path / file_name
+                    service_dir = manifest_file.parent
+
+                    if manifest_file.name == 'Chart.yaml' and service_dir.name in {'chart', 'charts'}:
+                        service_dir = service_dir.parent
+                    if manifest_file.name == 'kustomization.yaml' and service_dir.name in {'kustomize', 'kustomization'}:
+                        service_dir = service_dir.parent
+
+                    try:
+                        resolved_service_dir = service_dir.resolve()
+                        resolved_rel = str(resolved_service_dir.relative_to(self.repo_path))
+                    except (OSError, RuntimeError, ValueError):
+                        resolved_rel = str(service_dir)
+                    if resolved_rel in resolved_paths:
+                        continue
+                    resolved_paths.add(resolved_rel)
+
+                    try:
+                        rel_path = service_dir.relative_to(self.repo_path)
+                    except ValueError:
+                        continue
+                    if str(rel_path) in registered_paths:
+                        continue
+
+                    if self._is_collection_member(service_dir):
+                        logger.debug("Skipping collection member: %s", rel_path)
+                        continue
+
+                    if self._is_deployable_service(service_dir):
+                        container = self._create_container(service_dir)
+                        if container:
+                            containers.append(container)
+                            registered_paths.add(str(rel_path))
+
+        # Fallback: single-service repo
         if not containers:
             if self._is_deployable_service(self.repo_path):
                 container = self._create_container(self.repo_path)
-                if container:  # Only add if not None
+                if container:
                     containers.append(container)
-        
+
         return containers
-    
+
+    def _is_significant_module(self, directory: Path) -> bool:
+        """Return True if directory is a meaningful top-level module.
+
+        A directory is significant if it contains at least one framework manifest
+        nested within it.  Known build-infrastructure directories (buildSrc, gradle,
+        etc.) are already excluded before this method is reached.
+        """
+        return self._has_nested_manifest(directory, max_depth=3)
+
+    def _is_grouping_dir(self, directory: Path) -> bool:
+        """Return True if directory is a collection parent for many service subdirs.
+
+        A grouping dir has >= _collection_threshold direct child directories
+        that each contain at least one framework manifest within depth 2.
+        These are recursed into in Phase 2 to surface nested services.
+        """
+        count = 0
+        try:
+            for child in directory.iterdir():
+                if (not child.is_dir()
+                        or child.name in self.excluded_dirs
+                        or child.name.startswith('.')):
+                    continue
+                if self._has_nested_manifest(child, max_depth=2):
+                    count += 1
+                    if count >= self._collection_threshold:
+                        return True
+        except OSError:
+            pass
+        return False
+
+    def _has_deployable_children(self, directory: Path) -> bool:
+        """Return True if any immediate child directory is a deployable service."""
+        try:
+            for child in directory.iterdir():
+                if (child.is_dir()
+                        and not child.name.startswith('.')
+                        and child.name not in self.excluded_dirs
+                        and self._is_deployable_service(child)):
+                    return True
+        except OSError:
+            pass
+        return False
+
+    def _has_nested_manifest(self, directory: Path, max_depth: int = 3) -> bool:
+        """Return True if any framework manifest exists within max_depth directory levels."""
+        return self._search_nested(directory, self.framework_manifests, max_depth, check_name=True)
+
+    def _search_nested(
+        self,
+        directory: Path,
+        targets: set[str],
+        max_depth: int,
+        check_name: bool,
+        _depth: int = 0,
+    ) -> bool:
+        """Recursively search for target files within max_depth directory levels."""
+        if _depth > max_depth:
+            return False
+        try:
+            for child in directory.iterdir():
+                if child.is_file():
+                    if (child.name if check_name else child.suffix) in targets:
+                        return True
+                elif (child.is_dir()
+                      and child.name not in self.excluded_dirs
+                      and not child.name.startswith('.')):
+                    if self._search_nested(child, targets, max_depth, check_name, _depth + 1):
+                        return True
+        except OSError:
+            pass
+        return False
+
+    def _is_collection_member(self, service_dir: Path) -> bool:
+        """Return True when service_dir is part of a collection tree.
+
+        Walks upward from service_dir to the repo root.  At each level,
+        counts how many siblings (directories at the same level) carry at
+        least one framework manifest directly inside them.  If any level
+        reaches _collection_threshold, the directory is a collection member
+        (connector, plugin, base-image tree, etc.) and should not be a
+        standalone C4 container.
+
+        Direct children of the repo root are always exempt.
+        """
+        if service_dir.parent == self.repo_path:
+            return False  # depth-1 dirs are always real service candidates
+
+        current = service_dir
+        while True:
+            parent = current.parent
+            if parent == self.repo_path:
+                break  # reached root — direct children exempt
+            if parent.parent == self.repo_path:
+                break  # parent is a depth-1 dir — don't conflate its siblings with a collection
+
+            sibling_count = 0
+            try:
+                for child in parent.iterdir():
+                    if not child.is_dir() or child == current:
+                        continue
+                    if any((child / m).exists() for m in self.framework_manifests):
+                        sibling_count += 1
+                        if sibling_count >= self._collection_threshold:
+                            return True
+            except OSError:
+                pass
+
+            current = parent
+
+        return False
+
     def _is_infrastructure_only(self, project_dir: Path) -> bool:
         """Return True when the directory contains only IaC files with no application code.
 

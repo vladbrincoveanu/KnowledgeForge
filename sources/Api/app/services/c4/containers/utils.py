@@ -82,26 +82,54 @@ def infer_container_type(project_dir: Path) -> str:
     return "Service"
 
 
+_MANIFEST_SKIP_DIRS = frozenset({
+    ".git", "node_modules", "vendor", ".venv", "venv",
+    "__pycache__", "dist", "build", "target",
+})
+
+
+def _detect_tech_from_manifests(directory: Path) -> str:
+    """Check for build/package manifest files in a single directory."""
+    if (directory / "package.json").exists():
+        return "Node.js"
+    if (directory / "pyproject.toml").exists() or (directory / "requirements.txt").exists():
+        return "Python"
+    if (directory / "pom.xml").exists():
+        return "Java"
+    if (directory / "build.gradle").exists() or (directory / "build.gradle.kts").exists():
+        return "Java"
+    if (directory / "go.mod").exists():
+        return "Go"
+    if list(directory.glob("*.csproj")) or list(directory.glob("*.sln")):
+        return ".NET"
+    if (directory / "Cargo.toml").exists():
+        return "Rust"
+    if list(directory.glob("*.tf")):
+        return "Terraform"
+    if (directory / "chart" / "Chart.yaml").exists() or (directory / "Chart.yaml").exists():
+        return "Helm"
+    return ""
+
+
 def detect_technology_stack(project_dir: Path) -> str:
     """Detect primary technology stack."""
-    if (project_dir / "package.json").exists():
-        return "Node.js"
-    elif (project_dir / "pyproject.toml").exists() or (project_dir / "requirements.txt").exists():
-        return "Python"
-    elif (project_dir / "pom.xml").exists():
-        return "Java"
-    elif (project_dir / "build.gradle").exists() or (project_dir / "build.gradle.kts").exists():
-        return "Java"
-    elif (project_dir / "go.mod").exists():
-        return "Go"
-    elif list(project_dir.glob("*.csproj")) or list(project_dir.glob("*.sln")):
-        return ".NET"
-    elif (project_dir / "Cargo.toml").exists():
-        return "Rust"
-    elif list(project_dir.glob("*.tf")):
-        return "Terraform"
-    elif (project_dir / "chart" / "Chart.yaml").exists() or (project_dir / "Chart.yaml").exists():
-        return "Helm"
+    # Manifest-based detection at root
+    tech = _detect_tech_from_manifests(project_dir)
+    if tech:
+        return tech
+
+    # One level deep: monorepo packages often keep manifests in a sub-package dir
+    # (e.g. airbyte-cdk/python/pyproject.toml)
+    try:
+        for subdir in sorted(project_dir.iterdir()):
+            if (subdir.is_dir()
+                    and not subdir.name.startswith(".")
+                    and subdir.name not in _MANIFEST_SKIP_DIRS):
+                tech = _detect_tech_from_manifests(subdir)
+                if tech:
+                    return tech
+    except OSError:
+        pass
 
     # Fallback 1: infer from Dockerfile base image
     dockerfile = project_dir / "Dockerfile"
@@ -150,7 +178,10 @@ def _detect_tech_from_dockerfile(dockerfile: Path) -> str:
 
 
 def _detect_tech_from_source_files(project_dir: Path) -> str:
-    """Count source files by extension and return the dominant tech, or empty string."""
+    """Count source files by extension and return the dominant tech, or empty string.
+
+    Checks root files first; if none found, also scans immediate subdirectories.
+    """
     _EXT_TECH = {
         ".py": "Python",
         ".go": "Go",
@@ -163,13 +194,27 @@ def _detect_tech_from_source_files(project_dir: Path) -> str:
         ".sh": "Shell",
     }
     counts: dict[str, int] = {}
-    try:
-        for f in project_dir.iterdir():
-            if f.is_file() and f.suffix in _EXT_TECH:
-                tech = _EXT_TECH[f.suffix]
-                counts[tech] = counts.get(tech, 0) + 1
-    except Exception:
-        pass
+
+    def _scan(d: Path) -> None:
+        try:
+            for f in d.iterdir():
+                if f.is_file() and f.suffix in _EXT_TECH:
+                    counts[_EXT_TECH[f.suffix]] = counts.get(_EXT_TECH[f.suffix], 0) + 1
+        except OSError:
+            pass
+
+    _scan(project_dir)
+
+    if not counts:
+        try:
+            for subdir in project_dir.iterdir():
+                if (subdir.is_dir()
+                        and not subdir.name.startswith(".")
+                        and subdir.name not in _MANIFEST_SKIP_DIRS):
+                    _scan(subdir)
+        except OSError:
+            pass
+
     if not counts:
         return ""
     return max(counts, key=lambda t: counts[t])
