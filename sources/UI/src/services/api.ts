@@ -420,6 +420,76 @@ export type LLMConfigResponse = {
   rate_limit_max: number;
 };
 
+export type TestEvent =
+  | { type: "meta"; model: string; ttft_ms: number; ts: string }
+  | { type: "chunk"; delta: string }
+  | {
+      type: "done";
+      total_ms: number;
+      tokens_in: number;
+      tokens_out: number;
+      tps: number;
+    }
+  | { type: "error"; code: string; message: string };
+
+async function* testPromptImpl(
+  prompt: string,
+  model?: string,
+  signal?: AbortSignal,
+): AsyncGenerator<TestEvent> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/v1/config/llm/test-prompt`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+        Authorization: `Bearer ${API_KEY}`,
+      },
+      body: JSON.stringify({ prompt, model }),
+      signal,
+    },
+  );
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => response.statusText);
+    throw new Error(
+      `Test prompt failed: ${response.status} ${detail || response.statusText}`.trim(),
+    );
+  }
+  if (!response.body) {
+    throw new Error("Test prompt response had no body");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let idx: number;
+      while ((idx = buffer.indexOf("\n\n")) >= 0) {
+        const frame = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + 2);
+        const line = frame
+          .split("\n")
+          .find((l) => l.startsWith("data: "));
+        if (!line) continue;
+        const payload = line.slice("data: ".length);
+        try {
+          yield JSON.parse(payload) as TestEvent;
+        } catch {
+          // skip malformed frames
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 export const llmConfigAPI = {
   getConfig: async (): Promise<LLMConfigResponse> => {
     const response: AxiosResponse<LLMConfigResponse> = await api.get("/api/v1/config/llm/");
@@ -428,6 +498,13 @@ export const llmConfigAPI = {
   updateConfig: async (patch: Partial<{ api_key: string; model: string }>): Promise<LLMConfigResponse> => {
     const response: AxiosResponse<LLMConfigResponse> = await api.put("/api/v1/config/llm/", patch);
     return response.data;
+  },
+  testPrompt(
+    prompt: string,
+    model?: string,
+    signal?: AbortSignal,
+  ): AsyncGenerator<TestEvent> {
+    return testPromptImpl(prompt, model, signal);
   },
 };
 

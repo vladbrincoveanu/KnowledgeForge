@@ -2,12 +2,16 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { llmConfigAPI, LLMConfigResponse } from "../../../services/api";
 import { useLLMStats } from "../../../hooks/useLLMStats";
+import { useTestPrompt } from "../../../hooks/useTestPrompt";
+import { ResultCard } from "./ResultCard";
+import { isValidModelName } from "../../../schemas/modelName";
 import "./SystemMetrics.scss";
 
-const VALID_MODELS = [
+const KNOWN_MODELS = [
+  "MiniMax-M3",
+  "MiniMax-M2.7",
   "anthropic/claude-sonnet-4-20250514",
   "anthropic/claude-haiku-4-5-20251001",
-  "MiniMax-M2.7",
 ];
 
 function formatNum(n: number): string {
@@ -16,26 +20,32 @@ function formatNum(n: number): string {
 
 function fmtTs(ts: string): string {
   const d = new Date(ts);
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  return d.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 }
 
 const SystemMetrics: React.FC = () => {
   const { runs, totals, clearStats } = useLLMStats();
+  const { status, result, error, run, reset } = useTestPrompt();
   const [config, setConfig] = useState<LLMConfigResponse | null>(null);
   const [selectedModel, setSelectedModel] = useState("");
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [saveStatus, setSaveStatus] = useState<"idle" | "ok" | "err">("idle");
   const [errMsg, setErrMsg] = useState("");
   const [loading, setLoading] = useState(true);
-  const [testStatus, setTestStatus] = useState<"idle" | "testing" | "ok" | "err">("idle");
-  const [testMsg, setTestMsg] = useState("");
 
   useEffect(() => {
-    llmConfigAPI.getConfig().then((c) => {
-      setConfig(c);
-      setSelectedModel(c.model);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    llmConfigAPI
+      .getConfig()
+      .then((c) => {
+        setConfig(c);
+        setSelectedModel(c.model);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, []);
 
   const handleSave = async () => {
@@ -44,7 +54,16 @@ const SystemMetrics: React.FC = () => {
     try {
       const patch: Record<string, string> = {};
       if (apiKeyInput) patch.api_key = apiKeyInput;
-      if (selectedModel !== config?.model) patch.model = selectedModel;
+      if (selectedModel !== config?.model) {
+        if (!isValidModelName(selectedModel)) {
+          setErrMsg(
+            "Invalid model format. Use 'anthropic/<name>' or 'MiniMax-<version>'",
+          );
+          setSaveStatus("err");
+          return;
+        }
+        patch.model = selectedModel;
+      }
       if (!Object.keys(patch).length) return;
       const updated = await llmConfigAPI.updateConfig(patch);
       setConfig(updated);
@@ -53,26 +72,20 @@ const SystemMetrics: React.FC = () => {
     } catch (e: unknown) {
       const msg = axios.isAxiosError(e)
         ? (e.response?.data?.detail ?? e.message)
-        : (e instanceof Error ? e.message : "Failed to save");
+        : e instanceof Error
+          ? e.message
+          : "Failed to save";
       setErrMsg(msg);
       setSaveStatus("err");
     }
   };
 
-  const handleTestConnection = async () => {
-    setTestStatus("testing");
-    setTestMsg("");
-    try {
-      const res = await llmConfigAPI.updateConfig({});
-      setTestStatus("ok");
-      setTestMsg(`Connected — model: ${res.model}, key: ${res.api_key_set ? "set" : "not set"}`);
-    } catch (e: unknown) {
-      const msg = axios.isAxiosError(e)
-        ? (e.response?.data?.detail ?? e.message)
-        : (e instanceof Error ? e.message : "Connection failed");
-      setTestStatus("err");
-      setTestMsg(msg);
-    }
+  const handleRunTest = async () => {
+    const ta = document.getElementById(
+      "test-prompt",
+    ) as HTMLTextAreaElement | null;
+    if (!ta) return;
+    await run(ta.value, selectedModel);
   };
 
   if (loading) {
@@ -86,7 +99,9 @@ const SystemMetrics: React.FC = () => {
 
   const keySource = config?.api_key_source;
   const keyLabel = config?.api_key_set
-    ? keySource === "override" ? "● override" : "● env"
+    ? keySource === "override"
+      ? "● override"
+      : "● env"
     : "○ not set";
 
   return (
@@ -97,16 +112,20 @@ const SystemMetrics: React.FC = () => {
         <h3>LLM Configuration</h3>
         <div className="sm-config-panel">
           <div className="sm-field">
-            <label htmlFor="model-select">Model</label>
-            <select
-              id="model-select"
+            <label htmlFor="model-input">Model</label>
+            <input
+              id="model-input"
+              type="text"
+              list="known-models"
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
-            >
-              {VALID_MODELS.map((m) => (
-                <option key={m} value={m}>{m}</option>
+              placeholder="MiniMax-M3 or anthropic/claude-sonnet-4-20250514"
+            />
+            <datalist id="known-models">
+              {KNOWN_MODELS.map((m) => (
+                <option key={m} value={m} />
               ))}
-            </select>
+            </datalist>
           </div>
           <div className="sm-field">
             <label htmlFor="api-key-input">API Key</label>
@@ -118,7 +137,9 @@ const SystemMetrics: React.FC = () => {
                 value={apiKeyInput}
                 onChange={(e) => setApiKeyInput(e.target.value)}
               />
-              <span className={`sm-key-badge sm-key-badge--${keySource ?? "unset"}`}>
+              <span
+                className={`sm-key-badge sm-key-badge--${keySource ?? "unset"}`}
+              >
                 {keyLabel}
               </span>
             </div>
@@ -128,26 +149,38 @@ const SystemMetrics: React.FC = () => {
           </p>
           {saveStatus === "err" && <p className="sm-error">{errMsg}</p>}
           <div className="sm-actions">
-            <button className="sm-btn-primary" onClick={handleSave}>Save</button>
-            <button
-              className="sm-btn-secondary"
-              onClick={handleTestConnection}
-              disabled={testStatus === "testing"}
-            >
-              {testStatus === "testing" ? "Testing..." : "Test Connection"}
+            <button className="sm-btn-primary" onClick={handleSave}>
+              Save
             </button>
-            {saveStatus === "ok" && <span className="sm-toast">Saved</span>}
           </div>
-          {testMsg && (
-            <p className={`sm-test-msg sm-test-msg--${testStatus === "ok" ? "ok" : "err"}`}>
-              {testMsg}
-            </p>
-          )}
           {config && (
             <div className="sm-rate-chip">
-              Rate limit: {config.rate_limit_used} / {config.rate_limit_max} req/hr
+              Rate limit: {config.rate_limit_used} / {config.rate_limit_max}{" "}
+              req/hr
             </div>
           )}
+        </div>
+      </section>
+
+      <section className="sm-section">
+        <h3>Test Prompt</h3>
+        <div className="sm-test-panel">
+          <label htmlFor="test-prompt">Test Prompt (max 500 chars)</label>
+          <textarea
+            id="test-prompt"
+            defaultValue="Reply with the single word: pong"
+            maxLength={500}
+            rows={2}
+          />
+          <button
+            className="sm-btn-secondary"
+            onClick={handleRunTest}
+            disabled={status === "running"}
+          >
+            {status === "running" ? "Running..." : "Run Test"}
+          </button>
+          {result && <ResultCard result={result} onClear={reset} />}
+          {error && <p className="sm-error">{error.message}</p>}
         </div>
       </section>
 
@@ -160,11 +193,15 @@ const SystemMetrics: React.FC = () => {
           </div>
           <div className="sm-chip">
             <span className="sm-chip-label">Tokens Out</span>
-            <span className="sm-chip-value">{formatNum(totals.tokens_out)}</span>
+            <span className="sm-chip-value">
+              {formatNum(totals.tokens_out)}
+            </span>
           </div>
           <div className="sm-chip">
             <span className="sm-chip-label">Tool Calls</span>
-            <span className="sm-chip-value">{formatNum(totals.tool_calls)}</span>
+            <span className="sm-chip-value">
+              {formatNum(totals.tool_calls)}
+            </span>
           </div>
           <div className="sm-chip">
             <span className="sm-chip-label">Runs</span>
@@ -177,7 +214,9 @@ const SystemMetrics: React.FC = () => {
         <div className="sm-table-header">
           <h3>Per-Run Stats</h3>
           {runs.length > 0 && (
-            <button className="sm-btn-ghost" onClick={clearStats}>Clear</button>
+            <button className="sm-btn-ghost" onClick={clearStats}>
+              Clear
+            </button>
           )}
         </div>
         {runs.length === 0 ? (
@@ -190,7 +229,9 @@ const SystemMetrics: React.FC = () => {
                 <th>Model</th>
                 <th>In</th>
                 <th>Out</th>
-                <th>avg tok/s</th>
+                <th title="For batch enrichment runs. Includes tool execution + DB writes. For pure LLM speed, use the Test Prompt panel above.">
+                  avg tok/s
+                </th>
                 <th>Calls</th>
                 <th>Duration</th>
                 <th>Time</th>
@@ -200,12 +241,12 @@ const SystemMetrics: React.FC = () => {
               {runs.map((r) => (
                 <tr key={`${r.task_id}-${r.timestamp}`}>
                   <td>{r.task_id.slice(0, 8)}</td>
-                  <td>{r.model.includes("/") ? r.model.split("/")[1] : r.model}</td>
+                  <td>
+                    {r.model.includes("/") ? r.model.split("/")[1] : r.model}
+                  </td>
                   <td>{formatNum(r.tokens_in)}</td>
                   <td>{formatNum(r.tokens_out)}</td>
-                  <td title="Total tokens ÷ run duration (includes tool execution time)">
-                    {r.tps}
-                  </td>
+                  <td>{r.tps}</td>
                   <td>{r.tool_calls}</td>
                   <td>{r.duration_s}s</td>
                   <td>{fmtTs(r.timestamp)}</td>
