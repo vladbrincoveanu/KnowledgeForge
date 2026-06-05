@@ -2,12 +2,12 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Review Queue', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/review');
+    await page.goto('/workspace');
     await page.waitForLoadState('networkidle');
   });
 
-  test('page loads with Review Queue heading', async ({ page }) => {
-    await expect(page.locator('h1').filter({ hasText: 'Review Queue' })).toBeVisible({ timeout: 10000 });
+  test('section loads with Pending Review Items heading', async ({ page }) => {
+    await expect(page.locator('h2').filter({ hasText: 'Pending Review Items' })).toBeVisible({ timeout: 10000 });
   });
 
   test('shows extraction run ID input and Load button', async ({ page }) => {
