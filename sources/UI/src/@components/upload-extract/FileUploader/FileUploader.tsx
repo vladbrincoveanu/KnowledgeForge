@@ -32,7 +32,14 @@ interface FileUploaderProps {
   ) => void;
 }
 
-type RepoStatus = "idle" | "pending" | "scanning" | "completed" | "failed" | "zipping" | "uploading";
+type RepoStatus =
+  | "idle"
+  | "pending"
+  | "scanning"
+  | "completed"
+  | "failed"
+  | "zipping"
+  | "uploading";
 
 interface RepoEntry {
   url: string;
@@ -276,7 +283,12 @@ const FileUploader: React.FC<FileUploaderProps> = ({
             setRepos((prev) =>
               prev.map((r) =>
                 r.url === folderName + "/"
-                  ? { ...r, status: "uploading" as RepoStatus, message: `Uploading… ${pct}%`, progress: pct / 100 }
+                  ? {
+                      ...r,
+                      status: "uploading" as RepoStatus,
+                      message: `Uploading… ${pct}%`,
+                      progress: pct / 100,
+                    }
                   : r,
               ),
             );
@@ -319,7 +331,13 @@ const FileUploader: React.FC<FileUploaderProps> = ({
         setRepos((prev) =>
           prev.map((r) =>
             r.url === displayName
-              ? { ...r, taskId, status: "pending" as RepoStatus, message: "Queued", progress: 0 }
+              ? {
+                  ...r,
+                  taskId,
+                  status: "pending" as RepoStatus,
+                  message: "Queued",
+                  progress: 0,
+                }
               : r,
           ),
         );
@@ -352,10 +370,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     (phase: "zipping" | "uploading" | "warning", value: number) => {
       if (phase === "warning") {
         const mb = Math.round(value / 1024 / 1024);
-        showNotification(
-          `Large zip (${mb} MB) — upload may be slow.`,
-          "info",
-        );
+        showNotification(`Large zip (${mb} MB) — upload may be slow.`, "info");
         return;
       }
       setRepos((prev) =>
@@ -461,54 +476,54 @@ const FileUploader: React.FC<FileUploaderProps> = ({
           onError={(msg) => showNotification(msg, "error")}
         />
       ) : (
-      <>
-      {/* URL Input */}
-      <div className="url-input-section">
-        <div className="url-input-row">
-          <div className="url-input-wrapper">
-            <Github size={18} className="url-input-icon" />
-            <input
-              type="url"
-              className={`url-input ${inputError ? "url-input--error" : ""}`}
-              placeholder="https://github.com/owner/repo or https://gitlab.example.com/group/repo"
-              value={inputUrl}
-              onChange={(e) => {
-                setInputUrl(e.target.value);
-                if (inputError) setInputError("");
-              }}
-              onKeyDown={handleKeyDown}
-            />
+        <>
+          {/* URL Input */}
+          <div className="url-input-section">
+            <div className="url-input-row">
+              <div className="url-input-wrapper">
+                <Github size={18} className="url-input-icon" />
+                <input
+                  type="url"
+                  className={`url-input ${inputError ? "url-input--error" : ""}`}
+                  placeholder="https://github.com/owner/repo or https://gitlab.example.com/group/repo"
+                  value={inputUrl}
+                  onChange={(e) => {
+                    setInputUrl(e.target.value);
+                    if (inputError) setInputError("");
+                  }}
+                  onKeyDown={handleKeyDown}
+                />
+              </div>
+              <button className="btn-add" onClick={addRepo}>
+                <Plus size={18} />
+                Add
+              </button>
+            </div>
+            <div className="token-input-row">
+              <div className="url-input-wrapper token-input-wrapper">
+                <Lock size={16} className="url-input-icon token-icon" />
+                <input
+                  type={showToken ? "text" : "password"}
+                  className="url-input token-input"
+                  placeholder="Access token (optional — for private repos)"
+                  value={inputToken}
+                  onChange={(e) => setInputToken(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  autoComplete="off"
+                />
+                <button
+                  type="button"
+                  className="btn-toggle-token"
+                  onClick={() => setShowToken((v) => !v)}
+                  aria-label={showToken ? "Hide token" : "Show token"}
+                >
+                  {showToken ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+            </div>
+            {inputError && <p className="url-error">{inputError}</p>}
           </div>
-          <button className="btn-add" onClick={addRepo}>
-            <Plus size={18} />
-            Add
-          </button>
-        </div>
-        <div className="token-input-row">
-          <div className="url-input-wrapper token-input-wrapper">
-            <Lock size={16} className="url-input-icon token-icon" />
-            <input
-              type={showToken ? "text" : "password"}
-              className="url-input token-input"
-              placeholder="Access token (optional — for private repos)"
-              value={inputToken}
-              onChange={(e) => setInputToken(e.target.value)}
-              onKeyDown={handleKeyDown}
-              autoComplete="off"
-            />
-            <button
-              type="button"
-              className="btn-toggle-token"
-              onClick={() => setShowToken((v) => !v)}
-              aria-label={showToken ? "Hide token" : "Show token"}
-            >
-              {showToken ? <EyeOff size={15} /> : <Eye size={15} />}
-            </button>
-          </div>
-        </div>
-        {inputError && <p className="url-error">{inputError}</p>}
-      </div>
-      </>
+        </>
       )}
 
       {/* Repo List */}

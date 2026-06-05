@@ -34,7 +34,12 @@ describe("llmConfigAPI.testPrompt", () => {
       out.push(ev);
     }
     expect(out).toEqual([
-      { type: "meta", model: "MiniMax-M2.7", ttft_ms: 100, ts: "2026-06-01T10:00:00Z" },
+      {
+        type: "meta",
+        model: "MiniMax-M2.7",
+        ttft_ms: 100,
+        ts: "2026-06-01T10:00:00Z",
+      },
       { type: "chunk", delta: "p" },
       { type: "chunk", delta: "ong" },
       { type: "done", total_ms: 200, tokens_in: 3, tokens_out: 3, tps: 15 },
@@ -44,9 +49,11 @@ describe("llmConfigAPI.testPrompt", () => {
   it("throws on non-2xx response", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ detail: "no key" }), { status: 401 }),
-      ),
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(JSON.stringify({ detail: "no key" }), { status: 401 }),
+        ),
     );
     await expect(async () => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars

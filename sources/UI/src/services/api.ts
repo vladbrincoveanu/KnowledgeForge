@@ -473,9 +473,7 @@ async function* testPromptImpl(
       while ((idx = buffer.indexOf("\n\n")) >= 0) {
         const frame = buffer.slice(0, idx);
         buffer = buffer.slice(idx + 2);
-        const line = frame
-          .split("\n")
-          .find((l) => l.startsWith("data: "));
+        const line = frame.split("\n").find((l) => l.startsWith("data: "));
         if (!line) continue;
         const payload = line.slice("data: ".length);
         try {
@@ -492,11 +490,18 @@ async function* testPromptImpl(
 
 export const llmConfigAPI = {
   getConfig: async (): Promise<LLMConfigResponse> => {
-    const response: AxiosResponse<LLMConfigResponse> = await api.get("/api/v1/config/llm/");
+    const response: AxiosResponse<LLMConfigResponse> = await api.get(
+      "/api/v1/config/llm/",
+    );
     return response.data;
   },
-  updateConfig: async (patch: Partial<{ api_key: string; model: string }>): Promise<LLMConfigResponse> => {
-    const response: AxiosResponse<LLMConfigResponse> = await api.put("/api/v1/config/llm/", patch);
+  updateConfig: async (
+    patch: Partial<{ api_key: string; model: string }>,
+  ): Promise<LLMConfigResponse> => {
+    const response: AxiosResponse<LLMConfigResponse> = await api.put(
+      "/api/v1/config/llm/",
+      patch,
+    );
     return response.data;
   },
   testPrompt(

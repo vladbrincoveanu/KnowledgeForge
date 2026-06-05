@@ -376,8 +376,12 @@ describe("FileUploader Component", () => {
         showNotification={mockShowNotification}
       />,
     );
-    expect(screen.getByRole("tab", { name: /github url/i })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /local folder/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("tab", { name: /github url/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("tab", { name: /local folder/i }),
+    ).toBeInTheDocument();
   });
 
   it("switches to Local Folder tab on click", () => {
@@ -390,7 +394,9 @@ describe("FileUploader Component", () => {
       />,
     );
     fireEvent.click(screen.getByRole("tab", { name: /local folder/i }));
-    expect(screen.getByRole("region", { name: /drop project folder/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: /drop project folder/i }),
+    ).toBeInTheDocument();
   });
 
   it("GitHub tab still shows URL input after tab switch and back", () => {
