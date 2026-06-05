@@ -73,7 +73,7 @@ export const ReviewDashboard: React.FC = () => {
           marginBottom: "1.5rem",
         }}
       >
-        <h1>Review Queue</h1>
+        <h3>Review Queue</h3>
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
           <input
             placeholder="Extraction run ID"
