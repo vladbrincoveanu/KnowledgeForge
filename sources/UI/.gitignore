@@ -1,8 +1,8 @@
 .vercel
 
 # Playwright
-e2e/test-results/
-e2e/playwright-report/
+test-results/
+playwright-report/
 e2e/.extraction-state.json
 e2e/.extraction-fixtures.json
 e2e/.extraction-result.json
