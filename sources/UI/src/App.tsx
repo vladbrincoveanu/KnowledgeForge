@@ -7,12 +7,7 @@ import {
   Link,
   useLocation,
 } from "react-router-dom";
-import {
-  Activity,
-  Upload,
-  Settings as SettingsIcon,
-  Code,
-} from "lucide-react";
+import { Activity, Upload, Settings as SettingsIcon, Code } from "lucide-react";
 import KFLogo from "./@components/KFLogo";
 import "./App.scss";
 import CodeArchitectureViewer from "./@components/architecture-map/CodeArchitectureViewer/CodeArchitectureViewer";
@@ -261,7 +256,10 @@ const MainContent: React.FC = () => {
           } ${isLandingRoute ? "landing-main-content" : ""}`}
         >
           <Routes>
-            <Route path="/" element={<Navigate to="/code-architecture" replace />} />
+            <Route
+              path="/"
+              element={<Navigate to="/code-architecture" replace />}
+            />
             <Route
               path="/workspace"
               element={
@@ -353,7 +351,10 @@ const MainContent: React.FC = () => {
               }
             />
 
-            <Route path="/review/*" element={<Navigate to="/workspace" replace />} />
+            <Route
+              path="/review/*"
+              element={<Navigate to="/workspace" replace />}
+            />
           </Routes>
         </main>
       </div>

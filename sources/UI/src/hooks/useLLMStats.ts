@@ -54,7 +54,9 @@ function saveToStorage(runs: LLMRun[]): void {
 
 export function useLLMStats() {
   const [runs, setRuns] = useState<LLMRun[]>(loadFromStorage);
-  const [totals, setTotals] = useState<LLMTotals>(() => computeTotals(loadFromStorage()));
+  const [totals, setTotals] = useState<LLMTotals>(() =>
+    computeTotals(loadFromStorage()),
+  );
 
   const clearStats = useCallback(() => {
     sessionStorage.removeItem(STORAGE_KEY);
@@ -98,9 +100,13 @@ export function useLLMStats() {
         tokens_out: data.tokens_out as number,
         tool_calls: data.tool_calls_used as number,
         duration_s: data.duration_s as number,
-        tps: data.duration_s > 0
-          ? Math.round(((data.tokens_in as number) + (data.tokens_out as number)) / (data.duration_s as number))
-          : 0,
+        tps:
+          data.duration_s > 0
+            ? Math.round(
+                ((data.tokens_in as number) + (data.tokens_out as number)) /
+                  (data.duration_s as number),
+              )
+            : 0,
         timestamp: new Date().toISOString(),
       };
 

@@ -1946,10 +1946,11 @@
     animation: blink 0.9s step-end infinite;
 
     @keyframes blink {
-      50% { opacity: 0; }
+      50% {
+        opacity: 0;
+      }
     }
   }
-
 }
 
 // ── Split Layout: 80% Graph / 20% Right Panel ─────────────────────────────────────

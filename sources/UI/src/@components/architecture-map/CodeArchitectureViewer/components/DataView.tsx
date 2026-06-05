@@ -17,7 +17,11 @@ interface Relationship {
   target_entity_id?: string;
   relationship_type?: string;
   context?: string;
-  attributes?: { protocol?: string; description?: string; [key: string]: unknown };
+  attributes?: {
+    protocol?: string;
+    description?: string;
+    [key: string]: unknown;
+  };
   [key: string]: unknown;
 }
 
@@ -58,7 +62,12 @@ function cleanRelationship(r: Relationship) {
   );
 }
 
-export default function DataView({ levelData, levelLabel, architecture, markdownCache }: DataViewProps) {
+export default function DataView({
+  levelData,
+  levelLabel,
+  architecture,
+  markdownCache,
+}: DataViewProps) {
   const entities = levelData?.entities ?? [];
   const relationships = levelData?.relationships ?? [];
 

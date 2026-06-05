@@ -376,7 +376,10 @@ const getLayoutedElements = (
       cg.setDefaultEdgeLabel(() => ({}));
       cg.setGraph({ rankdir: "LR", ranksep: 80, nodesep: 40 });
       children.forEach((child) => {
-        cg.setNode(child.id, { width: childNodeWidth, height: childNodeHeight });
+        cg.setNode(child.id, {
+          width: childNodeWidth,
+          height: childNodeHeight,
+        });
       });
       childEdges.forEach((e) => cg.setEdge(e.source, e.target));
       dagre.layout(cg);
@@ -401,8 +404,12 @@ const getLayoutedElements = (
         child.targetPosition = Position.Left;
       });
 
-      const maxChildX = Math.max(...children.map((c) => c.position.x + childNodeWidth));
-      const maxChildY = Math.max(...children.map((c) => c.position.y + childNodeHeight));
+      const maxChildX = Math.max(
+        ...children.map((c) => c.position.x + childNodeWidth),
+      );
+      const maxChildY = Math.max(
+        ...children.map((c) => c.position.y + childNodeHeight),
+      );
       container.style = {
         ...container.style,
         width: Math.max(400, maxChildX + childStartX),
@@ -1442,8 +1449,12 @@ const CodeArchitectureViewerInner: React.FC = () => {
         data.relationships.components.forEach((rel: any, idx: number) => {
           const srcName = rel.from ?? rel.source;
           const tgtName = rel.to ?? rel.destination ?? rel.target;
-          const srcId = srcName ? componentIdByName.get(String(srcName)) : undefined;
-          const tgtId = tgtName ? componentIdByName.get(String(tgtName)) : undefined;
+          const srcId = srcName
+            ? componentIdByName.get(String(srcName))
+            : undefined;
+          const tgtId = tgtName
+            ? componentIdByName.get(String(tgtName))
+            : undefined;
           if (srcId && tgtId) {
             const pairKey = [srcId, tgtId].sort().join("|||");
             if (seenPairs.has(pairKey)) return;
@@ -2816,30 +2827,32 @@ const CodeArchitectureViewerInner: React.FC = () => {
           />
         )}
 
-        {viewMode === "diagram" && <div className="chat-panel-container">
-          {selectedEdge && !selectedNode ? (
-            <EdgeDetailsPanel
-              selectedEdge={selectedEdge}
-              onClose={() => setSelectedEdge(null)}
-              edgeDescription={edgeDescription}
-              isEdgeLoading={isEdgeLoading}
-              chatMessages={chatMessages}
-              isChatLoading={isChatLoading}
-              onSendChat={handleArchitectureChat}
-            />
-          ) : (
-            <NodeDetailsPanel
-              selectedNode={mergeNodeReviewOverride(selectedNode)}
-              onClose={() => setSelectedNode(null)}
-              nodeDescription={nodeDescription}
-              isNodeLoading={isNodeLoading}
-              chatMessages={chatMessages}
-              isChatLoading={isChatLoading}
-              onSendChat={handleArchitectureChat}
-              onApplyReviewDecision={handleApplyReviewDecision}
-            />
-          )}
-        </div>}
+        {viewMode === "diagram" && (
+          <div className="chat-panel-container">
+            {selectedEdge && !selectedNode ? (
+              <EdgeDetailsPanel
+                selectedEdge={selectedEdge}
+                onClose={() => setSelectedEdge(null)}
+                edgeDescription={edgeDescription}
+                isEdgeLoading={isEdgeLoading}
+                chatMessages={chatMessages}
+                isChatLoading={isChatLoading}
+                onSendChat={handleArchitectureChat}
+              />
+            ) : (
+              <NodeDetailsPanel
+                selectedNode={mergeNodeReviewOverride(selectedNode)}
+                onClose={() => setSelectedNode(null)}
+                nodeDescription={nodeDescription}
+                isNodeLoading={isNodeLoading}
+                chatMessages={chatMessages}
+                isChatLoading={isChatLoading}
+                onSendChat={handleArchitectureChat}
+                onApplyReviewDecision={handleApplyReviewDecision}
+              />
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

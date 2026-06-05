@@ -500,7 +500,9 @@
   font-weight: 500;
   color: #6c757d;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 
   &:hover {
     color: #343a40;
@@ -524,7 +526,9 @@
   border-radius: 8px;
   padding: 2rem;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
   margin-bottom: 1.5rem;
 
   &:hover,

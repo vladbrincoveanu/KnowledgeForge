@@ -24,7 +24,10 @@ function isExcluded(relativePath: string): boolean {
 
 export interface FolderDropZoneProps {
   onZipReady: (blob: Blob, name: string, sizeBytes: number) => void;
-  onProgress: (phase: "zipping" | "uploading" | "warning", value: number) => void;
+  onProgress: (
+    phase: "zipping" | "uploading" | "warning",
+    value: number,
+  ) => void;
   onError: (msg: string) => void;
 }
 
@@ -179,8 +182,16 @@ const FolderDropZone: React.FC<FolderDropZoneProps> = ({
         or click to select folder &nbsp;·&nbsp;{" "}
         <button
           className="folder-drop-zone__zip-link"
-          onClick={(e) => { e.stopPropagation(); zipInputRef.current?.click(); }}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); zipInputRef.current?.click(); } }}
+          onClick={(e) => {
+            e.stopPropagation();
+            zipInputRef.current?.click();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.stopPropagation();
+              zipInputRef.current?.click();
+            }
+          }}
         >
           browse for .zip
         </button>
