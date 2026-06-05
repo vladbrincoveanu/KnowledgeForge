@@ -54,7 +54,7 @@ Remove the top-level Review Queue nav tab and embed the review table inline with
 1. Remove the `review` entry from `navItems` array
 2. Remove `if (path.startsWith("/review")) return "review";` from `getActiveTab()`
 3. Remove `<Route path="/review" element={<ReviewDashboard />} />`
-4. Add `<Route path="/review" element={<Navigate to="/workspace" replace />} />` (redirect)
+4. Add `<Route path="/review/*" element={<Navigate to="/workspace" replace />} />` (wildcard redirect — catches `/review` and any `/review/*` deep links; renders 404-free)
 5. In the `/workspace` route element, append after the `uploaded-files` block:
    ```tsx
    <hr className="workspace-divider" />
@@ -120,7 +120,7 @@ Remove the top-level Review Queue nav tab and embed the review table inline with
 ## Edge Cases
 
 1. **No pending items on first load:** Workspace shows uploader + "No pending items. All clear!" — same as old ReviewQueue at empty state. ✓
-2. **Legacy `/review` URL:** redirects to `/workspace` via `<Navigate replace>`. No 404. ✓
+2. **Legacy `/review` and `/review/*` URLs:** wildcard-redirect to `/workspace` via `<Navigate replace>`. No 404 for any sub-path. ✓
 3. **ReviewDashboard re-renders when uploader re-renders:** React sibling components have independent state. `ReviewDashboard` state survives. ✓
 4. **`runId="latest"` default:** unchanged, resolves via backend. ✓
 5. **Mobile / narrow viewport:** table overflows; existing `ReviewDashboard` does not handle this. Out of scope — same behavior as before, no regression. (Acceptable: review workflow is desktop-first per team norm.)
