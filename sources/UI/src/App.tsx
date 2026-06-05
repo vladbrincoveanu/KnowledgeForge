@@ -89,12 +89,6 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab }) => {
       icon: <SettingsIcon size={20} />,
       path: "/settings",
     },
-    {
-      id: "review",
-      label: "Review Queue",
-      icon: <Activity size={20} />,
-      path: "/review",
-    },
   ];
 
   return (
@@ -200,7 +194,6 @@ const MainContent: React.FC = () => {
     if (path.startsWith("/code-architecture")) return "code-architecture";
     if (path.startsWith("/metrics")) return "metrics";
     if (path.startsWith("/settings")) return "settings";
-    if (path.startsWith("/review")) return "review";
     return "code-architecture";
   };
 
@@ -306,6 +299,17 @@ const MainContent: React.FC = () => {
                       </ul>
                     </div>
                   )}
+                  <hr
+                    style={{
+                      margin: "2rem 0",
+                      border: 0,
+                      borderTop: "1px solid #e5e7eb",
+                    }}
+                  />
+                  <section className="review-section">
+                    <h2>Pending Review Items</h2>
+                    <ReviewDashboard />
+                  </section>
                 </div>
               }
             />
@@ -349,7 +353,7 @@ const MainContent: React.FC = () => {
               }
             />
 
-            <Route path="/review" element={<ReviewDashboard />} />
+            <Route path="/review/*" element={<Navigate to="/workspace" replace />} />
           </Routes>
         </main>
       </div>
