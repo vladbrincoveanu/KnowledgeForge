@@ -534,10 +534,10 @@ class GitHubScanRequest(BaseModel):
         ),
     )
     full_history: bool = Field(
-        default=False,
+        default=True,
         description=(
-            "Clone with full Git history. Set True for repos > 6GB or when historical "
-            "analysis is needed. When False (default), uses --depth 1 for speed."
+            "Clone with full Git history (default). Set False to use --depth 1 for "
+            "faster clones when git metadata (contributors, activity, status) is not needed."
         ),
     )
 
@@ -548,7 +548,7 @@ class GitHubScanRequest(BaseModel):
                     "github_url": "https://github.com/microservices-demo/microservices-demo",
                     "use_git": True,
                     "append_mode": False,
-                    "full_history": False,
+                    "full_history": True,
                 }
             ]
         }
@@ -961,7 +961,11 @@ async def extract_from_github(
     request: GitHubScanRequest,
     background_tasks: BackgroundTasks,
 ):
-    """Download a GitHub repository and start C4 extraction (download is synchronous, scan is async)."""
+    """Start C4 extraction from a GitHub repository — returns task_id immediately.
+
+    Both the git clone and the C4 scan run in a background task so the HTTP
+    response is never blocked by a slow or large repository download.
+    """
     if not request.github_url:
         raise HTTPException(status_code=400, detail="github_url is required")
 
@@ -979,43 +983,23 @@ async def extract_from_github(
         'errors': [],
     }
 
-    try:
-        temp_dir = Path(tempfile.mkdtemp(prefix=f"code_arch_{task_id}_"))
-        repo_path = GitHubDownloader.download_repository(
-            request.github_url,
-            output_dir=temp_dir,
-            use_git=request.use_git,
-            full_history=request.full_history,
-            token=request.token or None,
-        )
+    background_tasks.add_task(
+        _clone_and_extract,
+        task_id,
+        request.github_url,
+        use_git=request.use_git,
+        full_history=request.full_history,
+        token=request.token or None,
+        max_components=request.max_components_per_domain,
+        append_mode=request.append_mode,
+    )
 
-        scan_tasks[task_id].update({
-            'repo_path': str(repo_path),
-            'temp_dir': str(temp_dir),
-            'message': 'Repository downloaded, scan queued',
-        })
-
-        background_tasks.add_task(
-            run_c4_extraction,
-            task_id,
-            repo_path,
-            max_components=request.max_components_per_domain,
-            append_mode=request.append_mode,
-        )
-
-        return ScanResponse(
-            task_id=task_id,
-            status='pending',
-            message='Repository downloaded and scan queued',
-            created_at=datetime.now(),
-        )
-
-    except Exception as e:
-        logger.error(f"Failed to download repository: {e}")
-        scan_tasks[task_id]['status'] = 'failed'
-        scan_tasks[task_id]['message'] = f'Failed to download repository: {str(e)}'
-        scan_tasks[task_id].setdefault('errors', []).append(str(e))
-        raise HTTPException(status_code=500, detail=f"Failed to download repository: {str(e)}")
+    return ScanResponse(
+        task_id=task_id,
+        status='pending',
+        message='Repository download queued',
+        created_at=datetime.now(),
+    )
 
 
 class GitHubOrgScanRequest(BaseModel):
@@ -1183,7 +1167,8 @@ async def run_batch_extraction(task_id: str, repo_urls: list[str], append_mode: 
             repo_path = GitHubDownloader.download_repository(
                 repo_url,
                 output_dir=temp_dir,
-                use_git=True
+                use_git=True,
+                full_history=True,
             )
 
             # Run extraction with same task_id (will aggregate all repos)
@@ -1260,6 +1245,57 @@ async def scan_repository(
         message='Repository scan queued',
         created_at=datetime.now(),
     )
+
+
+async def _clone_and_extract(
+    task_id: str,
+    github_url: str,
+    use_git: bool = True,
+    full_history: bool = True,
+    token: str | None = None,
+    max_components: int = 10,
+    append_mode: bool = True,
+) -> None:
+    """Clone a repository then hand off to run_c4_extraction.
+
+    Runs entirely in the background so the HTTP response is never blocked by
+    a slow or large git clone.
+    """
+    task = scan_tasks.get(task_id)
+    if not task:
+        return
+
+    task['status'] = 'cloning'
+    task['progress'] = 0.05
+    task['message'] = 'Cloning repository…'
+    logger.info(f"Cloning {github_url} for task {task_id}")
+
+    try:
+        temp_dir = Path(tempfile.mkdtemp(prefix=f"code_arch_{task_id}_"))
+        repo_path = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: GitHubDownloader.download_repository(
+                github_url,
+                output_dir=temp_dir,
+                use_git=use_git,
+                full_history=full_history,
+                token=token,
+            ),
+        )
+    except Exception as exc:
+        logger.error(f"Clone failed for task {task_id}: {exc}")
+        task['status'] = 'failed'
+        task['progress'] = 0.0
+        task['message'] = f'Repository clone failed: {exc}'
+        task.setdefault('errors', []).append(str(exc))
+        return
+
+    task['repo_path'] = str(repo_path)
+    task['temp_dir'] = str(temp_dir)
+    task['message'] = 'Repository cloned, starting scan'
+    task['progress'] = 0.1
+
+    await run_c4_extraction(task_id, repo_path, max_components=max_components, append_mode=append_mode)
 
 
 async def run_c4_extraction(

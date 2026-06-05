@@ -26,6 +26,7 @@ from typing import Any, Optional
 from uuid import uuid4
 
 from app.domain.review_queue import enqueue_review_item_if_low_confidence
+from app.services.c4.containers.c4_types import coerce_container_type
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +96,13 @@ YOUR TASK
 Given a JSON evidence bundle produced by a static-analysis pipeline, return a
 JSON object (no markdown, no comments) that:
   1. Reviews each detected container: verdict = keep | discard | merge
-  2. Improves container_type, technology, protocol when the evidence is clear
+  2. Improves container_type using ONLY these exact values (copy verbatim):
+       ServerSideWebApp | ClientSideWebApp | MobileApp | ConsoleApp |
+       ServerlessFunction | ShellScript | Database | BlobStore |
+       FileSystem | MessageBroker | Unknown
+     Guidance: background workers/schedulers → ConsoleApp; SPAs → ClientSideWebApp;
+     Redis/Memcached as cache → Database; Redis/NATS as pub-sub → MessageBroker;
+     if role is unclear → Unknown. Any other value is invalid.
   3. Infers relationships between containers — see strategy below
   4. Writes concise 1-2 sentence descriptions
 
@@ -239,7 +246,7 @@ _FEW_SHOT_EXAMPLES: list[dict[str, Any]] = [
                 },
                 {
                     "name": "notification-worker", "verdict": "keep",
-                    "container_type": "ServerSideConsoleApp", "technology": "Node.js",
+                    "container_type": "ConsoleApp", "technology": "Node.js",
                     "protocol": None,
                     "description": "Background worker that sends transactional emails on behalf of order-service.",
                     "confidence": 0.72,
@@ -279,7 +286,7 @@ _FEW_SHOT_EXAMPLES: list[dict[str, Any]] = [
             "containers": [
                 {
                     "name": "ts-order-service", "verdict": "keep",
-                    "container_type": "Microservice", "technology": "Java/Spring Boot",
+                    "container_type": "ServerSideWebApp", "technology": "Java/Spring Boot",
                     "protocol": "HTTP",
                     "description": "Manages train ticket order lifecycle and persists orders to MongoDB.",
                     "confidence": 0.85,
@@ -881,12 +888,12 @@ def apply_enrichments(
         container["llm_verdict"] = "keep"
         verdicts_applied += 1
 
-        # container_type: only update if existing is generic
-        llm_type = verdict_item.get("container_type")
-        if llm_type and _should_update_field(
+        # container_type: only update if existing is generic; enforce enum vocabulary
+        validated_type = coerce_container_type(verdict_item.get("container_type"))
+        if validated_type and validated_type != "Unknown" and _should_update_field(
             container.get("container_type"), _GENERIC_CONTAINER_TYPES
         ):
-            container["container_type"] = llm_type
+            container["container_type"] = validated_type
 
         # technology: only update if existing is unknown/empty
         llm_tech = verdict_item.get("technology")

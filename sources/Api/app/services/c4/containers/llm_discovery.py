@@ -25,6 +25,8 @@ import re
 from pathlib import Path
 from typing import Any, Optional
 
+from app.services.c4.containers.c4_types import coerce_container_type
+
 logger = logging.getLogger(__name__)
 
 _ENV_MAX_CHARS = 2000
@@ -71,9 +73,16 @@ DO NOT include:
 
 For each container:
   - name: kebab-case identifier (e.g. "airbyte-server", "postgres")
-  - container_type: WebApplication | API | Database | MessageBroker |
-                    WorkflowEngine | BackgroundWorker | Cache | ObjectStore |
-                    Library | CLI | Service
+  - container_type: exactly one of the following values (copy verbatim):
+                    ServerSideWebApp | ClientSideWebApp | MobileApp |
+                    ConsoleApp | ServerlessFunction | ShellScript |
+                    Database | BlobStore | FileSystem | MessageBroker | Unknown
+    Guidance:
+      • Background workers, job runners (Sidekiq, Celery), schedulers → ConsoleApp
+      • React/Vue/Angular SPAs, static frontends → ClientSideWebApp
+      • Redis/Memcached used as cache or key-value store → Database
+      • Redis/NATS used purely for Pub/Sub → MessageBroker
+      • If the role is unclear → Unknown
   - technology: e.g. "Java/Kotlin", "Python/FastAPI", "PostgreSQL", "Temporal"
   - description: 1-sentence purpose
   - confidence: 0.0-1.0
@@ -325,7 +334,7 @@ def discover_containers(
             "c4_level": 2,
             "type": "container",
             "name": name,
-            "container_type": item.get("container_type") or "Service",
+            "container_type": coerce_container_type(item.get("container_type")),
             "technology": item.get("technology") or "Unknown",
             "protocol": "",
             "path": "",

@@ -10,6 +10,7 @@ from app.services.c4.components.parsing.visitors.csharp_visitor import CSharpVis
 from app.services.c4.components.parsing.visitors.go_visitor import GoVisitor
 from app.services.c4.components.parsing.visitors.java_visitor import JavaVisitor
 from app.services.c4.components.parsing.visitors.typescript_visitor import TypeScriptVisitor
+from app.services.c4.components.parsing.visitors.ruby_visitor import RubyVisitor
 from app.services.c4.components.graph.structural_deps import StructuralDependencyAnalyzer
 from app.services.c4.components.graph.directory_deps import DirectoryDependencyAnalyzer
 from app.services.c4.components.graph.dependency_graph import DependencyGraphBuilder
@@ -32,7 +33,7 @@ _DEPENDENCY_LABELS: dict[str, str] = {
 logger = logging.getLogger(__name__)
 
 _VISITORS: dict = {}
-for _v in [PythonVisitor(), CSharpVisitor(), GoVisitor(), JavaVisitor(), TypeScriptVisitor()]:
+for _v in [PythonVisitor(), CSharpVisitor(), GoVisitor(), JavaVisitor(), TypeScriptVisitor(), RubyVisitor()]:
     for _lang in _v.supported_languages:
         _VISITORS[_lang] = _v
 

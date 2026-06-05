@@ -67,7 +67,7 @@ def valid_llm_result():
             {
                 "name": "api",
                 "verdict": "keep",
-                "container_type": "Microservice",
+                "container_type": "ServerSideWebApp",
                 "technology": "Python/FastAPI",
                 "protocol": "HTTP",
                 "description": "REST API serving user requests backed by PostgreSQL.",
@@ -265,7 +265,7 @@ class TestParseLlmEnrichmentResponse:
 class TestApplyEnrichmentsKeep:
     def test_generic_container_type_updated(self, simple_containers, simple_relationships, valid_llm_result):
         apply_enrichments(simple_containers, simple_relationships, valid_llm_result)
-        assert simple_containers["api"]["container_type"] == "Microservice"
+        assert simple_containers["api"]["container_type"] == "ServerSideWebApp"
 
     def test_unknown_technology_updated(self, simple_containers, simple_relationships, valid_llm_result):
         apply_enrichments(simple_containers, simple_relationships, valid_llm_result)

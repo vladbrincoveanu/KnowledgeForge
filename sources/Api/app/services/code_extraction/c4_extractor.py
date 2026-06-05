@@ -562,7 +562,10 @@ class C4ArchitectureExtractor:
                 continue
 
             container_rel_path = container.get("path", "")
-            container_abs_path = str(self.repo_path / container_rel_path) if container_rel_path else str(self.repo_path)
+            _resolved = (self.repo_path / container_rel_path) if container_rel_path else self.repo_path
+            # If the path resolves to a file (e.g. "docker-compose.yml") rather than a
+            # source directory, fall back to the repo root so we still scan application code.
+            container_abs_path = str(_resolved) if _resolved.is_dir() else str(self.repo_path)
 
             # Polylith: project directories have no source — resolve brick paths instead.
             # extract_multi combines all bricks before building the dependency graph so

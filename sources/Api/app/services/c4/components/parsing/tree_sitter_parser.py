@@ -105,6 +105,7 @@ class TreeSitterParser:
         "*_test.go",
         "*.test.ts",
         "*.spec.ts",
+        "*_spec.rb",
     ]
 
     def __init__(self) -> None:

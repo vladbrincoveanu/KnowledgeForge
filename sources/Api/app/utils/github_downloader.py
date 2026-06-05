@@ -78,7 +78,7 @@ class GitHubDownloader:
         github_url: str,
         output_dir: Path,
         use_git: bool = True,
-        full_history: bool = False,
+        full_history: bool = True,
         token: Optional[str] = None,
     ) -> Path:
         """Clone a Git repository.
@@ -87,7 +87,7 @@ class GitHubDownloader:
             github_url: HTTPS URL of the repository (GitHub, GitLab, Bitbucket, etc.)
             output_dir: Directory to save the repository
             use_git: Use git clone (always True; archive path kept for compat)
-            full_history: Clone with full history or shallow
+            full_history: Clone with full history (default) or shallow (--depth 1)
             token: Optional personal access token for private repositories.
                    Falls back to host-specific env vars (GITHUB_TOKEN, GITLAB_TOKEN,
                    BITBUCKET_TOKEN) then GIT_TOKEN.

@@ -27,6 +27,22 @@ class C4ContainerType(str, Enum):
     UNKNOWN = "Unknown"
 
 
+_VALID_CONTAINER_TYPE_VALUES = frozenset(t.value for t in C4ContainerType)
+
+
+def coerce_container_type(raw: str | None) -> str:
+    """Return raw if it is a valid C4ContainerType value, otherwise 'Unknown'.
+
+    Never silently maps near-misses (e.g., 'WebApplication' → Unknown, not
+    ServerSideWebApp). Invalid responses surface as Unknown for human review.
+    """
+    if not raw:
+        return C4ContainerType.UNKNOWN.value
+    if raw in _VALID_CONTAINER_TYPE_VALUES:
+        return raw
+    return C4ContainerType.UNKNOWN.value
+
+
 def classify_c4_container_type(container: dict) -> C4ContainerType:
     """Map a detected container dict to a canonical C4ContainerType.
 
