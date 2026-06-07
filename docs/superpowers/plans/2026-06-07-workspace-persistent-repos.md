@@ -12,6 +12,35 @@
 
 **Worktree:** This plan runs in `/Users/vladbrincoveanu/Desktop/Startup/workspace-persistent-repos` on branch `relentless/workspace-persistent-repos`. All paths below are relative to the worktree root.
 
+## Testing Patterns (REQUIRED — apply to ALL test files in this plan)
+
+These patterns are **mandatory** in every test file created by this plan. They were discovered during Task 3/4 implementation when the plan's original test code failed. Do NOT skip them.
+
+1. **Wrap state-mutating calls in `act()`** — React 18 auto-batches setState. Without `act()`, the test reads stale state.
+   ```ts
+   act(() => {
+     getApi().addRepo(REPO_A);
+   });
+   expect(getApi().repos).toHaveLength(1); // now sees updated state
+   ```
+
+2. **`TestConsumer` must use a block body in `useEffect`** — implicit return passes the API object as the cleanup, which React tries to call as a destructor.
+   ```ts
+   // WRONG — implicit return of onReady(api) which returns the api object
+   React.useEffect(() => onReady(api), [api, onReady]);
+
+   // CORRECT — block body, no return value
+   React.useEffect(() => {
+     onReady(api);
+   }, [api, onReady]);
+   ```
+
+3. **Hoist all `import` statements to the top of the test file** — no mid-file imports inside `describe` blocks.
+
+4. **Mock pattern:** derive from interface, not implementation. Match the canonical mock in `FileUploader.test.tsx:22-33` for `codeArchitectureAPI` + `wsService`.
+
+5. **`npx vitest run <file>`** is the test command. `npx vitest run` (no file) runs all.
+
 ---
 
 ## File Structure
