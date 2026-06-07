@@ -130,3 +130,44 @@ describe("RepoProvider — addRepo", () => {
     expect(getApi().repos.map((r) => r.url)).toEqual([REPO_A, REPO_B]);
   });
 });
+
+describe("RepoProvider — removeRepo", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+  afterEach(() => cleanup());
+
+  it("removes a repo by URL", () => {
+    const { getApi } = renderWithProvider();
+    act(() => {
+      getApi().addRepo(REPO_A);
+      getApi().addRepo(REPO_B);
+    });
+    act(() => getApi().removeRepo(REPO_A));
+    expect(getApi().repos.map((r) => r.url)).toEqual([REPO_B]);
+  });
+
+  it("is a no-op for unknown URL", () => {
+    const { getApi } = renderWithProvider();
+    act(() => getApi().addRepo(REPO_A));
+    act(() => getApi().removeRepo("https://github.com/other/repo"));
+    expect(getApi().repos).toHaveLength(1);
+  });
+});
+
+describe("RepoProvider — clearAll", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+  afterEach(() => cleanup());
+
+  it("empties the repos list", () => {
+    const { getApi } = renderWithProvider();
+    act(() => {
+      getApi().addRepo(REPO_A);
+      getApi().addRepo(REPO_B);
+    });
+    act(() => getApi().clearAll());
+    expect(getApi().repos).toEqual([]);
+  });
+});
