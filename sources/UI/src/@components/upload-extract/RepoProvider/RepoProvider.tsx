@@ -4,7 +4,6 @@ import React, {
   useState,
   useRef,
   useEffect,
-  useCallback,
 } from "react";
 import { codeArchitectureAPI, wsService } from "@/services/api";
 
