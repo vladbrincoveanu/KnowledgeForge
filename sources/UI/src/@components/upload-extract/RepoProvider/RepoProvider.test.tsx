@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as matchers from "@testing-library/jest-dom/matchers";
 import { render, cleanup, act } from "@testing-library/react";
 import { RepoProvider, useRepos, RepoEntry } from "./RepoProvider";
-import { wsService } from "@/services/api";
+import { codeArchitectureAPI, wsService } from "@/services/api";
 
 expect.extend(matchers);
 
@@ -168,6 +168,85 @@ describe("RepoProvider — clearAll", () => {
       getApi().addRepo(REPO_B);
     });
     act(() => getApi().clearAll());
+    expect(getApi().repos).toEqual([]);
+  });
+});
+
+describe("RepoProvider — startExtraction", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+  afterEach(() => cleanup());
+
+  it("calls extractFromGitHub, updates repo to pending with taskId, returns taskId", async () => {
+    (codeArchitectureAPI.extractFromGitHub as any).mockResolvedValue({ task_id: "task-123" });
+    const { getApi } = renderWithProvider();
+    act(() => getApi().addRepo(REPO_A));
+    let returned: string | null = "sentinel";
+    await act(async () => {
+      returned = await getApi().startExtraction(REPO_A, true);
+    });
+    expect(codeArchitectureAPI.extractFromGitHub).toHaveBeenCalledWith(REPO_A, true, true, undefined);
+    expect(returned).toBe("task-123");
+    const repo = getApi().repos[0];
+    expect(repo.taskId).toBe("task-123");
+    expect(repo.status).toBe("pending");
+  });
+
+  it("marks repo as failed when API throws, returns null", async () => {
+    (codeArchitectureAPI.extractFromGitHub as any).mockRejectedValue({
+      response: { data: { detail: "Bad URL" } },
+    });
+    const { getApi } = renderWithProvider();
+    act(() => getApi().addRepo(REPO_A));
+    let returned: string | null = "sentinel";
+    await act(async () => {
+      returned = await getApi().startExtraction(REPO_A, true);
+    });
+    expect(returned).toBeNull();
+    const repo = getApi().repos[0];
+    expect(repo.status).toBe("failed");
+    expect(repo.message).toBe("Bad URL");
+  });
+
+  it("returns null when called for unknown url", async () => {
+    const { getApi } = renderWithProvider();
+    let returned: string | null = "sentinel";
+    await act(async () => {
+      returned = await getApi().startExtraction("https://unknown/x", true);
+    });
+    expect(returned).toBeNull();
+  });
+
+  it("updates repo from WS message matching taskId", async () => {
+    (codeArchitectureAPI.extractFromGitHub as any).mockResolvedValue({ task_id: "task-123" });
+    let capturedHandler: ((data?: unknown) => void) | undefined;
+    (wsService.on as any).mockImplementation((event: string, cb: (data?: unknown) => void) => {
+      if (event === "message") capturedHandler = cb;
+    });
+    const { getApi } = renderWithProvider();
+    act(() => getApi().addRepo(REPO_A));
+    await act(async () => {
+      await getApi().startExtraction(REPO_A, true);
+    });
+    act(() => {
+      capturedHandler?.({ task_id: "task-123", status: "scanning", progress: 0.5, message: "Scanning..." });
+    });
+    const repo = getApi().repos[0];
+    expect(repo.status).toBe("scanning");
+    expect(repo.progress).toBe(0.5);
+    expect(repo.message).toBe("Scanning...");
+  });
+
+  it("ignores WS message for unknown taskId", async () => {
+    let capturedHandler: ((data?: unknown) => void) | undefined;
+    (wsService.on as any).mockImplementation((event: string, cb: (data?: unknown) => void) => {
+      if (event === "message") capturedHandler = cb;
+    });
+    const { getApi } = renderWithProvider();
+    act(() => {
+      capturedHandler?.({ task_id: "unknown", status: "scanning" });
+    });
     expect(getApi().repos).toEqual([]);
   });
 });

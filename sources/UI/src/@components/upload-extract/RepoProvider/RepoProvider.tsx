@@ -28,7 +28,7 @@ export interface RepoContextValue {
   addRepo: (url: string, token?: string) => { ok: true } | { ok: false; error: string };
   removeRepo: (url: string) => void;
   clearAll: () => void;
-  startExtraction: (url: string, append: boolean) => Promise<void>;
+  startExtraction: (url: string, append: boolean) => Promise<string | null>;
 }
 
 export const RepoContext = createContext<RepoContextValue | null>(null);
@@ -101,13 +101,72 @@ export const RepoProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setRepos([]);
   };
 
-  const startExtraction: RepoContextValue["startExtraction"] = async () => {
-    // Implemented in Task 5
+  const startExtraction: RepoContextValue["startExtraction"] = async (url, append) => {
+    const repo = repos.find((r) => r.url === url);
+    if (!repo) return null;
+
+    setRepos((prev) =>
+      prev.map((r) =>
+        r.url === url
+          ? { ...r, status: "pending", message: "Queuing extraction...", progress: 0 }
+          : r,
+      ),
+    );
+
+    try {
+      const result = await codeArchitectureAPI.extractFromGitHub(
+        url,
+        true,
+        append,
+        repo.token,
+      );
+      const taskId = result.task_id;
+      setRepos((prev) =>
+        prev.map((r) =>
+          r.url === url
+            ? { ...r, taskId, status: "pending", message: "Extraction queued", progress: 0 }
+            : r,
+        ),
+      );
+      return taskId;
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail ?? err?.message ?? "Extraction failed";
+      setRepos((prev) =>
+        prev.map((r) =>
+          r.url === url ? { ...r, status: "failed", message: msg } : r,
+        ),
+      );
+      return null;
+    }
   };
 
-  // WS subscription + cleanup — implemented in Task 6
   useEffect(() => {
-    return () => undefined;
+    wsService.connect();
+    const handler = (data?: unknown) => {
+      const msg = data as {
+        task_id?: string;
+        status?: string;
+        message?: string;
+        progress?: number;
+      };
+      if (!msg?.task_id) return;
+      setRepos((prev) =>
+        prev.map((r) => {
+          if (r.taskId !== msg.task_id) return r;
+          return {
+            ...r,
+            status: (msg.status as RepoStatus) ?? r.status,
+            message: msg.message ?? r.message,
+            progress: msg.progress ?? r.progress,
+          };
+        }),
+      );
+    };
+    wsService.on("message", handler);
+    return () => {
+      wsService.off("message", handler);
+      Object.values(pollIntervalsRef.current).forEach(clearInterval);
+    };
   }, []);
 
   const value: RepoContextValue = {
