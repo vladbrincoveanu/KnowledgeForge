@@ -107,17 +107,31 @@ describe("RepoExplorer", () => {
   it("Append toggle changes startExtraction append param", async () => {
     (codeArchitectureAPI.extractFromGitHub as any).mockResolvedValue({ task_id: "task-1" });
     const { getApi } = renderExplorer();
-    act(() => getApi().addRepo(REPO_A));
-    const toggle = screen.getByLabelText(/Add to existing graph data/i);
-    fireEvent.click(toggle);
+    act(() => {
+      getApi().addRepo(REPO_A);
+    });
     const extractBtn = screen.getByRole("button", { name: /Extract 1 Repo/i });
     await act(async () => {
       fireEvent.click(extractBtn);
     });
-    expect(codeArchitectureAPI.extractFromGitHub).toHaveBeenCalledWith(
+    expect(codeArchitectureAPI.extractFromGitHub).toHaveBeenLastCalledWith(
       REPO_A,
       true,
       false,
+      undefined,
+    );
+    const toggle = screen.getByLabelText(/Add to existing graph data/i);
+    fireEvent.click(toggle);
+    act(() => {
+      getApi().addRepo(REPO_B);
+    });
+    await act(async () => {
+      fireEvent.click(extractBtn);
+    });
+    expect(codeArchitectureAPI.extractFromGitHub).toHaveBeenLastCalledWith(
+      REPO_B,
+      true,
+      true,
       undefined,
     );
   });
