@@ -3,7 +3,7 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as matchers from "@testing-library/jest-dom/matchers";
-import { render, cleanup } from "@testing-library/react";
+import { render, cleanup, act } from "@testing-library/react";
 import { RepoProvider, useRepos, RepoEntry } from "./RepoProvider";
 import { wsService } from "@/services/api";
 
@@ -26,7 +26,9 @@ const TestConsumer: React.FC<{ onReady: (api: ReturnType<typeof useRepos>) => vo
   onReady,
 }) => {
   const api = useRepos();
-  React.useEffect(() => onReady(api), [api, onReady]);
+  React.useEffect(() => {
+    onReady(api);
+  }, [api, onReady]);
   return null;
 };
 
@@ -51,7 +53,10 @@ describe("RepoProvider — addRepo", () => {
 
   it("appends a new repo with status=idle on valid URL", () => {
     const { getApi } = renderWithProvider();
-    const result = getApi().addRepo(REPO_A);
+    let result: ReturnType<ReturnType<typeof useRepos>["addRepo"]> = { ok: false, error: "" };
+    act(() => {
+      result = getApi().addRepo(REPO_A);
+    });
     expect(result).toEqual({ ok: true });
     expect(getApi().repos).toHaveLength(1);
     expect(getApi().repos[0]).toMatchObject({
@@ -66,19 +71,25 @@ describe("RepoProvider — addRepo", () => {
 
   it("strips trailing .git and slash from URL", () => {
     const { getApi } = renderWithProvider();
-    getApi().addRepo("https://github.com/facebook/react.git/");
+    act(() => {
+      getApi().addRepo("https://github.com/facebook/react.git/");
+    });
     expect(getApi().repos[0].url).toBe(REPO_A);
   });
 
   it("includes token when provided", () => {
     const { getApi } = renderWithProvider();
-    getApi().addRepo(REPO_A, "ghp_xxx");
+    act(() => {
+      getApi().addRepo(REPO_A, "ghp_xxx");
+    });
     expect(getApi().repos[0].token).toBe("ghp_xxx");
   });
 
   it("omits token when empty string", () => {
     const { getApi } = renderWithProvider();
-    getApi().addRepo(REPO_A, "  ");
+    act(() => {
+      getApi().addRepo(REPO_A, "  ");
+    });
     expect(getApi().repos[0].token).toBeUndefined();
   });
 
@@ -98,7 +109,7 @@ describe("RepoProvider — addRepo", () => {
 
   it("rejects duplicate URL", () => {
     const { getApi } = renderWithProvider();
-    getApi().addRepo(REPO_A);
+    act(() => getApi().addRepo(REPO_A));
     const result = getApi().addRepo(REPO_A);
     expect(result).toEqual({ ok: false, error: "This repository has already been added." });
     expect(getApi().repos).toHaveLength(1);
@@ -112,8 +123,10 @@ describe("RepoProvider — addRepo", () => {
 
   it("supports multiple repos", () => {
     const { getApi } = renderWithProvider();
-    getApi().addRepo(REPO_A);
-    getApi().addRepo(REPO_B);
+    act(() => {
+      getApi().addRepo(REPO_A);
+      getApi().addRepo(REPO_B);
+    });
     expect(getApi().repos.map((r) => r.url)).toEqual([REPO_A, REPO_B]);
   });
 });
