@@ -19,6 +19,8 @@ import LandingPage from "./@components/landing/LandingPage/LandingPage";
 import { wsService } from "./services/api";
 import { IncrementalSummary } from "@/types";
 import { ReviewDashboard } from "./pages/ReviewDashboard";
+import { RepoProvider } from "./@components/upload-extract/RepoProvider/RepoProvider";
+import RepoExplorer from "./@components/upload-extract/RepoExplorer/RepoExplorer";
 
 // TypeScript interfaces
 interface NavItem {
@@ -26,15 +28,6 @@ interface NavItem {
   label: string;
   icon: React.ReactElement;
   path: string;
-}
-
-interface UploadedFile {
-  name: string;
-  headers: string[];
-  data: Record<string, string>[];
-  size: number;
-  rowCount: number;
-  type: string;
 }
 
 interface WebSocketMessage {
@@ -114,8 +107,6 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab }) => {
 
 const MainContent: React.FC = () => {
   const location = useLocation();
-  const [files, setFiles] = useState<UploadedFile[]>([]);
-  const isProcessing = false;
   const [, setActiveTaskId] = useState<string | null>(null);
   const [notification, setNotification] = useState<{
     message: string;
@@ -203,8 +194,6 @@ const MainContent: React.FC = () => {
       return;
     }
 
-    wsService.connect();
-
     const handleConnected = () => {};
     const handleDisconnected = () => {};
 
@@ -212,31 +201,18 @@ const MainContent: React.FC = () => {
     wsService.on("connected", handleConnected);
     wsService.on("disconnected", handleDisconnected);
 
-    // Load available tasks on component mount
     loadAvailableTasks();
 
     return () => {
       wsService.off("message", handleWebSocketMessage);
       wsService.off("connected", handleConnected);
       wsService.off("disconnected", handleDisconnected);
-      wsService.disconnect();
     };
   }, [handleWebSocketMessage, loadAvailableTasks, shouldBootstrapExtraction]);
 
-  const handleFilesUploaded = useCallback(
-    async (uploadedFiles: UploadedFile[]) => {
-      setFiles(uploadedFiles);
-    },
-    [],
-  );
-
-  const handleExtractionStarted = useCallback(
-    (taskId: string, _file: UploadedFile) => {
-      // Set as active task (always use the most recent upload)
-      setActiveTaskId(taskId);
-    },
-    [],
-  );
+  const handleExtractionStarted = useCallback((taskId: string) => {
+    setActiveTaskId(taskId);
+  }, []);
 
   return (
     <div className="app">
@@ -274,29 +250,13 @@ const MainContent: React.FC = () => {
                   </div>
 
                   <FileUploader
-                    onFilesUploaded={handleFilesUploaded}
-                    isProcessing={isProcessing}
+                    isProcessing={false}
                     onExtractionStarted={handleExtractionStarted}
                     showNotification={showNotification}
                   />
 
-                  {files.length > 0 && (
-                    <div className="uploaded-files">
-                      <h3>Uploaded Files ({files.length})</h3>
-                      <ul>
-                        {files.map((file, index) => (
-                          <li key={index}>
-                            <strong>{file.name}</strong>
-                            <br />
-                            <small>
-                              {file.headers.length} columns, {file.rowCount}{" "}
-                              rows
-                            </small>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                  <RepoExplorer onExtractionStarted={handleExtractionStarted} />
+
                   <hr
                     style={{
                       margin: "2rem 0",
@@ -365,9 +325,11 @@ const MainContent: React.FC = () => {
 // App wrapper with router
 const App: React.FC = () => {
   return (
-    <Router>
-      <MainContent />
-    </Router>
+    <RepoProvider>
+      <Router>
+        <MainContent />
+      </Router>
+    </RepoProvider>
   );
 };
 
