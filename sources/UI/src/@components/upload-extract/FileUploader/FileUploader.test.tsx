@@ -69,7 +69,9 @@ describe("FileUploader (refactored — input only)", () => {
         />
       </RepoProvider>,
     );
-    expect(screen.getByPlaceholderText(/github\.com\/owner\/repo/i)).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText(/github\.com\/owner\/repo/i),
+    ).toBeInTheDocument();
   });
 
   it("Add button calls addRepo via context and clears inputs", () => {

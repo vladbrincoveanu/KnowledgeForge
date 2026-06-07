@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+} from "react";
 import { codeArchitectureAPI, wsService } from "@/services/api";
 
 export type RepoStatus =
@@ -25,7 +32,10 @@ export interface RepoEntry {
 export interface RepoContextValue {
   repos: RepoEntry[];
   isExtracting: boolean;
-  addRepo: (url: string, token?: string) => { ok: true } | { ok: false; error: string };
+  addRepo: (
+    url: string,
+    token?: string,
+  ) => { ok: true } | { ok: false; error: string };
   removeRepo: (url: string) => void;
   clearAll: () => void;
   startExtraction: (url: string, append: boolean) => Promise<string | null>;
@@ -55,12 +65,19 @@ const isValidGitUrl = (url: string): boolean => {
 };
 
 const normalizeUrl = (raw: string): string =>
-  raw.trim().replace(/\.git\/?$/, "").replace(/\/$/, "");
+  raw
+    .trim()
+    .replace(/\.git\/?$/, "")
+    .replace(/\/$/, "");
 
-export const RepoProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const RepoProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [repos, setRepos] = useState<RepoEntry[]>([]);
   const [isExtracting, setIsExtracting] = useState(false);
-  const pollIntervalsRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+  const pollIntervalsRef = useRef<
+    Record<string, ReturnType<typeof setInterval>>
+  >({});
 
   const addRepo: RepoContextValue["addRepo"] = (url, token) => {
     const trimmed = normalizeUrl(url);
@@ -101,14 +118,22 @@ export const RepoProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setRepos([]);
   };
 
-  const startExtraction: RepoContextValue["startExtraction"] = async (url, append) => {
+  const startExtraction: RepoContextValue["startExtraction"] = async (
+    url,
+    append,
+  ) => {
     const repo = repos.find((r) => r.url === url);
     if (!repo) return null;
 
     setRepos((prev) =>
       prev.map((r) =>
         r.url === url
-          ? { ...r, status: "pending", message: "Queuing extraction...", progress: 0 }
+          ? {
+              ...r,
+              status: "pending",
+              message: "Queuing extraction...",
+              progress: 0,
+            }
           : r,
       ),
     );
@@ -124,13 +149,20 @@ export const RepoProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setRepos((prev) =>
         prev.map((r) =>
           r.url === url
-            ? { ...r, taskId, status: "pending", message: "Extraction queued", progress: 0 }
+            ? {
+                ...r,
+                taskId,
+                status: "pending",
+                message: "Extraction queued",
+                progress: 0,
+              }
             : r,
         ),
       );
       return taskId;
     } catch (err: any) {
-      const msg = err?.response?.data?.detail ?? err?.message ?? "Extraction failed";
+      const msg =
+        err?.response?.data?.detail ?? err?.message ?? "Extraction failed";
       setRepos((prev) =>
         prev.map((r) =>
           r.url === url ? { ...r, status: "failed", message: msg } : r,

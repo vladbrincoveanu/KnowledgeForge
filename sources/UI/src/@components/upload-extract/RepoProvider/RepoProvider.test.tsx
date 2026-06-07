@@ -22,9 +22,9 @@ vi.mock("@/services/api", () => ({
   },
 }));
 
-const TestConsumer: React.FC<{ onReady: (api: ReturnType<typeof useRepos>) => void }> = ({
-  onReady,
-}) => {
+const TestConsumer: React.FC<{
+  onReady: (api: ReturnType<typeof useRepos>) => void;
+}> = ({ onReady }) => {
   const api = useRepos();
   React.useEffect(() => {
     onReady(api);
@@ -53,7 +53,10 @@ describe("RepoProvider — addRepo", () => {
 
   it("appends a new repo with status=idle on valid URL", () => {
     const { getApi } = renderWithProvider();
-    let result: ReturnType<ReturnType<typeof useRepos>["addRepo"]> = { ok: false, error: "" };
+    let result: ReturnType<ReturnType<typeof useRepos>["addRepo"]> = {
+      ok: false,
+      error: "",
+    };
     act(() => {
       result = getApi().addRepo(REPO_A);
     });
@@ -96,7 +99,10 @@ describe("RepoProvider — addRepo", () => {
   it("rejects empty URL", () => {
     const { getApi } = renderWithProvider();
     const result = getApi().addRepo("   ");
-    expect(result).toEqual({ ok: false, error: "Please enter a repository URL." });
+    expect(result).toEqual({
+      ok: false,
+      error: "Please enter a repository URL.",
+    });
     expect(getApi().repos).toHaveLength(0);
   });
 
@@ -111,7 +117,10 @@ describe("RepoProvider — addRepo", () => {
     const { getApi } = renderWithProvider();
     act(() => getApi().addRepo(REPO_A));
     const result = getApi().addRepo(REPO_A);
-    expect(result).toEqual({ ok: false, error: "This repository has already been added." });
+    expect(result).toEqual({
+      ok: false,
+      error: "This repository has already been added.",
+    });
     expect(getApi().repos).toHaveLength(1);
   });
 
@@ -179,14 +188,21 @@ describe("RepoProvider — startExtraction", () => {
   afterEach(() => cleanup());
 
   it("calls extractFromGitHub, updates repo to pending with taskId, returns taskId", async () => {
-    (codeArchitectureAPI.extractFromGitHub as any).mockResolvedValue({ task_id: "task-123" });
+    (codeArchitectureAPI.extractFromGitHub as any).mockResolvedValue({
+      task_id: "task-123",
+    });
     const { getApi } = renderWithProvider();
     act(() => getApi().addRepo(REPO_A));
     let returned: string | null = "sentinel";
     await act(async () => {
       returned = await getApi().startExtraction(REPO_A, true);
     });
-    expect(codeArchitectureAPI.extractFromGitHub).toHaveBeenCalledWith(REPO_A, true, true, undefined);
+    expect(codeArchitectureAPI.extractFromGitHub).toHaveBeenCalledWith(
+      REPO_A,
+      true,
+      true,
+      undefined,
+    );
     expect(returned).toBe("task-123");
     const repo = getApi().repos[0];
     expect(repo.taskId).toBe("task-123");
@@ -219,18 +235,27 @@ describe("RepoProvider — startExtraction", () => {
   });
 
   it("updates repo from WS message matching taskId", async () => {
-    (codeArchitectureAPI.extractFromGitHub as any).mockResolvedValue({ task_id: "task-123" });
-    let capturedHandler: ((data?: unknown) => void) | undefined;
-    (wsService.on as any).mockImplementation((event: string, cb: (data?: unknown) => void) => {
-      if (event === "message") capturedHandler = cb;
+    (codeArchitectureAPI.extractFromGitHub as any).mockResolvedValue({
+      task_id: "task-123",
     });
+    let capturedHandler: ((data?: unknown) => void) | undefined;
+    (wsService.on as any).mockImplementation(
+      (event: string, cb: (data?: unknown) => void) => {
+        if (event === "message") capturedHandler = cb;
+      },
+    );
     const { getApi } = renderWithProvider();
     act(() => getApi().addRepo(REPO_A));
     await act(async () => {
       await getApi().startExtraction(REPO_A, true);
     });
     act(() => {
-      capturedHandler?.({ task_id: "task-123", status: "scanning", progress: 0.5, message: "Scanning..." });
+      capturedHandler?.({
+        task_id: "task-123",
+        status: "scanning",
+        progress: 0.5,
+        message: "Scanning...",
+      });
     });
     const repo = getApi().repos[0];
     expect(repo.status).toBe("scanning");
@@ -240,9 +265,11 @@ describe("RepoProvider — startExtraction", () => {
 
   it("ignores WS message for unknown taskId", async () => {
     let capturedHandler: ((data?: unknown) => void) | undefined;
-    (wsService.on as any).mockImplementation((event: string, cb: (data?: unknown) => void) => {
-      if (event === "message") capturedHandler = cb;
-    });
+    (wsService.on as any).mockImplementation(
+      (event: string, cb: (data?: unknown) => void) => {
+        if (event === "message") capturedHandler = cb;
+      },
+    );
     const { getApi } = renderWithProvider();
     act(() => {
       capturedHandler?.({ task_id: "unknown", status: "scanning" });

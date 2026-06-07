@@ -3,7 +3,13 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as matchers from "@testing-library/jest-dom/matchers";
-import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  cleanup,
+  act,
+} from "@testing-library/react";
 
 expect.extend(matchers);
 
@@ -66,7 +72,9 @@ describe("RepoExplorer", () => {
 
   it("renders empty state when no repos", () => {
     renderExplorer();
-    expect(screen.getByText(/Add one or more repository URLs above/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Add one or more repository URLs above/i),
+    ).toBeInTheDocument();
   });
 
   it("renders a row per repo with URL and status", () => {
@@ -90,7 +98,9 @@ describe("RepoExplorer", () => {
   });
 
   it("Extract All button calls startExtraction for each idle repo", async () => {
-    (codeArchitectureAPI.extractFromGitHub as any).mockResolvedValue({ task_id: "task-1" });
+    (codeArchitectureAPI.extractFromGitHub as any).mockResolvedValue({
+      task_id: "task-1",
+    });
     const { getApi, onExtractionStarted } = renderExplorer();
     act(() => {
       getApi().addRepo(REPO_A);
@@ -105,7 +115,9 @@ describe("RepoExplorer", () => {
   });
 
   it("Append toggle changes startExtraction append param", async () => {
-    (codeArchitectureAPI.extractFromGitHub as any).mockResolvedValue({ task_id: "task-1" });
+    (codeArchitectureAPI.extractFromGitHub as any).mockResolvedValue({
+      task_id: "task-1",
+    });
     const { getApi } = renderExplorer();
     act(() => {
       getApi().addRepo(REPO_A);

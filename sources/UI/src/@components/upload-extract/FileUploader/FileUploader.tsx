@@ -6,7 +6,10 @@ import FolderDropZone from "./FolderDropZone";
 
 interface FileUploaderProps {
   isProcessing: boolean;
-  onExtractionStarted: (taskId: string, file: { name: string; type: string; size: number }) => void;
+  onExtractionStarted: (
+    taskId: string,
+    file: { name: string; type: string; size: number },
+  ) => void;
   showNotification: (
     message: string,
     type: "success" | "error" | "info",

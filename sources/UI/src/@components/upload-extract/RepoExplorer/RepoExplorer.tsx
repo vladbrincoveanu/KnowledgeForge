@@ -57,7 +57,8 @@ const statusConfig: Record<
 };
 
 const RepoExplorer: React.FC<RepoExplorerProps> = ({ onExtractionStarted }) => {
-  const { repos, isExtracting, removeRepo, clearAll, startExtraction } = useRepos();
+  const { repos, isExtracting, removeRepo, clearAll, startExtraction } =
+    useRepos();
   const [appendMode, setAppendMode] = useState(false);
 
   const idleCount = repos.filter(
@@ -112,7 +113,9 @@ const RepoExplorer: React.FC<RepoExplorerProps> = ({ onExtractionStarted }) => {
                         ) : (
                           <div
                             className="repo-item__progress-fill"
-                            style={{ width: `${Math.round(repo.progress * 100)}%` }}
+                            style={{
+                              width: `${Math.round(repo.progress * 100)}%`,
+                            }}
                           />
                         )}
                       </div>
@@ -120,7 +123,8 @@ const RepoExplorer: React.FC<RepoExplorerProps> = ({ onExtractionStarted }) => {
                     {repo.status === "completed" && (
                       <div className="repo-item__stats">
                         <span>
-                          <Package size={12} /> {repo.containersCount} containers
+                          <Package size={12} /> {repo.containersCount}{" "}
+                          containers
                         </span>
                         <span>
                           <Layers size={12} /> {repo.componentsCount} components
@@ -168,7 +172,8 @@ const RepoExplorer: React.FC<RepoExplorerProps> = ({ onExtractionStarted }) => {
           <Github size={48} className="empty-state__icon" />
           <p>Add one or more repository URLs above</p>
           <p className="empty-state__hint">
-            Each repo will be cloned, scanned, and added to the architecture graph
+            Each repo will be cloned, scanned, and added to the architecture
+            graph
           </p>
         </div>
       )}
