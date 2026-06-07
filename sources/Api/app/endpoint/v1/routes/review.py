@@ -9,7 +9,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, func
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.domain.models import Base, ReviewItemModel
@@ -108,6 +108,17 @@ def list_pending(
     db: Session = Depends(get_db),
 ):
     """List all pending review items for a given extraction run."""
+    if run_id == "latest":
+        latest_run = (
+            db.query(ReviewItemModel.extraction_run_id)
+            .group_by(ReviewItemModel.extraction_run_id)
+            .order_by(func.max(ReviewItemModel.created_at).desc())
+            .first()
+        )
+        if latest_run is None:
+            return PendingResponse(items=[], total=0)
+        run_id = latest_run[0]
+
     items = (
         db.query(ReviewItemModel)
         .filter(
