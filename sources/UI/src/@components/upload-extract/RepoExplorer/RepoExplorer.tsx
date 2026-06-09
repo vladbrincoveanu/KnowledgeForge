@@ -57,9 +57,16 @@ const statusConfig: Record<
 };
 
 const RepoExplorer: React.FC<RepoExplorerProps> = ({ onExtractionStarted }) => {
-  const { repos, isExtracting, removeRepo, clearAll, startExtraction } =
-    useRepos();
+  const {
+    repos,
+    isExtracting,
+    removeRepo,
+    clearAll,
+    startExtraction,
+    addRepo,
+  } = useRepos();
   const [appendMode, setAppendMode] = useState(false);
+  const [isUrlDragging, setIsUrlDragging] = useState(false);
 
   const idleCount = repos.filter(
     (r) => r.status === "idle" || r.status === "failed",
@@ -82,8 +89,56 @@ const RepoExplorer: React.FC<RepoExplorerProps> = ({ onExtractionStarted }) => {
     }
   };
 
+  const handleUrlDragOver = (e: React.DragEvent) => {
+    // Only react if a URL/text payload is being dragged, not files
+    if (e.dataTransfer.types.includes("text/plain")) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+      setIsUrlDragging(true);
+    }
+  };
+
+  const handleUrlDragLeave = (e: React.DragEvent) => {
+    if (e.currentTarget === e.target) setIsUrlDragging(false);
+  };
+
+  const handleUrlDrop = (e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes("text/plain")) return;
+    e.preventDefault();
+    setIsUrlDragging(false);
+    const text = e.dataTransfer.getData("text/plain").trim();
+    if (!text) return;
+    // Accept the first whitespace-delimited token that looks like a URL.
+    const tokens = text.split(/\s+/);
+    let added = 0;
+    let lastError = "";
+    for (const token of tokens) {
+      let url: URL;
+      try {
+        url = new URL(token);
+      } catch {
+        continue;
+      }
+      if (url.protocol !== "https:" && url.protocol !== "http:") continue;
+      const result = addRepo(url.toString());
+      if (result.ok) added += 1;
+      else lastError = result.error;
+    }
+    if (added === 0 && lastError) {
+      // Surface only the last validation error; the drop event has no
+      // native channel for it.
+      // eslint-disable-next-line no-console
+      console.warn("Drop ignored:", lastError);
+    }
+  };
+
   return (
-    <div className="repo-explorer">
+    <div
+      className={`repo-explorer${isUrlDragging ? " repo-explorer--url-drop" : ""}`}
+      onDragOver={handleUrlDragOver}
+      onDragLeave={handleUrlDragLeave}
+      onDrop={handleUrlDrop}
+    >
       {repos.length > 0 && (
         <div className="repo-list">
           {repos.map((repo) => {

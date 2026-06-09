@@ -158,4 +158,53 @@ describe("RepoExplorer", () => {
     act(() => fireEvent.click(clearBtn));
     expect(getApi().repos).toEqual([]);
   });
+
+  describe("URL drag-drop", () => {
+    function dropText(text: string) {
+      const explorer = document.querySelector(".repo-explorer");
+      expect(explorer).not.toBeNull();
+      const dataTransfer = {
+        types: ["text/plain"],
+        getData: (type: string) => (type === "text/plain" ? text : ""),
+        dropEffect: "",
+      } as unknown as DataTransfer;
+      const event = new Event("drop", { bubbles: true, cancelable: true });
+      Object.defineProperty(event, "dataTransfer", { value: dataTransfer });
+      fireEvent(explorer!, event);
+    }
+
+    it("adds a single dropped GitHub URL to the queue", () => {
+      const { getApi } = renderExplorer();
+      act(() => {
+        dropText("https://github.com/facebook/react");
+      });
+      expect(getApi().repos).toHaveLength(1);
+      expect(getApi().repos[0].url).toBe("https://github.com/facebook/react");
+    });
+
+    it("extracts the first valid URL from mixed text", () => {
+      const { getApi } = renderExplorer();
+      act(() => {
+        dropText("check this out https://github.com/vercel/next.js and more");
+      });
+      expect(getApi().repos).toHaveLength(1);
+      expect(getApi().repos[0].url).toBe("https://github.com/vercel/next.js");
+    });
+
+    it("ignores non-URL text without adding anything", () => {
+      const { getApi } = renderExplorer();
+      act(() => {
+        dropText("just some plain text, no links here");
+      });
+      expect(getApi().repos).toEqual([]);
+    });
+
+    it("ignores non-http(s) schemes", () => {
+      const { getApi } = renderExplorer();
+      act(() => {
+        dropText("ftp://example.com/repo git://host/repo file:///tmp/x");
+      });
+      expect(getApi().repos).toEqual([]);
+    });
+  });
 });
