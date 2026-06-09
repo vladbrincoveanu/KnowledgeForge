@@ -102,24 +102,26 @@ const RepoExplorer: React.FC<RepoExplorerProps> = ({ onExtractionStarted }) => {
     if (e.currentTarget === e.target) setIsUrlDragging(false);
   };
 
+  const tryParseHttpUrl = (token: string): URL | null => {
+    try {
+      const url = new URL(token);
+      return url.protocol === "https:" || url.protocol === "http:" ? url : null;
+    } catch {
+      return null;
+    }
+  };
+
   const handleUrlDrop = (e: React.DragEvent) => {
     if (!e.dataTransfer.types.includes("text/plain")) return;
     e.preventDefault();
     setIsUrlDragging(false);
     const text = e.dataTransfer.getData("text/plain").trim();
     if (!text) return;
-    // Accept the first whitespace-delimited token that looks like a URL.
-    const tokens = text.split(/\s+/);
     let added = 0;
     let lastError = "";
-    for (const token of tokens) {
-      let url: URL;
-      try {
-        url = new URL(token);
-      } catch {
-        continue;
-      }
-      if (url.protocol !== "https:" && url.protocol !== "http:") continue;
+    for (const token of text.split(/\s+/)) {
+      const url = tryParseHttpUrl(token);
+      if (!url) continue;
       const result = addRepo(url.toString());
       if (result.ok) added += 1;
       else lastError = result.error;
