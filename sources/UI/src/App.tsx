@@ -7,13 +7,12 @@ import {
   Link,
   useLocation,
 } from "react-router-dom";
-import { Activity, Upload, Settings as SettingsIcon, Code } from "lucide-react";
+import { Upload, Settings as SettingsIcon, Code } from "lucide-react";
 import KFLogo from "./@components/KFLogo";
 import "./App.scss";
 import CodeArchitectureViewer from "./@components/architecture-map/CodeArchitectureViewer/CodeArchitectureViewer";
 import Notification from "./@components/notification/Notification";
 import FileUploader from "./@components/upload-extract/FileUploader/FileUploader";
-import SystemMetrics from "./@components/system-metrics/SystemMetrics/SystemMetrics";
 import Settings from "./@components/settings/Settings/Settings";
 import LandingPage from "./@components/landing/LandingPage/LandingPage";
 import { wsService } from "./services/api";
@@ -64,12 +63,6 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab }) => {
       label: "Code Architecture",
       icon: <Code size={20} />,
       path: "/code-architecture",
-    },
-    {
-      id: "metrics",
-      label: "System Metrics",
-      icon: <Activity size={20} />,
-      path: "/metrics",
     },
     {
       id: "settings",
@@ -178,7 +171,6 @@ const MainContent: React.FC = () => {
     const path = location.pathname;
     if (path.startsWith("/workspace")) return "workspace";
     if (path.startsWith("/code-architecture")) return "code-architecture";
-    if (path.startsWith("/metrics")) return "metrics";
     if (path.startsWith("/settings")) return "settings";
     return "code-architecture";
   };
@@ -275,24 +267,6 @@ const MainContent: React.FC = () => {
             <Route
               path="/code-architecture"
               element={<CodeArchitectureViewer />}
-            />
-
-            <Route
-              path="/metrics"
-              element={
-                <div className="metrics-section">
-                  <div className="section-header">
-                    <h1>
-                      <Activity size={32} /> System Metrics
-                    </h1>
-                    <p>
-                      Monitor system performance, health, and extraction metrics
-                    </p>
-                  </div>
-
-                  <SystemMetrics />
-                </div>
-              }
             />
 
             <Route
