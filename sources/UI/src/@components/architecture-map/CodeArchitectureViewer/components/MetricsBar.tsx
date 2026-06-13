@@ -18,12 +18,6 @@ interface MetricsBarProps {
   selectedRelationshipTypes: string[];
   toggleRelationshipType: (type: string) => void;
 
-  // Externals + dependency view
-  showExternal: boolean;
-  setShowExternal: (val: boolean) => void;
-  dependencyViewFilter: "all" | "business" | "technical";
-  setDependencyViewFilter: (val: "all" | "business" | "technical") => void;
-
   // Repo section
   repoSectionExpanded: boolean;
   setRepoSectionExpanded: (val: boolean) => void;
@@ -64,10 +58,6 @@ export default function MetricsBar({
   relationshipTypes,
   selectedRelationshipTypes,
   toggleRelationshipType,
-  showExternal,
-  setShowExternal,
-  dependencyViewFilter,
-  setDependencyViewFilter,
   repoSectionExpanded,
   setRepoSectionExpanded,
   githubUrl,
@@ -131,42 +121,6 @@ export default function MetricsBar({
             </div>
           </div>
 
-          <div className="metrics-cluster dependency-section">
-            <span className="section-label">View</span>
-            <div className="view-toggle">
-              <button
-                className={`view-btn cursor-pointer ${dependencyViewFilter === "all" ? "active" : ""}`}
-                onClick={() => setDependencyViewFilter("all")}
-              >
-                All
-              </button>
-              <button
-                className={`view-btn cursor-pointer ${dependencyViewFilter === "business" ? "active" : ""}`}
-                onClick={() => setDependencyViewFilter("business")}
-              >
-                Business
-              </button>
-              <button
-                className={`view-btn cursor-pointer ${dependencyViewFilter === "technical" ? "active" : ""}`}
-                onClick={() => setDependencyViewFilter("technical")}
-              >
-                Technical
-              </button>
-            </div>
-          </div>
-
-          <div className="metrics-cluster external-section">
-            <span className="section-label">Scope</span>
-            <label className="toggle-label cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showExternal}
-                onChange={(e) => setShowExternal(e.target.checked)}
-              />
-              <span className="toggle-switch"></span>
-              <span>External</span>
-            </label>
-          </div>
         </div>
       </div>
     </div>

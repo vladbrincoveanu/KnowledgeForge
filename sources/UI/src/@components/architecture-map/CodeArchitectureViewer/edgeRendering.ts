@@ -187,6 +187,7 @@ export const buildRenderedEdges = (
         id: `edge-${idx}`,
         source: relationship.source_entity_id,
         target: relationship.target_entity_id!,
+        zIndex: isContextLevel ? 0 : 1,
         label: isContextLevel
           ? description ||
             compactLabel ||

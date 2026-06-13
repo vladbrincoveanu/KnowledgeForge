@@ -702,7 +702,7 @@ function layoutContextLevel(nodes: Node[]): Node[] {
   const nodeWidth = 260;
   const nodeHeight = 140;
   const personsX = 80; // Far left
-  const externalsX = cx + 150; // Closer to center
+  const externalsX = cx + 420; // Far right — clear of system node
   const systemX = cx - nodeWidth / 2; // Center
   const systemY = cy - nodeHeight / 2;
 
@@ -947,7 +947,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
     selectedEntityTypes: [],
     selectedRelationshipTypes: [],
     showExternal: true,
-    dependencyViewFilter: "business",
+    dependencyViewFilter: "all",
     searchTerm: "",
     relationshipTypes: [],
   });
@@ -1032,10 +1032,6 @@ const CodeArchitectureViewerInner: React.FC = () => {
     filterDispatch({ type: "SET_ENTITY_TYPES", payload: v });
   const setSelectedRelationshipTypes = (v: string[]) =>
     filterDispatch({ type: "SET_RELATIONSHIP_TYPES", payload: v });
-  const setShowExternal = (v: boolean) =>
-    filterDispatch({ type: "SET_SHOW_EXTERNAL", payload: v });
-  const setDependencyViewFilter = (v: "all" | "business" | "technical") =>
-    filterDispatch({ type: "SET_DEPENDENCY_VIEW", payload: v });
   const setSearchTerm = (v: string) =>
     filterDispatch({ type: "SET_SEARCH_TERM", payload: v });
   const setRelationshipTypes = (v: string[]) =>
@@ -1099,7 +1095,6 @@ const CodeArchitectureViewerInner: React.FC = () => {
         compliance_factors: sysCtx.compliance_factors,
       };
       const containerEntities: CodeEntity[] = data.containers
-        .filter((container: any) => !container.is_infrastructure_only)
         .map((container: any, idx: number) => ({
           id: `container_${container.name || idx}`,
           name: container.name,
@@ -1283,6 +1278,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
             url: dep.url,
             detected_from: dep.detected_from,
             is_external: true,
+            description: dep.description,
             protocol: dep.protocol,
             integration_surface: dep.integration_surface,
             dependency_type: dep_type,
@@ -1318,6 +1314,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
         }
       });
 
+      // Try to resolve LLM-generated context relationships by name
       if (data.relationships?.context?.length) {
         data.relationships.context.forEach(
           (rel: C4DiagramRelationship, idx: number) => {
@@ -1337,6 +1334,31 @@ const CodeArchitectureViewerInner: React.FC = () => {
             }
           },
         );
+      }
+
+      // If name resolution produced no edges (LLM pointed at containers instead of
+      // system/externals), fall back to auto-generating canonical C4 context edges:
+      //   each actor → system
+      //   system → each external dependency
+      if (contextRelationships.length === 0) {
+        actorEntities.forEach((actor, idx) => {
+          contextRelationships.push({
+            id: `rel_actor_sys_${idx}`,
+            source_entity_id: actor.id,
+            target_entity_id: systemId,
+            relationship_type: "uses",
+            attributes: { description: "" },
+          });
+        });
+        externalEntities.forEach((ext, idx) => {
+          contextRelationships.push({
+            id: `rel_sys_ext_${idx}`,
+            source_entity_id: systemId,
+            target_entity_id: ext.id,
+            relationship_type: "uses",
+            attributes: { description: "" },
+          });
+        });
       }
 
       data.context_level = {
@@ -1418,6 +1440,8 @@ const CodeArchitectureViewerInner: React.FC = () => {
               container: component.container,
               endpoint_path: component.endpoint_path,
               endpoint_method: component.endpoint_method,
+              description: component.description,
+              language: component.language,
               ...inheritedForComponents,
             },
           });
@@ -1899,7 +1923,6 @@ const CodeArchitectureViewerInner: React.FC = () => {
       architecture.containers?.length
     ) {
       const fallbackContainers = architecture.containers
-        .filter((container: any) => !container.is_infrastructure_only)
         .map((container: any, idx: number) => ({
           id: `container_${container.name || idx}`,
           name: container.name,
@@ -2073,6 +2096,15 @@ const CodeArchitectureViewerInner: React.FC = () => {
             label: displayName,
             containerType: containerType,
             technology: technology,
+            description: containerInfo?.description || "",
+            containerMeta: containerInfo
+              ? {
+                  description: containerInfo.description || "",
+                  technology: containerInfo.technology || "",
+                  container_type: containerInfo.container_type || "",
+                  protocol: containerInfo.protocol || "",
+                }
+              : undefined,
           },
           style: {
             width: 700,
@@ -2769,10 +2801,6 @@ const CodeArchitectureViewerInner: React.FC = () => {
           relationshipTypes={relationshipTypes}
           selectedRelationshipTypes={selectedRelationshipTypes}
           toggleRelationshipType={toggleRelationshipType}
-          showExternal={showExternal}
-          setShowExternal={setShowExternal}
-          dependencyViewFilter={dependencyViewFilter}
-          setDependencyViewFilter={setDependencyViewFilter}
           repoSectionExpanded={repoSectionExpanded}
           setRepoSectionExpanded={setRepoSectionExpanded}
           githubUrl={githubUrl}

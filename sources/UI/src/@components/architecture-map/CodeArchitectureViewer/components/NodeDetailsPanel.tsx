@@ -551,7 +551,7 @@ export default function NodeDetailsPanel({
           containerMeta.owner ||
           containerMeta.owner_team) && (
           <DetailRow
-            label="Owner Team"
+            label="Owner"
             tooltip="The team or individual responsible for this system. If unassigned, add a CODEOWNERS file or specify the team in the README."
           >
             <span className="detail-value">{ownerValue || "Unassigned"}</span>
@@ -605,7 +605,7 @@ export default function NodeDetailsPanel({
             tooltip="Total number of deployable containers/microservices detected in this system."
           >
             <span className="detail-value">
-              {systemAttributes.service_count} microservices
+              {systemAttributes.service_count} containers
             </span>
           </DetailRow>
         )}
@@ -662,7 +662,7 @@ export default function NodeDetailsPanel({
         )}
 
         {/* Active experts */}
-        {(nodeType === "system" || activeExpertsValue != null) && (
+        {activeExpertsValue != null && (
           <DetailRow
             label="Active Experts (Bus Factor)"
             tooltip="Bus factor: contributors with 3+ commits in last 90 days. 0 = high risk (no active maintainers). 1 = single point of failure. Higher is better."
@@ -759,7 +759,7 @@ export default function NodeDetailsPanel({
         )}
 
         {/* Git activity */}
-        {nodeType === "system" && (
+        {nodeType === "system" && systemAttributes?.commit_count_90d != null && (
           <DetailRow
             label="Git Activity (90d)"
             tooltip="Number of commits in the last 90 days. Low activity on a Tier-1 system may indicate maintenance risk. Shows 'No git access' when the repository was extracted without a .git directory (e.g. from a ZIP download). Re-extract from a proper git clone to populate this field."

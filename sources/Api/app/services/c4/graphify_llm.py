@@ -130,13 +130,14 @@ def call_openrouter(prompt: str) -> dict[str, Any]:
 
     client = OpenAI(base_url=_OPENROUTER_BASE_URL, api_key=api_key)
 
-    last_exc: Exception | None = None
+    raw = ""
     for attempt in range(1, 4):  # up to 3 attempts
         try:
             response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.1,
+                max_tokens=8192,
             )
         except Exception as exc:
             raise LLMConnectionError(f"OpenRouter request failed: {exc}") from exc
@@ -145,26 +146,30 @@ def call_openrouter(prompt: str) -> dict[str, Any]:
         # minimax-m3 is a reasoning model: on some calls content is null
         # and the answer lands in the reasoning field instead.
         raw = msg.content or getattr(msg, "reasoning", None) or ""
-        logger.info("OpenRouter attempt %d response: %d chars", attempt, len(raw))
+        logger.info("OpenRouter attempt %d response: %d chars finish_reason=%s",
+                    attempt, len(raw), getattr(response.choices[0], "finish_reason", "?"))
 
-        if raw.strip():
-            break
+        if not raw.strip():
+            logger.warning("OpenRouter returned empty content on attempt %d — retrying", attempt)
+            if attempt < 3:
+                time.sleep(5)
+            continue
 
-        logger.warning("OpenRouter returned empty content on attempt %d — retrying", attempt)
-        if attempt < 3:
-            time.sleep(5)
-    else:
-        raise LLMResponseError("OpenRouter returned empty content after 3 attempts")
+        # Strip markdown fences if the model wraps the JSON
+        stripped = raw.strip()
+        if stripped.startswith("```"):
+            stripped = stripped.split("```", 2)[-1] if stripped.count("```") >= 2 else stripped
+            stripped = stripped.lstrip("json").lstrip("\n").rsplit("```", 1)[0].strip()
 
-    # Strip markdown fences if the model wraps the JSON
-    stripped = raw.strip()
-    if stripped.startswith("```"):
-        stripped = stripped.split("```", 2)[-1] if stripped.count("```") >= 2 else stripped
-        stripped = stripped.lstrip("json").lstrip("\n").rsplit("```", 1)[0].strip()
+        try:
+            # raw_decode stops at the first complete JSON object, ignoring trailing text
+            obj, _ = json.JSONDecoder().raw_decode(stripped)
+            return obj
+        except json.JSONDecodeError as exc:
+            logger.warning(
+                "OpenRouter attempt %d returned invalid JSON (%s) — retrying", attempt, exc
+            )
+            if attempt < 3:
+                time.sleep(5)
 
-    try:
-        # raw_decode stops at the first complete JSON object, ignoring trailing text
-        obj, _ = json.JSONDecoder().raw_decode(stripped)
-        return obj
-    except json.JSONDecodeError as exc:
-        raise LLMResponseError(f"OpenRouter returned non-JSON: {exc}\nRaw: {raw[:500]}") from exc
+    raise LLMResponseError(f"OpenRouter returned invalid JSON after 3 attempts\nRaw: {raw[:500]}")

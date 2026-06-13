@@ -104,15 +104,8 @@ class GraphWriter:
         containers: list[dict[str, Any]],
         relationships: list[dict[str, Any]],
     ) -> None:
-        infra_names = {
-            c.get("name") for c in containers if c.get("is_infrastructure_only")
-        }
-        visible_containers = [
-            c for c in containers if not c.get("is_infrastructure_only")
-        ]
-
         container_id_by_name = {}
-        for c in visible_containers:
+        for c in containers:
             cid = f"container:{c.get('name', 'unknown')}"
             container_id_by_name[c.get("name")] = cid
             self._upsert_node(
@@ -202,11 +195,12 @@ class GraphWriter:
                 "level": "component",
                 "extraction_task_id": task_id,
                 "properties": {
-                    "component_type": comp.get("component_type", ""),
-                    "container": container_name,
-                    "endpoint_path": comp.get("endpoint_path", ""),
+                    "component_type":  comp.get("component_type", ""),
+                    "container":       container_name,
+                    "endpoint_path":   comp.get("endpoint_path", ""),
                     "endpoint_method": comp.get("endpoint_method", ""),
-                    "language": comp.get("language", ""),
+                    "language":        comp.get("language", ""),
+                    "description":     comp.get("description", ""),
                 },
             },
         )
@@ -272,43 +266,28 @@ class GraphWriter:
 
 def _system_context_properties(sc: dict[str, Any]) -> dict[str, Any]:
     return {
-        "owner_team": sc.get("owner_team", ""),
-        "owner": sc.get("owner", ""),
-        "business_domain": sc.get("business_domain", ""),
-        "domain": sc.get("domain", ""),
-        "criticality": sc.get("criticality", ""),
-        "tier": sc.get("tier", ""),
-        "status": sc.get("status", ""),
+        "purpose":    sc.get("purpose", ""),
+        "domain":     sc.get("domain", ""),
+        "owner":      sc.get("owner", ""),
+        "status":     sc.get("status", ""),
+        "tier":       sc.get("tier", ""),
         "data_class": sc.get("data_class", ""),
         "compliance": sc.get("compliance", ""),
-        "active_experts": sc.get("active_experts") if sc.get("active_experts") is not None else 0,
-        "languages": json.dumps(sc.get("languages", [])),
+        "languages":  json.dumps(sc.get("languages", [])),
         "frameworks": json.dumps(sc.get("frameworks", [])),
-        "repository_url": sc.get("repository_url", ""),
     }
 
 
 def _external_dependency_properties(dep: dict[str, Any]) -> dict[str, Any]:
     return {
-        "provider": dep.get("provider", ""),
-        "company": dep.get("company", ""),
-        "url": dep.get("url", ""),
-        "classification_confidence": dep.get("classification_confidence", 0.0),
-        "decision_mode": dep.get("decision_mode", ""),
-        "review_status": dep.get("review_status", ""),
-        "dependency_type": dep.get("dependency_type", ""),
+        "description": dep.get("description", ""),
     }
 
 
 def _container_properties(c: dict[str, Any]) -> dict[str, Any]:
     return {
-        "technology": c.get("technology", ""),
+        "technology":     c.get("technology", ""),
         "container_type": c.get("container_type", ""),
-        "protocol": c.get("protocol", ""),
-        "runtime_info": c.get("runtime_info", ""),
-        "runtime_environment": c.get("runtime_environment", ""),
-        "deployment": c.get("deployment", ""),
-        "description": c.get("description", ""),
-        "repository_url": c.get("repository_url", ""),
-        "health_endpoint": c.get("health_endpoint", ""),
+        "protocol":       c.get("protocol", ""),
+        "description":    c.get("description", ""),
     }

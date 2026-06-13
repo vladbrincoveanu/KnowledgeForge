@@ -115,7 +115,7 @@ const C4Edge = ({
         }}
         className="c4-edge-line"
       />
-      {hasContent ? (
+      {showLabel ? (
         <EdgeLabelRenderer>
           <div
             className={`c4-edge-label${
