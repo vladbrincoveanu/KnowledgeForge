@@ -281,6 +281,7 @@ def _system_context_properties(sc: dict[str, Any]) -> dict[str, Any]:
         "status": sc.get("status", ""),
         "data_class": sc.get("data_class", ""),
         "compliance": sc.get("compliance", ""),
+        "active_experts": sc.get("active_experts") if sc.get("active_experts") is not None else 0,
         "languages": json.dumps(sc.get("languages", [])),
         "frameworks": json.dumps(sc.get("frameworks", [])),
         "repository_url": sc.get("repository_url", ""),

@@ -156,3 +156,6 @@ sources/Api/sources/data/sessions/
 
 # Worktrees
 .worktrees/
+
+# Graphify (separate git repo — not a submodule)
+graphify/

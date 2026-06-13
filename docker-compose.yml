@@ -110,8 +110,13 @@ services:
       - ONTOLOGY_ENVIRONMENT=development
       - ONTOLOGY_LOGGING__FILE_PATH=/app/logs/api.log
       - LOG_LEVEL=INFO
+      # Graphify extraction backend
+      - GRAPHIFY_ROOT=/graphify
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-minimax/minimax-m3}
     volumes:
       - ./sources/Api:/app
+      - ./graphify:/graphify:ro
       - ./sources/Api/config.yaml:/app/config.yaml:ro
       - ./sources/data:/app/data
       - ./sources/demo:/app/sources/demo:ro

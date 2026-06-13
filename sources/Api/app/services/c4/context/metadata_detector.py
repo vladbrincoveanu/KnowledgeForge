@@ -86,48 +86,64 @@ class MetadataDetector:
                     logger.warning(f"Failed to read CODEOWNERS: {e}")
                     pass
 
-        # Check README for maintainers or team info
-        readme_paths = [
-            self.repo_path / "README.md",
-            self.repo_path / "README.rst",
-            self.repo_path / "README.txt",
+        # Check explicit MAINTAINERS / OWNERS files
+        maintainer_file_paths = [
+            self.repo_path / "MAINTAINERS",
+            self.repo_path / "MAINTAINERS.md",
+            self.repo_path / "OWNERS",
+            self.repo_path / ".github" / "MAINTAINERS",
         ]
-
-        for readme in readme_paths:
-            if readme.exists():
-                logger.info(f"Checking README at {readme}")
+        for mf in maintainer_file_paths:
+            if mf.exists():
+                logger.info(f"Found maintainers file at {mf}")
                 try:
-                    with open(readme) as f:
+                    with open(mf) as f:
                         content = f.read()
-
-                    # Look for maintainers section
-                    maintainer_patterns = [
-                        r'maintainer[s]?:\s*(.+)',
-                        r'owner[s]?:\s*(.+)',
-                        r'team:\s*(.+)',
-                        r'contact:\s*(.+)',
-                        r'#([a-z0-9_-]+)',  # Slack channel
-                    ]
-
-                    for pattern in maintainer_patterns:
-                        match = re.search(pattern, content, re.IGNORECASE)
-                        if match:
-                            team_info = match.group(1).strip()
-                            if len(team_info) < 50:
-                                logger.info(f"Found team in README: {team_info}")
-                                return (team_info, {
-                                    "detection_source": "readme",
-                                    "confidence": 0.80,
-                                    "evidence": [{"type": "readme", "source": str(readme), "snippet": team_info[:100]}]
-                                })
-
+                    team_pattern = r'@([a-zA-Z0-9_-]+(?:/[a-zA-Z0-9_-]+)?)'
+                    teams = re.findall(team_pattern, content)
+                    if teams:
+                        logger.info(f"Found team in {mf.name}: {teams[0]}")
+                        return (teams[0], {
+                            "detection_source": "maintainers_file",
+                            "confidence": 0.92,
+                            "evidence": [{"type": "maintainers_file", "source": str(mf), "snippet": teams[0]}]
+                        })
+                    # No @mention — use first non-empty, non-comment line
+                    for line in content.splitlines():
+                        line = line.strip()
+                        if line and not line.startswith('#') and len(line) < 80:
+                            logger.info(f"Found maintainer name in {mf.name}: {line}")
+                            return (line, {
+                                "detection_source": "maintainers_file",
+                                "confidence": 0.88,
+                                "evidence": [{"type": "maintainers_file", "source": str(mf), "snippet": line}]
+                            })
                 except (OSError, ValueError) as e:
-                    logger.warning(f"Failed to read README: {e}")
-                    pass
+                    logger.warning(f"Failed to read {mf}: {e}")
 
-        # Fallback: Get top contributors from git
-        logger.info("No CODEOWNERS or README team found, checking git contributors")
+        # Check package manifest author fields
+        manifest_owner = self._detect_owner_from_manifests()
+        if manifest_owner:
+            logger.info(f"Found owner in package manifest: {manifest_owner}")
+            return (manifest_owner, {
+                "detection_source": "package_manifest",
+                "confidence": 0.85,
+                "evidence": [{"type": "package_manifest", "source": "manifest", "snippet": manifest_owner}]
+            })
+
+        # Get top contributors from git
+        logger.info("No ownership file found, checking git contributors")
         top_contributors = self._get_top_git_contributors(max_contributors=5)
+
+        # README parsing — demoted to after git contributor check; key-value patterns only
+        readme_owner = self._detect_owner_from_readme()
+        if readme_owner and not top_contributors:
+            logger.info(f"Found owner in README (fallback): {readme_owner}")
+            return (readme_owner, {
+                "detection_source": "readme",
+                "confidence": 0.60,
+                "evidence": [{"type": "readme", "source": "README", "snippet": readme_owner}]
+            })
 
         # Try LLM enrichment first if available
         if top_contributors and self.llm_manager:
@@ -778,8 +794,8 @@ Team name:"""
             email_counts: dict[str, int] = {}
             for root in git_roots:
                 result = subprocess.run(
-                    ['git', 'shortlog', '-sne', '--since=90.days'],
-                    cwd=root, capture_output=True, text=True, timeout=10,
+                    ['git', 'shortlog', '-sne', '--since=90.days', 'HEAD'],
+                    cwd=root, capture_output=True, text=True, timeout=30,
                 )
                 if result.returncode != 0:
                     continue
@@ -1148,6 +1164,69 @@ Team name:"""
                 except (OSError, ValueError):
                     pass
 
+        return None
+
+    def _detect_owner_from_manifests(self) -> Optional[str]:
+        """Return author/owner string from package manifest files."""
+        root = Path(self.repo_path)
+
+        # package.json "author" field
+        pkg_json = root / "package.json"
+        if pkg_json.exists():
+            try:
+                import json as _json
+                data = _json.loads(pkg_json.read_text(encoding="utf-8", errors="ignore"))
+                author = data.get("author")
+                if isinstance(author, str) and author.strip():
+                    return author.strip()
+                if isinstance(author, dict) and author.get("name"):
+                    return str(author["name"]).strip()
+            except (OSError, ValueError):
+                pass
+
+        # pyproject.toml authors
+        pyproject = root / "pyproject.toml"
+        if pyproject.exists():
+            try:
+                content = pyproject.read_text(encoding="utf-8", errors="ignore")
+                m = re.search(r'authors\s*=\s*\[\s*["\{]([^"\},]+)', content)
+                if m:
+                    return m.group(1).strip()
+            except (OSError, ValueError):
+                pass
+
+        # *.gemspec authors
+        for gemspec in root.glob("*.gemspec"):
+            try:
+                content = gemspec.read_text(encoding="utf-8", errors="ignore")
+                m = re.search(r'\.authors\s*=\s*\[["\'](.*?)["\']', content)
+                if m:
+                    return m.group(1).strip()
+            except (OSError, ValueError):
+                pass
+
+        return None
+
+    def _detect_owner_from_readme(self) -> Optional[str]:
+        """Return owner from README using key-value patterns only (no bare headings)."""
+        for name in ("README.md", "README.rst", "README.txt", "readme.md"):
+            readme = Path(self.repo_path) / name
+            if not readme.exists():
+                continue
+            try:
+                text = readme.read_text(encoding="utf-8", errors="ignore")[:4000]
+                # Key-value patterns only: "maintainer: Foo", "owner: Bar", etc.
+                m = re.search(
+                    r'^(?:maintainer|owner|team|contact)\s*:\s*(.+)$',
+                    text,
+                    re.IGNORECASE | re.MULTILINE,
+                )
+                if m:
+                    value = m.group(1).strip()
+                    if value and len(value) < 100:
+                        return value
+            except (OSError, ValueError):
+                pass
         return None
 
     def _get_contributor_name(self, email: str) -> str:

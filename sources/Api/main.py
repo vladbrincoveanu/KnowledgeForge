@@ -167,10 +167,10 @@ if __name__ == "__main__":
 
         # Run the application
         uvicorn.run(
-            app,
+            "main:app",
             host="0.0.0.0",
             port=8000,
-            reload=False,  # Disable reload for now to avoid import issues
+            reload=True,
             log_level=config.logging.level.lower(),
             access_log=True,
         )
