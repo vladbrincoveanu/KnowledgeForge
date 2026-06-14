@@ -14,136 +14,6 @@ afterEach(() => {
 });
 
 describe("NodeDetailsPanel", () => {
-  test("renders container ownership and risk metadata from containerMeta", () => {
-    render(
-      <NodeDetailsPanel
-        selectedNode={{
-          type: "container",
-          name: "omnipay-gateway",
-          attributes: {},
-          containerMeta: {
-            owner: "Vlad",
-            tier: "Tier 2 - Production Standard",
-            data_class: "General",
-            active_experts: 2,
-            compliance: "COMPLIANT",
-            compliance_confidence: 0.94,
-            description: "Client API gateway for the mobile apps.",
-          },
-        }}
-        onClose={vi.fn()}
-        nodeDescription=""
-        isNodeLoading={false}
-        chatMessages={[]}
-        isChatLoading={false}
-        onSendChat={vi.fn().mockResolvedValue(undefined)}
-        onApplyReviewDecision={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByText("Vlad")).toBeInTheDocument();
-    expect(
-      screen.getByText("Tier 2 - Production Standard"),
-    ).toBeInTheDocument();
-    expect(screen.getByText("General")).toBeInTheDocument();
-    expect(screen.getByText("2 active experts")).toBeInTheDocument();
-    expect(screen.getByText("Compliant")).toBeInTheDocument();
-    expect(screen.getByText("94%")).toBeInTheDocument();
-  });
-
-  test("renders human review controls for ambiguous external dependencies", () => {
-    const onApplyReviewDecision = vi.fn();
-    const onSendChat = vi.fn().mockResolvedValue(undefined);
-
-    render(
-      <NodeDetailsPanel
-        selectedNode={{
-          id: "context_external_7",
-          type: "external_system",
-          name: "SignalForge",
-          attributes: {
-            detected_from: "omnipay-gateway/README.md",
-            dependency_type: "BUSINESS_SYSTEM",
-            classification_confidence: 0.64,
-            classification_reasoning:
-              "The documentation is exploratory and still ambiguous.",
-            decision_mode: "llm_adjudicated",
-            review_status: "needs_review",
-            requires_human_review: true,
-            review_threshold: 0.7,
-            review_options: [
-              {
-                id: "signalforge-business",
-                label: "Keep At Context Level",
-                value: "BUSINESS_SYSTEM",
-                description:
-                  "Treat SignalForge as an external risk-decisioning company.",
-              },
-              {
-                id: "signalforge-technical",
-                label: "Move To Container Level",
-                value: "TECHNICAL_INFRA",
-                description:
-                  "Treat SignalForge as a technical integration detail.",
-              },
-            ],
-            suggested_prompts: [
-              "We use SignalForge for merchant risk scoring. Compare it with Sift and Sardine.",
-            ],
-            provider_alternatives: [
-              {
-                provider: "Sift",
-                price_tier: "High",
-                performance_tier: "Enterprise",
-                profile: "Mature fraud network effects.",
-              },
-            ],
-          },
-        }}
-        onClose={vi.fn()}
-        nodeDescription=""
-        isNodeLoading={false}
-        chatMessages={[]}
-        isChatLoading={false}
-        onSendChat={onSendChat}
-        onApplyReviewDecision={onApplyReviewDecision}
-      />,
-    );
-
-    expect(screen.getByText("Needs Human Review")).toBeInTheDocument();
-    expect(screen.getByText("External Dependency")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "I am not fully confident where SignalForge belongs in the context diagram.",
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("Possible alternatives for SignalForge"),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("button", { name: /keep at context level/i }),
-    );
-
-    expect(onApplyReviewDecision).toHaveBeenCalledWith(
-      expect.objectContaining({
-        nodeId: "context_external_7",
-        value: "BUSINESS_SYSTEM",
-        label: "Keep At Context Level",
-      }),
-    );
-
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: /We use SignalForge for merchant risk scoring/i,
-      }),
-    );
-
-    expect(onSendChat).toHaveBeenCalledWith(
-      "We use SignalForge for merchant risk scoring. Compare it with Sift and Sardine.",
-    );
-  });
-
   test("clears the chat input immediately after sending", () => {
     let resolveSend: (() => void) | undefined;
     const onSendChat = vi.fn(
@@ -166,7 +36,6 @@ describe("NodeDetailsPanel", () => {
         chatMessages={[]}
         isChatLoading={false}
         onSendChat={onSendChat}
-        onApplyReviewDecision={vi.fn()}
       />,
     );
 
@@ -204,7 +73,6 @@ describe("NodeDetailsPanel", () => {
       isNodeLoading: false,
       isChatLoading: false,
       onSendChat: vi.fn().mockResolvedValue(undefined),
-      onApplyReviewDecision: vi.fn(),
     };
 
     const { rerender } = render(
@@ -242,11 +110,119 @@ describe("NodeDetailsPanel", () => {
         chatMessages={[]}
         isChatLoading
         onSendChat={vi.fn().mockResolvedValue(undefined)}
-        onApplyReviewDecision={vi.fn()}
       />,
     );
 
     expect(screen.getByText("Preparing a response...")).toBeInTheDocument();
     expect(screen.queryByText("Thinking...")).not.toBeInTheDocument();
+  });
+
+  test("container panel shows technology and protocol but not system fields", () => {
+    render(
+      <NodeDetailsPanel
+        selectedNode={{
+          type: "container",
+          name: "Streaming API",
+          attributes: {
+            description: "WebSocket service",
+            technology: "Node.js",
+            container_type: "service",
+            protocol: "WebSocket",
+            connections: { outgoing: [], incoming: [] },
+            componentsInside: [],
+            // Inherited from system — should NOT be shown on container panel
+            owner: "Mastodon gGmbH",
+            status: "ACTIVE",
+            tier: "Tier 1",
+            data_class: "PII",
+            compliance: "MEDIUM_RISK",
+          },
+        }}
+        onClose={vi.fn()}
+        nodeDescription=""
+        isNodeLoading={false}
+        chatMessages={[]}
+        isChatLoading={false}
+        onSendChat={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    expect(screen.getByText("Node.js")).toBeInTheDocument();
+    expect(screen.getByText("WebSocket")).toBeInTheDocument();
+    expect(screen.getByText("service")).toBeInTheDocument();
+    expect(screen.queryByText("Mastodon gGmbH")).not.toBeInTheDocument();
+    expect(screen.queryByText("Tier 1")).not.toBeInTheDocument();
+    expect(screen.queryByText("PII")).not.toBeInTheDocument();
+  });
+
+  test("container panel renders Connections list when relationships exist", () => {
+    render(
+      <NodeDetailsPanel
+        selectedNode={{
+          type: "container",
+          name: "Rails Web Application",
+          attributes: {
+            description: "Mastodon web app",
+            technology: "Ruby on Rails",
+            container_type: "service",
+            connections: {
+              outgoing: [
+                { name: "PostgreSQL", protocol: "TCP", description: "Stores accounts" },
+                { name: "Redis", protocol: "TCP", description: "Caches sessions" },
+              ],
+              incoming: [],
+            },
+            componentsInside: ["AccountsController", "StatusesController"],
+          },
+        }}
+        onClose={vi.fn()}
+        nodeDescription=""
+        isNodeLoading={false}
+        chatMessages={[]}
+        isChatLoading={false}
+        onSendChat={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    expect(screen.getByText("Connections")).toBeInTheDocument();
+    expect(screen.getByText("PostgreSQL")).toBeInTheDocument();
+    expect(screen.getByText("Redis")).toBeInTheDocument();
+    expect(screen.getByText("Components Inside")).toBeInTheDocument();
+  });
+
+  test("component panel shows component_type and endpoint but not system fields", () => {
+    render(
+      <NodeDetailsPanel
+        selectedNode={{
+          type: "component",
+          name: "AccountsController",
+          attributes: {
+            description: "Handles account REST endpoints",
+            component_type: "http_handler",
+            endpoint_method: "GET",
+            endpoint_path: "/api/v1/accounts/:id",
+            language: "Ruby",
+            container: "Rails Web Application",
+            connections: { outgoing: [], incoming: [] },
+            // Inherited from system — should NOT be shown
+            owner: "Mastodon gGmbH",
+            tier: "Tier 1",
+          },
+        }}
+        onClose={vi.fn()}
+        nodeDescription=""
+        isNodeLoading={false}
+        chatMessages={[]}
+        isChatLoading={false}
+        onSendChat={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    expect(screen.getByText("http_handler")).toBeInTheDocument();
+    expect(screen.getByText("GET /api/v1/accounts/:id")).toBeInTheDocument();
+    expect(screen.getByText("Ruby")).toBeInTheDocument();
+    expect(screen.getByText("Rails Web Application")).toBeInTheDocument();
+    expect(screen.queryByText("Mastodon gGmbH")).not.toBeInTheDocument();
+    expect(screen.queryByText("Tier 1")).not.toBeInTheDocument();
   });
 });

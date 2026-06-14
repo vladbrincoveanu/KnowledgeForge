@@ -93,13 +93,6 @@ interface C4Architecture {
   component_level?: C4Level; // Transformed format
 }
 
-interface DependencyReviewDecision {
-  nodeId: string;
-  value: string;
-  label: string;
-  description?: string;
-}
-
 const edgeTypes = {
   C4Edge,
 };
@@ -983,7 +976,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
     [],
   );
   const [isChatLoading, setIsChatLoading] = useState(false);
-  const [reviewOverrides, setReviewOverrides] = useState<
+  const [reviewOverrides] = useState<
     Record<string, Record<string, unknown>>
   >({});
 
@@ -1094,6 +1087,56 @@ const CodeArchitectureViewerInner: React.FC = () => {
         compliance_confidence: sysCtx.compliance_confidence,
         compliance_factors: sysCtx.compliance_factors,
       };
+      // Pre-compute connections per container name and components grouped by container
+      const containerRels = data.relationships?.containers || [];
+      const connectionsByContainer = new Map<
+        string,
+        {
+          outgoing: { name: string; protocol?: string; description?: string }[];
+          incoming: { name: string; protocol?: string; description?: string }[];
+        }
+      >();
+      containerRels.forEach((rel: any) => {
+        const from = rel.from ?? rel.source;
+        const to = rel.to ?? rel.destination;
+        if (!from || !to) return;
+        const entry = {
+          name: String(to),
+          protocol: rel.protocol,
+          description: rel.description,
+        };
+        const out = connectionsByContainer.get(from) || {
+          outgoing: [],
+          incoming: [],
+        };
+        out.outgoing.push(entry);
+        connectionsByContainer.set(from, out);
+
+        const inn = connectionsByContainer.get(to) || {
+          outgoing: [],
+          incoming: [],
+        };
+        inn.incoming.push({
+          name: String(from),
+          protocol: rel.protocol,
+          description: rel.description,
+        });
+        connectionsByContainer.set(to, inn);
+      });
+
+      const componentsByContainer = new Map<string, string[]>();
+      (data.components || []).forEach((comp: any) => {
+        if (comp?.type === "component_group" && Array.isArray(comp.components)) {
+          const arr = componentsByContainer.get(comp.container) || [];
+          comp.components.forEach((name: string) => arr.push(name));
+          if (comp.container) componentsByContainer.set(comp.container, arr);
+        } else if (comp?.container && comp?.name) {
+          const arr = componentsByContainer.get(comp.container) || [];
+          arr.push(comp.name);
+          componentsByContainer.set(comp.container, arr);
+        }
+      });
+
       const containerEntities: CodeEntity[] = data.containers
         .map((container: any, idx: number) => ({
           id: `container_${container.name || idx}`,
@@ -1112,6 +1155,11 @@ const CodeArchitectureViewerInner: React.FC = () => {
             repository_url: container.repository_url,
             health_endpoint: container.health_endpoint,
             is_infrastructure_only: container.is_infrastructure_only,
+            connections: connectionsByContainer.get(container.name) || {
+              outgoing: [],
+              incoming: [],
+            },
+            componentsInside: componentsByContainer.get(container.name) || [],
             ...inheritedAttrs,
           },
         }));
@@ -1304,7 +1352,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
       contextEntities.forEach((entity) => {
         contextIdByName.set(entity.name, entity.id);
       });
-      externalEntities.forEach((entity, idx) => {
+      externalEntities.forEach((entity: any, idx: number) => {
         const rawDependency = data.system_context?.external_dependencies?.[idx];
         if (rawDependency?.name) {
           contextIdByName.set(String(rawDependency.name), entity.id);
@@ -1341,7 +1389,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
       //   each actor → system
       //   system → each external dependency
       if (contextRelationships.length === 0) {
-        actorEntities.forEach((actor, idx) => {
+        actorEntities.forEach((actor: any, idx: number) => {
           contextRelationships.push({
             id: `rel_actor_sys_${idx}`,
             source_entity_id: actor.id,
@@ -1350,7 +1398,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
             attributes: { description: "" },
           });
         });
-        externalEntities.forEach((ext, idx) => {
+        externalEntities.forEach((ext: any, idx: number) => {
           contextRelationships.push({
             id: `rel_sys_ext_${idx}`,
             source_entity_id: systemId,
@@ -1385,6 +1433,33 @@ const CodeArchitectureViewerInner: React.FC = () => {
         compliance_confidence: sysCtxForComponents.compliance_confidence,
         compliance_factors: sysCtxForComponents.compliance_factors,
       };
+      // Pre-compute component connections by name
+      const compRels = data.relationships?.components || [];
+      const connectionsByComponent = new Map<
+        string,
+        {
+          outgoing: { name: string; label?: string }[];
+          incoming: { name: string; label?: string }[];
+        }
+      >();
+      compRels.forEach((rel: any) => {
+        const from = rel.from ?? rel.source;
+        const to = rel.to ?? rel.destination ?? rel.target;
+        if (!from || !to) return;
+        const out = connectionsByComponent.get(from) || {
+          outgoing: [],
+          incoming: [],
+        };
+        out.outgoing.push({ name: String(to), label: rel.label });
+        connectionsByComponent.set(from, out);
+        const inn = connectionsByComponent.get(to) || {
+          outgoing: [],
+          incoming: [],
+        };
+        inn.incoming.push({ name: String(from), label: rel.label });
+        connectionsByComponent.set(to, inn);
+      });
+
       data.components.forEach((component: any, groupIdx: number) => {
         // Check if this is a component group
         if (
@@ -1405,6 +1480,10 @@ const CodeArchitectureViewerInner: React.FC = () => {
                 component_type: component.component_type || "Component",
                 group: component.name,
                 container: component.container,
+                connections: connectionsByComponent.get(compName) || {
+                  outgoing: [],
+                  incoming: [],
+                },
                 ...inheritedForComponents,
               },
             });
@@ -1442,6 +1521,10 @@ const CodeArchitectureViewerInner: React.FC = () => {
               endpoint_method: component.endpoint_method,
               description: component.description,
               language: component.language,
+              connections: connectionsByComponent.get(component.name) || {
+                outgoing: [],
+                incoming: [],
+              },
               ...inheritedForComponents,
             },
           });
@@ -2083,28 +2166,41 @@ const CodeArchitectureViewerInner: React.FC = () => {
         const containerInfo = architecture?.containers?.find(
           (c: any) => c.name === containerName,
         );
+        const containerEntityAttrs =
+          (architecture as any)?.container_level?.entities?.find(
+            (e: any) => e.name === containerName,
+          )?.attributes ?? {};
         const displayName = containerInfo?.name || containerName;
         const containerType = containerInfo?.container_type || "Service";
         const technology = containerInfo?.technology || "Unknown";
 
         // Create container parent node
+        const frameAttrs = containerInfo
+          ? {
+              description: containerInfo.description || "",
+              technology: containerInfo.technology || "",
+              container_type: containerInfo.container_type || "",
+              protocol: containerInfo.protocol || "",
+              connections: containerEntityAttrs.connections || {
+                outgoing: [],
+                incoming: [],
+              },
+              componentsInside: containerEntityAttrs.componentsInside || [],
+            }
+          : undefined;
         const containerNode: Node = {
           id: `container_frame_${containerName}`,
           type: "container",
           position: { x: currentX, y: 100 },
           data: {
             label: displayName,
+            name: displayName,
+            type: "container",
             containerType: containerType,
             technology: technology,
             description: containerInfo?.description || "",
-            containerMeta: containerInfo
-              ? {
-                  description: containerInfo.description || "",
-                  technology: containerInfo.technology || "",
-                  container_type: containerInfo.container_type || "",
-                  protocol: containerInfo.protocol || "",
-                }
-              : undefined,
+            attributes: frameAttrs,
+            containerMeta: frameAttrs,
           },
           style: {
             width: 700,
@@ -2668,43 +2764,6 @@ const CodeArchitectureViewerInner: React.FC = () => {
     [buildArchitectureChatContext, buildSelectionChatContext, chatMessages],
   );
 
-  const handleApplyReviewDecision = useCallback(
-    (decision: DependencyReviewDecision) => {
-      const reviewedNodeName =
-        selectedNode?.id === decision.nodeId
-          ? selectedNode.name
-          : decision.nodeId;
-      const reviewerSummary =
-        decision.description ||
-        `Human review classified ${reviewedNodeName} as ${decision.label}.`;
-
-      setReviewOverrides((current) => ({
-        ...current,
-        [decision.nodeId]: {
-          dependency_type: decision.value,
-          decision_mode: "human_reviewed",
-          review_status: "approved",
-          requires_human_review: false,
-          human_review_choice: decision.label,
-          human_review_summary: reviewerSummary,
-        },
-      }));
-
-      setChatMessages((currentMessages) => [
-        ...currentMessages,
-        {
-          role: "user",
-          content: `Review decision: ${decision.label}`,
-        },
-        {
-          role: "assistant",
-          content: `${reviewedNodeName}: ${reviewerSummary}`,
-        },
-      ]);
-    },
-    [selectedNode],
-  );
-
   const onEdgeClick = useCallback(
     async (_event: React.MouseEvent, edge: Edge) => {
       setSelectedNode(null);
@@ -2876,7 +2935,6 @@ const CodeArchitectureViewerInner: React.FC = () => {
                 chatMessages={chatMessages}
                 isChatLoading={isChatLoading}
                 onSendChat={handleArchitectureChat}
-                onApplyReviewDecision={handleApplyReviewDecision}
               />
             )}
           </div>
