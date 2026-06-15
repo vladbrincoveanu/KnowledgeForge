@@ -24,7 +24,9 @@ import { codeArchitectureAPI } from "../../../services/api";
 import { useEnrichmentWS } from "../../../hooks/useEnrichmentWS";
 import CustomNode from "./CustomNode";
 import ContainerNode from "./ContainerNode";
+import PortfolioNode from "./PortfolioNode";
 import C4Edge from "./C4Edge";
+import LevelBreadcrumb from "./components/LevelBreadcrumb";
 import ArchitectureHeader from "./components/ArchitectureHeader";
 import GraphView from "./components/GraphView";
 import NodeDetailsPanel from "./components/NodeDetailsPanel";
@@ -105,6 +107,7 @@ const normalizeDescription = (text?: string) => {
 const nodeTypes = {
   custom: CustomNode,
   container: ContainerNode,
+  portfolio: PortfolioNode,
 };
 
 type ContainerTier = "entry" | "service" | "infra";
@@ -999,6 +1002,15 @@ const CodeArchitectureViewerInner: React.FC = () => {
 
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const { enrichedNodes: wsEnrichedNodes } = useEnrichmentWS(activeTaskId);
+
+  const [availableExtractions, setAvailableExtractions] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch("/api/v1/code/extractions")
+      .then((r) => r.ok ? r.json() : [])
+      .then((data) => setAvailableExtractions(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, []);
 
   const pollIntervalRef = useRef<number | null>(null);
   const markdownCacheRef = useRef<Record<string, string>>({});
@@ -1976,6 +1988,75 @@ const CodeArchitectureViewerInner: React.FC = () => {
 
   // Process architecture data into graph format
   useEffect(() => {
+    // Portfolio level: render all completed extraction runs as nodes
+    if (selectedLevel === "portfolio_level") {
+      const NODE_W = 280;
+      const NODE_H = 160;
+
+      // Build edges first so dagre can lay out in dependency order
+      const rfEdges: Edge[] = [];
+      availableExtractions.forEach((src) => {
+        const srcExternals: string[] = src.external_system_names || [];
+        availableExtractions.forEach((dst) => {
+          if (src.task_id === dst.task_id) return;
+          const dstShort = (dst.repo_name || "").split("/").pop() || "";
+          const dstSystem = dst.system_name || "";
+          const matched = dstShort.length >= 4 && srcExternals.some(
+            (n) => n.toLowerCase() === dstShort.toLowerCase() ||
+                   n.toLowerCase() === dstSystem.toLowerCase(),
+          );
+          if (matched) {
+            rfEdges.push({
+              id: `portfolio_edge_${src.task_id}_${dst.task_id}`,
+              source: `portfolio_${src.task_id}`,
+              target: `portfolio_${dst.task_id}`,
+              type: "smoothstep",
+              animated: false,
+              style: { stroke: "#f59e0b", strokeWidth: 2 },
+              markerEnd: { type: MarkerType.ArrowClosed, color: "#f59e0b" },
+            });
+          }
+        });
+      });
+
+      // Use dagre LR so edges flow left→right (user repo on left, dependency on right)
+      const pg = new dagre.graphlib.Graph();
+      pg.setDefaultEdgeLabel(() => ({}));
+      pg.setGraph({ rankdir: "LR", ranksep: 100, nodesep: 60 });
+      availableExtractions.forEach((ex) => {
+        pg.setNode(`portfolio_${ex.task_id}`, { width: NODE_W, height: NODE_H });
+      });
+      rfEdges.forEach((e) => pg.setEdge(e.source, e.target));
+      dagre.layout(pg);
+
+      const rfNodes: Node[] = availableExtractions.map((ex) => {
+        const pos = pg.node(`portfolio_${ex.task_id}`);
+        return {
+          id: `portfolio_${ex.task_id}`,
+          type: "portfolio",
+          position: {
+            x: pos ? pos.x - NODE_W / 2 : 60,
+            y: pos ? pos.y - NODE_H / 2 : 60,
+          },
+          data: {
+            label: ex.repo_name || ex.task_id,
+            systemName: ex.system_name,
+            repoUrl: ex.repo_url,
+            containersCount: ex.containers_count ?? 0,
+            componentsCount: ex.components_count ?? 0,
+            completedAt: ex.completed_at,
+            isPortfolioNode: true,
+            taskId: ex.task_id,
+          },
+        };
+      });
+
+      setNodes(rfNodes);
+      setEdges(rfEdges);
+      setTimeout(() => fitView({ padding: 0.2 }), 300);
+      return;
+    }
+
     if (!architecture) {
       return;
     }
@@ -2563,9 +2644,25 @@ const CodeArchitectureViewerInner: React.FC = () => {
     searchTerm,
     reviewOverrides,
     fitView,
+    availableExtractions,
   ]);
 
   const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
+    // Portfolio node: drill into that repo's C4
+    if (node.data?.isPortfolioNode) {
+      const taskId = node.data.taskId as string;
+      fetch(`/api/v1/code/architecture?task_id=${taskId}`)
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => {
+          if (data) {
+            applyArchitecture(data);
+            setSelectedLevel("context_level");
+          }
+        })
+        .catch(() => {});
+      return;
+    }
+
     setSelectedEdge(null);
     setEdgeDescription("");
     setSelectedNode(node.data);
@@ -2581,7 +2678,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
 
     setNodeDescription(normalizeDescription(precomputedDescription) || "");
     setIsNodeLoading(false);
-  }, []);
+  }, [applyArchitecture]);
 
   const buildArchitectureChatContext = useCallback(() => {
     const system = architecture?.system_context || {};
@@ -2807,6 +2904,15 @@ const CodeArchitectureViewerInner: React.FC = () => {
   const avgConnections =
     nodes.length > 0 ? (edges.length / nodes.length).toFixed(1) : "0";
 
+  const handleBreadcrumbNavigate = useCallback((level: string) => {
+    if (level === "portfolio_level") {
+      setArchitecture(null);
+    }
+    setSelectedLevel(level);
+  }, []);
+
+  const breadcrumbRepoName = architecture?.system_context?.name ?? null;
+
   const toggleLevel = (level: string) => {
     setSelectedLevel(level);
   };
@@ -2878,6 +2984,11 @@ const CodeArchitectureViewerInner: React.FC = () => {
           setExtractionError={setExtractionError}
           extractionStatus={extractionStatus}
           extractionError={extractionError}
+        />
+        <LevelBreadcrumb
+          selectedLevel={selectedLevel}
+          repoName={breadcrumbRepoName}
+          onNavigate={handleBreadcrumbNavigate}
         />
       </div>
 

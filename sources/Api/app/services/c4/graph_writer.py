@@ -10,8 +10,9 @@ logger = logging.getLogger(__name__)
 
 
 class GraphWriter:
-    def __init__(self, neo4j_client: Neo4jClient) -> None:
+    def __init__(self, neo4j_client: Neo4jClient, repo_ns: str = "unknown") -> None:
         self._client = neo4j_client
+        self._repo_ns = repo_ns
 
     def write(self, task_id: str, c4_data: dict[str, Any]) -> None:
         self._client.clear_extraction(task_id)
@@ -39,7 +40,7 @@ class GraphWriter:
         relationships: list[dict[str, Any]],
     ) -> None:
         sys_name = system_context.get("name", "System") or "System"
-        system_id = f"context:{sys_name}"
+        system_id = f"{self._repo_ns}:context:{sys_name}"
         self._upsert_node(
             "System",
             {
@@ -53,7 +54,7 @@ class GraphWriter:
         )
 
         for actor in system_context.get("actors") or []:
-            actor_id = f"person:{actor.get('name', 'Unknown')}"
+            actor_id = f"{self._repo_ns}:person:{actor.get('name', 'Unknown')}"
             self._upsert_node(
                 "Person",
                 {
@@ -77,7 +78,7 @@ class GraphWriter:
 
         for idx, dep in enumerate(system_context.get("external_dependencies") or []):
             dep_name = dep.get("name") or dep.get("context_name") or f"Unknown:{idx}"
-            ext_id = f"external_system:{dep_name}:{idx}"
+            ext_id = f"{self._repo_ns}:external_system:{dep_name}:{idx}"
             self._upsert_node(
                 "ExternalSystem",
                 {
@@ -106,7 +107,7 @@ class GraphWriter:
     ) -> None:
         container_id_by_name = {}
         for c in containers:
-            cid = f"container:{c.get('name', 'unknown')}"
+            cid = f"{self._repo_ns}:container:{c.get('name', 'unknown')}"
             container_id_by_name[c.get("name")] = cid
             self._upsert_node(
                 "Container",
@@ -156,10 +157,10 @@ class GraphWriter:
             if comp_type == "component_group":
                 for sub in comp.get("components") or []:
                     self._write_component(task_id, sub, comp.get("container") or "")
-                    comp_id_by_name[sub.get("name", "")] = f"component:{sub.get('name', 'unknown')}"
+                    comp_id_by_name[sub.get("name", "")] = f"{self._repo_ns}:component:{sub.get('name', 'unknown')}"
             else:
                 self._write_component(task_id, comp, comp.get("container") or "")
-                comp_id_by_name[comp.get("name", "")] = f"component:{comp.get('name', 'unknown')}"
+                comp_id_by_name[comp.get("name", "")] = f"{self._repo_ns}:component:{comp.get('name', 'unknown')}"
 
         for rel in relationships or []:
             src_name = rel.get("from")
@@ -184,8 +185,8 @@ class GraphWriter:
     def _write_component(
         self, task_id: str, comp: dict[str, Any], container_name: str
     ) -> None:
-        comp_id = f"component:{comp.get('name', 'unknown')}"
-        container_id = f"container:{container_name}" if container_name else None
+        comp_id = f"{self._repo_ns}:component:{comp.get('name', 'unknown')}"
+        container_id = f"{self._repo_ns}:container:{container_name}" if container_name else None
         self._upsert_node(
             "Component",
             {
@@ -224,7 +225,7 @@ class GraphWriter:
             evidence, list
         ), f"evidence must be a list, got {type(evidence)}"
         for idx, ev in enumerate(evidence):
-            ev_id = f"evidence:{external_system_id}:{idx}"
+            ev_id = f"{self._repo_ns}:evidence:{external_system_id}:{idx}"
             self._upsert_node(
                 "Evidence",
                 {

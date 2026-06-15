@@ -11,6 +11,7 @@ Focus on architectural boundaries, not code details.
 import json
 import logging
 import os
+import re
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
@@ -24,6 +25,16 @@ from app.domain.exceptions import GraphDatabaseError
 from utils.config import get_config
 
 logger = logging.getLogger(__name__)
+
+
+def _derive_repo_ns(url_or_path: str) -> str:
+    """Derive a stable namespace string for a repo to prefix Neo4j node IDs."""
+    if not url_or_path:
+        return "unknown"
+    m = re.match(r"https?://github\.com/([^/?#]+/[^/?#.]+)", url_or_path)
+    if m:
+        return m.group(1).rstrip("/")
+    return f"upload/{Path(url_or_path).name}" if Path(url_or_path).name else "unknown"
 
 
 @dataclass
@@ -114,7 +125,8 @@ class C4ArchitectureExtractor:
 
         # Write to Neo4j (extraction fails if Neo4j unavailable)
         try:
-            graph_writer = GraphWriter(Neo4jClient.from_config())
+            repo_ns = _derive_repo_ns(repo_url or str(self.repo_path))
+            graph_writer = GraphWriter(Neo4jClient.from_config(), repo_ns=repo_ns)
             graph_writer.write(task_id, c4_architecture)
         except GraphDatabaseError as e:
             logger.error(f"Neo4j write failed for extraction {task_id}: {e}")

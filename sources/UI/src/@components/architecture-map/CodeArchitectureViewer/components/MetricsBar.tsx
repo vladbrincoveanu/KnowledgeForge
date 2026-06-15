@@ -43,6 +43,7 @@ interface MetricsBarProps {
 }
 
 const AVAILABLE_LEVELS = [
+  { key: "portfolio_level", label: "Portfolio", color: "#f59e0b" },
   { key: "context_level", label: "Context", color: "#8b5cf6" },
   { key: "container_level", label: "Container", color: "#06b6d4" },
   { key: "component_level", label: "Component", color: "#10b981" },

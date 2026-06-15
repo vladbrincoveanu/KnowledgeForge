@@ -14,10 +14,13 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterator, Optional
 
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import create_engine, desc
+from sqlalchemy.orm import sessionmaker
 
+from app.domain.models import ExtractionRunModel
 from app.infrastructure.llm.llm_manager import LLMManager
 from app.services.code_extraction.c4_extractor import C4ArchitectureExtractor
 from app.utils.github_downloader import GitHubDownloader
@@ -47,6 +50,54 @@ scan_tasks: dict[str, dict[str, Any]] = {}
 #     "chunk_dir": Path,
 # }
 upload_sessions: dict[str, dict] = {}
+
+# PostgreSQL session for extraction run persistence
+_EXTRACTION_DB_URL = os.environ.get(
+    "DATABASE_URL",
+    f"postgresql://{os.environ.get('KF_DATABASE__USERNAME', 'knowledgeforge')}:"
+    f"{os.environ.get('KF_DATABASE__PASSWORD', 'knowledgeforge123')}@"
+    f"{os.environ.get('KF_DATABASE__HOST', 'postgres')}:"
+    f"{os.environ.get('KF_DATABASE__PORT', '5432')}/"
+    f"{os.environ.get('KF_DATABASE__NAME', 'knowledgeforge')}"
+)
+_extraction_engine = create_engine(_EXTRACTION_DB_URL, pool_pre_ping=True, pool_size=5, max_overflow=10)
+_ExtractionSession = sessionmaker(bind=_extraction_engine)
+
+
+def _derive_repo_name(task: dict) -> str:
+    """Derive a human-readable repo name from a task dict."""
+    url = task.get("github_url", "")
+    if url:
+        m = re.search(r"github\.com/([^/?#]+/[^/?#.]+)", url)
+        if m:
+            return m.group(1).rstrip("/")
+    path = task.get("repo_path", "")
+    if path:
+        return f"upload/{Path(path).name}"
+    return "unknown"
+
+
+def _persist_extraction_run(task_id: str, task: dict) -> None:
+    """Write a completed ExtractionRun record to PostgreSQL."""
+    session = _ExtractionSession()
+    try:
+        run = ExtractionRunModel(
+            id=task_id,
+            repo_url=task.get("github_url") or None,
+            repo_name=_derive_repo_name(task),
+            status=task.get("status", "completed"),
+            containers_count=task.get("containers_count", 0),
+            components_count=task.get("components_count", 0),
+            created_at=task.get("created_at"),
+            completed_at=task.get("completed_at"),
+        )
+        session.merge(run)
+        session.commit()
+    except Exception as exc:
+        session.rollback()
+        logger.warning("Failed to persist extraction run %s: %s", task_id, exc)
+    finally:
+        session.close()
 
 # Per-session asyncio locks to serialize concurrent chunk uploads
 upload_session_locks: dict[str, asyncio.Lock] = {}
@@ -1346,12 +1397,14 @@ async def run_c4_extraction(
         _save_c4_to_json(task_id, c4_architecture)
 
         logger.info(f"{task['message']} (progress: {int(task['progress'] * 100)}%)")
-        
+
         task['progress'] = 1.0
         task['status'] = 'completed'
         task['message'] = 'C4 extraction completed successfully'
         task['completed_at'] = datetime.now()
-        
+
+        _persist_extraction_run(task_id, task)
+
         logger.info(f"C4 extraction completed for task {task_id}")
 
     except Exception as e:
@@ -1460,6 +1513,58 @@ async def delete_scan_task(task_id: str):
 
 
 @router.get(
+    "/extractions",
+    summary="List all completed C4 extraction runs",
+    responses={200: {"description": "List of completed extractions ordered by most recent"}},
+)
+async def list_extractions():
+    """Return all completed extraction runs from PostgreSQL, newest first."""
+    session = _ExtractionSession()
+    try:
+        rows = (
+            session.query(ExtractionRunModel)
+            .filter(ExtractionRunModel.status == "completed")
+            .order_by(desc(ExtractionRunModel.completed_at))
+            .all()
+        )
+        api_root = Path(__file__).resolve().parents[4]
+        results = []
+        for r in rows:
+            system_name = r.repo_name
+            external_system_names: list[str] = []
+            json_path = api_root / "sources" / "data" / "c4_extractions" / f"{r.id}.json"
+            if json_path.exists():
+                try:
+                    with open(json_path, "r", encoding="utf-8") as f:
+                        c4 = json.load(f)
+                    sc = c4.get("system_context") or {}
+                    system_name = sc.get("name") or r.repo_name
+                    external_system_names = [
+                        dep.get("name") or dep.get("context_name") or ""
+                        for dep in (sc.get("external_dependencies") or [])
+                        if dep.get("name") or dep.get("context_name")
+                    ]
+                except Exception:
+                    pass
+            results.append({
+                "task_id": r.id,
+                "repo_name": r.repo_name,
+                "repo_url": r.repo_url,
+                "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+                "containers_count": r.containers_count,
+                "components_count": r.components_count,
+                "system_name": system_name,
+                "external_system_names": external_system_names,
+            })
+        return results
+    except Exception as exc:
+        logger.warning("Failed to list extraction runs: %s", exc)
+        return []
+    finally:
+        session.close()
+
+
+@router.get(
     "/architecture",
     summary="Retrieve the latest C4 architecture model",
     description=(
@@ -1485,13 +1590,22 @@ async def delete_scan_task(task_id: str):
         500: {"description": "Failed to load architecture data"},
     },
 )
-async def get_code_architecture():
+async def get_code_architecture(task_id: Optional[str] = Query(default=None)):
     """
     Get the active C4 architecture payload.
 
-    Priority: in-memory runtime extraction → latest JSON on disk → bundled demo.
+    When task_id is provided, returns that specific extraction.
+    Otherwise: in-memory runtime extraction → latest JSON on disk → bundled demo.
     """
     try:
+        if task_id:
+            api_root = Path(__file__).resolve().parents[4]
+            json_path = api_root / "sources" / "data" / "c4_extractions" / f"{task_id}.json"
+            if not json_path.exists():
+                raise HTTPException(status_code=404, detail=f"Extraction {task_id} not found")
+            with open(json_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+
         c4_data = _load_latest_runtime_c4()
         if not c4_data:
             c4_data = _load_latest_c4_from_json()
