@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from app.domain.exceptions import ExtractionError
+from app.services.c4.git_signals import collect_git_signals
 from app.services.c4.graphify_runner import run_graphify
 from app.services.c4.graphify_summarizer import summarize_graph
 from app.services.c4.graphify_llm import build_c4_prompt, build_iac_prompt, call_openrouter
@@ -103,6 +104,8 @@ class GraphifyC4Extractor:
         logger.info("Validating and mapping LLM output…")
         c4_data = _validate_and_map(raw, extraction_approach="graphify_llm")
 
+        self._stamp_git_signals(c4_data)
+
         logger.info(
             "GraphifyC4Extractor done: %d containers, %d components",
             len(c4_data["containers"]),
@@ -123,12 +126,34 @@ class GraphifyC4Extractor:
         logger.info("Validating and mapping LLM output…")
         c4_data = _validate_and_map(raw, extraction_approach="iac_llm")
 
+        self._stamp_git_signals(c4_data)
+
         logger.info(
             "IaC extraction done: %d containers, %d components",
             len(c4_data["containers"]),
             len(c4_data["components"]),
         )
         return c4_data
+
+    def _stamp_git_signals(self, c4_data: dict[str, Any]) -> None:
+        """Add activity/ownership signals from the local git history.
+
+        These fields don't change containers/components — they enrich
+        system_context with recency, cadence, and contributor data the LLM
+        cannot infer.  LLM-inferred owner is preserved; the actual top
+        contributor goes into a separate field.
+        """
+        signals = collect_git_signals(self.repo_path)
+        if not signals:
+            return
+        sc = c4_data.setdefault("system_context", {})
+        for key, value in signals.items():
+            sc[key] = value
+        logger.info(
+            "Stamped git signals: %d contributors, last commit %s",
+            signals.get("contributor_count", 0),
+            signals.get("last_commit_date", "?"),
+        )
 
 
 def _validate_and_map(raw: dict[str, Any], extraction_approach: str = "graphify_llm") -> dict[str, Any]:

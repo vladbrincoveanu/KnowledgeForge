@@ -1531,11 +1531,20 @@ async def list_extractions():
             .all()
         )
         api_root = Path(__file__).resolve().parents[4]
+        # Fields lifted directly from system_context for manager dashboards.
+        _MANAGER_FIELDS = (
+            "owner", "tier", "status", "data_class", "compliance",
+            "last_commit_date", "days_since_last_commit",
+            "commit_count_30d", "commit_count_90d",
+            "contributor_count", "top_contributor",
+            "top_contributor_share", "bus_factor",
+        )
         results = []
         for r in rows:
             system_name = r.repo_name
             external_system_names: list[str] = []
             container_names: list[str] = []
+            manager_fields: dict[str, Any] = {}
             json_path = api_root / "sources" / "data" / "c4_extractions" / f"{r.id}.json"
             if json_path.exists():
                 try:
@@ -1553,6 +1562,7 @@ async def list_extractions():
                         for c in (c4.get("containers") or [])
                         if c.get("name")
                     ]
+                    manager_fields = {k: sc.get(k) for k in _MANAGER_FIELDS if sc.get(k) is not None}
                 except Exception:
                     pass
             results.append({
@@ -1565,6 +1575,7 @@ async def list_extractions():
                 "system_name": system_name,
                 "external_system_names": external_system_names,
                 "container_names": container_names,
+                **manager_fields,
             })
 
         # Keep only the most recent run per repo (rows are already newest-first)

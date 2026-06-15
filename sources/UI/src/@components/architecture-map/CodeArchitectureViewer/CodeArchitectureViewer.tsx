@@ -2,6 +2,7 @@ import React, {
   useEffect,
   useReducer,
   useCallback,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -32,6 +33,9 @@ import GraphView from "./components/GraphView";
 import NodeDetailsPanel from "./components/NodeDetailsPanel";
 import EdgeDetailsPanel from "./components/EdgeDetailsPanel";
 import MetricsBar from "./components/MetricsBar";
+import PortfolioSummary, {
+  PortfolioSignalFilter,
+} from "./components/PortfolioSummary";
 import DataView from "./components/DataView";
 import { buildRenderedEdges } from "./edgeRendering";
 
@@ -1004,6 +1008,8 @@ const CodeArchitectureViewerInner: React.FC = () => {
   const { enrichedNodes: wsEnrichedNodes } = useEnrichmentWS(activeTaskId);
 
   const [availableExtractions, setAvailableExtractions] = useState<any[]>([]);
+  const [portfolioFilter, setPortfolioFilter] =
+    useState<PortfolioSignalFilter | null>(null);
 
   const fetchExtractions = useCallback(() => {
     fetch("/api/v1/code/extractions")
@@ -2023,6 +2029,39 @@ const CodeArchitectureViewerInner: React.FC = () => {
     [applyArchitecture],
   );
 
+  // Apply executive-summary filter (if any) to the extraction list used at
+  // portfolio level. Returns the same list when no filter is active.
+  const filteredExtractions = useMemo(() => {
+    if (!portfolioFilter) return availableExtractions;
+    const STALE_DAYS = 90;
+    const SINGLE_OWNER_SHARE = 0.8;
+    return availableExtractions.filter((e: any) => {
+      switch (portfolioFilter) {
+        case "tier1":
+          return e.tier === "Tier 1";
+        case "high_risk":
+          return e.compliance === "HIGH_RISK";
+        case "pii":
+          return e.data_class === "PII" || e.data_class === "Credit-Card";
+        case "stale":
+          return (
+            typeof e.days_since_last_commit === "number" &&
+            e.days_since_last_commit > STALE_DAYS
+          );
+        case "single_owner":
+          return (
+            e.bus_factor === 1 ||
+            (typeof e.top_contributor_share === "number" &&
+              e.top_contributor_share > SINGLE_OWNER_SHARE)
+          );
+        case "deprecated":
+          return e.status === "DEPRECATED" || e.status === "ARCHIVED";
+        default:
+          return true;
+      }
+    });
+  }, [availableExtractions, portfolioFilter]);
+
   // Process architecture data into graph format
   useEffect(() => {
     // Portfolio level: render all completed extraction runs as nodes
@@ -2057,13 +2096,17 @@ const CodeArchitectureViewerInner: React.FC = () => {
       };
 
       const rfEdges: Edge[] = [];
-      const seenEdges = new Set<string>();
-      availableExtractions.forEach((src) => {
+      // Unordered pair key so only one directed edge exists per repo pair.
+      // Prevents A→B and B→A both appearing when two repos share an external
+      // service (e.g. both reference "authentik"). Repos arrive ordered by
+      // created_at DESC, so the most-recently-updated repo wins the direction.
+      const seenPairs = new Set<string>();
+      filteredExtractions.forEach((src) => {
         const srcExternals: string[] = src.external_system_names || [];
-        availableExtractions.forEach((dst) => {
+        filteredExtractions.forEach((dst) => {
           if (src.task_id === dst.task_id) return;
-          const edgeKey = `${src.task_id}→${dst.task_id}`;
-          if (seenEdges.has(edgeKey)) return;
+          const pairKey = [src.task_id, dst.task_id].sort().join("↔");
+          if (seenPairs.has(pairKey)) return;
 
           const dstShort = (dst.repo_name || "").split("/").pop() || "";
           const dstTargets = [
@@ -2077,7 +2120,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
           );
 
           if (matched) {
-            seenEdges.add(edgeKey);
+            seenPairs.add(pairKey);
             rfEdges.push({
               id: `portfolio_edge_${src.task_id}_${dst.task_id}`,
               source: `portfolio_${src.task_id}`,
@@ -2095,13 +2138,13 @@ const CodeArchitectureViewerInner: React.FC = () => {
       const pg = new dagre.graphlib.Graph();
       pg.setDefaultEdgeLabel(() => ({}));
       pg.setGraph({ rankdir: "LR", ranksep: 100, nodesep: 60 });
-      availableExtractions.forEach((ex) => {
+      filteredExtractions.forEach((ex) => {
         pg.setNode(`portfolio_${ex.task_id}`, { width: NODE_W, height: NODE_H });
       });
       rfEdges.forEach((e) => pg.setEdge(e.source, e.target));
       dagre.layout(pg);
 
-      const rfNodes: Node[] = availableExtractions.map((ex) => {
+      const rfNodes: Node[] = filteredExtractions.map((ex) => {
         const pos = pg.node(`portfolio_${ex.task_id}`);
         return {
           id: `portfolio_${ex.task_id}`,
@@ -2119,6 +2162,15 @@ const CodeArchitectureViewerInner: React.FC = () => {
             completedAt: ex.completed_at,
             isPortfolioNode: true,
             taskId: ex.task_id,
+            tier: ex.tier,
+            status: ex.status,
+            compliance: ex.compliance,
+            dataClass: ex.data_class,
+            daysSinceLastCommit: ex.days_since_last_commit,
+            busFactor: ex.bus_factor,
+            contributorCount: ex.contributor_count,
+            topContributorShare: ex.top_contributor_share,
+            topContributor: ex.top_contributor,
           },
         };
       });
@@ -2717,6 +2769,7 @@ const CodeArchitectureViewerInner: React.FC = () => {
     reviewOverrides,
     fitView,
     availableExtractions,
+    filteredExtractions,
   ]);
 
   const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
@@ -3073,6 +3126,13 @@ const CodeArchitectureViewerInner: React.FC = () => {
           repoName={breadcrumbRepoName}
           onNavigate={handleBreadcrumbNavigate}
         />
+        {selectedLevel === "portfolio_level" && (
+          <PortfolioSummary
+            extractions={availableExtractions}
+            activeFilter={portfolioFilter}
+            onToggleFilter={setPortfolioFilter}
+          />
+        )}
       </div>
 
       <div className="viewer-layout">
