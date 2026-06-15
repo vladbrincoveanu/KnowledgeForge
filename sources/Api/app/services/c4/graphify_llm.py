@@ -90,6 +90,15 @@ COMPONENTS — entry point rules (strict):
 - Aim for 3–8 components per container. Prefer fewer, broader components over many fine-grained ones.
 - Each component must justify its inclusion by being a clear boundary or integration point.
 
+RELATIONSHIPS — evidence-only rules (strict, anti-hallucination):
+- Only add a relationship between two containers when there is at least ONE concrete signal in the graph data:
+  (a) A `cross_dir_edges` entry whose `from_dir` belongs to one container and `to_dir` belongs to another — this is a real code import or call.
+  (b) A `shell_references` entry (HTTP URL or kubectl namespace) in one container's files that names a resource clearly owned by another container.
+  (c) A `god_node` whose `file` path sits in one container and whose label matches a known entry point of another container.
+- NEVER infer a relationship from shared words in names, descriptions, or labels alone. A service that handles "X traffic" is not automatically connected to a service named "X". Descriptive adjectives are not dependency signals.
+- When the evidence is ambiguous or absent, OMIT the relationship. A missing edge is less harmful than a fabricated one.
+- Kubernetes-mediated relationships count: if `shell_references` shows service A running kubectl against a namespace that service B is known to watch, that is a real dependency.
+
 GENERAL:
 - Derive containers primarily from `deployment_units`, secondarily from top community clusters.
 - Derive components from god nodes that are entry points (controllers, workers, consumers, adapters).
@@ -99,8 +108,98 @@ GENERAL:
 """
 
 
+_IAC_PROMPT_TEMPLATE = """\
+You are a software architect. Analyze the IaC (Infrastructure-as-Code) repository \
+summary below and produce a complete C4 architecture model as a single JSON object.
+
+This is a GitOps / IaC repository — it does not contain application source code. \
+Instead it describes what services are deployed (via Helm charts, ArgoCD Applications, \
+Kustomize overlays, or Docker Compose).
+
+## IaC Repository Summary
+{iac_summary}
+
+## Required JSON output schema
+
+{{
+  "system_context": {{
+    "name": "<short system name>",
+    "purpose": "<one sentence — what the overall platform/system does>",
+    "domain": "<business domain: fintech | devtools | ecommerce | healthcare | ai | data | platform | other>",
+    "owner": "<team or person inferred from CODEOWNERS or readme>",
+    "status": "<ACTIVE | MAINTENANCE | DEPRECATED | ARCHIVED>",
+    "tier": "<Tier 1 | Tier 2 | Tier 3 | Unknown>",
+    "data_class": "<PII | Credit-Card | Internal | Public | Unknown>",
+    "compliance": "<LOW_RISK | MEDIUM_RISK | HIGH_RISK>",
+    "actors": [{{"name": "...", "description": "...", "role": "..."}}],
+    "external_dependencies": [{{"name": "...", "type": "...", "description": "..."}}],
+    "languages": [{{"language": "YAML"}}, {{"language": "Helm"}}, {{"language": "Terraform"}}],
+    "frameworks": [{{"framework": "..."}}]
+  }},
+  "containers": [
+    {{
+      "name": "<service name>",
+      "technology": "<Helm | Kustomize | Docker Compose | Terraform>",
+      "container_type": "<service | database | frontend | cache | queue | gateway | worker>",
+      "protocol": "<HTTP | gRPC | AMQP | TCP | none>",
+      "description": "<what this deployed service does>",
+      "is_infrastructure_only": <true if database/cache/queue/cert-manager/operator, else false>
+    }}
+  ],
+  "components": [
+    {{
+      "name": "<component name>",
+      "type": "component",
+      "component_type": "<http_handler | database_adapter | task_processor | event_listener | service_layer | utility | model>",
+      "container": "<must match a container name from above>",
+      "language": "<Helm | Kubernetes | Kustomize>",
+      "description": "<what this sub-resource does within the container>",
+      "endpoint_path": "",
+      "endpoint_method": ""
+    }}
+  ],
+  "relationships": {{
+    "context": [{{"source": "...", "destination": "...", "description": "..."}}],
+    "containers": [{{"from": "...", "to": "...", "protocol": "...", "description": "..."}}],
+    "components": [{{"from": "...", "to": "...", "label": "deploys | configures | routes"}}]
+  }}
+}}
+
+Rules:
+
+CONTAINERS — one per deployed service:
+- Each Helm chart project, ArgoCD Application, or Docker Compose service that represents \
+a running workload is a container.
+- Infrastructure operators (cert-manager, external-secrets-operator, grafana-operator) \
+count as containers with is_infrastructure_only=true.
+- Multiple Helm charts for the same logical service (e.g. kubeflow + kubeflow-profiles + \
+kubeflow-multitenant-pipelines) should be grouped into one container named after the service.
+- Do NOT create a container for Sealed Secrets, ConfigMaps, or RBAC-only resources; \
+treat those as components of the relevant service's container.
+
+COMPONENTS — key Kubernetes resources within each container:
+- Include Deployments, Services, Ingresses, CronJobs, Operators as components.
+- Skip RBAC (Roles, ClusterRoles, RoleBindings) unless they define a distinct security boundary.
+- Aim for 2–5 components per container.
+
+RELATIONSHIPS:
+- Use ArgoCD app dependencies and Helm chart `dependencies` fields to infer container→container relationships.
+- Common patterns: services with Ingress call each other via internal cluster DNS; \
+OAuth2 proxies sit in front of their upstream service.
+
+GENERAL:
+- Derive the system name and purpose from the README excerpt and overall set of services.
+- Derive external_dependencies from upstream Helm chart repos (bitnami, harbor, cert-manager.io, etc.).
+- Only output valid JSON — no markdown fences, no explanation, no trailing text.
+"""
+
+
 def build_c4_prompt(graph_summary: str) -> str:
     return _C4_PROMPT_TEMPLATE.format(graph_summary=graph_summary)
+
+
+def build_iac_prompt(iac_summary: str) -> str:
+    return _IAC_PROMPT_TEMPLATE.format(iac_summary=iac_summary)
 
 
 def call_openrouter(prompt: str) -> dict[str, Any]:

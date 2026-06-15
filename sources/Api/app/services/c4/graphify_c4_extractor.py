@@ -18,7 +18,8 @@ from typing import Any
 from app.domain.exceptions import ExtractionError
 from app.services.c4.graphify_runner import run_graphify
 from app.services.c4.graphify_summarizer import summarize_graph
-from app.services.c4.graphify_llm import build_c4_prompt, call_openrouter
+from app.services.c4.graphify_llm import build_c4_prompt, build_iac_prompt, call_openrouter
+from app.services.c4.iac_extractor import is_iac_repo, summarize_iac
 
 logger = logging.getLogger(__name__)
 
@@ -57,18 +58,35 @@ class GraphifyC4Extractor:
         self.repo_path = Path(repo_path).resolve()
 
     def extract(self) -> dict[str, Any]:
-        """Run the full Graphify → LLM → C4 pipeline.
+        """Run the full extraction pipeline, with IaC fallback for config-only repos.
+
+        Pipeline A (source code): Graphify AST → graph summary → OpenRouter C4
+        Pipeline B (IaC/GitOps):  IaC scan → IaC summary → OpenRouter C4
 
         Returns:
             Dict matching the GraphWriter.write() c4_data contract.
 
         Raises:
-            ExtractionError: If Graphify or the LLM call fails.
+            ExtractionError: If all extraction paths fail.
         """
         logger.info("GraphifyC4Extractor: starting for %s", self.repo_path)
 
+        # Fast-path: detect IaC-only repos before running Graphify
+        if is_iac_repo(self.repo_path):
+            logger.info("Detected IaC-only repo — using IaC extractor")
+            return self._extract_iac()
+
         logger.info("Step 1/3: Running Graphify AST extraction…")
-        graph = run_graphify(self.repo_path)
+        try:
+            graph = run_graphify(self.repo_path)
+        except ExtractionError as exc:
+            # Graphify produced no output — check if it's because the repo is IaC
+            logger.warning("Graphify failed: %s — checking for IaC fallback", exc)
+            if is_iac_repo(self.repo_path):
+                logger.info("Falling back to IaC extractor")
+                return self._extract_iac()
+            raise
+
         logger.info(
             "Step 1/3 done: %d nodes, %d edges",
             len(graph.get("nodes", [])),
@@ -83,7 +101,7 @@ class GraphifyC4Extractor:
         raw = call_openrouter(prompt)
 
         logger.info("Validating and mapping LLM output…")
-        c4_data = _validate_and_map(raw)
+        c4_data = _validate_and_map(raw, extraction_approach="graphify_llm")
 
         logger.info(
             "GraphifyC4Extractor done: %d containers, %d components",
@@ -92,8 +110,28 @@ class GraphifyC4Extractor:
         )
         return c4_data
 
+    def _extract_iac(self) -> dict[str, Any]:
+        """IaC extraction pipeline: scan repo → build summary → OpenRouter C4."""
+        logger.info("Step 1/2: Scanning IaC repo…")
+        iac_summary = summarize_iac(self.repo_path)
+        logger.info("IaC summary: %d chars", len(iac_summary))
 
-def _validate_and_map(raw: dict[str, Any]) -> dict[str, Any]:
+        logger.info("Step 2/2: Calling OpenRouter for C4 inference (IaC prompt)…")
+        prompt = build_iac_prompt(iac_summary)
+        raw = call_openrouter(prompt)
+
+        logger.info("Validating and mapping LLM output…")
+        c4_data = _validate_and_map(raw, extraction_approach="iac_llm")
+
+        logger.info(
+            "IaC extraction done: %d containers, %d components",
+            len(c4_data["containers"]),
+            len(c4_data["components"]),
+        )
+        return c4_data
+
+
+def _validate_and_map(raw: dict[str, Any], extraction_approach: str = "graphify_llm") -> dict[str, Any]:
     """Enforce enum constraints and strip unexpected keys from LLM output."""
     ctx: dict = raw.get("system_context", {})
 
@@ -181,7 +219,7 @@ def _validate_and_map(raw: dict[str, Any]) -> dict[str, Any]:
         "metadata": {
             "total_containers": len(containers),
             "total_components": len(components),
-            "extraction_approach": "graphify_llm",
+            "extraction_approach": extraction_approach,
             "runtime": {},
         },
     }

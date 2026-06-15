@@ -1005,12 +1005,20 @@ const CodeArchitectureViewerInner: React.FC = () => {
 
   const [availableExtractions, setAvailableExtractions] = useState<any[]>([]);
 
-  useEffect(() => {
+  const fetchExtractions = useCallback(() => {
     fetch("/api/v1/code/extractions")
       .then((r) => r.ok ? r.json() : [])
       .then((data) => setAvailableExtractions(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, []);
+
+  // Initial fetch on mount
+  useEffect(() => { fetchExtractions(); }, [fetchExtractions]);
+
+  // Re-fetch every time the user opens Portfolio view so new extractions appear
+  useEffect(() => {
+    if (selectedLevel === "portfolio_level") fetchExtractions();
+  }, [selectedLevel, fetchExtractions]);
 
   const pollIntervalRef = useRef<number | null>(null);
   const markdownCacheRef = useRef<Record<string, string>>({});
@@ -1396,10 +1404,8 @@ const CodeArchitectureViewerInner: React.FC = () => {
         );
       }
 
-      // If name resolution produced no edges (LLM pointed at containers instead of
-      // system/externals), fall back to auto-generating canonical C4 context edges:
-      //   each actor → system
-      //   system → each external dependency
+      // If name resolution produced no edges at all, fall back to auto-generating
+      // all canonical C4 context edges (actors → system, system → externals).
       if (contextRelationships.length === 0) {
         actorEntities.forEach((actor: any, idx: number) => {
           contextRelationships.push({
@@ -1418,6 +1424,37 @@ const CodeArchitectureViewerInner: React.FC = () => {
             relationship_type: "uses",
             attributes: { description: "" },
           });
+        });
+      } else {
+        // Partial resolution: actors or externals that weren't mentioned in any
+        // LLM relationship get a default edge so they're never left floating.
+        const connectedEntityIds = new Set(
+          contextRelationships.flatMap((r) => [
+            r.source_entity_id,
+            r.target_entity_id ?? "",
+          ]),
+        );
+        actorEntities.forEach((actor: any, idx: number) => {
+          if (!connectedEntityIds.has(actor.id)) {
+            contextRelationships.push({
+              id: `rel_actor_sys_fallback_${idx}`,
+              source_entity_id: actor.id,
+              target_entity_id: systemId,
+              relationship_type: "uses",
+              attributes: { description: "" },
+            });
+          }
+        });
+        externalEntities.forEach((ext: any, idx: number) => {
+          if (!connectedEntityIds.has(ext.id)) {
+            contextRelationships.push({
+              id: `rel_sys_ext_fallback_${idx}`,
+              source_entity_id: systemId,
+              target_entity_id: ext.id,
+              relationship_type: "uses",
+              attributes: { description: "" },
+            });
+          }
         });
       }
 
@@ -1993,19 +2030,54 @@ const CodeArchitectureViewerInner: React.FC = () => {
       const NODE_W = 280;
       const NODE_H = 160;
 
-      // Build edges first so dagre can lay out in dependency order
+      // Build edges first so dagre can lay out in dependency order.
+      // A → B when any of A's external_system_names matches:
+      //   • B's repo short name  (e.g. "monorepo")
+      //   • B's system_name      (e.g. "AI Factory Platform")
+      //   • any of B's container names (e.g. "APISIX Route Manager", "authentik")
+      // Matching is case-insensitive and uses whole-token containment so
+      // "APISIX" in src externals matches dst container "APISIX Route Manager".
+      // Generic infra terms (kubernetes, docker, …) are stripped so they don't
+      // create false edges between unrelated repos.
+      const GENERIC_INFRA_TOKENS = new Set([
+        "kubernetes", "docker", "nginx", "redis", "postgres", "postgresql",
+        "mysql", "mongodb", "kafka", "rabbitmq", "elasticsearch", "service",
+        "server", "platform", "cluster", "database", "cache", "queue",
+      ]);
+      const tokenize = (s: string) =>
+        s.toLowerCase()
+          .split(/[\s\-_./]+/)
+          .filter((t) => t.length >= 4 && !GENERIC_INFRA_TOKENS.has(t));
+
+      const matchesToken = (needle: string, haystack: string): boolean => {
+        const needleToks = tokenize(needle);
+        if (needleToks.length === 0) return false;
+        const haystackToks = new Set(tokenize(haystack));
+        return needleToks.some((t) => haystackToks.has(t));
+      };
+
       const rfEdges: Edge[] = [];
+      const seenEdges = new Set<string>();
       availableExtractions.forEach((src) => {
         const srcExternals: string[] = src.external_system_names || [];
         availableExtractions.forEach((dst) => {
           if (src.task_id === dst.task_id) return;
+          const edgeKey = `${src.task_id}→${dst.task_id}`;
+          if (seenEdges.has(edgeKey)) return;
+
           const dstShort = (dst.repo_name || "").split("/").pop() || "";
-          const dstSystem = dst.system_name || "";
-          const matched = dstShort.length >= 4 && srcExternals.some(
-            (n) => n.toLowerCase() === dstShort.toLowerCase() ||
-                   n.toLowerCase() === dstSystem.toLowerCase(),
+          const dstTargets = [
+            dstShort,
+            dst.system_name || "",
+            ...(dst.container_names || []),
+          ].filter((s) => s.length >= 3);
+
+          const matched = srcExternals.some((ext) =>
+            dstTargets.some((target) => matchesToken(ext, target)),
           );
+
           if (matched) {
+            seenEdges.add(edgeKey);
             rfEdges.push({
               id: `portfolio_edge_${src.task_id}_${dst.task_id}`,
               source: `portfolio_${src.task_id}`,
@@ -2651,10 +2723,16 @@ const CodeArchitectureViewerInner: React.FC = () => {
     // Portfolio node: drill into that repo's C4
     if (node.data?.isPortfolioNode) {
       const taskId = node.data.taskId as string;
+      const repoLabel = node.data.label as string | undefined;
       fetch(`/api/v1/code/architecture?task_id=${taskId}`)
         .then((r) => r.ok ? r.json() : null)
         .then((data) => {
           if (data) {
+            // Backfill repo_name for extractions that pre-date the metadata stamp.
+            if (repoLabel && !(data as any).metadata?.repo_name) {
+              (data as any).metadata = (data as any).metadata ?? {};
+              (data as any).metadata.repo_name = repoLabel;
+            }
             applyArchitecture(data);
             setSelectedLevel("context_level");
           }
@@ -2911,7 +2989,12 @@ const CodeArchitectureViewerInner: React.FC = () => {
     setSelectedLevel(level);
   }, []);
 
-  const breadcrumbRepoName = architecture?.system_context?.name ?? null;
+  // Prefer the repo name stamped at extraction time (e.g. "upload/developer-portal")
+  // over the LLM-inferred system name (e.g. "LLM Gateway Platform").
+  const breadcrumbRepoName =
+    (architecture as any)?.metadata?.repo_name ??
+    architecture?.system_context?.name ??
+    null;
 
   const toggleLevel = (level: string) => {
     setSelectedLevel(level);

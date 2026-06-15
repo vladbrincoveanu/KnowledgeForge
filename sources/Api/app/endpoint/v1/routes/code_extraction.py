@@ -1264,7 +1264,7 @@ async def scan_repository(
     try:
         repo_path = validate_local_repo_path(
             request.repo_path,
-            allowed_prefixes=["/tmp", "/repos", "/data", "/cms", "/app/data", "/app/sources/demo"],
+            allowed_prefixes=["/tmp", "/repos", "/data", "/cms", "/app/data", "/app/sources/demo", "/host/repos"],
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -1392,6 +1392,9 @@ async def run_c4_extraction(
         task['components_count'] = len(c4_architecture['components'])
         task['external_deps_count'] = len(c4_architecture['system_context'].get('external_dependencies', []))
         task['c4_architecture'] = c4_architecture
+
+        # Stamp the repo name so the UI can use it for navigation labels.
+        c4_architecture.setdefault("metadata", {})["repo_name"] = _derive_repo_name(task)
 
         # Save to JSON file
         _save_c4_to_json(task_id, c4_architecture)
@@ -1532,6 +1535,7 @@ async def list_extractions():
         for r in rows:
             system_name = r.repo_name
             external_system_names: list[str] = []
+            container_names: list[str] = []
             json_path = api_root / "sources" / "data" / "c4_extractions" / f"{r.id}.json"
             if json_path.exists():
                 try:
@@ -1544,6 +1548,11 @@ async def list_extractions():
                         for dep in (sc.get("external_dependencies") or [])
                         if dep.get("name") or dep.get("context_name")
                     ]
+                    container_names = [
+                        c.get("name") or ""
+                        for c in (c4.get("containers") or [])
+                        if c.get("name")
+                    ]
                 except Exception:
                     pass
             results.append({
@@ -1555,8 +1564,18 @@ async def list_extractions():
                 "components_count": r.components_count,
                 "system_name": system_name,
                 "external_system_names": external_system_names,
+                "container_names": container_names,
             })
-        return results
+
+        # Keep only the most recent run per repo (rows are already newest-first)
+        seen_repos: set[str] = set()
+        deduped = []
+        for entry in results:
+            key = entry["repo_name"] or entry["task_id"]
+            if key not in seen_repos:
+                seen_repos.add(key)
+                deduped.append(entry)
+        return deduped
     except Exception as exc:
         logger.warning("Failed to list extraction runs: %s", exc)
         return []

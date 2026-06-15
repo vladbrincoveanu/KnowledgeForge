@@ -3,7 +3,7 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   EdgeProps,
-  getBezierPath,
+  getSmoothStepPath,
 } from "reactflow";
 
 import { getC4EdgeGeometry } from "./c4EdgeGeometry";
@@ -54,14 +54,14 @@ const C4Edge = ({
     labelPlacement,
   });
 
-  const [edgePath] = getBezierPath({
+  const [edgePath] = getSmoothStepPath({
     sourceX,
     sourceY: sourceY + geometry.sourceYOffset,
     targetX,
     targetY: targetY + geometry.targetYOffset,
     sourcePosition,
     targetPosition,
-    curvature: 0.28,
+    borderRadius: 0,
   });
 
   const protocol = data?.protocol as string | undefined;
