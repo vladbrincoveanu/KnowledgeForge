@@ -20,10 +20,10 @@ const CATEGORY_CONFIG: Record<
   ContainerCategory,
   { badge: string; color: string; border: string }
 > = {
-  database: { badge: "DATABASE", color: "#1d4ed8", border: "#3b82f6" },
-  broker: { badge: "MESSAGE BROKER", color: "#b45309", border: "#f59e0b" },
-  cache: { badge: "CACHE", color: "#047857", border: "#10b981" },
-  service: { badge: "CONTAINER", color: "#334155", border: "#94a3b8" },
+  database: { badge: "DATABASE",       color: "#1d4ed8", border: "#3b82f6" },
+  broker:   { badge: "MESSAGE BROKER", color: "#b45309", border: "#f59e0b" },
+  cache:    { badge: "CACHE",          color: "#047857", border: "#10b981" },
+  service:  { badge: "CONTAINER",      color: "#334155", border: "#94a3b8" },
 };
 
 function inferCategory(containerType?: string): ContainerCategory {

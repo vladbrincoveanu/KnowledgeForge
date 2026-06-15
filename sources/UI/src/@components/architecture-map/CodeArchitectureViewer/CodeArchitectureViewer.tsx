@@ -36,6 +36,7 @@ import MetricsBar from "./components/MetricsBar";
 import PortfolioSummary, {
   PortfolioSignalFilter,
 } from "./components/PortfolioSummary";
+import RepoHealthStrip from "./components/RepoHealthStrip";
 import DataView from "./components/DataView";
 import { buildRenderedEdges } from "./edgeRendering";
 
@@ -3126,12 +3127,14 @@ const CodeArchitectureViewerInner: React.FC = () => {
           repoName={breadcrumbRepoName}
           onNavigate={handleBreadcrumbNavigate}
         />
-        {selectedLevel === "portfolio_level" && (
+        {selectedLevel === "portfolio_level" ? (
           <PortfolioSummary
             extractions={availableExtractions}
             activeFilter={portfolioFilter}
             onToggleFilter={setPortfolioFilter}
           />
+        ) : (
+          <RepoHealthStrip systemContext={architecture?.system_context} />
         )}
       </div>
 

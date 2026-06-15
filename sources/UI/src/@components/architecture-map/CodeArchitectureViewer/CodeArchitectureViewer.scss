@@ -2652,6 +2652,34 @@
   }
 }
 
+.repo-health-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 16px;
+  background: #fafafa;
+  border-top: 1px solid #f1f5f9;
+  flex-wrap: wrap;
+
+  &__dot {
+    color: #cbd5e1;
+    font-size: 14px;
+    line-height: 1;
+    user-select: none;
+  }
+
+  &__meta {
+    font-size: 12px;
+    color: #64748b;
+    strong { color: #1e293b; }
+
+    &--stale {
+      color: #92400e;
+      font-weight: 500;
+    }
+  }
+}
+
 .level-breadcrumb {
   display: flex;
   align-items: center;
